@@ -1,0 +1,11 @@
+{
+  "workspace": [
+    "./packages/shared",
+    "./packages/server",
+    "./packages/client",
+    "./packages/plugins"
+  ],
+  "compilerOptions": {
+    "strict": true
+  }
+}
