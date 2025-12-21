@@ -4,6 +4,7 @@
   "exports": {
     ".": "./types.ts",
     "./schemas": "./schemas.ts",
+    "./configSections": "./configSections.ts",
     "./async": "./async.ts",
     "./geo": "./geo.ts"
   }
