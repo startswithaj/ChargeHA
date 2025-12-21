@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "exports": {
     ".": "./types.ts",
-    "./async": "./async.ts"
+    "./async": "./async.ts",
+    "./geo": "./geo.ts"
   }
 }
