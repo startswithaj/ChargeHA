@@ -5,6 +5,7 @@
     ".": "./types.ts",
     "./schemas": "./schemas.ts",
     "./configSections": "./configSections.ts",
+    "./test-factories": "./test-factories.ts",
     "./async": "./async.ts",
     "./geo": "./geo.ts"
   }
