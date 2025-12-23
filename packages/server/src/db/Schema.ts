@@ -122,6 +122,44 @@ export const controllerLogs = sqliteTable("controller_logs", {
   index("idx_controller_logs_ts").on(table.timestamp),
 ]);
 
+// ---- Auth: Local Users ----
+
+export const authLocal = sqliteTable("auth_local", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  username: text("username").notNull(),
+  passwordHash: text("password_hash").notNull(),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
+}, (table) => [
+  uniqueIndex("idx_auth_local_username").on(table.username),
+]);
+
+// ---- Auth: OIDC Configuration ----
+
+export const authOidc = sqliteTable("auth_oidc", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  issuerUrl: text("issuer_url").notNull(),
+  clientId: text("client_id").notNull(),
+  clientSecret: text("client_secret").notNull(),
+  isEncrypted: integer("is_encrypted").notNull().default(0),
+  baseUrl: text("base_url").notNull(),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
+});
+
+// ---- Auth: Sessions ----
+
+export const sessions = sqliteTable("sessions", {
+  id: text("id").primaryKey(),
+  authType: text("auth_type").notNull(),
+  identifier: text("identifier").notNull(),
+  email: text("email"),
+  createdAt: integer("created_at").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+}, (table) => [
+  index("idx_sessions_expires_at").on(table.expiresAt),
+]);
+
 // ---- Tariff Periods ----
 
 export const tariffPeriods = sqliteTable("tariff_periods", {
