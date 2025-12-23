@@ -8,6 +8,13 @@
       "when": 1773708052011,
       "tag": "0000_dapper_jazinda",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1773886800000,
+      "tag": "0001_rename_plugin_config_keys",
+      "breakpoints": true
     }
   ]
 }
