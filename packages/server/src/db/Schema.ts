@@ -7,3 +7,131 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
+
+// ---- Energy Readings ----
+
+export const energyReadings = sqliteTable("energy_readings", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  timestamp: text("timestamp").notNull().default(sql`(datetime('now'))`),
+  solarProductionW: real("solar_production_w").notNull(),
+  gridPowerW: real("grid_power_w").notNull(),
+  homeConsumptionW: real("home_consumption_w").notNull(),
+  batteryPowerW: real("battery_power_w"),
+  batterySoc: real("battery_soc"),
+  ratePerKwh: real("rate_per_kwh"),
+}, (table) => [
+  index("idx_energy_readings_timestamp").on(table.timestamp),
+]);
+
+// ---- Config (key-value store) ----
+
+export const config = sqliteTable("config", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  isEncrypted: integer("is_encrypted").notNull().default(0),
+});
+
+// ---- Vehicle Charge Readings ----
+
+export const vehicleChargeReadings = sqliteTable("vehicle_charge_readings", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  timestamp: text("timestamp").notNull().default(sql`(datetime('now'))`),
+  vehicleId: text("vehicle_id").notNull(),
+  chargePowerW: real("charge_power_w").notNull(),
+  chargeAmps: integer("charge_amps").notNull(),
+  batteryLevel: integer("battery_level"),
+  solarContributionW: real("solar_contribution_w").notNull(),
+  gridContributionW: real("grid_contribution_w").notNull(),
+  isHome: integer("is_home").notNull().default(1),
+  ratePerKwh: real("rate_per_kwh"),
+}, (table) => [
+  index("idx_vcr_vehicle_ts").on(table.vehicleId, table.timestamp),
+  index("idx_vcr_timestamp").on(table.timestamp),
+]);
+
+// ---- Vehicle Poll Logs ----
+// Legacy name: originally populated by a background VehiclePoller. The poller
+// was replaced by on-demand fetches through the middleware layer (see
+// VehicleManager.requestState / VehicleFetchLogger). The table keeps the
+// "poll" name because renaming requires a migration.
+
+export const vehiclePollLogs = sqliteTable("vehicle_poll_logs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  timestamp: text("timestamp").notNull().default(sql`(datetime('now'))`),
+  vehicleId: text("vehicle_id").notNull(),
+  vehicleName: text("vehicle_name").notNull(),
+  isOnline: integer("is_online").notNull(),
+  isPluggedIn: integer("is_plugged_in").notNull(),
+  isCharging: integer("is_charging").notNull(),
+  batteryLevel: integer("battery_level").notNull(),
+  chargeLimit: integer("charge_limit").notNull(),
+  chargeAmps: integer("charge_amps").notNull(),
+  chargeAmpsMax: integer("charge_amps_max").notNull(),
+  chargePowerKw: real("charge_power_kw").notNull(),
+  chargerVoltage: integer("charger_voltage").notNull(),
+  energyAddedKwh: real("energy_added_kwh").notNull(),
+  minutesToFull: integer("minutes_to_full").notNull(),
+}, (table) => [
+  index("idx_vpl_vehicle_ts").on(table.vehicleId, table.timestamp),
+  index("idx_vpl_timestamp").on(table.timestamp),
+]);
+
+// ---- Vehicles ----
+
+export const vehicles = sqliteTable("vehicles", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  adapterType: text("adapter_type").notNull(),
+  priority: integer("priority").notNull().default(1),
+  config: text("config").notNull(),
+  mode: text("mode").notNull().default("auto"),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
+});
+
+// ---- Schedules ----
+
+export const schedules = sqliteTable("schedules", {
+  id: text("id").primaryKey(),
+  vehicleId: text("vehicle_id"),
+  scheduleType: text("schedule_type").notNull(),
+  startTime: text("start_time").notNull(),
+  endTime: text("end_time").notNull(),
+  daysJson: text("days_json").notNull(),
+  chargeAmps: integer("charge_amps"),
+  chargeLimitPct: integer("charge_limit_pct"),
+  enabled: integer("enabled").notNull().default(1),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
+});
+
+// ---- Controller Logs ----
+
+export const controllerLogs = sqliteTable("controller_logs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  timestamp: text("timestamp").notNull().default(sql`(datetime('now'))`),
+  vehicleId: text("vehicle_id").notNull(),
+  vehicleName: text("vehicle_name").notNull(),
+  mode: text("mode").notNull(),
+  inputsJson: text("inputs_json").notNull(),
+  checksJson: text("checks_json").notNull(),
+  action: text("action").notNull(),
+  actionDetail: text("action_detail").notNull(),
+  targetAmps: integer("target_amps"),
+}, (table) => [
+  index("idx_controller_logs_ts").on(table.timestamp),
+]);
+
+// ---- Tariff Periods ----
+
+export const tariffPeriods = sqliteTable("tariff_periods", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  label: text("label").notNull(),
+  startTime: text("start_time").notNull(),
+  endTime: text("end_time").notNull(),
+  days: text("days").notNull(),
+  ratePerKwh: real("rate_per_kwh").notNull(),
+  enabled: integer("enabled").notNull().default(1),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
+});
