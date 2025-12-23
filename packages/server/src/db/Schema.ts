@@ -122,6 +122,21 @@ export const controllerLogs = sqliteTable("controller_logs", {
   index("idx_controller_logs_ts").on(table.timestamp),
 ]);
 
+// ---- Plugin Logs ----
+
+export const pluginLogs = sqliteTable("plugin_logs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  timestamp: text("timestamp").notNull().default(sql`(datetime('now'))`),
+  pluginId: text("plugin_id").notNull(),
+  level: text("level").notNull(),
+  message: text("message").notNull(),
+  payload: text("payload"),
+  origin: text("origin"),
+}, (table) => [
+  index("idx_plugin_logs_plugin_ts").on(table.pluginId, table.timestamp),
+  index("idx_plugin_logs_ts").on(table.timestamp),
+]);
+
 // ---- Auth: Local Users ----
 
 export const authLocal = sqliteTable("auth_local", {
