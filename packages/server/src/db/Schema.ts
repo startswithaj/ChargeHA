@@ -121,8 +121,10 @@ export const controllerLogs = sqliteTable("controller_logs", {
   action: text("action").notNull(),
   actionDetail: text("action_detail").notNull(),
   targetAmps: integer("target_amps"),
+  traceId: text("trace_id"),
 }, (table) => [
   index("idx_controller_logs_ts").on(table.timestamp),
+  index("idx_controller_logs_trace").on(table.traceId),
 ]);
 
 // ---- Plugin Logs ----
@@ -135,9 +137,11 @@ export const pluginLogs = sqliteTable("plugin_logs", {
   message: text("message").notNull(),
   payload: text("payload"),
   origin: text("origin"),
+  traceId: text("trace_id"),
 }, (table) => [
   index("idx_plugin_logs_plugin_ts").on(table.pluginId, table.timestamp),
   index("idx_plugin_logs_ts").on(table.timestamp),
+  index("idx_plugin_logs_trace").on(table.traceId),
 ]);
 
 // ---- Auth: Local Users ----
