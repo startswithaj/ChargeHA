@@ -1,0 +1,1 @@
+ALTER TABLE `energy_readings` ADD `poll_failed` integer DEFAULT 0 NOT NULL;

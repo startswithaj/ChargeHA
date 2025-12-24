@@ -29,6 +29,13 @@
       "when": 1774004400000,
       "tag": "0003_plugin_logs",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1776573209294,
+      "tag": "0004_oval_shadow_king",
+      "breakpoints": true
     }
   ]
 }

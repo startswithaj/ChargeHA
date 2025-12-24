@@ -19,6 +19,9 @@ export const energyReadings = sqliteTable("energy_readings", {
   batteryPowerW: real("battery_power_w"),
   batterySoc: real("battery_soc"),
   ratePerKwh: real("rate_per_kwh"),
+  // 1 when the energy adapter poll threw — EnergyPoller writes a zero-valued row
+  // as a breadcrumb. Aggregation queries exclude these so failures do not skew totals.
+  pollFailed: integer("poll_failed").notNull().default(0),
 }, (table) => [
   index("idx_energy_readings_timestamp").on(table.timestamp),
 ]);
