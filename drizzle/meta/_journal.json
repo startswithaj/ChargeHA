@@ -43,6 +43,13 @@
       "when": 1776939368607,
       "tag": "0005_daily_richard_fisk",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1777672530975,
+      "tag": "0006_lonely_leech",
+      "breakpoints": true
     }
   ]
 }

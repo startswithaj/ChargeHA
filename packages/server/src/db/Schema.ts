@@ -74,6 +74,7 @@ export const vehiclePollLogs = sqliteTable("vehicle_poll_logs", {
   chargerVoltage: integer("charger_voltage").notNull(),
   energyAddedKwh: real("energy_added_kwh").notNull(),
   minutesToFull: integer("minutes_to_full").notNull(),
+  isHome: integer("is_home").notNull().default(0),
 }, (table) => [
   index("idx_vpl_vehicle_ts").on(table.vehicleId, table.timestamp),
   index("idx_vpl_timestamp").on(table.timestamp),
