@@ -2,6 +2,7 @@
   "name": "@chargeha/server",
   "version": "0.0.1",
   "exports": {
-    "./db/types": "./src/db/types.ts"
+    "./db/types": "./src/db/types.ts",
+    "./db/Serialization": "./src/db/Serialization.ts"
   }
 }
