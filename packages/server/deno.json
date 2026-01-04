@@ -2,6 +2,7 @@
   "name": "@chargeha/server",
   "version": "0.0.1",
   "exports": {
+    "./db": "./src/db/AppDatabase.ts",
     "./db/types": "./src/db/types.ts",
     "./db/Serialization": "./src/db/Serialization.ts",
     "./lib/Logger": "./src/lib/Logger.ts",
