@@ -7,5 +7,24 @@
   ],
   "compilerOptions": {
     "strict": true
+  },
+  "lint": {
+    "plugins": [
+      "./devtools/lint-plugins/function-length.ts",
+      "./devtools/lint-plugins/expression-complexity.ts",
+      "./devtools/lint-plugins/no-swallowed-catch.ts",
+      "./devtools/lint-plugins/no-select-side-effects.ts",
+      "./devtools/lint-plugins/no-param-mutation.ts",
+      "./devtools/lint-plugins/no-imperative-loops.ts",
+      "./devtools/lint-plugins/no-let.ts",
+      "./devtools/lint-plugins/no-foreach-mutation.ts",
+      "./devtools/lint-plugins/no-plugin-refs.ts",
+      "./devtools/lint-plugins/no-test-globals.ts",
+      "./devtools/lint-plugins/test-file-length.ts"
+    ],
+    "rules": {
+      "tags": ["recommended"],
+      "include": ["no-non-null-assertion"]
+    }
   }
 }
