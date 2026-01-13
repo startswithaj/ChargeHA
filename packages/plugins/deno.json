@@ -1,5 +1,7 @@
 {
   "name": "@chargeha/plugins",
   "version": "0.0.1",
-  "exports": {}
+  "exports": {
+    "./types": "./types.ts"
+  }
 }
