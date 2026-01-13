@@ -2,6 +2,7 @@
   "name": "@chargeha/plugins",
   "version": "0.0.1",
   "exports": {
-    "./types": "./types.ts"
+    "./types": "./types.ts",
+    "./PluginDbLogger": "./PluginDbLogger.ts"
   }
 }
