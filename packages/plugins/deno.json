@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "exports": {
     "./types": "./types.ts",
-    "./PluginDbLogger": "./PluginDbLogger.ts"
+    "./PluginDbLogger": "./PluginDbLogger.ts",
+    "./componentRegistry": "./componentRegistry.ts"
   }
 }
