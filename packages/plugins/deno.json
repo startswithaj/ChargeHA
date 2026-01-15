@@ -4,6 +4,7 @@
   "exports": {
     "./types": "./types.ts",
     "./PluginDbLogger": "./PluginDbLogger.ts",
+    "./registerPlugins": "./registerPlugins.ts",
     "./componentRegistry": "./componentRegistry.ts"
   }
 }
