@@ -7,6 +7,7 @@
     "./db/Serialization": "./src/db/Serialization.ts",
     "./lib/Logger": "./src/lib/Logger.ts",
     "./lib/Encryption": "./src/lib/Encryption.ts",
-    "./bootstrap/PluginDependencies": "./src/bootstrap/PluginDependencies.ts"
+    "./bootstrap/PluginDependencies": "./src/bootstrap/PluginDependencies.ts",
+    "./bootstrap/EnergyPluginRegistry": "./src/bootstrap/EnergyPluginRegistry.ts"
   }
 }
