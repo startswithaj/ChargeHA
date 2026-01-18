@@ -1,5 +1,7 @@
 import type { AnyRouter } from "@trpc/server";
 import { mergeRouters, router } from "./trpc.ts";
+import { configRouter } from "./routers/config.ts";
+import { healthRouter } from "./routers/health.ts";
 /** Plugin router records collected from registries at startup. */
 export interface PluginRouters<
   TVehicle extends Record<string, AnyRouter> = Record<string, AnyRouter>,
@@ -15,6 +17,8 @@ export function createAppRouter<
   TEnergy extends Record<string, AnyRouter>,
 >(pluginRouters: PluginRouters<TVehicle, TEnergy>) {
   return router({
+    config: configRouter,
+    health: healthRouter,
   });
 }
 
