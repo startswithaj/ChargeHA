@@ -2,9 +2,30 @@ import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 
+import { EnergyAdapterManager } from "../services/EnergyAdapterManager.ts";
+import { EnergyPoller } from "../services/EnergyPoller.ts";
+import { DataRecorder } from "../services/DataRecorder.ts";
 import { createAppRouter } from "../trpc/root.ts";
 import type { TrpcContext } from "../trpc/trpc.ts";
 
+  new DataRecorder(
+    db,
+    vehicleManager,
+    tariffService,
+    eventEmitter,
+    new Logger("DataRecorder", logLevel),
+  );
+  const poller = new EnergyPoller(
+    energyManager,
+    eventEmitter,
+    db,
+    new Logger("EnergyPoller", logLevel),
+  );
+  const energyManager = new EnergyAdapterManager(
+    db,
+    energyRegistry,
+    new Logger("EnergyAdapter", logLevel),
+  );
 function buildHttpApp(
 ) {
   const appRouter = createAppRouter({
