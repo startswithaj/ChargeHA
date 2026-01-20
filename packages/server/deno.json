@@ -2,14 +2,24 @@
   "name": "@chargeha/server",
   "version": "0.0.1",
   "exports": {
+    ".": "./src/main.ts",
     "./db": "./src/db/AppDatabase.ts",
     "./db/types": "./src/db/types.ts",
     "./db/Serialization": "./src/db/Serialization.ts",
     "./lib/Logger": "./src/lib/Logger.ts",
     "./lib/Encryption": "./src/lib/Encryption.ts",
+    "./services/VehicleManager": "./src/services/VehicleManager.ts",
     "./services/EnergyAdapterManager": "./src/services/EnergyAdapterManager.ts",
     "./bootstrap/PluginDependencies": "./src/bootstrap/PluginDependencies.ts",
     "./bootstrap/VehiclePluginRegistry": "./src/bootstrap/VehiclePluginRegistry.ts",
     "./bootstrap/EnergyPluginRegistry": "./src/bootstrap/EnergyPluginRegistry.ts"
+  },
+  "imports": {
+    "hono": "jsr:@hono/hono@^4",
+    "hono/deno": "jsr:@hono/hono@^4/deno",
+    "@std/dotenv": "jsr:@std/dotenv@^0.225",
+    "@trpc/server": "npm:@trpc/server@^11"
+  },
+  "tasks": {
   }
 }
