@@ -2,8 +2,11 @@ import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 
+import { VehicleFetchLogger } from "../services/VehicleFetchLogger.ts";
+import { VehicleManager } from "../services/VehicleManager.ts";
 import { EnergyAdapterManager } from "../services/EnergyAdapterManager.ts";
 import { EnergyPoller } from "../services/EnergyPoller.ts";
+import { VehicleService } from "../services/VehicleService.ts";
 import { DataRecorder } from "../services/DataRecorder.ts";
 import { createAppRouter } from "../trpc/root.ts";
 import type { TrpcContext } from "../trpc/trpc.ts";
@@ -21,10 +24,24 @@ import type { TrpcContext } from "../trpc/trpc.ts";
     db,
     new Logger("EnergyPoller", logLevel),
   );
+  new VehicleFetchLogger(db, eventEmitter, new Logger("FetchLog", logLevel));
+  const vehicleManager = new VehicleManager(
+    db,
+    eventEmitter,
+    new Logger("VehicleManager", logLevel),
+    vehicleRegistry,
+  );
   const energyManager = new EnergyAdapterManager(
     db,
     energyRegistry,
     new Logger("EnergyAdapter", logLevel),
+  );
+  const vehicleService = new VehicleService(
+    db,
+    vehicleManager,
+    vehicleRegistry,
+    eventEmitter,
+    new Logger("VehicleService", logLevel),
   );
 function buildHttpApp(
 ) {
