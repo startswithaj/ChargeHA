@@ -8,6 +8,7 @@
     "./test-factories": "./test-factories.ts",
     "./database-driver": "./database-driver.ts",
     "./wasm-database": "./wasm-database.ts",
+    "./engine": "./engine/mod.ts",
     "./async": "./async.ts",
     "./geo": "./geo.ts"
   }
