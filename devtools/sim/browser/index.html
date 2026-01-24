@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>ChargeHA Solar Simulator</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://sql.js.org/dist/sql-wasm.js"></script>
+    <script>
+      // Polyfill Node builtins that better-sqlite3's CJS code references at import time
+      if (!window.process) window.process = { env: {} };
+      if (!window.util) window.util = { promisify: (fn) => fn };
+    </script>
+    <style>
+      body {
+        font-family: system-ui;
+        margin: 40px;
+        background: #fafafa;
+      }
+      h1 {
+        font-size: 1.4rem;
+        color: #333;
+      }
+      canvas {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        margin-top: 16px;
+      }
+      .controls {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin: 16px 0;
+        align-items: end;
+      }
+      .control {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .control label {
+        font-size: 12px;
+        color: #666;
+        font-weight: 500;
+      }
+      .control input, .control select {
+        padding: 6px 10px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 14px;
+      }
+      .control input[type="number"] {
+        width: 80px;
+      }
+      button {
+        padding: 8px 20px;
+        background: #6366f1;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #4f46e5;
+      }
+      button:disabled {
+        background: #aaa;
+        cursor: wait;
+      }
+      .stats {
+        display: flex;
+        gap: 16px;
+        margin: 12px 0;
+        font-size: 14px;
+        color: #555;
+        flex-wrap: wrap;
+      }
+      .stat {
+        background: white;
+        padding: 6px 14px;
+        border-radius: 6px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+      }
+      .stat b {
+        color: #111;
+      }
+      #status {
+        font-size: 13px;
+        color: #888;
+        margin-left: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>ChargeHA Solar Charge Simulator</h1>
+
+    <div class="controls">
+      <div class="control">
+        <label>Seed</label>
+        <input type="number" id="seed" value="42">
+      </div>
+      <div class="control">
+        <label>Vehicles</label>
+        <select id="vehicles">
+          <option value="1">1</option>
+          <option value="2" selected>2</option>
+        </select>
+      </div>
+      <div class="control">
+        <label>Allocation</label>
+        <select id="allocation">
+          <option value="equal" selected>Equal</option>
+          <option value="waterfall">Waterfall (priority)</option>
+        </select>
+      </div>
+      <div class="control">
+        <label>Min Generation (kW)</label>
+        <input type="number" id="minGen" value="1" step="0.1" min="0">
+      </div>
+      <div class="control">
+        <label>Grace (min)</label>
+        <input type="number" id="grace" value="6" step="1" min="0">
+      </div>
+      <div class="control">
+        <label>Cooldown (min)</label>
+        <input type="number" id="cooldown" value="15" step="1" min="0">
+      </div>
+      <div class="control">
+        <label>Peak Solar (kW)</label>
+        <input type="number" id="peakSolar" value="8" step="1" min="1">
+      </div>
+      <div class="control">
+        <label>Min Excess Solar (kW)</label>
+        <input
+          type="number"
+          id="minExcess"
+          value=""
+          step="0.1"
+          min="0"
+          placeholder="Disabled"
+        >
+      </div>
+      <div class="control">
+        <label>Cloudiness %</label>
+        <input
+          type="number"
+          id="cloudiness"
+          value="30"
+          step="any"
+          min="0"
+          max="100"
+        >
+      </div>
+      <div class="control">
+        <label>Storm Events</label>
+        <input type="number" id="storms" value="0" step="1" min="0" max="5">
+      </div>
+      <div class="control">
+        <label>Home Load (W)</label>
+        <input type="number" id="homeLoad" value="1500" step="100" min="0">
+      </div>
+      <div class="control">
+        <label>Sunrise</label>
+        <input
+          type="number"
+          id="sunrise"
+          value="6.5"
+          step="0.5"
+          min="4"
+          max="9"
+        >
+      </div>
+      <div class="control">
+        <label>Sunset</label>
+        <input
+          type="number"
+          id="sunset"
+          value="18"
+          step="0.5"
+          min="15"
+          max="21"
+        >
+      </div>
+      <div class="control">
+        <label>EV 1 Start %</label>
+        <input
+          type="number"
+          id="ev1Start"
+          value="40"
+          step="5"
+          min="0"
+          max="100"
+        >
+      </div>
+      <div class="control">
+        <label>EV 1 Battery (kWh)</label>
+        <input
+          type="number"
+          id="ev1Capacity"
+          value="75"
+          step="5"
+          min="10"
+          max="200"
+        >
+      </div>
+      <div class="control">
+        <label>EV 2 Start %</label>
+        <input
+          type="number"
+          id="ev2Start"
+          value="60"
+          step="5"
+          min="0"
+          max="100"
+        >
+      </div>
+      <div class="control">
+        <label>EV 2 Battery (kWh)</label>
+        <input
+          type="number"
+          id="ev2Capacity"
+          value="75"
+          step="5"
+          min="10"
+          max="200"
+        >
+      </div>
+      <div class="control">
+        <label>Debounce Threshold (A)</label>
+        <input
+          type="number"
+          id="ampDebounceThreshold"
+          value="2"
+          step="1"
+          min="1"
+          max="5"
+        >
+      </div>
+      <div class="control">
+        <label>Debounce Settle (min)</label>
+        <input
+          type="number"
+          id="ampDebounceSettleMinutes"
+          value="3"
+          step="1"
+          min="1"
+          max="10"
+        >
+      </div>
+      <button id="run" onclick="runSim()">Run Simulation</button>
+      <button
+        onclick="document.getElementById('seed').value = Math.floor(Math.random()*10000); runSim()"
+      >
+        Random Seed
+      </button>
+      <span id="status"></span>
+    </div>
+    <div id="simNote" style="font-size: 12px; color: #888; margin-bottom: 12px">
+    </div>
+
+    <div id="statsContainer" class="stats" style="display: none"></div>
+    <canvas id="chart" width="1400" height="500" style="display: none"></canvas>
+    <canvas
+      id="batteryChart"
+      width="1400"
+      height="200"
+      style="display: none"
+    ></canvas>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
