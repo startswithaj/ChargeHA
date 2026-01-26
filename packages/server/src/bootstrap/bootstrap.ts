@@ -8,6 +8,7 @@ import { EnergyAdapterManager } from "../services/EnergyAdapterManager.ts";
 import { EnergyPoller } from "../services/EnergyPoller.ts";
 import { VehicleService } from "../services/VehicleService.ts";
 import { DataRecorder } from "../services/DataRecorder.ts";
+import { ChargeController } from "../services/ChargeController.ts";
 import { createAppRouter } from "../trpc/root.ts";
 import type { TrpcContext } from "../trpc/trpc.ts";
 
@@ -42,6 +43,14 @@ import type { TrpcContext } from "../trpc/trpc.ts";
     vehicleRegistry,
     eventEmitter,
     new Logger("VehicleService", logLevel),
+  );
+  new ChargeController(
+    vehicleManager,
+    poller,
+    db,
+    configService,
+    eventEmitter,
+    new Logger("ChargeController", logLevel),
   );
 function buildHttpApp(
 ) {
