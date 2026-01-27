@@ -7,11 +7,16 @@ import { VehicleManager } from "../services/VehicleManager.ts";
 import { EnergyAdapterManager } from "../services/EnergyAdapterManager.ts";
 import { EnergyPoller } from "../services/EnergyPoller.ts";
 import { VehicleService } from "../services/VehicleService.ts";
+import { ScheduleService } from "../services/ScheduleService.ts";
 import { DataRecorder } from "../services/DataRecorder.ts";
 import { ChargeController } from "../services/ChargeController.ts";
 import { createAppRouter } from "../trpc/root.ts";
 import type { TrpcContext } from "../trpc/trpc.ts";
 
+  const scheduleService = new ScheduleService(
+    db,
+    new Logger("ScheduleService", logLevel),
+  );
   new DataRecorder(
     db,
     vehicleManager,
