@@ -1,6 +1,7 @@
 import type { AnyRouter } from "@trpc/server";
 import { mergeRouters, router } from "./trpc.ts";
 import { energyRouter } from "./routers/energy.ts";
+import { statsRouter } from "./routers/stats.ts";
 import { vehiclesRouter } from "./routers/vehicles.ts";
 import { configRouter } from "./routers/config.ts";
 import { healthRouter } from "./routers/health.ts";
@@ -27,6 +28,7 @@ export function createAppRouter<
 
   return router({
     energy: combinedEnergyRouter,
+    stats: statsRouter,
     vehicle: vehiclesRouter,
     config: configRouter,
     health: healthRouter,
