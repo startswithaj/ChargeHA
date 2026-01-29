@@ -5,6 +5,7 @@ import { statsRouter } from "./routers/stats.ts";
 import { vehiclesRouter } from "./routers/vehicles.ts";
 import { configRouter } from "./routers/config.ts";
 import { healthRouter } from "./routers/health.ts";
+import { tariffsRouter } from "./routers/tariffs.ts";
 import { schedulesRouter } from "./routers/schedules.ts";
 /** Plugin router records collected from registries at startup. */
 export interface PluginRouters<
@@ -32,6 +33,7 @@ export function createAppRouter<
     vehicle: vehiclesRouter,
     config: configRouter,
     health: healthRouter,
+    tariff: tariffsRouter,
     schedule: schedulesRouter,
   });
 }
