@@ -15,6 +15,7 @@ import { ScheduleService } from "../services/ScheduleService.ts";
 import { DataRecorder } from "../services/DataRecorder.ts";
 import { NotificationListener } from "../services/NotificationListener.ts";
 import { ChargeController } from "../services/ChargeController.ts";
+import { Overseer } from "../services/Overseer.ts";
 import { createAppRouter } from "../trpc/root.ts";
 import type { TrpcContext } from "../trpc/trpc.ts";
 
@@ -96,6 +97,7 @@ function registerNotificationListeners(
     eventEmitter,
     new Logger("ChargeController", logLevel),
   );
+  new Overseer(db, eventEmitter, new Logger("Overseer", logLevel));
 function buildHttpApp(
 ) {
   const appRouter = createAppRouter({
