@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 
+import { NotificationService } from "../services/NotificationService.ts";
+import { TelegramProvider } from "../services/notification-providers/TelegramProvider.ts";
 import { VehicleFetchLogger } from "../services/VehicleFetchLogger.ts";
 import { VehicleManager } from "../services/VehicleManager.ts";
 import { EnergyAdapterManager } from "../services/EnergyAdapterManager.ts";
@@ -11,6 +13,7 @@ import { TariffService } from "../services/TariffService.ts";
 import { StatsService } from "../services/StatsService.ts";
 import { ScheduleService } from "../services/ScheduleService.ts";
 import { DataRecorder } from "../services/DataRecorder.ts";
+import { NotificationListener } from "../services/NotificationListener.ts";
 import { ChargeController } from "../services/ChargeController.ts";
 import { createAppRouter } from "../trpc/root.ts";
 import type { TrpcContext } from "../trpc/trpc.ts";
@@ -37,6 +40,28 @@ import type { TrpcContext } from "../trpc/trpc.ts";
     db,
     new Logger("EnergyPoller", logLevel),
   );
+function registerNotificationListeners(
+  { eventEmitter, notificationService, db, scheduleService, logLevel }: {
+    eventEmitter: TypedEventEmitter;
+    notificationService: NotificationService;
+    db: AppDatabase;
+    scheduleService: ScheduleService;
+    logLevel: "debug" | "info" | "warn" | "error";
+  },
+) {
+  new NotificationListener(
+    eventEmitter,
+    notificationService,
+    db,
+    scheduleService,
+    new Logger("Notifications", logLevel),
+  );
+}
+  const notificationService = new NotificationService(
+    db,
+    [new TelegramProvider(db)],
+    new Logger("Notifications", logLevel),
+  );
   new VehicleFetchLogger(db, eventEmitter, new Logger("FetchLog", logLevel));
   const vehicleManager = new VehicleManager(
     db,
@@ -56,6 +81,13 @@ import type { TrpcContext } from "../trpc/trpc.ts";
     eventEmitter,
     new Logger("VehicleService", logLevel),
   );
+  registerNotificationListeners({
+    eventEmitter,
+    notificationService,
+    db,
+    scheduleService,
+    logLevel,
+  });
   new ChargeController(
     vehicleManager,
     poller,
