@@ -8,6 +8,7 @@ import { healthRouter } from "./routers/health.ts";
 import { tariffsRouter } from "./routers/tariffs.ts";
 import { schedulesRouter } from "./routers/schedules.ts";
 import { notificationsRouter } from "./routers/notifications.ts";
+import { authRouter } from "./routers/auth.ts";
 /** Plugin router records collected from registries at startup. */
 export interface PluginRouters<
   TVehicle extends Record<string, AnyRouter> = Record<string, AnyRouter>,
@@ -29,6 +30,7 @@ export function createAppRouter<
   );
 
   return router({
+    auth: authRouter,
     energy: combinedEnergyRouter,
     stats: statsRouter,
     vehicle: vehiclesRouter,
