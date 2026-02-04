@@ -11,11 +11,20 @@ import { EnergyPoller } from "../services/EnergyPoller.ts";
 import { VehicleService } from "../services/VehicleService.ts";
 import { TariffService } from "../services/TariffService.ts";
 import { StatsService } from "../services/StatsService.ts";
+import { OidcService } from "../services/OidcService.ts";
+import { RateLimiter } from "../middleware/rateLimit.ts";
+import { AuthService } from "../services/AuthService.ts";
 import { ScheduleService } from "../services/ScheduleService.ts";
 import { DataRecorder } from "../services/DataRecorder.ts";
 import { NotificationListener } from "../services/NotificationListener.ts";
 import { ChargeController } from "../services/ChargeController.ts";
 import { Overseer } from "../services/Overseer.ts";
+import {
+  createAuthMiddleware,
+  hstsMiddleware,
+  isHttps,
+} from "../middleware/auth.ts";
+import { createOidcRoutes } from "../routes/oidcAuth.ts";
 import { createAppRouter } from "../trpc/root.ts";
 import type { TrpcContext } from "../trpc/trpc.ts";
 
@@ -24,6 +33,20 @@ import type { TrpcContext } from "../trpc/trpc.ts";
     new Logger("TariffService", logLevel),
   );
   const statsService = new StatsService(db);
+  const oidcService = new OidcService(
+    db,
+    encryptionKey,
+    new Logger("OIDC", logLevel),
+  );
+  const rateLimiter = new RateLimiter();
+  const authService = new AuthService(
+    db,
+    encryptionKey,
+    new Logger("Auth", logLevel),
+    oidcService,
+    configService,
+    rateLimiter,
+  );
   const scheduleService = new ScheduleService(
     db,
     new Logger("ScheduleService", logLevel),
@@ -104,6 +127,23 @@ function buildHttpApp(
   });
   const app = new Hono();
   app.use(secureHeaders({ strictTransportSecurity: false }));
+  app.use(hstsMiddleware());
+  const authLogger = new Logger("Auth", logLevel);
+  app.use(
+    createAuthMiddleware({
+      authService: services.authService,
+      configService: services.configService,
+      logger: authLogger,
+    }),
+  );
+  app.route(
+    "/auth/oidc",
+    createOidcRoutes({
+      authService: services.authService,
+      oidcService: services.oidcService,
+      logger: authLogger,
+    }),
+  );
   setupTrpcEndpoint(app, appRouter, {
   });
   return app;
