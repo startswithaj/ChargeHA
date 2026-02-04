@@ -1,0 +1,32 @@
+# Dex OIDC provider config for local development/testing.
+# Docs: https://dexidp.io/docs/
+
+issuer: http://localhost:5556/dex
+
+storage:
+  type: memory
+
+web:
+  http: 0.0.0.0:5556
+
+oauth2:
+  # Allow PKCE without a client secret (public client)
+  responseTypes: ["code"]
+
+staticClients:
+  - id: chargeha-dev
+    name: ChargeHA (Dev)
+    secret: chargeha-dev-secret
+    redirectURIs:
+      - http://localhost:8000/auth/oidc/callback
+      - http://localhost:5175/auth/oidc/callback
+
+# Enable the password grant connector with a static user
+enablePasswordDB: true
+
+staticPasswords:
+  - email: test@chargeha.local
+    # bcrypt hash of "password"
+    hash: "$2a$10$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W"
+    username: testuser
+    userID: "1234-5678-abcd-efgh"

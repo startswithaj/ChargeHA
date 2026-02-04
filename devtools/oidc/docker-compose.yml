@@ -1,0 +1,10 @@
+# Local OIDC provider (Dex) for testing SSO authentication.
+# Usage: docker compose -f devtools/oidc/docker-compose.yml up
+services:
+  dex:
+    image: dexidp/dex:latest
+    command: ["dex", "serve", "/etc/dex/config.yml"]
+    ports:
+      - "5556:5556"
+    volumes:
+      - ./dex-config.yml:/etc/dex/config.yml:ro
