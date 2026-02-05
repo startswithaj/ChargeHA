@@ -8,6 +8,7 @@ import { healthRouter } from "./routers/health.ts";
 import { tariffsRouter } from "./routers/tariffs.ts";
 import { schedulesRouter } from "./routers/schedules.ts";
 import { notificationsRouter } from "./routers/notifications.ts";
+import { wizardRouter } from "./routers/wizard.ts";
 import { authRouter } from "./routers/auth.ts";
 /** Plugin router records collected from registries at startup. */
 export interface PluginRouters<
@@ -39,6 +40,7 @@ export function createAppRouter<
     tariff: tariffsRouter,
     schedule: schedulesRouter,
     notification: notificationsRouter,
+    wizard: wizardRouter,
   });
 }
 
