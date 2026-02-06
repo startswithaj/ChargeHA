@@ -15,6 +15,7 @@ import { OidcService } from "../services/OidcService.ts";
 import { RateLimiter } from "../middleware/rateLimit.ts";
 import { AuthService } from "../services/AuthService.ts";
 import { ScheduleService } from "../services/ScheduleService.ts";
+import { TunnelManager } from "../services/TunnelManager.ts";
 import { WizardService } from "../services/WizardService.ts";
 import { DataRecorder } from "../services/DataRecorder.ts";
 import { NotificationListener } from "../services/NotificationListener.ts";
@@ -51,6 +52,12 @@ import type { TrpcContext } from "../trpc/trpc.ts";
   const scheduleService = new ScheduleService(
     db,
     new Logger("ScheduleService", logLevel),
+  );
+  const tunnelManager = new TunnelManager(
+    new Logger("Tunnel", logLevel),
+    port,
+    4040,
+    Deno.env.get("CLOUDFLARED_PATH") ?? "cloudflared",
   );
   const wizardService = new WizardService(
     db,
