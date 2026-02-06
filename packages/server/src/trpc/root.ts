@@ -8,6 +8,7 @@ import { configRouter } from "./routers/config.ts";
 import { healthRouter } from "./routers/health.ts";
 import { tariffsRouter } from "./routers/tariffs.ts";
 import { schedulesRouter } from "./routers/schedules.ts";
+import { logsRouter } from "./routers/logs.ts";
 import { notificationsRouter } from "./routers/notifications.ts";
 import { wizardRouter } from "./routers/wizard.ts";
 import { authRouter } from "./routers/auth.ts";
@@ -41,8 +42,10 @@ export function createAppRouter<
     health: healthRouter,
     tariff: tariffsRouter,
     schedule: schedulesRouter,
+    log: logsRouter,
     notification: notificationsRouter,
     wizard: wizardRouter,
+    ...pluginRouters.vehicle,
   });
 }
 
