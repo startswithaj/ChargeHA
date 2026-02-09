@@ -5,6 +5,7 @@
     "./types": "./types.ts",
     "./PluginDbLogger": "./PluginDbLogger.ts",
     "./registerPlugins": "./registerPlugins.ts",
+    "./energy/fronius-local/server/config": "./energy/fronius-local/server/config.ts",
     "./componentRegistry": "./componentRegistry.ts"
   }
 }
