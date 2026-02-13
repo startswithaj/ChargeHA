@@ -16,6 +16,8 @@
     "./energy/fronius-cloud/server/FroniusCloudAdapter": "./energy/fronius-cloud/server/FroniusCloudAdapter.ts",
     "./energy/fronius-cloud/server/router": "./energy/fronius-cloud/server/router.ts",
     "./energy/fronius-cloud/server/config": "./energy/fronius-cloud/server/config.ts",
+    "./energy/fronius-cloud/client/FroniusCloudConfig": "./energy/fronius-cloud/client/FroniusCloudConfig.tsx",
+    "./energy/fronius-cloud/client/FroniusCloudForm": "./energy/fronius-cloud/client/FroniusCloudForm.tsx",
     "./componentRegistry": "./componentRegistry.ts"
   }
 }
