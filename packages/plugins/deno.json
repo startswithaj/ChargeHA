@@ -13,6 +13,7 @@
     "./energy/fronius-local/client/FroniusLocalConfig": "./energy/fronius-local/client/FroniusLocalConfig.tsx",
     "./energy/fronius-local/client/FroniusLocalForm": "./energy/fronius-local/client/FroniusLocalForm.tsx",
     "./energy/fronius-cloud/server/FroniusCloudAdapter": "./energy/fronius-cloud/server/FroniusCloudAdapter.ts",
+    "./energy/fronius-cloud/server/router": "./energy/fronius-cloud/server/router.ts",
     "./energy/fronius-cloud/server/config": "./energy/fronius-cloud/server/config.ts",
     "./componentRegistry": "./componentRegistry.ts"
   }
