@@ -18,6 +18,7 @@
     "./energy/fronius-cloud/server/config": "./energy/fronius-cloud/server/config.ts",
     "./energy/fronius-cloud/client/FroniusCloudConfig": "./energy/fronius-cloud/client/FroniusCloudConfig.tsx",
     "./energy/fronius-cloud/client/FroniusCloudForm": "./energy/fronius-cloud/client/FroniusCloudForm.tsx",
+    "./energy/InverterSetupShared": "./energy/InverterSetupShared.tsx",
     "./componentRegistry": "./componentRegistry.ts"
   }
 }
