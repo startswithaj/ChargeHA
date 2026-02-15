@@ -5,6 +5,7 @@
     "./types": "./types.ts",
     "./PluginDbLogger": "./PluginDbLogger.ts",
     "./registerPlugins": "./registerPlugins.ts",
+    "./vehicles/tesla/server/TeslaTokenManager": "./vehicles/tesla/server/TeslaTokenManager.ts",
     "./energy/fronius-local/server": "./energy/fronius-local/server/index.ts",
     "./energy/fronius-local/server/FroniusLocalAdapter": "./energy/fronius-local/server/FroniusLocalAdapter.ts",
     "./energy/fronius-local/server/router": "./energy/fronius-local/server/router.ts",
