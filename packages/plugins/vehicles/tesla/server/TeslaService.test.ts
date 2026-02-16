@@ -1,0 +1,450 @@
+import { describe, it } from "@std/testing/bdd";
+import { expect } from "@std/expect";
+import { TeslaService } from "./TeslaService.ts";
+import type { TeslaServiceIo } from "./TeslaService.ts";
+import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
+import type { TeslaTokenManager } from "./TeslaTokenManager.ts";
+import type { Logger } from "@chargeha/server/lib/Logger";
+import type { VehicleRow } from "@chargeha/server/db/types";
+
+describe("TeslaService", () => {
+  const VEHICLE_ROW: VehicleRow = {
+    id: "VIN123",
+    name: "Tesla",
+    adapterType: "tesla",
+    priority: 1,
+    config: "{}",
+    mode: "auto",
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z",
+  };
+
+  // ── Mocks ───────────────────────────────────────────────────────────────────
+
+  function mockLogger(): Logger {
+    return {
+      debug: () => {},
+      info: () => {},
+      warn: () => {},
+      error: () => {},
+    } as unknown as Logger;
+  }
+
+  function mockTokenManager(
+    overrides: Partial<TeslaTokenManager> = {},
+  ): TeslaTokenManager {
+    return {
+      getAccessToken: () => Promise.resolve("mock-token"),
+      getFleetApiBaseUrl: () =>
+        Promise.resolve("https://fleet-api.prd.na.vn.cloud.tesla.com"),
+      stopAutoRefresh: () => {},
+      deleteTokens: () => Promise.resolve(),
+      ...overrides,
+    } as unknown as TeslaTokenManager;
+  }
+
+  function mockDeps(
+    overrides: Partial<PluginDependencies> = {},
+  ): PluginDependencies {
+    return {
+      pluginId: "tesla",
+      getConfig: () => Promise.resolve(null),
+      setConfig: () => Promise.resolve(),
+      getSecret: () => Promise.resolve(null),
+      setSecret: () => Promise.resolve(),
+      getVehicleRows: () => Promise.resolve([]),
+      getVehicleRow: () => Promise.resolve(null),
+      upsertVehicleRow: () => Promise.resolve(),
+      deleteVehicleRow: () => Promise.resolve(),
+      deleteSchedulesByVehicle: () => Promise.resolve(),
+      addVehicle: () => Promise.resolve(),
+      removeVehicle: () => Promise.resolve(),
+      setSimulatedLoad: () => {},
+      log: mockLogger(),
+      dbLog: mockLogger() as unknown as PluginDependencies["dbLog"],
+      ...overrides,
+    } as unknown as PluginDependencies;
+  }
+
+  function extractUrl(input: string | URL | Request): string {
+    if (typeof input === "string") return input;
+    if (input instanceof URL) return input.toString();
+    return input.url;
+  }
+
+  function mockIo(
+    fetchHandler: (
+      url: string,
+      init?: RequestInit,
+    ) => Response | Promise<Response>,
+    connectResult: "success" | "fail" = "success",
+  ): TeslaServiceIo {
+    const mockConnect = connectResult === "success"
+      ? () => Promise.resolve({ close: () => {} })
+      : () => Promise.reject(new Error("Connection refused"));
+    return {
+      fetch: (input: string | URL | Request, init?: RequestInit) =>
+        Promise.resolve(fetchHandler(extractUrl(input), init)),
+      connect: mockConnect as unknown as typeof Deno.connect,
+      wakePollDelayMs: 0,
+      wakePollAttempts: 3,
+    };
+  }
+
+  function makeService(
+    opts: {
+      deps?: Partial<PluginDependencies>;
+      tokenManager?: Partial<TeslaTokenManager>;
+      io?: TeslaServiceIo;
+    } = {},
+  ): TeslaService {
+    return new TeslaService(
+      mockDeps(opts.deps ?? {}),
+      mockTokenManager(opts.tokenManager ?? {}),
+      mockLogger(),
+      opts.io,
+    );
+  }
+
+  const DEPS_WITH_CREDS: Partial<PluginDependencies> = {
+    getConfig: (key: string) => {
+      const config: Record<string, string> = {
+        client_id: "id",
+        client_secret: "secret",
+        region: "na",
+        public_key_domain: "https://example.com",
+      };
+      return Promise.resolve(config[key] ?? null);
+    },
+  };
+
+  // ── listFleetVehicles ───────────────────────────────────────────────────────
+
+  describe("TeslaService.listFleetVehicles", () => {
+    it("returns mapped vehicle list from Fleet API", async () => {
+      const io = mockIo(() =>
+        new Response(
+          JSON.stringify({
+            response: [
+              { vin: "VIN1", display_name: "Model 3", state: "online" },
+              { vin: "VIN2", display_name: "Model Y", state: "asleep" },
+            ],
+          }),
+          { status: 200 },
+        )
+      );
+
+      const service = makeService({ io });
+      const result = await service.listFleetVehicles();
+      expect(result.vehicles).toHaveLength(2);
+      expect(result.vehicles[0]).toEqual({
+        vin: "VIN1",
+        name: "Model 3",
+        state: "online",
+      });
+      expect(result.vehicles[1]).toEqual({
+        vin: "VIN2",
+        name: "Model Y",
+        state: "asleep",
+      });
+    });
+
+    it("throws on non-ok response", async () => {
+      const io = mockIo(() => new Response("Unauthorized", { status: 401 }));
+      const service = makeService({ io });
+      await expect(service.listFleetVehicles()).rejects.toThrow(
+        "Tesla API error",
+      );
+    });
+  });
+
+  // ── disconnect ──────────────────────────────────────────────────────────────
+
+  describe("TeslaService.disconnect", () => {
+    it("removes vehicles, clears tokens, and stops refresh", async () => {
+      const removed: string[] = [];
+      const deleted: string[] = [];
+      const schedulesDeleted: string[] = [];
+      const stopCalls: boolean[] = [];
+      const deleteTokenCalls: boolean[] = [];
+
+      const service = makeService({
+        deps: {
+          getVehicleRows: () => Promise.resolve([VEHICLE_ROW]),
+          deleteVehicleRow: (id: string) => {
+            deleted.push(id);
+            return Promise.resolve();
+          },
+          deleteSchedulesByVehicle: (id: string) => {
+            schedulesDeleted.push(id);
+            return Promise.resolve();
+          },
+          removeVehicle: (id: string) => {
+            removed.push(id);
+            return Promise.resolve();
+          },
+        },
+        tokenManager: {
+          stopAutoRefresh: () => {
+            stopCalls.push(true);
+          },
+          deleteTokens: () => {
+            deleteTokenCalls.push(true);
+            return Promise.resolve();
+          },
+        } as unknown as Partial<TeslaTokenManager>,
+      });
+
+      const result = await service.disconnect();
+      expect(result.success).toBe(true);
+      expect(stopCalls).toHaveLength(1);
+      expect(removed).toEqual(["VIN123"]);
+      expect(schedulesDeleted).toEqual(["VIN123"]);
+      expect(deleted).toEqual(["VIN123"]);
+      expect(deleteTokenCalls).toHaveLength(1);
+    });
+  });
+
+  // ── selectVehicle ───────────────────────────────────────────────────────────
+
+  describe("TeslaService.selectVehicle", () => {
+    it("upserts vehicle row and registers with manager", async () => {
+      const upserted: unknown[] = [];
+      const added: unknown[] = [];
+
+      const service = makeService({
+        deps: {
+          upsertVehicleRow: (row) => {
+            upserted.push(row);
+            return Promise.resolve();
+          },
+          getVehicleRow: () => Promise.resolve(VEHICLE_ROW),
+          addVehicle: (row) => {
+            added.push(row);
+            return Promise.resolve();
+          },
+        },
+        // checkKeyPairing runs in background — needs IO that won't hang
+        io: mockIo(() => new Response("{}", { status: 404 }), "fail"),
+      });
+
+      const result = await service.selectVehicle({
+        vin: "VIN123",
+        name: "My Tesla",
+      });
+      expect(result.success).toBe(true);
+      expect(result.vin).toBe("VIN123");
+      expect(upserted).toHaveLength(1);
+      expect(added).toHaveLength(1);
+    });
+  });
+
+  // ── registerPartner ─────────────────────────────────────────────────────────
+
+  describe("TeslaService.registerPartner", () => {
+    it("throws when client credentials are not configured", async () => {
+      const service = makeService();
+      await expect(service.registerPartner()).rejects.toThrow(
+        "Tesla client credentials not configured",
+      );
+    });
+
+    it("throws when domain is not configured", async () => {
+      const service = makeService({
+        deps: {
+          getConfig: (key: string) => {
+            if (key === "client_id") return Promise.resolve("id");
+            if (key === "client_secret") return Promise.resolve("secret");
+            return Promise.resolve(null);
+          },
+        },
+      });
+      await expect(service.registerPartner()).rejects.toThrow(
+        "Tesla domain not configured",
+      );
+    });
+
+    it("fetches partner token then registers", async () => {
+      const fetches: string[] = [];
+      const io = mockIo((url) => {
+        fetches.push(url);
+        if (url.includes("oauth2")) {
+          return new Response(JSON.stringify({ access_token: "tok" }), {
+            status: 200,
+          });
+        }
+        if (url.includes("partner_accounts")) {
+          return new Response(JSON.stringify({ response: {} }), {
+            status: 200,
+          });
+        }
+        return new Response("", { status: 404 });
+      });
+
+      const service = makeService({ deps: DEPS_WITH_CREDS, io });
+      const result = await service.registerPartner();
+      expect(result.success).toBe(true);
+      expect(fetches).toHaveLength(2);
+      expect(fetches[0]).toContain("oauth2");
+      expect(fetches[1]).toContain("partner_accounts");
+    });
+
+    it("throws when partner token fetch fails", async () => {
+      const io = mockIo(() => new Response("Unauthorized", { status: 401 }));
+      const service = makeService({ deps: DEPS_WITH_CREDS, io });
+      await expect(service.registerPartner()).rejects.toThrow(
+        "Failed to obtain partner token",
+      );
+    });
+  });
+
+  // ── checkProxyReachable ─────────────────────────────────────────────────────
+
+  describe("TeslaService.checkProxyReachable", () => {
+    it("returns not configured when no vehicles", async () => {
+      const service = makeService();
+      const result = await service.checkProxyReachable();
+      expect(result).toEqual({ teslaConfigured: false, proxyReachable: false });
+    });
+
+    it("returns reachable when connect succeeds", async () => {
+      const service = makeService({
+        deps: {
+          getVehicleRows: () => Promise.resolve([VEHICLE_ROW]),
+          getConfig: (key: string) =>
+            Promise.resolve(
+              key === "proxy_url" ? "https://localhost:4443" : null,
+            ),
+        },
+        io: mockIo(() => new Response("", { status: 200 }), "success"),
+      });
+      const result = await service.checkProxyReachable();
+      expect(result).toEqual({ teslaConfigured: true, proxyReachable: true });
+    });
+
+    it("returns not reachable when connect fails", async () => {
+      const service = makeService({
+        deps: {
+          getVehicleRows: () => Promise.resolve([VEHICLE_ROW]),
+          getConfig: (key: string) =>
+            Promise.resolve(
+              key === "proxy_url" ? "https://localhost:4443" : null,
+            ),
+        },
+        io: mockIo(() => new Response("", { status: 200 }), "fail"),
+      });
+      const result = await service.checkProxyReachable();
+      expect(result).toEqual({ teslaConfigured: true, proxyReachable: false });
+    });
+  });
+
+  // ── checkKeyPairing ─────────────────────────────────────────────────────────
+
+  describe("TeslaService.checkKeyPairing", () => {
+    const depsWithVehicle = (
+      setConfigFn?: (key: string, value: string) => Promise<void>,
+    ): Partial<PluginDependencies> => ({
+      getConfig: (key: string) =>
+        Promise.resolve(key === "proxy_url" ? "https://localhost:4443" : null),
+      setConfig: setConfigFn ?? (() => Promise.resolve()),
+      getVehicleRows: () => Promise.resolve([VEHICLE_ROW]),
+    });
+
+    it("returns error when no vehicle configured", async () => {
+      const result = await makeService().checkKeyPairing();
+      expect(result.paired).toBe(null);
+      expect(result.error).toBe("No Tesla vehicle configured");
+    });
+
+    it("returns proxy not reachable when connect fails", async () => {
+      const service = makeService({
+        deps: depsWithVehicle(),
+        io: mockIo(() => new Response("", { status: 200 }), "fail"),
+      });
+      const result = await service.checkKeyPairing();
+      expect(result.paired).toBe(null);
+      expect(result.error).toBe("Proxy not reachable");
+    });
+
+    it("returns paired true when command succeeds on first read", async () => {
+      const configSet: Record<string, string> = {};
+      const io = mockIo((url) => {
+        if (url.includes("vehicle_data")) {
+          return new Response(
+            JSON.stringify({
+              response: { charge_state: { charge_limit_soc: 80 } },
+            }),
+            { status: 200 },
+          );
+        }
+        if (url.includes("set_charge_limit")) {
+          return new Response(JSON.stringify({ response: { result: true } }), {
+            status: 200,
+          });
+        }
+        return new Response("", { status: 404 });
+      });
+
+      const service = makeService({
+        deps: depsWithVehicle((key, value) => {
+          configSet[key] = value;
+          return Promise.resolve();
+        }),
+        io,
+      });
+
+      const result = await service.checkKeyPairing();
+      expect(result.paired).toBe(true);
+      expect(configSet["key_paired"]).toBe("true");
+    });
+
+    it("returns not paired when command returns pairing error", async () => {
+      const configSet: Record<string, string> = {};
+      const io = mockIo((url) => {
+        if (url.includes("vehicle_data")) {
+          return new Response(
+            JSON.stringify({
+              response: { charge_state: { charge_limit_soc: 80 } },
+            }),
+            { status: 200 },
+          );
+        }
+        if (url.includes("set_charge_limit")) {
+          return new Response(
+            JSON.stringify({
+              error: {
+                message: "Public key has not been paired with this vehicle",
+              },
+            }),
+            { status: 422 },
+          );
+        }
+        return new Response("", { status: 404 });
+      });
+
+      const service = makeService({
+        deps: depsWithVehicle((key, value) => {
+          configSet[key] = value;
+          return Promise.resolve();
+        }),
+        io,
+      });
+
+      const result = await service.checkKeyPairing();
+      expect(result.paired).toBe(false);
+      expect(configSet["key_paired"]).toBe("false");
+    });
+
+    it("returns could not read when vehicle never wakes", async () => {
+      const io = mockIo((url) => {
+        if (url.includes("wake_up")) return new Response("{}", { status: 200 });
+        return new Response("{}", { status: 408 });
+      });
+
+      const service = makeService({ deps: depsWithVehicle(), io });
+      const result = await service.checkKeyPairing();
+      expect(result.paired).toBe(null);
+      expect(result.error).toBe("Could not read vehicle data after waking");
+    });
+  });
+});
