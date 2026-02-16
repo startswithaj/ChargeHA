@@ -7,6 +7,7 @@
     "./registerPlugins": "./registerPlugins.ts",
     "./vehicles/tesla/server/TeslaAdapter": "./vehicles/tesla/server/TeslaAdapter.ts",
     "./vehicles/tesla/server/TeslaTokenManager": "./vehicles/tesla/server/TeslaTokenManager.ts",
+    "./vehicles/tesla/server/TeslaVehicleMiddleware": "./vehicles/tesla/server/TeslaVehicleMiddleware.ts",
     "./energy/fronius-local/server": "./energy/fronius-local/server/index.ts",
     "./energy/fronius-local/server/FroniusLocalAdapter": "./energy/fronius-local/server/FroniusLocalAdapter.ts",
     "./energy/fronius-local/server/router": "./energy/fronius-local/server/router.ts",
