@@ -11,6 +11,7 @@
     "./vehicles/tesla/client/KeyGenerationStep": "./vehicles/tesla/client/KeyGenerationStep.tsx",
     "./vehicles/tesla/client/PartnerRegistrationStep": "./vehicles/tesla/client/PartnerRegistrationStep.tsx",
     "./vehicles/tesla/client/PublicKeyHostingStep": "./vehicles/tesla/client/PublicKeyHostingStep.tsx",
+    "./vehicles/tesla/client/TeslaAuthStep": "./vehicles/tesla/client/TeslaAuthStep.tsx",
     "./vehicles/tesla/client/TeslaCredentialsStep": "./vehicles/tesla/client/TeslaCredentialsStep.tsx",
     "./vehicles/tesla/client/TeslaSettings": "./vehicles/tesla/client/TeslaSettings.tsx",
     "./vehicles/tesla/client/TeslaSetupInstructions": "./vehicles/tesla/client/TeslaSetupInstructions.tsx",
