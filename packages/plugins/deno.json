@@ -9,6 +9,7 @@
     "./vehicles/tesla/server/TeslaTokenManager": "./vehicles/tesla/server/TeslaTokenManager.ts",
     "./vehicles/tesla/server/TeslaVehicleMiddleware": "./vehicles/tesla/server/TeslaVehicleMiddleware.ts",
     "./vehicles/tesla/client/KeyGenerationStep": "./vehicles/tesla/client/KeyGenerationStep.tsx",
+    "./vehicles/tesla/client/PublicKeyHostingStep": "./vehicles/tesla/client/PublicKeyHostingStep.tsx",
     "./vehicles/tesla/client/TeslaCredentialsStep": "./vehicles/tesla/client/TeslaCredentialsStep.tsx",
     "./vehicles/tesla/client/TeslaSettings": "./vehicles/tesla/client/TeslaSettings.tsx",
     "./vehicles/tesla/client/TeslaSetupInstructions": "./vehicles/tesla/client/TeslaSetupInstructions.tsx",
