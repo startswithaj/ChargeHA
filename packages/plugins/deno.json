@@ -13,6 +13,8 @@
     "./vehicles/tesla/client/PublicKeyHostingStep": "./vehicles/tesla/client/PublicKeyHostingStep.tsx",
     "./vehicles/tesla/client/TeslaAuthStep": "./vehicles/tesla/client/TeslaAuthStep.tsx",
     "./vehicles/tesla/client/TeslaCredentialsStep": "./vehicles/tesla/client/TeslaCredentialsStep.tsx",
+    "./vehicles/tesla/client/VehicleSelectionStep": "./vehicles/tesla/client/VehicleSelectionStep.tsx",
+    "./vehicles/tesla/client/VirtualKeyPairingStep": "./vehicles/tesla/client/VirtualKeyPairingStep.tsx",
     "./vehicles/tesla/client/TeslaSettings": "./vehicles/tesla/client/TeslaSettings.tsx",
     "./vehicles/tesla/client/TeslaSetupInstructions": "./vehicles/tesla/client/TeslaSetupInstructions.tsx",
     "./energy/fronius-local/server": "./energy/fronius-local/server/index.ts",
