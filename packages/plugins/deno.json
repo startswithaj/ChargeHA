@@ -17,6 +17,7 @@
     "./vehicles/tesla/client/VirtualKeyPairingStep": "./vehicles/tesla/client/VirtualKeyPairingStep.tsx",
     "./vehicles/tesla/client/TeslaSettings": "./vehicles/tesla/client/TeslaSettings.tsx",
     "./vehicles/tesla/client/TeslaSetupInstructions": "./vehicles/tesla/client/TeslaSetupInstructions.tsx",
+    "./vehicles/simulated/server": "./vehicles/simulated/server/index.ts",
     "./vehicles/simulated/server/SimulatedVehicleAdapter": "./vehicles/simulated/server/SimulatedVehicleAdapter.ts",
     "./energy/fronius-local/server": "./energy/fronius-local/server/index.ts",
     "./energy/fronius-local/server/FroniusLocalAdapter": "./energy/fronius-local/server/FroniusLocalAdapter.ts",
