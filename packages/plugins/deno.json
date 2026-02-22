@@ -17,6 +17,8 @@
     "./vehicles/tesla/client/VirtualKeyPairingStep": "./vehicles/tesla/client/VirtualKeyPairingStep.tsx",
     "./vehicles/tesla/client/TeslaSettings": "./vehicles/tesla/client/TeslaSettings.tsx",
     "./vehicles/tesla/client/TeslaSetupInstructions": "./vehicles/tesla/client/TeslaSetupInstructions.tsx",
+    "./vehicles/simulated/client/SimulatedVehicleDialog": "./vehicles/simulated/client/SimulatedVehicleDialog.tsx",
+    "./vehicles/simulated/client/LocationField": "./vehicles/simulated/client/LocationField.tsx",
     "./vehicles/simulated/server": "./vehicles/simulated/server/index.ts",
     "./vehicles/simulated/server/SimulatedVehicleAdapter": "./vehicles/simulated/server/SimulatedVehicleAdapter.ts",
     "./energy/fronius-local/server": "./energy/fronius-local/server/index.ts",
@@ -34,5 +36,30 @@
     "./energy/fronius-cloud/client/FroniusCloudForm": "./energy/fronius-cloud/client/FroniusCloudForm.tsx",
     "./energy/InverterSetupShared": "./energy/InverterSetupShared.tsx",
     "./componentRegistry": "./componentRegistry.ts"
+  },
+  "imports": {
+    "hono": "jsr:@hono/hono@^4",
+    "@trpc/server": "npm:@trpc/server@^11",
+    "react": "npm:react@^18",
+    "react/jsx-runtime": "npm:react@^18/jsx-runtime",
+    "@radix-ui/themes": "npm:@radix-ui/themes@^3",
+    "lucide-react": "npm:lucide-react@^0.460",
+    "@tanstack/react-query": "npm:@tanstack/react-query@^5",
+    "qrcode.react": "npm:qrcode.react@^4",
+    "vitest": "npm:vitest@^3",
+    "@testing-library/react": "npm:@testing-library/react@^16",
+    "@testing-library/jest-dom": "npm:@testing-library/jest-dom@^6",
+    "@trpc/react-query": "npm:@trpc/react-query@^11"
+  },
+  "lint": {
+    "rules": {
+      "exclude": ["no-slow-types"]
+    }
+  },
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "lib": ["dom", "dom.iterable", "esnext", "deno.ns"],
+    "types": ["@testing-library/jest-dom/vitest"]
   }
 }
