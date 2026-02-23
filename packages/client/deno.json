@@ -1,4 +1,20 @@
 {
   "name": "@chargeha/client",
-  "version": "0.0.1"
+  "version": "0.0.1",
+  "exports": "./src/main.tsx",
+  "imports": {
+    "react": "npm:react@^18",
+    "react-dom": "npm:react-dom@^18",
+    "react-dom/client": "npm:react-dom@^18/client",
+    "react/jsx-runtime": "npm:react@^18/jsx-runtime",
+    "@types/react": "npm:@types/react@^18",
+    "vite": "npm:vite@^6",
+    "@vitejs/plugin-react": "npm:@vitejs/plugin-react@^4",
+    "@deno/vite-plugin": "npm:@deno/vite-plugin@^1"
+  },
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "lib": ["dom", "dom.iterable", "esnext"]
+  }
 }
