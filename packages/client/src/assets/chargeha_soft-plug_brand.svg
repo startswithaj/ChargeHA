@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 512 512"
+  width="512"
+  height="512"
+>
+  <title>ChargeHA – Soft Plug</title>
+  <rect width="512" height="512" fill="#3E63DD" />
+  <g transform="translate(256,244)">
+    <rect x="-68" y="-166" width="32" height="64" rx="16" fill="#FFFFFF" />
+    <rect x="36" y="-166" width="32" height="64" rx="16" fill="#FFFFFF" />
+    <rect x="-112" y="-112" width="224" height="200" rx="40" fill="#FFFFFF" />
+    <path
+      d="M-80 76 C-80 76 -72 148 0 148 C72 148 80 76 80 76Z"
+      fill="#FFFFFF"
+    />
+    <rect x="-14" y="136" width="28" height="52" rx="14" fill="#FFFFFF" />
+    <path d="M20 -68 L-44 8 L0 8 L-20 68 L44 -8 L0 -8Z" fill="#3E63DD" />
+  </g>
+</svg>

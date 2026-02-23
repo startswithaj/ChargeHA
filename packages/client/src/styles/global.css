@@ -1,0 +1,53 @@
+:root {
+  /* Energy domain color tokens */
+  --color-solar: #f59e0b;
+  --color-grid-import: #ef4444;
+  --color-grid-export: #22c55e;
+  --color-home: #60a5fa;
+  --color-battery: #a78bfa;
+
+  /* Semantic aliases */
+  --color-solar-bg: rgba(245, 158, 11, 0.12);
+  --color-grid-import-bg: rgba(239, 68, 68, 0.12);
+  --color-grid-export-bg: rgba(34, 197, 94, 0.12);
+  --color-home-bg: rgba(96, 165, 250, 0.12);
+  --color-battery-bg: rgba(167, 139, 250, 0.12);
+
+  /* Vehicle colors */
+  --color-vehicle: #3b82f6;
+  --color-charging: #22c55e;
+  --color-vehicle-bg: rgba(59, 130, 246, 0.12);
+  --color-charging-bg: rgba(34, 197, 94, 0.12);
+
+  /* Away charging (dark navy) */
+  --color-away: #1e293b;
+
+  /* Chart segment colors for unified energy chart */
+  --color-solar-car: #84cc16; /* lime green — solar to car */
+  --color-grid-car: #3b82f6; /* blue — grid to car */
+
+  /* Chart overlay colors */
+  --color-solar-production: #334155; /* slate-700 — solar production line */
+  --color-consumption: #8b5cf6; /* violet-500 — total consumption line */
+
+  /* Status colors */
+  --color-connected: #22c55e;
+  --color-connecting: #f59e0b;
+  --color-disconnected: #ef4444;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--default-font-family, system-ui, -apple-system, sans-serif);
+}
