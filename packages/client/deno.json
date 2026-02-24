@@ -8,9 +8,17 @@
     "react-dom/client": "npm:react-dom@^18/client",
     "react/jsx-runtime": "npm:react@^18/jsx-runtime",
     "@types/react": "npm:@types/react@^18",
+    "vitest": "npm:vitest@^3",
+    "jsdom": "npm:jsdom@^25",
+    "@vitest/coverage-v8": "npm:@vitest/coverage-v8@^3",
     "vite": "npm:vite@^6",
     "@vitejs/plugin-react": "npm:@vitejs/plugin-react@^4",
     "@deno/vite-plugin": "npm:@deno/vite-plugin@^1"
+  },
+  "tasks": {
+    "test": "deno run -A npm:vitest@^3 run",
+    "test:watch": "deno run -A npm:vitest@^3",
+    "test:coverage": "deno run -A npm:vitest@^3 run --coverage"
   },
   "compilerOptions": {
     "jsx": "react-jsx",
