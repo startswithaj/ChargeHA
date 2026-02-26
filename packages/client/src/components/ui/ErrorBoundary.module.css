@@ -1,0 +1,116 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+}
+
+.modal {
+  background: var(--color-background, #fff);
+  border: 1px solid var(--gray-a5);
+  border-radius: 12px;
+  width: min(540px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--gray-a3);
+}
+
+.icon {
+  font-size: 18px;
+  color: var(--red-9, #e5484d);
+}
+
+.title {
+  flex: 1;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--gray-12);
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--gray-11);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.closeButton:hover {
+  background: var(--gray-a3);
+}
+
+.message {
+  padding: 16px;
+  font-size: 14px;
+  color: var(--red-11, #ce2c31);
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.stack {
+  margin: 0;
+  padding: 12px 16px;
+  background: var(--gray-a2);
+  border-top: 1px solid var(--gray-a3);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--gray-11);
+  overflow: auto;
+  max-height: 300px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--gray-a3);
+  justify-content: flex-end;
+}
+
+.retryButton {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: none;
+  background: var(--accent-9);
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.retryButton:hover {
+  opacity: 0.9;
+}
+
+.dismissButton {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--gray-a5);
+  background: transparent;
+  color: var(--gray-11);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.dismissButton:hover {
+  background: var(--gray-a2);
+}

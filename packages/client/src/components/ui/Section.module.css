@@ -1,0 +1,91 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.icon {
+  color: var(--gray-9);
+  display: flex;
+  align-items: center;
+}
+
+.action {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Dirty state ────────────────────────────────────────── */
+
+.dirtyCard {
+  box-shadow: 0 0 0 2px var(--amber-9);
+}
+
+/* ── Save status animations ─────────────────────────────── */
+
+.savedBadge {
+  animation: badgeFlash 2s ease-out forwards;
+}
+
+@keyframes badgeFlash {
+  0% {
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.savedCard {
+  animation: cardFlash 1.8s ease-out;
+}
+
+@keyframes cardFlash {
+  0% {
+    box-shadow: 0 0 0 2px var(--green-9);
+    background-color: var(--green-a2);
+  }
+  40% {
+    box-shadow: 0 0 0 2px var(--green-9);
+    background-color: var(--green-a2);
+  }
+  100% {
+    box-shadow: none;
+    background-color: transparent;
+  }
+}
+
+.errorCard {
+  animation: cardErrorFlash 0.4s ease-out;
+  box-shadow: 0 0 0 2px var(--red-9);
+}
+
+@keyframes cardErrorFlash {
+  0% {
+    box-shadow: 0 0 0 3px var(--red-9);
+  }
+  100% {
+    box-shadow: 0 0 0 2px var(--red-9);
+  }
+}

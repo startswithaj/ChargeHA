@@ -1,0 +1,20 @@
+.banner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--orange-a2);
+  border: 1px solid var(--orange-a5);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon {
+  color: var(--orange-9);
+  flex-shrink: 0;
+}

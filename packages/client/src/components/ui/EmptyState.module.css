@@ -1,0 +1,15 @@
+.card {
+  border-left: 3px solid var(--gray-a6);
+}
+
+.content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.icon {
+  color: var(--gray-9);
+  flex-shrink: 0;
+}
