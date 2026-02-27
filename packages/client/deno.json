@@ -12,6 +12,9 @@
     "@radix-ui/react-icons": "npm:@radix-ui/react-icons@^1",
     "lucide-react": "npm:lucide-react@^0.460",
     "vitest": "npm:vitest@^3",
+    "@testing-library/react": "npm:@testing-library/react@^16",
+    "@testing-library/jest-dom": "npm:@testing-library/jest-dom@^6",
+    "@testing-library/user-event": "npm:@testing-library/user-event@^14",
     "jsdom": "npm:jsdom@^25",
     "@vitest/coverage-v8": "npm:@vitest/coverage-v8@^3",
     "vite": "npm:vite@^6",
@@ -31,6 +34,7 @@
   "compilerOptions": {
     "jsx": "react-jsx",
     "jsxImportSource": "react",
-    "lib": ["dom", "dom.iterable", "esnext"]
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "types": ["@testing-library/jest-dom/vitest"]
   }
 }

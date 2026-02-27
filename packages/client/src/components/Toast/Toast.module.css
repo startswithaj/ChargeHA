@@ -1,0 +1,69 @@
+.container {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(420px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--gray-a5);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  pointer-events: auto;
+  animation: slideUp 0.2s ease-out;
+}
+
+.toast[data-type="error"] {
+  border-left: 3px solid var(--color-grid-import);
+}
+
+.toast[data-type="success"] {
+  border-left: 3px solid var(--color-charging);
+}
+
+.toast[data-type="info"] {
+  border-left: 3px solid var(--color-vehicle);
+}
+
+.message {
+  flex: 1;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.dismiss {
+  all: unset;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  color: var(--gray-9);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.dismiss:hover {
+  background: var(--gray-a3);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
