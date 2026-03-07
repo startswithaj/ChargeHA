@@ -1,0 +1,171 @@
+.layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  padding: 12px 24px;
+  gap: 24px;
+  border-bottom: 1px solid var(--gray-a5);
+}
+
+.brand {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.logo {
+  width: 28px;
+  height: 28px;
+}
+
+.accent {
+  color: var(--accent-9);
+}
+
+.nav {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+
+.navLinkActive,
+.navLink {
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+  user-select: none;
+}
+
+.navLinkActive {
+  background-color: var(--accent-a3);
+  color: var(--accent-11);
+}
+
+.navLink {
+  color: var(--gray-11);
+}
+
+.navLink:hover {
+  background-color: var(--gray-a3);
+  color: var(--gray-12);
+}
+
+.navLink:active {
+  background-color: var(--gray-a4);
+}
+
+.status {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.main {
+  flex: 1;
+  padding: 24px;
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Hamburger button — hidden on desktop */
+.menuButton {
+  display: none;
+}
+
+/* Mobile menu — only rendered when open, styled here */
+.mobileMenu {
+  display: none;
+}
+
+/* Hide logout in status on mobile — it moves to the hamburger menu */
+.statusLogout {
+  display: contents;
+}
+
+@media (max-width: 900px) {
+  .header {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  /* Hide desktop nav on mobile */
+  .nav {
+    display: none;
+  }
+
+  /* Push status + hamburger to the right */
+  .status {
+    margin-left: auto;
+  }
+
+  /* Hide logout from header status on mobile */
+  .statusLogout {
+    display: none;
+  }
+
+  /* Show hamburger */
+  .menuButton {
+    display: flex;
+  }
+
+  /* Mobile dropdown menu */
+  .mobileMenu {
+    display: flex;
+    flex-direction: column;
+    border-bottom: 1px solid var(--gray-a5);
+    background-color: var(--color-background);
+  }
+
+  .mobileNav {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mobileNavLink,
+  .mobileNavLinkActive {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s, color 0.15s;
+  }
+
+  .mobileNavLinkActive {
+    background-color: var(--accent-a3);
+    color: var(--accent-11);
+  }
+
+  .mobileNavLink {
+    color: var(--gray-11);
+  }
+
+  .mobileNavLink:hover {
+    background-color: var(--gray-a3);
+    color: var(--gray-12);
+  }
+
+  .mobileMenuFooter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--gray-a4);
+    color: var(--gray-11);
+  }
+
+  .main {
+    padding: 16px 12px;
+  }
+}
