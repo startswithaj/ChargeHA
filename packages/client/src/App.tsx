@@ -2,6 +2,7 @@ import { Theme } from "@radix-ui/themes";
 import { useRouter } from "./hooks/useRouter.ts";
 import type { Route } from "./hooks/useRouter.ts";
 import type { Page } from "./components/Layout/AppLayout.tsx";
+import { AuthGate } from "./components/AuthGate.tsx";
 import { RealtimeSync } from "./components/RealtimeSync.tsx";
 import { AppLayout } from "./components/Layout/AppLayout.tsx";
 import { ToastProvider } from "./hooks/useToast.tsx";
@@ -20,7 +21,11 @@ function AppContent() {
   return (
     <Theme appearance={appearance}>
       <ToastProvider>
+        <AuthGate navigate={navigate}>
+          {({ authMode, onLogout }) => (
               <RealtimeSync />
+          )}
+        </AuthGate>
       </ToastProvider>
     </Theme>
   );
