@@ -1,0 +1,65 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+
+.stepIndicator {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  padding-bottom: 2rem;
+}
+
+.stepDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--gray-5);
+  transition: background 0.2s ease;
+}
+
+.stepDotActive {
+  background: var(--accent-9);
+  transform: scale(1.2);
+}
+
+.stepDotCompleted {
+  background: var(--accent-7);
+}
+
+.stepHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-bottom: 1.5rem;
+}
+
+.stepContent {
+  flex: 1;
+  padding-bottom: 2rem;
+}
+
+.navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 1rem;
+  border-top: 1px solid var(--gray-4);
+}
+
+.navigationRight {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}

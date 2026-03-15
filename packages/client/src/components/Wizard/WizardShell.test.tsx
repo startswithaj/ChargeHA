@@ -1,0 +1,326 @@
+import "@testing-library/jest-dom/vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { renderWithProviders } from "../../test-utils.tsx";
+import { WizardShell, type WizardStepConfig } from "./WizardShell.tsx";
+import {
+  useWizardState,
+  type WizardState,
+} from "../../hooks/useWizardState.ts";
+
+vi.mock("../../hooks/useWizardState.ts", () => ({
+  useWizardState: vi.fn(),
+}));
+
+describe("WizardShell", () => {
+  const mockSetStepId = vi.fn();
+  let currentStepId = "welcome";
+
+  /** Full 14-step list (Tesla vehicle + inverter-setup energy step). */
+  const FULL_STEP_IDS = [
+    "welcome",
+    "timezone",
+    "vehicle-type",
+    "tesla-key-generation",
+    "tesla-public-key-hosting",
+    "tesla-credentials",
+    "tesla-partner-registration",
+    "tesla-auth",
+    "tesla-vehicle-selection",
+    "tesla-virtual-key-pairing",
+    "inverter-type",
+    "inverter-setup",
+    "home-location",
+    "done",
+  ];
+
+  const FULL_STEP_LABELS = [
+    "Welcome",
+    "Timezone",
+    "Vehicle Type",
+    "Tesla Key Generation",
+    "Tesla Public Key Hosting",
+    "Tesla Credentials",
+    "Tesla Partner Registration",
+    "Tesla Authorization",
+    "Tesla Vehicle Selection",
+    "Tesla Virtual Key Pairing",
+    "Inverter Type",
+    "Inverter Setup",
+    "Home Location",
+    "Done",
+  ];
+
+  const makeSteps = (
+    ids = FULL_STEP_IDS,
+    labels = FULL_STEP_LABELS,
+  ): WizardStepConfig[] => {
+    return labels.map((label, i) => ({
+      id: ids[i],
+      label,
+      render: () => <div data-testid={`step-content-${i}`}>{label} content
+      </div>,
+    }));
+  };
+
+  /** Core-only steps (no vehicle or energy plugin steps — e.g., simulated + skip). */
+  const makeCoreOnlySteps = (): WizardStepConfig[] => {
+    const ids = [
+      "welcome",
+      "timezone",
+      "vehicle-type",
+      "inverter-type",
+      "home-location",
+      "done",
+    ];
+    const labels = [
+      "Welcome",
+      "Timezone",
+      "Vehicle Type",
+      "Inverter Type",
+      "Home Location",
+      "Done",
+    ];
+    return makeSteps(ids, labels);
+  };
+
+  /** Update the mocked useWizardState return value, merging overrides over defaults. */
+  const setWizardState = (overrides: Partial<WizardState> = {}): void => {
+    vi.mocked(useWizardState).mockReturnValue({
+      stepId: currentStepId,
+      vehicleType: "",
+      energyType: "",
+      setStepId: mockSetStepId,
+      setVehicleType: vi.fn(),
+      setEnergyType: vi.fn(),
+      isLoading: false,
+      ...overrides,
+    });
+  };
+
+  /** Set the wizard mock state to a given step ID. */
+  const setMockStepId = (stepId: string) => {
+    currentStepId = stepId;
+    // When setStepId is called (navigation), update the mock state and re-render
+    mockSetStepId.mockImplementation((id: string) => {
+      currentStepId = id;
+      setWizardState({ stepId: id });
+    });
+    setWizardState({ stepId });
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setMockStepId("welcome");
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  // ---- Initial render ----
+
+  it("renders step indicator matching step count", () => {
+    renderWithProviders(<WizardShell steps={makeSteps()} />);
+
+    expect(screen.getByText("Step 1 of 14")).toBeInTheDocument();
+
+    const indicator = screen.getByRole("navigation", { name: "Wizard steps" });
+    const dots = indicator.querySelectorAll("[class*='stepDot']");
+    expect(dots).toHaveLength(14);
+  });
+
+  it("renders correct step count for core-only steps", () => {
+    renderWithProviders(<WizardShell steps={makeCoreOnlySteps()} />);
+
+    expect(screen.getByText("Step 1 of 6")).toBeInTheDocument();
+
+    const indicator = screen.getByRole("navigation", { name: "Wizard steps" });
+    const dots = indicator.querySelectorAll("[class*='stepDot']");
+    expect(dots).toHaveLength(6);
+  });
+
+  it("renders Back, Next, and Skip buttons", () => {
+    renderWithProviders(<WizardShell steps={makeSteps()} />);
+
+    expect(screen.getByText("Step 1 of 14")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Skip" })).toBeInTheDocument();
+  });
+
+  it("Back button is disabled on first step", () => {
+    renderWithProviders(<WizardShell steps={makeSteps()} />);
+
+    expect(screen.getByText("Step 1 of 14")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back" })).toBeDisabled();
+  });
+
+  it("renders empty state when no steps config is provided", () => {
+    renderWithProviders(<WizardShell />);
+
+    expect(screen.getByText("No wizard steps configured.")).toBeInTheDocument();
+  });
+
+  // ---- Navigation ----
+
+  it("clicking Next advances to next step", () => {
+    renderWithProviders(<WizardShell steps={makeSteps()} />);
+
+    expect(screen.getByText("Step 1 of 14")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+    // Verify setStepId was called with the next step's ID
+    expect(mockSetStepId).toHaveBeenCalledWith("timezone");
+  });
+
+  it("clicking Back goes to previous step", () => {
+    // Start at step 3 via mock state
+    setMockStepId("vehicle-type");
+
+    renderWithProviders(<WizardShell steps={makeSteps()} />);
+
+    expect(screen.getByText("Step 3 of 14")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+
+    expect(mockSetStepId).toHaveBeenCalledWith("timezone");
+  });
+
+  it("clicking Skip advances to next step", () => {
+    renderWithProviders(<WizardShell steps={makeSteps()} />);
+
+    expect(screen.getByText("Step 1 of 14")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+
+    expect(mockSetStepId).toHaveBeenCalledWith("timezone");
+  });
+
+  it("resumes at saved step from DB", () => {
+    setMockStepId("tesla-credentials");
+
+    renderWithProviders(<WizardShell steps={makeSteps()} />);
+
+    expect(screen.getByText("Step 6 of 14")).toBeInTheDocument();
+    expect(screen.getByText("Tesla Credentials")).toBeInTheDocument();
+  });
+
+  it("clamps to step after vehicle-type when stored ID is unknown", () => {
+    setMockStepId("nonexistent-step");
+
+    renderWithProviders(<WizardShell steps={makeSteps()} />);
+
+    // Clamped to step after vehicle-type (index 3 = Tesla Key Generation in full list)
+    expect(screen.getByText("Step 4 of 14")).toBeInTheDocument();
+    expect(screen.getByText("Tesla Key Generation")).toBeInTheDocument();
+  });
+
+  it("clamps to step after vehicle-type when stored step is a removed plugin step", () => {
+    // Simulate: user had Tesla steps, then switched to simulated (core-only steps)
+    setMockStepId("tesla-credentials");
+
+    renderWithProviders(<WizardShell steps={makeCoreOnlySteps()} />);
+
+    // Clamped to step after vehicle-type (index 3 = Inverter Type in core-only list)
+    expect(screen.getByText("Step 4 of 6")).toBeInTheDocument();
+    expect(screen.getByText("Inverter Type")).toBeInTheDocument();
+  });
+
+  it("falls back to step 0 when vehicle-type step not present", () => {
+    const minimalSteps = makeSteps(["a", "b", "c"], ["A", "B", "C"]);
+    setMockStepId("nonexistent");
+
+    renderWithProviders(<WizardShell steps={minimalSteps} />);
+
+    expect(screen.getByText("Step 1 of 3")).toBeInTheDocument();
+    expect(screen.getByText("A")).toBeInTheDocument();
+  });
+
+  // ---- Step content rendering ----
+
+  it("renders the correct step content for each step index", () => {
+    const steps = makeSteps();
+    renderWithProviders(<WizardShell steps={steps} />);
+
+    expect(screen.getByText("Step 1 of 14")).toBeInTheDocument();
+
+    // Step 0 (Welcome)
+    expect(screen.getByTestId("step-content-0")).toBeInTheDocument();
+    expect(screen.getByText("Welcome content")).toBeInTheDocument();
+  });
+
+  // ---- Last step ----
+
+  it("shows Finish button on last step instead of Next and Skip", () => {
+    setMockStepId("done");
+
+    renderWithProviders(<WizardShell steps={makeSteps()} />);
+
+    expect(screen.getByText("Step 14 of 14")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Finish" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Skip" })).not
+      .toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Next" })).not
+      .toBeInTheDocument();
+  });
+
+  it("calls onComplete when Finish is clicked on last step", () => {
+    const onComplete = vi.fn();
+    setMockStepId("done");
+
+    renderWithProviders(
+      <WizardShell steps={makeSteps()} onComplete={onComplete} />,
+    );
+
+    expect(screen.getByText("Step 14 of 14")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Finish" }));
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  // ---- Step indicator ----
+
+  it("marks active step dot in indicator", async () => {
+    setMockStepId("tesla-key-generation");
+
+    renderWithProviders(<WizardShell steps={makeSteps()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Step 4 of 14")).toBeInTheDocument();
+    });
+
+    const indicator = screen.getByRole("navigation", { name: "Wizard steps" });
+    const dots = indicator.querySelectorAll("[class*='stepDot']");
+
+    // Steps before current should be completed
+    Array.from({ length: 3 }).forEach((_, i) => {
+      expect(dots[i].className).toContain("stepDotCompleted");
+    });
+
+    // Current step should be active
+    expect(dots[3].className).toContain("stepDotActive");
+
+    // Steps after current should be neither active nor completed
+    expect(dots[4].className).not.toContain("stepDotActive");
+    expect(dots[4].className).not.toContain("stepDotCompleted");
+  });
+
+  // ---- Dynamic recomposition ----
+
+  it("recomputes progress bar when step list changes", () => {
+    // Start with full list
+    const { rerender } = renderWithProviders(
+      <WizardShell steps={makeSteps()} />,
+    );
+
+    expect(screen.getByText("Step 1 of 14")).toBeInTheDocument();
+
+    // Switch to core-only list
+    rerender(<WizardShell steps={makeCoreOnlySteps()} />);
+
+    expect(screen.getByText("Step 1 of 6")).toBeInTheDocument();
+  });
+});
