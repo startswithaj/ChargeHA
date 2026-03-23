@@ -1,0 +1,26 @@
+.card {
+  border-left: 3px solid var(--accent);
+  min-width: 160px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.icon {
+  display: flex;
+  align-items: center;
+}
+
+.value {
+  margin-bottom: 4px;
+  white-space: pre-line;
+}
+
+.subtitle {
+  display: block;
+  white-space: pre-line;
+}
