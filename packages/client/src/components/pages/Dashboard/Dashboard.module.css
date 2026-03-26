@@ -1,0 +1,28 @@
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.metricsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.metricsSectionLabel {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.metricsRow {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.lastUpdated {
+  display: block;
+  text-align: center;
+  margin-top: 4px;
+}
