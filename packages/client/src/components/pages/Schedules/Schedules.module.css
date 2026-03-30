@@ -1,0 +1,72 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.pageHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.disclaimer {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px;
+  background: var(--amber-a3);
+  border-radius: var(--radius-2);
+  border-left: 3px solid var(--amber-9);
+}
+
+.noVehicles {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 24px;
+  justify-content: center;
+}
+
+.noVehiclesText {
+  flex: 1;
+}
+
+.vehicleSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vehicleLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.separator {
+  height: 1px;
+  background: var(--gray-a5);
+}
+
+.scheduleList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.infoCard {
+  border-left: 3px solid var(--gray-a6);
+}
