@@ -1,0 +1,46 @@
+.formCard {
+  border-left: 3px solid var(--accent);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.timeRow {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.stepperRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stepperValue {
+  min-width: 48px;
+  text-align: center;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.error {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--red-a3);
+  border: 1px solid var(--red-a6);
+}
