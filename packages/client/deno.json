@@ -22,11 +22,17 @@
     "@deno/vite-plugin": "npm:@deno/vite-plugin@^1",
     "@tanstack/react-query": "npm:@tanstack/react-query@^5",
     "@tanstack/react-query-devtools": "npm:@tanstack/react-query-devtools@^5",
+    "qrcode.react": "npm:qrcode.react@^4",
+    "recharts": "npm:recharts@^2",
+    "vitest/config": "npm:vitest@^3/config",
     "@trpc/client": "npm:@trpc/client@^11",
     "@trpc/react-query": "npm:@trpc/react-query@^11",
-    "@trpc/server": "npm:@trpc/server@^11"
+    "@trpc/server": "npm:@trpc/server@^11",
+    "chart.js": "npm:chart.js@^4"
   },
   "tasks": {
+    "dev": "deno run -A --unstable-no-legacy-abort npm:vite@^6 dev",
+    "build": "deno run -A npm:vite@^6 build",
     "test": "deno run -A npm:vitest@^3 run",
     "test:watch": "deno run -A npm:vitest@^3",
     "test:coverage": "deno run -A npm:vitest@^3 run --coverage"
