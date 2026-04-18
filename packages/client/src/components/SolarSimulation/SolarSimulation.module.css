@@ -1,0 +1,23 @@
+.vehicleRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--gray-a2);
+}
+
+.summaryBar {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--gray-a2);
+}
+
+.resultTag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
