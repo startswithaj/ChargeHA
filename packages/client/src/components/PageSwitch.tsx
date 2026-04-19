@@ -3,11 +3,13 @@ import { ErrorBoundary } from "./ui/ErrorBoundary.tsx";
 import { Dashboard } from "./pages/Dashboard/Dashboard.tsx";
 import { Stats } from "./pages/Stats/Stats.tsx";
 import { Schedules } from "./pages/Schedules/Schedules.tsx";
+import { Settings } from "./pages/Settings/Settings.tsx";
 
 const PAGE_LABELS: Record<Page, string> = {
   dashboard: "Dashboard",
   stats: "Stats",
   schedules: "Schedules",
+  settings: "Settings",
 };
 
 export function renderPage(page: Page, onNavigate: (p: Page) => void) {
@@ -19,6 +21,7 @@ export function renderPage(page: Page, onNavigate: (p: Page) => void) {
     schedules: () => (
       <Schedules onNavigateSettings={() => onNavigate("settings")} />
     ),
+    settings: () => <Settings />,
   };
   const content = pages[page]();
   return <ErrorBoundary label={PAGE_LABELS[page]}>{content}</ErrorBoundary>;
