@@ -1,0 +1,239 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.toolbarRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.logList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.logEntry {
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.logEntry:hover {
+  background: var(--gray-a2);
+}
+
+.logHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.logTopRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chevron {
+  flex-shrink: 0;
+  color: var(--gray-8);
+}
+
+.timestamp {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ampsLabel {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.logBottomRow {
+  padding-left: 22px;
+}
+
+.expandedSection {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--gray-a4);
+  padding-left: 22px;
+}
+
+.detailGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detailLabel {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.checksList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.checkItem {
+  display: flex;
+  gap: 8px;
+  font-size: 0.8125rem;
+  font-family: var(--default-font-family);
+  line-height: 1.5;
+}
+
+.checkName {
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--gray-11);
+}
+
+.checkResult {
+  color: var(--gray-10);
+}
+
+.dataGrid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  font-size: 0.8125rem;
+}
+
+.dataKey {
+  color: var(--gray-11);
+  font-weight: 500;
+}
+
+.dataValue {
+  color: var(--gray-12);
+  font-variant-numeric: tabular-nums;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.customRange {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+}
+
+.customRange label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.actionFilters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.actionCheckbox {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+}
+
+.tabContent {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 16px;
+}
+
+.dataTableWrapper {
+  overflow-x: auto;
+}
+
+.dataTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.dataTable th {
+  text-align: left;
+  padding: 6px 10px;
+  color: var(--gray-11);
+  font-weight: 500;
+  border-bottom: 1px solid var(--gray-a4);
+  white-space: nowrap;
+}
+
+.dataTable td {
+  padding: 5px 10px;
+  color: var(--gray-12);
+  border-bottom: 1px solid var(--gray-a3);
+  white-space: nowrap;
+}
+
+.dataTable tbody tr:hover {
+  background: var(--gray-a2);
+}
+
+@keyframes rowFlash {
+  from {
+    background-color: var(--accent-a5);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+.freshRow > td {
+  animation: rowFlash 1.5s ease-out;
+}
+
+.logList > .freshRow {
+  animation: rowFlash 1.5s ease-out;
+  border-radius: 6px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 0.6s linear 1;
+}
