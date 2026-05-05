@@ -1,0 +1,167 @@
+.simulator {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: end;
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.control label {
+  font-size: 0.75rem;
+  color: var(--gray-11);
+  font-weight: 500;
+}
+
+.control input,
+.control select {
+  padding: 6px 10px;
+  border: 1px solid var(--gray-6);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  background: var(--color-panel-solid);
+  color: var(--gray-12);
+}
+
+.control input[type="number"] {
+  width: 90px;
+}
+
+.sectionLabel {
+  width: 100%;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gray-9);
+  margin-top: 4px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.simNote {
+  font-size: 0.75rem;
+  color: var(--gray-9);
+}
+
+.statsRow {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.stat {
+  background: var(--color-panel-solid);
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--gray-4);
+  font-size: 0.875rem;
+  color: var(--gray-11);
+}
+
+.stat b {
+  color: var(--gray-12);
+}
+
+.chartContainer {
+  background: var(--color-panel-solid);
+  border-radius: 8px;
+  border: 1px solid var(--gray-4);
+  padding: 16px;
+}
+
+.chartCanvas {
+  width: 100%;
+}
+
+.eventsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.eventsTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.eventsTable th {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 2px solid var(--gray-5);
+  font-weight: 600;
+  color: var(--gray-11);
+}
+
+.eventsTable td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--gray-4);
+  vertical-align: top;
+}
+
+.eventRow {
+  cursor: pointer;
+}
+
+.eventRow:hover {
+  background: var(--gray-2);
+}
+
+.actionStart {
+  color: var(--green-11);
+  font-weight: 600;
+}
+
+.actionStop {
+  color: var(--red-11);
+  font-weight: 600;
+}
+
+.actionAdjust {
+  color: var(--blue-11);
+  font-weight: 600;
+}
+
+.checksRow td {
+  padding: 0 12px 6px;
+}
+
+.checksList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  background: var(--gray-2);
+  border-radius: 6px;
+  font-size: 0.75rem;
+}
+
+.checkItem {
+  display: flex;
+  gap: 8px;
+}
+
+.checkName {
+  font-weight: 600;
+  color: var(--gray-11);
+  min-width: 140px;
+}
+
+.checkResult {
+  color: var(--gray-10);
+}
