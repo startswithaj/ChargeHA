@@ -1,0 +1,16 @@
+node_modules
+.git
+.env
+data
+
+coverage
+coverage_*
+*.log
+*.db
+*.db-wal
+*.db-shm
+
+# Not needed in Docker build
+docs/
+prds/
+devtools/
