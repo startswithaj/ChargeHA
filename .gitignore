@@ -1,2 +1,23 @@
+.env
+private-key.pem
+public-key.pem
 node_modules/
+packages/server/dist/
+**/.vite/
+data/
+deno.lock
 .DS_Store
+packages/client/coverage/
+coverage/
+coverage_*/
+
+# Database files in root (downloaded/backup copies)
+*.db
+*.db.backup
+
+# Devtools build artifacts
+devtools/output/
+
+
+
+.scratch/
