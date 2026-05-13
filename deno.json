@@ -5,8 +5,45 @@
     "./packages/client",
     "./packages/plugins"
   ],
+  "nodeModulesDir": "auto",
+  "minimumDependencyAge": "P14D",
   "compilerOptions": {
     "strict": true
+  },
+  "exclude": [
+    "devtools/sim/browser/",
+    "devtools/output/",
+    "packages/server/dist/"
+  ],
+  "tasks": {
+    "dev": "deno task dev:server & deno task dev:client & wait",
+    "dev:server": "deno run --watch --unsafely-ignore-certificate-errors=localhost --allow-net --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-sys=networkInterfaces --unstable-ffi packages/server/src/main.ts",
+    "dev:client": "deno task --filter client dev",
+    "build": "deno task --filter client build",
+    "start": "deno run --allow-net --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-sys=networkInterfaces --unstable-ffi --unsafely-ignore-certificate-errors=localhost packages/server/src/main.ts",
+    "test": "deno check && deno task test:server && deno task test:client",
+    "test:server": "deno test --allow-net --allow-read --allow-write --allow-env --allow-ffi --unstable-ffi --ignore='**/client/**,**/*.test.tsx' packages/server/ packages/plugins/ devtools/ packages/shared/",
+    "test:server:coverage": "deno test --coverage=coverage/ --allow-net --allow-read --allow-write --allow-env --allow-ffi --unstable-ffi --ignore='**/client/**,**/*.test.tsx' packages/server/ packages/plugins/ devtools/ packages/shared/",
+    "test:client:coverage": "deno task --filter client test:coverage",
+    "coverage": "deno task test:server:coverage && deno coverage coverage/ --exclude=test && deno task test:client:coverage",
+    "coverage:report": "deno coverage coverage/ --exclude=test",
+    "coverage:lcov": "deno coverage coverage/ --lcov --output=coverage/lcov.info",
+    "test:client": "deno task --filter client test",
+    "db:cli": "deno run -A --unstable-ffi devtools/db/db-cli.ts",
+    "db:generate": "deno -A --node-modules-dir npm:drizzle-kit generate --config drizzle/drizzle.config.ts",
+    "check:unused": "bash devtools/quality/check-unused-files.sh",
+    "check:all": "deno fmt && deno fmt --check && deno lint && deno check && deno task check:unused && deno task test:server && deno task test:client"
+  },
+  "imports": {
+    "@db/sqlite": "jsr:@db/sqlite@^0.12",
+    "@std/assert": "jsr:@std/assert@^1",
+    "@std/expect": "jsr:@std/expect@^1.0.18",
+    "@std/testing": "jsr:@std/testing@^1.0.17",
+    "drizzle-orm": "npm:drizzle-orm@^0.45.1",
+    "drizzle-kit": "npm:drizzle-kit@^0.31.1",
+    "@ts-rex/argon2": "jsr:@ts-rex/argon2@^1.0.3",
+    "oauth4webapi": "npm:oauth4webapi@^3",
+    "zod": "npm:zod@^3.24"
   },
   "lint": {
     "plugins": [
@@ -25,6 +62,23 @@
     "rules": {
       "tags": ["recommended"],
       "include": ["no-non-null-assertion"]
-    }
+    },
+    "exclude": [
+      "**/coverage/",
+      "**/dist/",
+      "**/node_modules/",
+      "scripts/",
+      "**/.vite/",
+      "devtools/"
+    ]
+  },
+  "fmt": {
+    "exclude": [
+      "**/coverage/",
+      "**/dist/",
+      "**/node_modules/",
+      "scripts/",
+      "**/.vite/"
+    ]
   }
 }
