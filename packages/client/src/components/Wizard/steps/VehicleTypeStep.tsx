@@ -7,6 +7,7 @@ import {
   vehiclePluginSteps,
 } from "@chargeha/plugins/componentRegistry";
 import { trpc } from "../../../trpc.ts";
+import { isDemoMode } from "../../../lib/featureFlags.ts";
 import type { StepProps } from "../WizardShell.tsx";
 import styles from "./steps.module.css";
 
@@ -17,6 +18,7 @@ const icons = {
 
 export function VehicleTypeStep({ onNext: _onNext }: StepProps) {
   const wizardState = useWizardState();
+  const demoMode = isDemoMode();
   const pendingIdRef = useRef<string | null>(null);
 
   /** Navigate to the first plugin step, or skip to inverter-type if the plugin has none. */
@@ -63,12 +65,14 @@ export function VehicleTypeStep({ onNext: _onNext }: StepProps) {
         {vehiclePluginOptions.map((option, idx) => {
           const Icon = icons[option.iconKey];
           const isDemoSetup = !!option.demoSetup;
+          const demoBlocked = demoMode && !option.demoAvailable;
           return (
             <Button
               key={option.id}
               size="3"
               variant={idx === 0 ? "solid" : "soft"}
-              disabled={isDemoSetup && demoSetupMutation.isPending}
+              disabled={demoBlocked ||
+                (isDemoSetup && demoSetupMutation.isPending)}
               onClick={() => handleSelect(option.id)}
             >
               <Icon size={18} />

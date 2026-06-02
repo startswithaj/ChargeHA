@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Text, TextField } from "@radix-ui/themes";
 import { Globe, KeyRound, ShieldOff } from "lucide-react";
 import { trpc } from "../../../trpc.ts";
+import { Feature, isFeatureEnabled } from "../../../lib/featureFlags.ts";
 import type { StepProps } from "../WizardShell.tsx";
 import styles from "./steps.module.css";
 
@@ -46,9 +47,10 @@ function validateOidc(form: OidcForm): string | null {
 }
 
 function ModeCard(
-  { mode, selected, icon, title, description, onSelect }: {
+  { mode, selected, disabled, icon, title, description, onSelect }: {
     mode: AuthMode;
     selected: boolean;
+    disabled?: boolean;
     icon: React.ReactNode;
     title: string;
     description: string;
@@ -61,9 +63,14 @@ function ModeCard(
         selected ? styles.optionCardSelected : ""
       }`}
       role="button"
-      tabIndex={0}
-      onClick={() => onSelect(mode)}
+      aria-disabled={disabled}
+      tabIndex={disabled ? -1 : 0}
+      style={disabled ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
+      onClick={() => {
+        if (!disabled) onSelect(mode);
+      }}
       onKeyDown={(e) => {
+        if (disabled) return;
         if (e.key === "Enter" || e.key === " ") onSelect(mode);
       }}
     >
@@ -326,6 +333,8 @@ export function AuthStep({ onNext }: StepProps) {
     selectMode,
   } = useAuthStepState(onNext);
 
+  const oidcEnabled = isFeatureEnabled(Feature.OidcAuth);
+
   return (
     <div className={styles.stepContainer}>
       <Text as="p" size="3" color="gray">
@@ -356,12 +365,15 @@ export function AuthStep({ onNext }: StepProps) {
         <ModeCard
           mode="oidc"
           selected={selectedMode === "oidc"}
+          disabled={!oidcEnabled}
           icon={<Globe size={18} />}
           title="OpenID Connect (OIDC)"
-          description="Delegate authentication to an external identity provider such as Authentik, Keycloak, or Google."
+          description={oidcEnabled
+            ? "Delegate authentication to an external identity provider such as Authentik, Keycloak, or Google."
+            : "Not available in demo mode."}
           onSelect={selectMode}
         />
-        {selectedMode === "oidc" && (
+        {oidcEnabled && selectedMode === "oidc" && (
           <OidcFormFields
             oidcForm={oidcForm}
             setOidcForm={setOidcForm}

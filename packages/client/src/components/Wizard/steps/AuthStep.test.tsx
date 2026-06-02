@@ -48,6 +48,15 @@ vi.mock("../../../trpc.ts", () => ({
   },
 }));
 
+const { mockIsFeatureEnabled } = vi.hoisted(() => ({
+  mockIsFeatureEnabled: vi.fn(() => true),
+}));
+
+vi.mock("../../../lib/featureFlags.ts", async (orig) => {
+  const actual = await orig() as typeof import("../../../lib/featureFlags.ts");
+  return { ...actual, isFeatureEnabled: mockIsFeatureEnabled };
+});
+
 // ---- Tests ----
 
 describe("AuthStep", () => {
@@ -63,6 +72,7 @@ describe("AuthStep", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    mockIsFeatureEnabled.mockReturnValue(true);
     // Reset location search
     globalThis.history.replaceState({}, "", "/");
   });
@@ -197,6 +207,21 @@ describe("AuthStep", () => {
   });
 
   // ---- OIDC mode ----
+
+  it("disables the OIDC option in demo mode", () => {
+    mockIsFeatureEnabled.mockReturnValue(false);
+    mockSessionRefetch.mockResolvedValue({ data: null });
+    renderWithProviders(<AuthStep {...makeStepProps()} />);
+
+    const oidcCard = screen
+      .getByText("OpenID Connect (OIDC)")
+      .closest('[role="button"]');
+    assertExists(oidcCard);
+    expect(oidcCard).toHaveAttribute("aria-disabled", "true");
+
+    fireEvent.click(oidcCard);
+    expect(screen.queryByTestId("oidc-form")).not.toBeInTheDocument();
+  });
 
   it("shows OIDC form when OpenID Connect is selected", () => {
     mockSessionRefetch.mockResolvedValue({ data: null });

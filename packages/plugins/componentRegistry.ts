@@ -61,6 +61,8 @@ export interface EnergyPluginOption {
   label: string;
   description: string;
   iconKey: "server" | "cloud";
+  /** When true, this option is selectable in demo mode; others are disabled. */
+  demoAvailable?: boolean;
 }
 
 /** Energy plugin options for the inverter type selection step. */
@@ -81,6 +83,8 @@ export interface VehiclePluginOption {
   label: string;
   description: string;
   iconKey: "car" | "monitor";
+  /** When true, this option is selectable in demo mode; others are disabled. */
+  demoAvailable?: boolean;
   /** When true, selecting this option triggers the demo setup flow instead of plugin wizard steps. */
   demoSetup?: boolean;
   /** Default config for creating a new vehicle of this type from the settings page. */
@@ -97,6 +101,7 @@ export const vehiclePluginOptions: VehiclePluginOption[] = [
       "Creates a virtual vehicle for testing. You can add a real vehicle later in Settings.",
     iconKey: "monitor",
     demoSetup: true,
+    demoAvailable: true,
     defaultVehicleConfig: {
       batteryCapacityKwh: 75,
       initialSocPercent: 50,
