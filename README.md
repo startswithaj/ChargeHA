@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="packages/client/public/social-card.png" alt="ChargeHA" />
+  <img src="packages/client/public/social-card-rounded.png" alt="ChargeHA" />
 </p>
 
 <p align="center">
