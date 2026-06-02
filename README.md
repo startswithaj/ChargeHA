@@ -8,6 +8,15 @@
   self-consumption — keeping your energy costs low and your car charged.
 </p>
 
+## ChargeHQ.net
+
+ChargeHA is a self-hosted app that aims to have feature parity with
+[ChargeHQ](https://chargehq.net/). ChargeHQ is a very stable, reliable charge
+controller. It's only $7.99 AUD, so highly recommended if you don't care about
+self-hosting.
+
+ChargeHA is not affiliated with, endorsed by, or associated with ChargeHQ.
+
 ## Features
 
 - **Solar tracking** — dynamically adjusts charging amps based on available
