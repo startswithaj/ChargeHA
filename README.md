@@ -1,8 +1,12 @@
-# ChargeHA
+<p align="center">
+  <img src="packages/client/public/social-card.png" alt="ChargeHA" />
+</p>
 
-Solar-aware EV charge controller for home automation. ChargeHA monitors your
-solar production and intelligently manages EV charging to maximise
-self-consumption — keeping your energy costs low and your car charged.
+<p align="center">
+  Solar-aware EV charge controller for home automation. ChargeHA monitors your
+  solar production and intelligently manages EV charging to maximise
+  self-consumption — keeping your energy costs low and your car charged.
+</p>
 
 ## Features
 
