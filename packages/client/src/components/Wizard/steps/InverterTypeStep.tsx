@@ -1,5 +1,5 @@
 import { Text } from "@radix-ui/themes";
-import { Cloud, Server, SkipForward } from "lucide-react";
+import { Cloud, Monitor, Server, SkipForward } from "lucide-react";
 import { useWizardState } from "../../../hooks/useWizardState.ts";
 import {
   energyPluginOptions,
@@ -16,6 +16,7 @@ import styles from "./steps.module.css";
 const icons = {
   server: Server,
   cloud: Cloud,
+  monitor: Monitor,
 } as const;
 
 export function InverterTypeStep(_props: StepProps) {

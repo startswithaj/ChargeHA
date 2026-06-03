@@ -22,6 +22,9 @@ import { VirtualKeyPairingStep } from "./vehicles/tesla/client/VirtualKeyPairing
 import { FroniusLocalSetupStep } from "./energy/fronius-local/client/FroniusLocalSetupStep.tsx";
 import { FroniusCloudSetupStep } from "./energy/fronius-cloud/client/FroniusCloudSetupStep.tsx";
 
+// Simulated energy settings component
+import { SimulatedEnergyConfig } from "./energy/simulated/client/SimulatedEnergyConfig.tsx";
+
 // Tesla settings component
 import { TeslaSettings } from "./vehicles/tesla/client/TeslaSettings.tsx";
 
@@ -42,6 +45,10 @@ import {
   froniusLocalWizardSteps,
 } from "./energy/fronius-local/client/wizardSteps.ts";
 import {
+  simulatedEnergyOption,
+  simulatedEnergyWizardSteps,
+} from "./energy/simulated/client/wizardSteps.ts";
+import {
   teslaScheduleNote,
   teslaVehicleOption,
   teslaWizardSteps,
@@ -60,7 +67,7 @@ export interface EnergyPluginOption {
   id: string;
   label: string;
   description: string;
-  iconKey: "server" | "cloud";
+  iconKey: "server" | "cloud" | "monitor";
   /** When true, this option is selectable in demo mode; others are disabled. */
   demoAvailable?: boolean;
 }
@@ -69,6 +76,7 @@ export interface EnergyPluginOption {
 export const energyPluginOptions: EnergyPluginOption[] = [
   froniusLocalOption,
   froniusCloudOption,
+  simulatedEnergyOption,
 ];
 
 /** A schedule-related note contributed by a vehicle plugin. */
@@ -125,6 +133,7 @@ export const vehiclePluginSteps: Record<string, PluginWizardStep[]> = {
 export const energyPluginSteps: Record<string, PluginWizardStep[]> = {
   fronius_local: froniusLocalWizardSteps,
   fronius_cloud: froniusCloudWizardSteps,
+  simulated_energy: simulatedEnergyWizardSteps,
 };
 
 /**
@@ -152,4 +161,5 @@ export const pluginSettingsComponents: Record<string, ComponentType> = {
   "simulated-settings": SimulatedVehicleSettings,
   "fronius-local-config": FroniusLocalConfig,
   "fronius-cloud-config": FroniusCloudConfig,
+  "simulated-energy-config": SimulatedEnergyConfig,
 };
