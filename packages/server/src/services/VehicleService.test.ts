@@ -81,6 +81,7 @@ describe("VehicleService", () => {
       getVehicleError: () => null,
       addVehicle: () => Promise.resolve(),
       removeVehicle: () => Promise.resolve(),
+      deleteVehicle: () => Promise.resolve(),
       requestState: () => Promise.resolve(CHARGE_STATE),
       startChargingAt: () =>
         Promise.resolve(
@@ -545,28 +546,13 @@ describe("VehicleService", () => {
 
   describe("deleteVehicle", () => {
     it("deletes vehicle and all related data", async () => {
-      let removeCalled = false;
-      let deleteSchedulesCalled = false;
-      let deleteVehicleCalled = false;
-      let resequenceCalled = false;
+      const deletedIds: string[] = [];
       mgr = makeMockVehicleManager({
-        removeVehicle: () => {
-          removeCalled = true;
+        deleteVehicle: (id: string) => {
+          deletedIds.push(id);
           return Promise.resolve();
         },
       });
-      db.deleteSchedulesByVehicle = () => {
-        deleteSchedulesCalled = true;
-        return Promise.resolve();
-      };
-      db.deleteVehicle = () => {
-        deleteVehicleCalled = true;
-        return Promise.resolve();
-      };
-      db.resequenceVehiclePriorities = () => {
-        resequenceCalled = true;
-        return Promise.resolve();
-      };
       service = new VehicleService(
         db,
         mgr,
@@ -577,10 +563,7 @@ describe("VehicleService", () => {
 
       const result = await service.deleteVehicle("v1");
       expect(result).toEqual({ success: true });
-      expect(removeCalled).toBe(true);
-      expect(deleteSchedulesCalled).toBe(true);
-      expect(deleteVehicleCalled).toBe(true);
-      expect(resequenceCalled).toBe(true);
+      expect(deletedIds).toEqual(["v1"]);
     });
 
     it("throws NOT_FOUND when vehicle missing", async () => {

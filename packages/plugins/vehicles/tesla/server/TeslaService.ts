@@ -84,9 +84,7 @@ export class TeslaService {
       const vehicles = await this.deps.getVehicleRows();
       await vehicles.reduce(async (prev, v) => {
         await prev;
-        await this.deps.removeVehicle(v.id);
-        await this.deps.deleteSchedulesByVehicle(v.id);
-        await this.deps.deleteVehicleRow(v.id);
+        await this.deps.deleteVehicle(v.id);
       }, Promise.resolve());
 
       // Clear stored tokens

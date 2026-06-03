@@ -123,6 +123,47 @@ describe("VehicleManager", () => {
     });
   });
 
+  describe("deleteVehicle", () => {
+    it("removes live state, deletes the row, cascades schedules, resequences", async () => {
+      await db.upsertVehicle({
+        id: "VIN1",
+        name: "Car 1",
+        adapterType: "tesla",
+        priority: 1,
+        config: "{}",
+        mode: "auto",
+      });
+      await db.upsertVehicle({
+        id: "VIN2",
+        name: "Car 2",
+        adapterType: "tesla",
+        priority: 2,
+        config: "{}",
+        mode: "auto",
+      });
+      await db.createSchedule({
+        id: "sched-1",
+        vehicleId: "VIN1",
+        scheduleType: "charge",
+        startTime: "22:00",
+        endTime: "06:00",
+        days: ["mon"],
+        chargeAmps: 16,
+        chargeLimitPct: 80,
+      });
+      await manager.addVehicle(VEHICLE_ROW);
+
+      await manager.deleteVehicle("VIN1");
+
+      expect(manager.hasVehicle("VIN1")).toBe(false);
+      expect(await db.getVehicle("VIN1")).toBeNull();
+      expect(await db.getSchedules()).toHaveLength(0);
+
+      const remaining = await db.getVehicle("VIN2");
+      expect(remaining?.priority).toBe(1);
+    });
+  });
+
   describe("requestState", () => {
     it("returns null for unknown vehicle", async () => {
       const state = await manager.requestState("UNKNOWN", REQUEST_CONTEXT);
