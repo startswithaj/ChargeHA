@@ -1,0 +1,35 @@
+name: test
+
+on:
+  workflow_call:
+
+jobs:
+  test:
+    name: deno task check:all
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.7.7
+
+      - name: Cache Deno deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/deno
+            node_modules
+          key: deno-2.7.7-${{ runner.os }}-${{ hashFiles('deno.lock', 'deno.json', 'packages/*/deno.json') }}
+          restore-keys: |
+            deno-2.7.7-${{ runner.os }}-
+
+      - name: Print Deno version
+        run: deno --version
+
+      - name: Install dependencies (frozen lockfile)
+        run: deno install --frozen
+
+      - name: Run check:all
+        run: deno task check:all
