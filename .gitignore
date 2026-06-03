@@ -5,7 +5,6 @@ node_modules/
 packages/server/dist/
 **/.vite/
 data/
-deno.lock
 .DS_Store
 packages/client/coverage/
 coverage/
