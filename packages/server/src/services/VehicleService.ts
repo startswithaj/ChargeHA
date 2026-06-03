@@ -164,10 +164,7 @@ export class VehicleService {
   /** Delete a vehicle from DB and manager. */
   async deleteVehicle(vehicleId: string) {
     await this.getVehicleOrThrow(vehicleId);
-    this.vehicleManager.removeVehicle(vehicleId);
-    await this.db.deleteSchedulesByVehicle(vehicleId);
-    await this.db.deleteVehicle(vehicleId);
-    await this.db.resequenceVehiclePriorities();
+    await this.vehicleManager.deleteVehicle(vehicleId);
     return { success: true };
   }
 

@@ -55,10 +55,8 @@ describe("TeslaService", () => {
       getVehicleRows: () => Promise.resolve([]),
       getVehicleRow: () => Promise.resolve(null),
       upsertVehicleRow: () => Promise.resolve(),
-      deleteVehicleRow: () => Promise.resolve(),
-      deleteSchedulesByVehicle: () => Promise.resolve(),
       addVehicle: () => Promise.resolve(),
-      removeVehicle: () => Promise.resolve(),
+      deleteVehicle: () => Promise.resolve(),
       setSimulatedLoad: () => {},
       log: mockLogger(),
       dbLog: mockLogger() as unknown as PluginDependencies["dbLog"],
@@ -162,25 +160,15 @@ describe("TeslaService", () => {
 
   describe("TeslaService.disconnect", () => {
     it("removes vehicles, clears tokens, and stops refresh", async () => {
-      const removed: string[] = [];
       const deleted: string[] = [];
-      const schedulesDeleted: string[] = [];
       const stopCalls: boolean[] = [];
       const deleteTokenCalls: boolean[] = [];
 
       const service = makeService({
         deps: {
           getVehicleRows: () => Promise.resolve([VEHICLE_ROW]),
-          deleteVehicleRow: (id: string) => {
+          deleteVehicle: (id: string) => {
             deleted.push(id);
-            return Promise.resolve();
-          },
-          deleteSchedulesByVehicle: (id: string) => {
-            schedulesDeleted.push(id);
-            return Promise.resolve();
-          },
-          removeVehicle: (id: string) => {
-            removed.push(id);
             return Promise.resolve();
           },
         },
@@ -198,8 +186,6 @@ describe("TeslaService", () => {
       const result = await service.disconnect();
       expect(result.success).toBe(true);
       expect(stopCalls).toHaveLength(1);
-      expect(removed).toEqual(["VIN123"]);
-      expect(schedulesDeleted).toEqual(["VIN123"]);
       expect(deleted).toEqual(["VIN123"]);
       expect(deleteTokenCalls).toHaveLength(1);
     });

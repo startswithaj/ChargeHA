@@ -178,7 +178,9 @@ export class AppDatabase {
     return await this.vehicles.getVehicles();
   }
   async deleteVehicle(id: string): Promise<void> {
-    return await this.vehicles.deleteVehicle(id);
+    // Schedules reference a vehicle but have no DB-level FK, so cascade here.
+    await this.schedules.deleteSchedulesByVehicle(id);
+    await this.vehicles.deleteVehicle(id);
   }
   async updateVehicleMode(id: string, mode: VehicleMode): Promise<void> {
     return await this.vehicles.updateVehicleMode(id, mode);

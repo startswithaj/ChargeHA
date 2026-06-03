@@ -89,22 +89,16 @@ export class PluginDependencies<K extends string = string> {
     return this.db.upsertVehicle(input);
   }
 
-  deleteVehicleRow(id: string): Promise<void> {
-    return this.db.deleteVehicle(id);
-  }
-
-  deleteSchedulesByVehicle(vehicleId: string): Promise<void> {
-    return this.db.deleteSchedulesByVehicle(vehicleId);
-  }
-
   // ── Vehicle lifecycle (notify VehicleManager) ────────────────────────
 
   addVehicle(row: VehicleRow): Promise<void> {
     return this.vehicleManager.addVehicle(row);
   }
 
-  removeVehicle(id: string): Promise<void> {
-    return this.vehicleManager.removeVehicle(id);
+  /** Permanently delete a vehicle: drops live state, deletes the row
+   *  (cascading its schedules), and renumbers remaining priorities. */
+  deleteVehicle(id: string): Promise<void> {
+    return this.vehicleManager.deleteVehicle(id);
   }
 
   // ── Simulated load (Simulated plugin only) ───────────────────────────

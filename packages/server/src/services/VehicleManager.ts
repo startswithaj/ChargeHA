@@ -189,6 +189,14 @@ export class VehicleManager {
     this.logger.info(`Vehicle removed: ${id}`);
   }
 
+  /** Permanently delete a vehicle: drop live state, delete the row (cascades
+   *  its schedules), and renumber remaining priorities so there are no gaps. */
+  async deleteVehicle(id: string): Promise<void> {
+    await this.removeVehicle(id);
+    await this.db.deleteVehicle(id);
+    await this.db.resequenceVehiclePriorities();
+  }
+
   // ── Data requests ─────────────────────────────────────────────────────
 
   /** Request vehicle state via the middleware. Detects plug transitions
