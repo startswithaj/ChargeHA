@@ -30,7 +30,6 @@
     "coverage:lcov": "deno coverage coverage/ --lcov --output=coverage/lcov.info",
     "test:client": "deno task --filter client test",
     "db:cli": "deno run -A --unstable-ffi devtools/db/db-cli.ts",
-    "gen:demo-data": "deno run --allow-read --allow-write devtools/sim/generate-demo-data.ts",
     "db:generate": "deno -A --node-modules-dir npm:drizzle-kit generate --config drizzle/drizzle.config.ts",
     "check:unused": "bash devtools/quality/check-unused-files.sh",
     "check:all": "deno fmt && deno fmt --check && deno lint && deno check && deno task check:unused && deno task test:server && deno task test:client"
