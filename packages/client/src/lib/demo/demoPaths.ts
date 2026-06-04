@@ -14,7 +14,25 @@
 // HANDLED_QUERIES. When PENDING is empty, delete it.
 
 /** Queries the demo serves with a handler. */
-export const HANDLED_QUERIES: readonly string[] = [];
+export const HANDLED_QUERIES: readonly string[] = [
+  "config.battery.get",
+  "config.charging.get",
+  "config.equipment.get",
+  "config.geocode",
+  "config.geocodeAutocomplete",
+  "config.home.get",
+  "config.notification.get",
+  "config.solar.get",
+  "config.system.get",
+  "config.systemAlert",
+  "stats.day",
+  "stats.month",
+  "stats.year",
+  "wizard.getEnergyType",
+  "wizard.getStep",
+  "wizard.getVehicleType",
+  "wizard.status",
+];
 
 /** Queries deliberately unreachable in demo (disabled plugins / features). */
 export const GATED_QUERIES: readonly string[] = [
@@ -34,16 +52,6 @@ export const GATED_QUERIES: readonly string[] = [
 export const PENDING_QUERIES: readonly string[] = [
   "auth.oidcConfig",
   "auth.session",
-  "config.battery.get",
-  "config.charging.get",
-  "config.equipment.get",
-  "config.geocode",
-  "config.geocodeAutocomplete",
-  "config.home.get",
-  "config.notification.get",
-  "config.solar.get",
-  "config.system.get",
-  "config.systemAlert",
   "energy.getPlugins",
   "energy.history",
   "energy.realtime",
@@ -57,19 +65,12 @@ export const PENDING_QUERIES: readonly string[] = [
   "notification.providers",
   "schedule.active",
   "schedule.list",
-  "stats.day",
-  "stats.month",
-  "stats.year",
   "tariff.currentRate",
   "tariff.defaultRate",
   "tariff.list",
   "vehicle.commandStatus",
   "vehicle.getPlugins",
   "vehicle.list",
-  "wizard.getEnergyType",
-  "wizard.getStep",
-  "wizard.getVehicleType",
-  "wizard.status",
 ];
 
 /** Every query path the demo accounts for (handled + gated + pending). */
