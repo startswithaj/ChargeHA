@@ -11,7 +11,11 @@ import { simulatedRouter } from "../packages/plugins/vehicles/simulated/server/r
 import { froniusLocalRouter } from "../packages/plugins/energy/fronius-local/server/router.ts";
 import { froniusCloudRouter } from "../packages/plugins/energy/fronius-cloud/server/router.ts";
 import { simulatedEnergyRouter } from "../packages/plugins/energy/simulated/server/router.ts";
-import { ALL_DEMO_QUERIES } from "../packages/client/src/lib/demo/demoPaths.ts";
+import {
+  GATED_QUERIES,
+  PENDING_QUERIES,
+} from "../packages/client/src/lib/demo/demoPaths.ts";
+import { queryHandlers } from "../packages/client/src/lib/demo/handlers/index.ts";
 
 interface ProcedureDef {
   _def: { type: "query" | "mutation" | "subscription" };
@@ -38,6 +42,13 @@ const realQueryPaths = (): string[] => {
 
 describe("demo query coverage", () => {
   it("accounts for every query path on the real merged router", () => {
-    expect([...ALL_DEMO_QUERIES].sort()).toEqual(realQueryPaths());
+    const declared = [
+      ...new Set([
+        ...Object.keys(queryHandlers),
+        ...GATED_QUERIES,
+        ...PENDING_QUERIES,
+      ]),
+    ].sort();
+    expect(declared).toEqual(realQueryPaths());
   });
 });

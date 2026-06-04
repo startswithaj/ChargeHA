@@ -73,6 +73,8 @@ const defaultConfig = (): Record<string, string> => ({
   solar_tracking_enabled: "true",
   solar_tracking_mode: "solar_only",
   solar_reference: "excess",
+  default_rate_per_kwh: "0.30",
+  auth_mode: "none",
   energy_adapter_type: "",
   wizard_completed: "",
   wizard_step: "",
