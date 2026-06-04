@@ -8,6 +8,13 @@
 //
 // devtools/demoCoverage.test.ts asserts handlers ∪ GATED ∪ PENDING equals the
 // real merged router's query paths — add/remove a route anywhere and CI fails.
+//
+// Both arrays are `satisfies readonly QueryPath[]`: a typo or non-existent path
+// is a compile error (QueryPath is derived from the real merged router type).
+// The `readonly string[]` annotation keeps the export usable for runtime
+// membership checks (e.g. GATED_QUERIES.includes(path)).
+
+import type { QueryPath } from "./queryPaths.ts";
 
 /** Queries deliberately unreachable in demo (disabled plugins / features). */
 export const GATED_QUERIES: readonly string[] = [
@@ -21,19 +28,11 @@ export const GATED_QUERIES: readonly string[] = [
   "energy.fronius_cloud.getConfig",
   // Cloudflare tunnel — Tesla-only setup step, never reached.
   "wizard.tunnelStatus",
-];
+] as const satisfies readonly QueryPath[];
 
 /** Queries known to exist but not yet implemented. Shrinks to [] as we build. */
 export const PENDING_QUERIES: readonly string[] = [
   "energy.getPlugins",
-  "energy.history",
-  "energy.realtime",
-  "energy.simulated_energy.getConfig",
-  "log.chargeController",
-  "log.energyReads",
-  "log.pluginLogs",
-  "log.vehicleUpdates",
-  "vehicle.commandStatus",
   "vehicle.getPlugins",
   "vehicle.list",
-];
+] as const satisfies readonly QueryPath[];

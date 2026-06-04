@@ -6,6 +6,9 @@ import { authHandlers } from "./auth.ts";
 import { scheduleHandlers } from "./schedule.ts";
 import { tariffHandlers } from "./tariff.ts";
 import { miscHandlers } from "./misc.ts";
+import { energyHandlers } from "./energy.ts";
+import { logsHandlers } from "./logs.ts";
+import { vehicleHandlers } from "./vehicle.ts";
 
 // Domain handler maps are spread in here as each is built (Phase 4d).
 // Keys must stay in sync with HANDLED_QUERIES in ../demoPaths.ts — enforced by
@@ -18,4 +21,7 @@ export const queryHandlers: Record<string, QueryHandler> = {
   ...scheduleHandlers,
   ...tariffHandlers,
   ...miscHandlers,
+  ...energyHandlers,
+  ...logsHandlers,
+  ...vehicleHandlers,
 };
