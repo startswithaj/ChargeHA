@@ -35,7 +35,8 @@
     "./energy/fronius-cloud/client/FroniusCloudConfig": "./energy/fronius-cloud/client/FroniusCloudConfig.tsx",
     "./energy/fronius-cloud/client/FroniusCloudForm": "./energy/fronius-cloud/client/FroniusCloudForm.tsx",
     "./energy/InverterSetupShared": "./energy/InverterSetupShared.tsx",
-    "./componentRegistry": "./componentRegistry.ts"
+    "./componentRegistry": "./componentRegistry.ts",
+    "./demoPluginSummaries": "./demoPluginSummaries.ts"
   },
   "imports": {
     "hono": "jsr:@hono/hono@^4",

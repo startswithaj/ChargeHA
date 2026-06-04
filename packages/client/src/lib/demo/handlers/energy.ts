@@ -1,6 +1,7 @@
 import type { QueryHandler } from "./types.ts";
 import type { EnergyData } from "@chargeha/shared";
 import { deserializeSection } from "@chargeha/shared/configSections";
+import { demoEnergyPluginSummaries } from "@chargeha/plugins/demoPluginSummaries";
 import { simulatedEnergyConfigDef } from "../../../../../plugins/energy/simulated/server/config.ts";
 import type { DemoState } from "../demoState.ts";
 import { currentSnapshot } from "../demoTick.ts";
@@ -40,6 +41,11 @@ const datedReadings = (s: DemoState, limit: number): DatedReading[] => {
 
 export const energyHandlers: Record<string, QueryHandler> = {
   "energy.realtime": (_i, s) => currentSnapshot(s),
+  "energy.getPlugins": (_i, s) =>
+    demoEnergyPluginSummaries.map((p) => ({
+      ...p,
+      configured: s.config.energy_adapter_type === p.id,
+    })),
   "energy.history": (input, s) => ({
     readings: datedReadings(s, (input as { limit?: number }).limit ?? 60),
   }),

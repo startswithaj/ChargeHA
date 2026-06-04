@@ -30,9 +30,6 @@ export const GATED_QUERIES: readonly string[] = [
   "wizard.tunnelStatus",
 ] as const satisfies readonly QueryPath[];
 
-/** Queries known to exist but not yet implemented. Shrinks to [] as we build. */
-export const PENDING_QUERIES: readonly string[] = [
-  "energy.getPlugins",
-  "vehicle.getPlugins",
-  "vehicle.list",
-] as const satisfies readonly QueryPath[];
+/** Queries known to exist but not yet implemented. Empty — all are handled. */
+export const PENDING_QUERIES: readonly string[] =
+  [] as const satisfies readonly QueryPath[];
