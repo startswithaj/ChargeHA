@@ -12,16 +12,19 @@ import { froniusLocalRouter } from "../packages/plugins/energy/fronius-local/ser
 import { froniusCloudRouter } from "../packages/plugins/energy/fronius-cloud/server/router.ts";
 import { simulatedEnergyRouter } from "../packages/plugins/energy/simulated/server/router.ts";
 import {
+  GATED_MUTATIONS,
   GATED_QUERIES,
+  PENDING_MUTATIONS,
   PENDING_QUERIES,
 } from "../packages/client/src/lib/demo/demoPaths.ts";
 import { queryHandlers } from "../packages/client/src/lib/demo/handlers/index.ts";
+import { mutationHandlers } from "../packages/client/src/lib/demo/handlers/mutations/index.ts";
 
 interface ProcedureDef {
   _def: { type: "query" | "mutation" | "subscription" };
 }
 
-const realQueryPaths = (): string[] => {
+const realPaths = (type: "query" | "mutation"): string[] => {
   const merged = createAppRouter({
     vehicle: { tesla: teslaRouter, simulated: simulatedRouter },
     energy: {
@@ -35,7 +38,7 @@ const realQueryPaths = (): string[] => {
   })
     ._def.procedures;
   return Object.entries(procedures)
-    .filter(([, p]) => p._def.type === "query")
+    .filter(([, p]) => p._def.type === type)
     .map(([path]) => path)
     .sort();
 };
@@ -49,6 +52,19 @@ describe("demo query coverage", () => {
         ...PENDING_QUERIES,
       ]),
     ].sort();
-    expect(declared).toEqual(realQueryPaths());
+    expect(declared).toEqual(realPaths("query"));
+  });
+});
+
+describe("demo mutation coverage", () => {
+  it("accounts for every mutation path on the real merged router", () => {
+    const declared = [
+      ...new Set([
+        ...Object.keys(mutationHandlers),
+        ...GATED_MUTATIONS,
+        ...PENDING_MUTATIONS,
+      ]),
+    ].sort();
+    expect(declared).toEqual(realPaths("mutation"));
   });
 });
