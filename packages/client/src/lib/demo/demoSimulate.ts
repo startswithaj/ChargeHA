@@ -42,8 +42,49 @@ const pad = (n: number): string => String(n).padStart(2, "0");
 const timeOfDay = (minute: number): string =>
   `${pad(Math.floor(minute / 60))}:${pad(minute % 60)}`;
 
-const simOptions = (seed: number): SimulationOptions => ({
-  seed,
+interface DayProfile {
+  seed: number;
+  cloudiness: number;
+  storms: number;
+  homeLoad: number;
+  ev1Start: number;
+  ev2Start: number;
+  away: boolean[];
+}
+
+// Stateless per-day hash → [0,1). Keeps every relative day reproducible across
+// reloads (no Math.random) while giving real day-to-day variation.
+const hash01 = (n: number): number => {
+  const a = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
+  const b = Math.imul(a ^ (a >>> 13), 0xc2b2ae35);
+  return ((b ^ (b >>> 16)) >>> 0) / 4294967296;
+};
+const rand = (offset: number, salt: number): number =>
+  hash01(offset * 131 + salt);
+
+/**
+ * Per-day weather + vehicle presence so no two days look alike: clear days,
+ * overcast days, the occasional storm, and days a car is away (no charging).
+ */
+const dayProfile = (offset: number): DayProfile => {
+  const stormy = rand(offset, 2) < 0.12;
+  return {
+    seed: 1000 + offset,
+    cloudiness: Math.round(10 + rand(offset, 1) * 75),
+    storms: stormy ? 1 + Math.floor(rand(offset, 3) * 2) : 0,
+    homeLoad: Math.round(
+      DEFAULT_SOLAR_CONFIG.homeBaseW * (0.85 + rand(offset, 4) * 0.5),
+    ),
+    // Vary the daily start SoC so charging amount differs day-to-day: a nearly
+    // full car barely charges, a low one pulls from grid when solar is short.
+    ev1Start: Math.round(35 + rand(offset, 5) * 55),
+    ev2Start: Math.round(30 + rand(offset, 6) * 60),
+    away: DEMO_VEHICLES.map((_, i) => rand(offset, 10 + i) < 0.18),
+  };
+};
+
+const simOptions = (profile: DayProfile): SimulationOptions => ({
+  seed: profile.seed,
   vehicleCount: 2,
   waterfall: false,
   minGenKw: "1",
@@ -51,13 +92,13 @@ const simOptions = (seed: number): SimulationOptions => ({
   cooldownMin: "15",
   peakSolarKw: DEFAULT_SOLAR_CONFIG.peakKw,
   minExcessKw: "",
-  cloudiness: DEFAULT_SOLAR_CONFIG.cloudiness,
-  storms: DEFAULT_SOLAR_CONFIG.storms,
-  homeLoad: DEFAULT_SOLAR_CONFIG.homeBaseW,
+  cloudiness: profile.cloudiness,
+  storms: profile.storms,
+  homeLoad: profile.homeLoad,
   sunrise: DEFAULT_SOLAR_CONFIG.sunrise,
   sunset: DEFAULT_SOLAR_CONFIG.sunset,
-  ev1Start: DEMO_VEHICLES[0].start,
-  ev2Start: DEMO_VEHICLES[1].start,
+  ev1Start: profile.ev1Start,
+  ev2Start: profile.ev2Start,
   ev1CapacityKwh: DEMO_VEHICLES[0].capacityKwh,
   ev2CapacityKwh: DEMO_VEHICLES[1].capacityKwh,
 });
@@ -96,7 +137,8 @@ const allocateSolar = (
   ).rows;
 
 const buildDay = (offset: number): DemoDay => {
-  const out = runSimulation(simOptions(69 + offset));
+  const profile = dayProfile(offset);
+  const out = runSimulation(simOptions(profile));
   const buckets = out.results.filter((r) => r.minute % BUCKET_MINUTES === 0);
 
   const readings = buckets.map((r): DemoReading => {
@@ -106,7 +148,8 @@ const buildDay = (offset: number): DemoDay => {
         w: v.isCharging ? Math.round(v.chargePowerW) : 0,
         amps: v.chargeAmps,
         soc: Math.round(v.batteryLevel),
-        isCharging: v.isCharging && v.chargePowerW > 0,
+        // A car that's away that day contributes no charging load.
+        isCharging: v.isCharging && v.chargePowerW > 0 && !profile.away[i],
       }))
       .filter((v) => v.isCharging);
 
@@ -120,18 +163,20 @@ const buildDay = (offset: number): DemoDay => {
     };
   });
 
-  const logs = out.events.map((e) => {
-    const idx = e.vehicleId === "SIM_V1" ? 0 : 1;
-    return {
-      time: timeOfDay(e.minute),
-      vehicleId: DEMO_VEHICLES[idx].id,
-      vehicleName: DEMO_VEHICLES[idx].name,
-      action: e.action,
-      detail: e.detail,
-      amps: e.targetAmps,
-      checksJson: e.checksJson,
-    };
-  });
+  const logs = out.events
+    .filter((e) => !profile.away[e.vehicleId === "SIM_V1" ? 0 : 1])
+    .map((e) => {
+      const idx = e.vehicleId === "SIM_V1" ? 0 : 1;
+      return {
+        time: timeOfDay(e.minute),
+        vehicleId: DEMO_VEHICLES[idx].id,
+        vehicleName: DEMO_VEHICLES[idx].name,
+        action: e.action,
+        detail: e.detail,
+        amps: e.targetAmps,
+        checksJson: e.checksJson,
+      };
+    });
 
   return { offset, readings, logs };
 };

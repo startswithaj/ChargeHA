@@ -52,6 +52,51 @@ const energyReads = (s: DemoState) =>
     })
     .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 
+const CHARGER_VOLTAGE_V = 230;
+const CHARGE_AMPS_MAX = 32;
+
+/** Synthesize vehicle-update rows from the series' per-vehicle charge entries
+ *  (one row per charging reading — idle readings aren't stored per-vehicle). */
+const vehicleUpdates = (s: DemoState) => {
+  const vById = new Map(s.series.vehicles.map((v) => [v.id, v]));
+  return s.series.days
+    .flatMap((day, di) => {
+      const date = dateForOffset(day.offset);
+      return day.readings.flatMap((r, ri) =>
+        r.charge.map((c, ci) => {
+          const v = vById.get(c.vehicleId);
+          const capacityKwh = v?.capacityKwh ?? 60;
+          const chargeLimit = v?.chargeLimitPercent ?? 80;
+          const powerKw = c.w / 1000;
+          const remainingKwh = Math.max(
+            0,
+            (chargeLimit - c.soc) / 100 * capacityKwh,
+          );
+          return {
+            id: di * 1_000_000 + ri * 10 + ci,
+            timestamp: `${date}T${r.time}:00`,
+            vehicleName: v?.name ?? c.vehicleId,
+            isOnline: true,
+            isHome: true,
+            isPluggedIn: true,
+            isCharging: true,
+            batteryLevel: c.soc,
+            chargeLimit,
+            chargePowerKw: powerKw,
+            chargeAmps: c.amps,
+            chargeAmpsMax: CHARGE_AMPS_MAX,
+            chargerVoltage: CHARGER_VOLTAGE_V,
+            energyAddedKwh: 0,
+            minutesToFull: powerKw > 0
+              ? Math.round(remainingKwh / powerKw * 60)
+              : 0,
+          };
+        })
+      );
+    })
+    .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+};
+
 const paginate = <T>(rows: T[], input: Page): { rows: T[]; total: number } => {
   const offset = input.offset ?? 0;
   const limit = input.limit ?? 50;
@@ -67,7 +112,10 @@ export const logsHandlers: Record<string, QueryHandler> = {
     const { rows, total } = paginate(energyReads(s), input as Page);
     return { readings: rows, total };
   },
-  // No simulated vehicle-poll or plugin logs in demo.
-  "log.vehicleUpdates": () => ({ readings: [], total: 0 }),
+  "log.vehicleUpdates": (input, s) => {
+    const { rows, total } = paginate(vehicleUpdates(s), input as Page);
+    return { readings: rows, total };
+  },
+  // No plugin logs in demo — nothing meaningful to fabricate.
   "log.pluginLogs": () => ({ logs: [], total: 0 }),
 };

@@ -63,7 +63,7 @@ export function SimulatedVehicleSettings(): JSX.Element | null {
                 <Text size="2" weight="bold">{v.name}</Text>
                 {v.state && (
                   <Badge size="1" variant="soft" color="gray">
-                    {v.state.batteryLevel}% /{" "}
+                    {v.state.batteryLevel.toFixed(2)}% /{" "}
                     {v.state.isPluggedIn ? "Plugged in" : "Unplugged"}
                   </Badge>
                 )}

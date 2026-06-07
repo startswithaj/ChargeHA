@@ -14,7 +14,6 @@ import { simulatedEnergyRouter } from "../packages/plugins/energy/simulated/serv
 import {
   GATED_MUTATIONS,
   GATED_QUERIES,
-  PENDING_MUTATIONS,
   PENDING_QUERIES,
 } from "../packages/client/src/lib/demo/demoPaths.ts";
 import { queryHandlers } from "../packages/client/src/lib/demo/handlers/index.ts";
@@ -62,7 +61,6 @@ describe("demo mutation coverage", () => {
       ...new Set([
         ...Object.keys(mutationHandlers),
         ...GATED_MUTATIONS,
-        ...PENDING_MUTATIONS,
       ]),
     ].sort();
     expect(declared).toEqual(realPaths("mutation"));

@@ -1,35 +1,13 @@
 import type { QueryHandler } from "./types.ts";
 import type { DemoVehicle } from "../demoState.ts";
+import { buildVehicleState, SYDNEY } from "./vehicleState.ts";
 import { demoVehiclePluginSummaries } from "@chargeha/plugins/demoPluginSummaries";
 
-const SYDNEY = { latitude: -33.8688, longitude: 151.2093 };
-const VOLTAGE = 230;
 const CREATED_AT = "2026-01-01T00:00:00.000Z";
 
 /** Build a vehicle.list item (VehicleRow + live charge state) from demo state. */
 const toListItem = (v: DemoVehicle, now: string) => {
-  const state = {
-    vehicleId: v.id,
-    batteryLevel: v.socPercent,
-    chargeLimit: v.chargeLimitPercent,
-    isCharging: v.isCharging,
-    isPluggedIn: v.isPluggedIn,
-    isOnline: true,
-    chargeAmps: v.isCharging ? v.chargeAmps : 0,
-    chargeAmpsMax: 32,
-    chargeAmpsMin: 5,
-    chargePowerKw: v.isCharging ? (v.chargeAmps * VOLTAGE) / 1000 : 0,
-    chargerVoltage: VOLTAGE,
-    chargerPhases: 1,
-    energyAddedKwh: 0,
-    minutesToFull: 0,
-    chargePortOpen: v.isPluggedIn,
-    vehicleName: v.name,
-    lastUpdated: now,
-    latitude: SYDNEY.latitude,
-    longitude: SYDNEY.longitude,
-    isHome: true,
-  };
+  const state = buildVehicleState(v, now);
   return {
     id: v.id,
     name: v.name,

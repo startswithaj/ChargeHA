@@ -1,10 +1,19 @@
+import type { DayOfWeek } from "@chargeha/shared";
 import type { QueryHandler } from "./types.ts";
 import type { DemoSchedule } from "../demoState.ts";
 
-const DAY_ABBRS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+const DAY_ABBRS: DayOfWeek[] = [
+  "sun",
+  "mon",
+  "tue",
+  "wed",
+  "thu",
+  "fri",
+  "sat",
+];
 
 /** Map a stored schedule to the server's discriminated charge/blockout shape. */
-const toSchedule = (r: DemoSchedule) => {
+export const toSchedule = (r: DemoSchedule) => {
   const base = {
     id: r.id,
     startTime: r.startTime,
@@ -30,7 +39,7 @@ const minutesOf = (t: string): number => {
 };
 
 /** True if the schedule is enabled and its window contains `now` (handles wrap). */
-const isActiveNow = (r: DemoSchedule, now: Date): boolean => {
+export const isActiveNow = (r: DemoSchedule, now: Date): boolean => {
   if (!r.enabled || !r.days.includes(DAY_ABBRS[now.getDay()])) return false;
   const cur = now.getHours() * 60 + now.getMinutes();
   const start = minutesOf(r.startTime);

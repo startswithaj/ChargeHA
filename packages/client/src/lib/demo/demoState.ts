@@ -3,6 +3,7 @@
 // it and persist to sessionStorage (see demoPersistence.ts). The simulated time
 // series is held alongside but is regenerated each session, never persisted.
 
+import type { DayOfWeek } from "@chargeha/shared";
 import type { DemoSeries } from "./series.ts";
 import { loadDemoSeries } from "./demoSeriesLoader.ts";
 import { OFFPEAK_RATE, PEAK_RATE } from "./demoTariff.ts";
@@ -30,7 +31,7 @@ export interface DemoSchedule {
   scheduleType: string;
   startTime: string;
   endTime: string;
-  days: string[];
+  days: DayOfWeek[];
   chargeAmps: number | null;
   chargeLimitPct: number | null;
   enabled: boolean;
@@ -41,9 +42,11 @@ export interface DemoTariff {
   label: string;
   startTime: string;
   endTime: string;
-  days: string[];
+  days: DayOfWeek[];
   ratePerKwh: number;
   enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** Everything the user can change — persisted to sessionStorage. */
@@ -60,7 +63,8 @@ export interface DemoState extends DemoMutable {
   series: DemoSeries;
 }
 
-const ALL_DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+const ALL_DAYS: DayOfWeek[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+const SEED_AT = "2026-01-01T00:00:00.000Z";
 
 /** Default config — lands on the first-run wizard (no adapter, no vehicles). */
 const defaultConfig = (): Record<string, string> => ({
@@ -91,6 +95,8 @@ const defaultTariffs = (): DemoTariff[] => [
     days: ALL_DAYS,
     ratePerKwh: PEAK_RATE,
     enabled: true,
+    createdAt: SEED_AT,
+    updatedAt: SEED_AT,
   },
   {
     id: 2,
@@ -100,6 +106,8 @@ const defaultTariffs = (): DemoTariff[] => [
     days: ALL_DAYS,
     ratePerKwh: OFFPEAK_RATE,
     enabled: true,
+    createdAt: SEED_AT,
+    updatedAt: SEED_AT,
   },
 ];
 
@@ -139,16 +147,27 @@ const toMutable = (s: DemoState): DemoMutable => ({
   authenticated: s.authenticated,
 });
 
-/** Apply a change to the mutable state, persist it, and return the new state. */
-export const updateDemoState = (
+const applyUpdate = (
   fn: (m: DemoMutable) => DemoMutable,
+  persist: boolean,
 ): DemoState => {
   const current = getDemoState();
   const nextMutable = fn(toMutable(current));
   state = { ...nextMutable, series: current.series };
-  savePersisted(nextMutable);
+  if (persist) savePersisted(nextMutable);
   return state;
 };
+
+/** Apply a change to the mutable state, persist it, and return the new state. */
+export const updateDemoState = (
+  fn: (m: DemoMutable) => DemoMutable,
+): DemoState => applyUpdate(fn, true);
+
+/** Apply a change WITHOUT persisting — for the realtime tick's live controller,
+ *  which updates state every few seconds and must not spam sessionStorage. */
+export const updateDemoStateLive = (
+  fn: (m: DemoMutable) => DemoMutable,
+): DemoState => applyUpdate(fn, false);
 
 /** Test-only: clear the singleton so the next init starts fresh. */
 export const resetDemoState = (): void => {

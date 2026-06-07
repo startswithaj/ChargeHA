@@ -10,15 +10,18 @@ import { useDraftConfig } from "../../../hooks/useDraftConfig.ts";
 import { SettingsRow, SettingsSection } from "./SettingsLayout.tsx";
 import { trpc } from "../../../trpc.ts";
 import {
+  energyPluginOptions,
   energyPluginSteps,
   pluginSettingsComponents,
 } from "@chargeha/plugins/componentRegistry";
+import { demoBlockedPluginIds } from "../../../lib/featureFlags.ts";
 
 function PluginSelect(
-  { value, onChange, pluginsByVendor }: {
+  { value, onChange, pluginsByVendor, disabledIds }: {
     value: string;
     onChange: (v: string) => void;
     pluginsByVendor: Record<string, Array<{ id: string; displayName: string }>>;
+    disabledIds: ReadonlySet<string>;
   },
 ) {
   return (
@@ -36,7 +39,11 @@ function PluginSelect(
           <Select.Group key={vendor}>
             <Select.Label>{vendor}</Select.Label>
             {vendorPlugins.map((plugin) => (
-              <Select.Item key={plugin.id} value={plugin.id}>
+              <Select.Item
+                key={plugin.id}
+                value={plugin.id}
+                disabled={disabledIds.has(plugin.id)}
+              >
                 {plugin.displayName}
               </Select.Item>
             ))}
@@ -75,6 +82,9 @@ export function InverterSettings() {
     return acc;
   }, {});
 
+  // In demo, disable energy plugins the demo can't serve (Fronius local/cloud).
+  const disabledIds = demoBlockedPluginIds(energyPluginOptions);
+
   // Resolve the settings component for the currently selected adapter
   const selectedPlugin = (plugins ?? []).find(
     (p) => p.id === fields.energyAdapterType,
@@ -110,6 +120,7 @@ export function InverterSettings() {
           value={fields.energyAdapterType ?? ""}
           onChange={(v) => setField("energyAdapterType", v)}
           pluginsByVendor={pluginsByVendor}
+          disabledIds={disabledIds}
         />
       </SettingsRow>
 

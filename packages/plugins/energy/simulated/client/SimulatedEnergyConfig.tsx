@@ -1,4 +1,5 @@
-import { TextField } from "@radix-ui/themes";
+import { useState } from "react";
+import { Button, TextField } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
 import { SettingsRow } from "../../../../client/src/components/pages/Settings/SettingsLayout.tsx";
 import type { SimulatedEnergyConfig as SimulatedEnergyConfigShape } from "../server/config.ts";
@@ -49,11 +50,19 @@ const FIELDS: {
 export function SimulatedEnergyConfig(): JSX.Element | null {
   const { data: config } = trpc.energy.simulated_energy.getConfig.useQuery();
   const utils = trpc.useUtils();
+  const [draft, setDraft] = useState<Partial<Record<string, string>>>({});
   const configMutation = trpc.energy.simulated_energy.setConfig.useMutation({
-    onSuccess: () => utils.energy.simulated_energy.getConfig.invalidate(),
+    onSuccess: () => {
+      utils.energy.simulated_energy.getConfig.invalidate();
+      setDraft({});
+    },
   });
 
   if (!config) return null;
+
+  const isDirty = Object.keys(draft).length > 0;
+  const valueOf = (key: keyof SimulatedEnergyConfigShape): string =>
+    draft[key] ?? String(config[key]);
 
   return (
     <>
@@ -61,13 +70,24 @@ export function SimulatedEnergyConfig(): JSX.Element | null {
         <SettingsRow key={field.key} label={field.label} help={field.help}>
           <TextField.Root
             size="2"
-            value={config[field.key]}
+            value={valueOf(field.key)}
             onChange={(e: { target: { value: string } }) =>
-              configMutation.mutate({ [field.key]: e.target.value })}
+              setDraft((d) => ({ ...d, [field.key]: e.target.value }))}
             style={{ width: 100 }}
           />
         </SettingsRow>
       ))}
+      <div
+        style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}
+      >
+        <Button
+          size="1"
+          disabled={!isDirty || configMutation.isPending}
+          onClick={() => configMutation.mutate(draft)}
+        >
+          {configMutation.isPending ? "Saving…" : "Save"}
+        </Button>
+      </div>
     </>
   );
 }

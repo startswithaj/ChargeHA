@@ -4,8 +4,10 @@ import { Badge, Button, Card, Switch, Text } from "@radix-ui/themes";
 import { ErrorBoundary } from "../../ui/ErrorBoundary.tsx";
 import {
   pluginSettingsComponents,
+  vehiclePluginOptions,
   vehiclePluginSteps,
 } from "@chargeha/plugins/componentRegistry";
+import { demoBlockedPluginIds } from "../../../lib/featureFlags.ts";
 import {
   useChargingConfig,
   useChargingConfigMutation,
@@ -316,9 +318,14 @@ export function VehicleSettings() {
     );
   }
 
+  // In demo, hide plugins the demo can't set up (Tesla), mirroring wizard gating.
+  const demoBlockedIds = demoBlockedPluginIds(vehiclePluginOptions);
+
   // Unconfigured vehicle plugins with wizard steps (excludes simulated, which has none)
   const unconfiguredPlugins = vehiclePlugins.filter(
-    (p) => !p.configured && (vehiclePluginSteps[p.id]?.length ?? 0) > 0,
+    (p) =>
+      !p.configured && (vehiclePluginSteps[p.id]?.length ?? 0) > 0 &&
+      !demoBlockedIds.has(p.id),
   );
 
   return (

@@ -4,6 +4,7 @@ import type {
   MutationOutput,
   MutationPath,
 } from "../queryPaths.ts";
+import type { RequiredMutationPath } from "../demoPaths.ts";
 
 /**
  * A demo query handler: a pure read from demo state / the aggregator / the tick.
@@ -18,9 +19,10 @@ export type MutationHandler<P extends MutationPath> = (
 ) => MutationOutput<P>;
 
 /**
- * Path → handler map. Each handler is checked against its own path's input and
- * output types; a wrong shape or unknown path is a compile error. Partial so
- * domain files declare only their own paths; the coverage test guarantees the
- * union of all maps + GATED + PENDING covers the real router.
+ * Path → handler map, TOTAL over every required (non-gated) mutation. Each
+ * handler is checked against its own path's input and output types; a wrong
+ * shape, a missing handler, or a new ungated router mutation is a compile error.
  */
-export type MutationHandlers = { [P in MutationPath]?: MutationHandler<P> };
+export type MutationHandlers = {
+  [P in RequiredMutationPath]: MutationHandler<P>;
+};

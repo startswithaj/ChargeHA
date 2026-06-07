@@ -35,7 +35,7 @@ export const PENDING_QUERIES: readonly string[] =
   [] as const satisfies readonly QueryPath[];
 
 /** Mutations deliberately unreachable in demo (disabled plugins / features). */
-export const GATED_MUTATIONS: readonly string[] = [
+export const GATED_MUTATIONS = [
   // Tesla — disabled in the wizard, no tesla vehicle ever exists.
   "tesla.checkKeyPairing",
   "tesla.disconnect",
@@ -60,43 +60,13 @@ export const GATED_MUTATIONS: readonly string[] = [
   "wizard.stopTunnel",
 ] as const satisfies readonly MutationPath[];
 
-/** Mutations known to exist but not yet implemented. Shrinks to [] as 5c–5e land. */
-export const PENDING_MUTATIONS: readonly string[] = [
-  "auth.changeMode",
-  "auth.changePassword",
-  "auth.login",
-  "auth.logout",
-  "config.battery.set",
-  "config.charging.set",
-  "config.dismissSystemAlert",
-  "config.equipment.set",
-  "config.home.set",
-  "config.notification.set",
-  "config.set",
-  "config.solar.set",
-  "config.system.set",
-  "energy.simulated_energy.setConfig",
-  "notification.test",
-  "schedule.create",
-  "schedule.delete",
-  "schedule.update",
-  "simulated.updateState",
-  "tariff.create",
-  "tariff.delete",
-  "tariff.loadPreset",
-  "tariff.update",
-  "tariff.updateDefaultRate",
-  "vehicle.command",
-  "vehicle.create",
-  "vehicle.delete",
-  "vehicle.refreshState",
-  "vehicle.setAmps",
-  "vehicle.setMode",
-  "vehicle.setPriority",
-  "wizard.complete",
-  "wizard.demoSetup",
-  "wizard.setAuthMode",
-  "wizard.setEnergyType",
-  "wizard.setStep",
-  "wizard.setVehicleType",
-] as const satisfies readonly MutationPath[];
+/** The gated mutation paths as a literal union. */
+export type GatedMutationPath = typeof GATED_MUTATIONS[number];
+
+/**
+ * Mutations the demo MUST handle: every router mutation except the gated ones.
+ * The handler map (handlers/mutations) is typed total over this, so a missing
+ * handler — or a new router mutation that is neither gated nor handled — is a
+ * compile error. There is deliberately no "pending" escape hatch.
+ */
+export type RequiredMutationPath = Exclude<MutationPath, GatedMutationPath>;
