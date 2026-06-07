@@ -5,6 +5,8 @@ import "./styles/global.css";
 import "./styles/animations.css";
 import { App } from "./App.tsx";
 
+// Deliberate exception to going through `demoMode` (see featureFlags.ts): the
+// inline literal lets the bundler tree-shake the demo engine out of the real build.
 const isDemoBuild = import.meta.env.VITE_DEMO_MODE === "1";
 
 const rootEl = document.getElementById("root");

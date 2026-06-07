@@ -9,7 +9,7 @@ import {
   useEquipmentConfig,
   useEquipmentConfigMutation,
 } from "../../../hooks/useSectionConfig.ts";
-import { isDemoMode } from "../../../lib/featureFlags.ts";
+import { demoMode } from "../../../lib/featureFlags.ts";
 import type { StepProps } from "../WizardShell.tsx";
 import styles from "./steps.module.css";
 
@@ -23,7 +23,7 @@ export function InverterTypeStep(_props: StepProps) {
   const { data: equipmentConfig } = useEquipmentConfig();
   const currentAdapter = equipmentConfig?.energyAdapterType ?? "";
   const wizardState = useWizardState();
-  const demoMode = isDemoMode();
+  const inDemo = demoMode.isActive();
 
   const mutation = useEquipmentConfigMutation();
 
@@ -55,7 +55,7 @@ export function InverterTypeStep(_props: StepProps) {
       <div className={styles.optionCards}>
         {energyPluginOptions.map((option) => {
           const Icon = icons[option.iconKey];
-          const demoBlocked = demoMode && !option.demoAvailable;
+          const demoBlocked = inDemo && !option.demoAvailable;
           return (
             <div
               key={option.id}

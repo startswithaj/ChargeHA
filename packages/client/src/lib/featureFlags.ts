@@ -1,22 +1,19 @@
 /**
- * Demo-mode feature gating for CORE features (not plugins — plugin availability
- * is data-driven via the `demoAvailable` flag on plugin option metadata).
+ * Demo-mode gating. This is the canonical place that reads VITE_DEMO_MODE —
+ * everything goes through `demoMode`, except trpcSetup/main, which read the
+ * literal inline so Vite can statically tree-shake the demo engine out of the
+ * real production build.
  */
 
 export enum Feature {
   OidcAuth = "oidc-auth",
 }
 
-/** Core features disabled when the app is built in demo mode. */
-const DEMO_DISABLED: ReadonlySet<Feature> = new Set([
-  Feature.OidcAuth,
-]);
+/** Core features disabled in a demo build. */
+const DEMO_DISABLED: ReadonlySet<Feature> = new Set([Feature.OidcAuth]);
 
 // Augment the global ImportMeta so `import.meta.env.VITE_DEMO_MODE` is typed
-// without aliasing import.meta. The alias form (`const m = import.meta; m.env`)
-// breaks Vite's static replacement — Vite only substitutes the literal
-// `import.meta.env.X` member expression — so demo mode would never activate in
-// a build. Access it directly everywhere instead.
+// without aliasing import.meta (the alias form breaks Vite's static replacement).
 declare global {
   interface ImportMetaEnv {
     readonly VITE_DEMO_MODE?: string;
@@ -26,22 +23,25 @@ declare global {
   }
 }
 
-export const isDemoMode = (): boolean => import.meta.env.VITE_DEMO_MODE === "1";
+interface PluginOption {
+  id: string;
+  demoAvailable?: boolean;
+}
 
-/** Pure predicate — takes demoMode explicitly so it is testable. */
-export const featureEnabledIn = (
-  demoMode: boolean,
-  feature: Feature,
-): boolean => (demoMode ? !DEMO_DISABLED.has(feature) : true);
+export const demoMode = {
+  /** True in a VITE_DEMO_MODE=1 build. */
+  isActive: (): boolean => import.meta.env.VITE_DEMO_MODE === "1",
 
-export const isFeatureEnabled = (feature: Feature): boolean =>
-  featureEnabledIn(isDemoMode(), feature);
+  /** Whether a core feature is available (gated off in demo). */
+  allows: (feature: Feature): boolean =>
+    !demoMode.isActive() || !DEMO_DISABLED.has(feature),
 
-/** Plugin option ids the demo build can't use — empty outside demo mode. Used to
- *  disable/hide gated plugins (Tesla, Fronius) in settings, mirroring the wizard. */
-export const demoBlockedPluginIds = (
-  options: ReadonlyArray<{ id: string; demoAvailable?: boolean }>,
-): ReadonlySet<string> => {
-  if (!isDemoMode()) return new Set<string>();
-  return new Set(options.filter((o) => !o.demoAvailable).map((o) => o.id));
+  /** Plugin ids the demo build can't use — empty outside demo. Mirrors the
+   *  wizard's gating; used to disable/hide gated plugins in settings. */
+  blockedPlugins: (
+    options: ReadonlyArray<PluginOption>,
+  ): ReadonlySet<string> => {
+    if (!demoMode.isActive()) return new Set();
+    return new Set(options.filter((o) => !o.demoAvailable).map((o) => o.id));
+  },
 };

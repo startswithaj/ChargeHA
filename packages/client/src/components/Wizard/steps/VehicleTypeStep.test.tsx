@@ -55,7 +55,10 @@ const { mockIsDemoMode } = vi.hoisted(() => ({
 
 vi.mock("../../../lib/featureFlags.ts", async (orig) => {
   const actual = await orig() as typeof import("../../../lib/featureFlags.ts");
-  return { ...actual, isDemoMode: mockIsDemoMode };
+  return {
+    ...actual,
+    demoMode: { ...actual.demoMode, isActive: mockIsDemoMode },
+  };
 });
 
 // ---- Tests ----

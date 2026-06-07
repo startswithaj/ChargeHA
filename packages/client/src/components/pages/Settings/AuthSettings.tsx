@@ -16,7 +16,7 @@ import {
 } from "@radix-ui/themes";
 import { Shield } from "lucide-react";
 import { trpc } from "../../../trpc.ts";
-import { Feature, isFeatureEnabled } from "../../../lib/featureFlags.ts";
+import { demoMode, Feature } from "../../../lib/featureFlags.ts";
 import { SettingsRow, SettingsSection } from "./SettingsLayout.tsx";
 
 type AuthMode = "none" | "local" | "oidc";
@@ -864,7 +864,7 @@ export function AuthSettings() {
     >
       <AuthModeRow
         value={targetMode ?? currentMode}
-        oidcEnabled={isFeatureEnabled(Feature.OidcAuth)}
+        oidcEnabled={demoMode.allows(Feature.OidcAuth)}
         onValueChange={handleModeSelect}
       />
 

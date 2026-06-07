@@ -7,7 +7,7 @@ import {
   vehiclePluginOptions,
   vehiclePluginSteps,
 } from "@chargeha/plugins/componentRegistry";
-import { demoBlockedPluginIds } from "../../../lib/featureFlags.ts";
+import { demoMode } from "../../../lib/featureFlags.ts";
 import {
   useChargingConfig,
   useChargingConfigMutation,
@@ -319,7 +319,7 @@ export function VehicleSettings() {
   }
 
   // In demo, hide plugins the demo can't set up (Tesla), mirroring wizard gating.
-  const demoBlockedIds = demoBlockedPluginIds(vehiclePluginOptions);
+  const demoBlockedIds = demoMode.blockedPlugins(vehiclePluginOptions);
 
   // Unconfigured vehicle plugins with wizard steps (excludes simulated, which has none)
   const unconfiguredPlugins = vehiclePlugins.filter(

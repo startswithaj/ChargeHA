@@ -14,7 +14,7 @@ import {
   energyPluginSteps,
   pluginSettingsComponents,
 } from "@chargeha/plugins/componentRegistry";
-import { demoBlockedPluginIds } from "../../../lib/featureFlags.ts";
+import { demoMode } from "../../../lib/featureFlags.ts";
 
 function PluginSelect(
   { value, onChange, pluginsByVendor, disabledIds }: {
@@ -83,7 +83,7 @@ export function InverterSettings() {
   }, {});
 
   // In demo, disable energy plugins the demo can't serve (Fronius local/cloud).
-  const disabledIds = demoBlockedPluginIds(energyPluginOptions);
+  const disabledIds = demoMode.blockedPlugins(energyPluginOptions);
 
   // Resolve the settings component for the currently selected adapter
   const selectedPlugin = (plugins ?? []).find(

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Text, TextField } from "@radix-ui/themes";
 import { Globe, KeyRound, ShieldOff } from "lucide-react";
 import { trpc } from "../../../trpc.ts";
-import { Feature, isFeatureEnabled } from "../../../lib/featureFlags.ts";
+import { demoMode, Feature } from "../../../lib/featureFlags.ts";
 import type { StepProps } from "../WizardShell.tsx";
 import styles from "./steps.module.css";
 
@@ -333,7 +333,7 @@ export function AuthStep({ onNext }: StepProps) {
     selectMode,
   } = useAuthStepState(onNext);
 
-  const oidcEnabled = isFeatureEnabled(Feature.OidcAuth);
+  const oidcEnabled = demoMode.allows(Feature.OidcAuth);
 
   return (
     <div className={styles.stepContainer}>

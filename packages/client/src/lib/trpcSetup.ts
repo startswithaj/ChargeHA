@@ -10,9 +10,10 @@ import type { AppRouter } from "../../../server/src/trpc/root.ts";
 import { trpc } from "../trpc.ts";
 import { demoLink } from "./demo/demoLink.ts";
 
-// Direct import.meta.env access (NOT aliased, NOT isDemoMode()) so the bundler
-// statically replaces it and eliminates the demoLink branch — and the whole
-// demo engine — from the real production build.
+// One of the two deliberate exceptions to going through `demoMode` (see
+// featureFlags.ts): read the literal inline so the bundler statically replaces
+// it and eliminates the demoLink branch — and the whole demo engine — from the
+// real production build. A `demoMode.isActive()` call can't be tree-shaken.
 const isDemoBuild = import.meta.env.VITE_DEMO_MODE === "1";
 
 /** Check whether a tRPC error indicates an UNAUTHORIZED response. */
