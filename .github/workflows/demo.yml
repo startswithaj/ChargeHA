@@ -1,7 +1,12 @@
 name: Deploy demo to GitHub Pages
 
+# Runs after CI succeeds on main (so a failing test/build never publishes the
+# demo), or on manual dispatch. Reuses CI's single test run rather than
+# re-running check:all here.
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -17,12 +22,16 @@ concurrency:
 
 jobs:
   build:
+    # Only proceed when the triggering CI run passed (manual dispatch always runs).
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
       - uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.x
+          deno-version: v2.7.7
       - run: deno task build:demo
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
