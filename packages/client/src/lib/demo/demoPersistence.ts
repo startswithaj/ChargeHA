@@ -5,11 +5,25 @@ import type { DemoMutable } from "./demoState.ts";
 
 const STORAGE_KEY = "chargeha-demo-state";
 
-/** Load persisted mutable state, or null if absent/unreadable. */
+/** Shape-check persisted JSON so a stale/corrupt blob falls back to defaults
+ *  rather than crashing downstream with a wrongly-typed cast. */
+const isDemoMutable = (v: unknown): v is DemoMutable => {
+  if (typeof v !== "object" || v === null) return false;
+  const m = v as Record<string, unknown>;
+  return typeof m.config === "object" && m.config !== null &&
+    Array.isArray(m.vehicles) && Array.isArray(m.schedules) &&
+    Array.isArray(m.tariffs) && typeof m.authenticated === "boolean";
+};
+
+/** Load persisted mutable state, or null if absent/unreadable/malformed. */
 export const loadPersisted = (): DemoMutable | null => {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) as DemoMutable : null;
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (isDemoMutable(parsed)) return parsed;
+    console.warn("Demo: persisted state has unexpected shape, using defaults");
+    return null;
   } catch (error) {
     console.warn("Demo: failed to read persisted state, using defaults", error);
     return null;

@@ -1,6 +1,7 @@
 import type { DayOfWeek } from "@chargeha/shared";
 import type { QueryHandler } from "./types.ts";
 import type { DemoSchedule } from "../demoState.ts";
+import { minuteOfDay } from "../demoDates.ts";
 
 const DAY_ABBRS: DayOfWeek[] = [
   "sun",
@@ -41,7 +42,7 @@ const minutesOf = (t: string): number => {
 /** True if the schedule is enabled and its window contains `now` (handles wrap). */
 export const isActiveNow = (r: DemoSchedule, now: Date): boolean => {
   if (!r.enabled || !r.days.includes(DAY_ABBRS[now.getDay()])) return false;
-  const cur = now.getHours() * 60 + now.getMinutes();
+  const cur = minuteOfDay(now);
   const start = minutesOf(r.startTime);
   const end = minutesOf(r.endTime);
   return start <= end ? cur >= start && cur < end : cur >= start || cur < end;

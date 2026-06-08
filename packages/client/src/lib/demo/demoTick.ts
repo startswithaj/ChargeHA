@@ -10,7 +10,8 @@ import { simulatedEnergyConfigDef } from "../../../../plugins/energy/simulated/s
 import type { DemoReading } from "./series.ts";
 import type { DemoSchedule, DemoState, DemoVehicle } from "./demoState.ts";
 import { getDemoState, updateDemoStateLive } from "./demoState.ts";
-import { timeToMinutes } from "./demoDates.ts";
+import { minuteOfDay, timeToMinutes } from "./demoDates.ts";
+import { hash01 } from "./hash.ts";
 import { isActiveNow } from "./handlers/schedule.ts";
 
 const TICK_INTERVAL_MS = 3000;
@@ -27,11 +28,6 @@ interface BasePoint {
   solarW: number;
   baseHomeW: number;
 }
-
-// Fractional minute (include seconds) so live values drift smoothly each tick
-// rather than stepping once per wall-clock minute.
-const minuteOfDay = (now: Date): number =>
-  now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
 
 // The live energy is simulated from the editable simulated-energy settings via
 // the real solar model. Memoise the generated day per config so we only rebuild
@@ -64,11 +60,6 @@ const solarConfigOf = (state: DemoState): SolarConfig => {
 
 // Per-second sensor-style noise so live readings visibly fluctuate each tick
 // (real solar/home meters jitter between polls). Stable within a second.
-const hash01 = (n: number): number => {
-  const a = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
-  const b = Math.imul(a ^ (a >>> 13), 0xc2b2ae35);
-  return ((b ^ (b >>> 16)) >>> 0) / 4294967296;
-};
 const noise = (now: Date, amp: number, salt: number): number =>
   (hash01(Math.floor(now.getTime() / 1000) + salt) - 0.5) * 2 * amp;
 

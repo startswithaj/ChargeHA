@@ -13,7 +13,8 @@ import type {
   DemoReading,
   DemoSeries,
 } from "./series.ts";
-import { timeToMinutes } from "./demoDates.ts";
+import { minuteOfDay, timeToMinutes } from "./demoDates.ts";
+import { hash01 } from "./hash.ts";
 
 const DEMO_DAYS = 90;
 const BUCKET_MINUTES = 15;
@@ -52,13 +53,7 @@ interface DayProfile {
   away: boolean[];
 }
 
-// Stateless per-day hash → [0,1). Keeps every relative day reproducible across
-// reloads (no Math.random) while giving real day-to-day variation.
-const hash01 = (n: number): number => {
-  const a = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
-  const b = Math.imul(a ^ (a >>> 13), 0xc2b2ae35);
-  return ((b ^ (b >>> 16)) >>> 0) / 4294967296;
-};
+// Deterministic per-(offset, salt) value in [0,1) for reproducible day variation.
 const rand = (offset: number, salt: number): number =>
   hash01(offset * 131 + salt);
 
@@ -186,7 +181,7 @@ const buildDay = (offset: number): DemoDay => {
  * time-of-day so it reads as a day in progress rather than a finished day.
  */
 export const buildDemoSeries = (now: Date = new Date()): DemoSeries => {
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const nowMinutes = minuteOfDay(now);
   const days = Array.from({ length: DEMO_DAYS }, (_, offset) => {
     const day = buildDay(offset);
     if (offset > 0) return day;

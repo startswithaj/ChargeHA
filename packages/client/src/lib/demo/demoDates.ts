@@ -35,3 +35,7 @@ export const timeToMinutes = (time: string): number => {
   const [h, m] = time.split(":").map(Number);
   return h * 60 + m;
 };
+
+/** Minutes since local midnight for a Date (fractional — includes seconds). */
+export const minuteOfDay = (now: Date = new Date()): number =>
+  now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;

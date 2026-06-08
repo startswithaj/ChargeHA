@@ -43,7 +43,8 @@ const parseConfig = (
 ): { batteryCapacityKwh?: number; chargeLimitPercent?: number } => {
   try {
     return config ? JSON.parse(config) : {};
-  } catch {
+  } catch (error) {
+    console.warn("Demo: ignoring malformed vehicle config", error);
     return {};
   }
 };
