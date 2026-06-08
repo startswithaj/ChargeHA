@@ -7,6 +7,12 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Collapse redundant runs on rapid pushes to the same ref. Never cancel a main
+# run mid-flight — it builds + releases.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   test:
     uses: ./.github/workflows/test.yml
