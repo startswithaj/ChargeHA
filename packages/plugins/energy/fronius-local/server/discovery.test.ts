@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { discoverFronius } from "./discovery.ts";
 import { Logger } from "@chargeha/server/lib/Logger";
 import {
   type FroniusFetchStub,
@@ -32,13 +31,12 @@ describe("discoverFronius", () => {
 
   afterEach(() => {
     fetchStub.restore();
-    discoveryStubs.restore();
   });
 
   describe("with explicit subnet", () => {
     it("scans all 254 IPs in the given subnet", async () => {
       froniusResponse("10.0.0.50", "TestInverter", 99);
-      const results = await discoverFronius(testLogger, "10.0.0");
+      const results = await discoveryStubs.discover(testLogger, "10.0.0");
       expect(results).toHaveLength(1);
       expect(results[0].host).toBe("10.0.0.50");
       expect(results[0].name).toBe("TestInverter");
@@ -47,7 +45,7 @@ describe("discoverFronius", () => {
 
     it("strips trailing dot from subnet", async () => {
       froniusResponse("10.0.0.1", "Inverter", 1);
-      const results = await discoverFronius(testLogger, "10.0.0.");
+      const results = await discoveryStubs.discover(testLogger, "10.0.0.");
       expect(results).toHaveLength(1);
       expect(results[0].host).toBe("10.0.0.1");
     });
@@ -61,7 +59,7 @@ describe("discoverFronius", () => {
       );
       froniusResponse("192.168.1.189", "MyFronius", 123);
 
-      const results = await discoverFronius(testLogger);
+      const results = await discoveryStubs.discover(testLogger);
       expect(results).toHaveLength(1);
       expect(results[0].host).toBe("192.168.1.189");
       expect(results[0].name).toBe("MyFronius");
@@ -73,7 +71,7 @@ describe("discoverFronius", () => {
       );
       froniusResponse("192.168.1.50", "Inverter", 1);
 
-      const results = await discoverFronius(testLogger);
+      const results = await discoveryStubs.discover(testLogger);
       expect(results).toHaveLength(1);
       expect(results[0].host).toBe("192.168.1.50");
     });
@@ -84,7 +82,7 @@ describe("discoverFronius", () => {
       );
       froniusResponse("10.0.0.100", "NetBInverter", 42);
 
-      const results = await discoverFronius(testLogger);
+      const results = await discoveryStubs.discover(testLogger);
       expect(results).toHaveLength(1);
       expect(results[0].host).toBe("10.0.0.100");
     });
@@ -106,7 +104,7 @@ describe("discoverFronius", () => {
       ]);
       froniusResponse("192.168.5.42", "FallbackInverter", 7);
 
-      const results = await discoverFronius(testLogger);
+      const results = await discoveryStubs.discover(testLogger);
       expect(results).toHaveLength(1);
       expect(results[0].host).toBe("192.168.5.42");
     });
@@ -135,7 +133,7 @@ describe("discoverFronius", () => {
       ]);
       froniusResponse("192.168.2.1", "Inverter", 1);
 
-      const results = await discoverFronius(testLogger);
+      const results = await discoveryStubs.discover(testLogger);
       expect(results).toHaveLength(1);
       expect(results[0].host).toBe("192.168.2.1");
     });
@@ -145,7 +143,7 @@ describe("discoverFronius", () => {
       discoveryStubs.setInterfacesThrow(true);
       froniusResponse("192.168.1.100", "LastResort", 55);
 
-      const results = await discoverFronius(testLogger);
+      const results = await discoveryStubs.discover(testLogger);
       expect(results).toHaveLength(1);
       expect(results[0].host).toBe("192.168.1.100");
     });
@@ -154,7 +152,7 @@ describe("discoverFronius", () => {
   describe("probe handling", () => {
     it("returns empty array when no inverters respond", async () => {
       discoveryStubs.setArpOutput("? (192.168.1.10) at aa:bb:cc:dd:ee:ff\n");
-      const results = await discoverFronius(testLogger);
+      const results = await discoveryStubs.discover(testLogger);
       expect(results).toHaveLength(0);
     });
 
@@ -166,7 +164,7 @@ describe("discoverFronius", () => {
         json: {},
       });
 
-      const results = await discoverFronius(testLogger);
+      const results = await discoveryStubs.discover(testLogger);
       expect(results).toHaveLength(0);
     });
 
@@ -178,7 +176,7 @@ describe("discoverFronius", () => {
         json: { Body: { Data: null } },
       });
 
-      const results = await discoverFronius(testLogger);
+      const results = await discoveryStubs.discover(testLogger);
       expect(results).toHaveLength(0);
     });
 
@@ -190,7 +188,7 @@ describe("discoverFronius", () => {
         json: { Body: { Data: { "1": {} } } },
       });
 
-      const results = await discoverFronius(testLogger);
+      const results = await discoveryStubs.discover(testLogger);
       expect(results).toHaveLength(1);
       expect(results[0].name).toBe("Fronius Inverter");
       expect(results[0].model).toBe("Unknown");
@@ -201,7 +199,7 @@ describe("discoverFronius", () => {
       froniusResponse("192.168.1.10", "Inverter1", 1);
       froniusResponse("192.168.1.50", "Inverter2", 2);
 
-      const results = await discoverFronius(testLogger);
+      const results = await discoveryStubs.discover(testLogger);
       expect(results).toHaveLength(2);
       const hosts = results.map((r) => r.host).sort();
       expect(hosts).toEqual(["192.168.1.10", "192.168.1.50"]);

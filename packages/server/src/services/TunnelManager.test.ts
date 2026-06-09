@@ -86,12 +86,6 @@ describe("TunnelManager", () => {
 
   // ── Stubs ───────────────────────────────────────────────────────────────────
 
-  // deno-lint-ignore no-explicit-any
-  type AnyFn = (...args: any[]) => any;
-
-  const originalCommand = Deno.Command;
-  const originalServe = Deno.serve;
-
   interface MockCommandOptions {
     mockProcess: Deno.ChildProcess;
     throwOnSpawn?: Error;
@@ -103,60 +97,81 @@ describe("TunnelManager", () => {
 
   let mockServerShutdownCalled = false;
 
+  // Fake Deno.serve injected into the manager; records the handler it registers.
+  const mockServe = ((
+    _options: unknown,
+    handler: (req: Request) => Response | Promise<Response>,
+  ) => {
+    capturedMiddlewareHandler = handler;
+    return {
+      shutdown: () => {
+        mockServerShutdownCalled = true;
+        return Promise.resolve();
+      },
+      finished: Promise.resolve(),
+      ref: () => {},
+      unref: () => {},
+      addr: { transport: "tcp", hostname: "localhost", port: 4040 },
+    };
+  }) as unknown as typeof Deno.serve;
+
+  // The command factory the injected wrapper delegates to. A test sets it via
+  // stubDenoCommand() — even after constructing the manager, before start().
+  const commandHolder = {
+    factory: (() => {
+      throw new Error("Deno.Command not stubbed for this test");
+    }) as unknown as typeof Deno.Command,
+  };
+
+  const lazyCommand = function (
+    this: unknown,
+    path: string | URL,
+    options?: Deno.CommandOptions,
+  ) {
+    return new commandHolder.factory(path, options);
+  } as unknown as typeof Deno.Command;
+
+  /** Reset the captured middleware-server state between tests. */
   function stubDenoServe(): void {
     mockServerShutdownCalled = false;
     capturedMiddlewareHandler = null;
-
-    (Deno as { serve: AnyFn }).serve = (
-      _options: unknown,
-      handler: (req: Request) => Response | Promise<Response>,
-    ) => {
-      capturedMiddlewareHandler = handler;
-      return {
-        shutdown: () => {
-          mockServerShutdownCalled = true;
-          return Promise.resolve();
-        },
-        finished: Promise.resolve(),
-        ref: () => {},
-        unref: () => {},
-        addr: { transport: "tcp", hostname: "localhost", port: 4040 },
-      };
-    };
   }
 
   function stubDenoCommand(options: MockCommandOptions): void {
-    const factory = function MockCommand(this: unknown) {
+    commandHolder.factory = function MockCommand(this: unknown) {
       return {
         spawn(): Deno.ChildProcess {
           if (options.throwOnSpawn) throw options.throwOnSpawn;
           return options.mockProcess;
         },
       };
-    };
-    // deno-lint-ignore no-explicit-any
-    (Deno as any).Command = factory as unknown as typeof Deno.Command;
+    } as unknown as typeof Deno.Command;
   }
 
-  function restoreStubs(): void {
-    (Deno as { Command: typeof Deno.Command }).Command = originalCommand;
-    (Deno as { serve: typeof Deno.serve }).serve = originalServe;
-  }
+  /** Construct a TunnelManager with the fake serve + command injected. */
+  const makeTunnelManager = (
+    logger: unknown = mockLogger,
+    middlewarePort = 4040,
+  ): TunnelManager =>
+    new TunnelManager(
+      logger as never,
+      3000,
+      middlewarePort,
+      "cloudflared",
+      mockServe,
+      lazyCommand,
+    );
 
   // ── Tests ───────────────────────────────────────────────────────────────────
 
-  afterEach(() => {
-    restoreStubs();
-  });
-
   describe("initial state", () => {
     it("isRunning returns false initially", () => {
-      const tm = new TunnelManager(mockLogger as never, 3000);
+      const tm = makeTunnelManager();
       expect(tm.isRunning).toBe(false);
     });
 
     it("tunnelUrl returns null initially", () => {
-      const tm = new TunnelManager(mockLogger as never, 3000);
+      const tm = makeTunnelManager();
       expect(tm.tunnelUrl).toBeNull();
     });
   });
@@ -172,7 +187,7 @@ describe("TunnelManager", () => {
       stubDenoServe();
       stubDenoCommand({ mockProcess: process });
 
-      const tm = new TunnelManager(mockLogger as never, 3000, 4040);
+      const tm = makeTunnelManager();
       const routes = [
         {
           path: "/test",
@@ -205,7 +220,7 @@ describe("TunnelManager", () => {
       stubDenoServe();
       stubDenoCommand({ mockProcess: process });
 
-      const tm = new TunnelManager(mockLogger as never, 3000, 4040);
+      const tm = makeTunnelManager();
       const url1 = await tm.start([]);
       expect(url1).toBe("https://existing-tunnel.trycloudflare.com");
 
@@ -223,7 +238,7 @@ describe("TunnelManager", () => {
       stubDenoServe();
       stubDenoCommand({ mockProcess: process });
 
-      const tm = new TunnelManager(mockLogger as never, 3000, 4040);
+      const tm = makeTunnelManager();
       await tm.start([
         { path: "/a", handler: () => new Response("a") },
       ]);
@@ -256,7 +271,7 @@ describe("TunnelManager", () => {
       stubDenoServe();
       stubDenoCommand({ mockProcess: process });
 
-      const tm = new TunnelManager(logger as never, 3000, 4040);
+      const tm = makeTunnelManager(logger);
       await tm.start([
         { path: "/dup", handler: () => new Response("first") },
       ]);
@@ -283,7 +298,7 @@ describe("TunnelManager", () => {
       stubDenoServe();
       stubDenoCommand({ mockProcess: proc1 });
 
-      const tm = new TunnelManager(mockLogger as never, 3000, 4040);
+      const tm = makeTunnelManager();
       await tm.start([
         { path: "/old", handler: () => new Response("old") },
       ]);
@@ -323,7 +338,7 @@ describe("TunnelManager", () => {
       stubDenoServe();
       stubDenoCommand({ mockProcess: process });
 
-      const tm = new TunnelManager(mockLogger as never, 3000, 4040);
+      const tm = makeTunnelManager();
       const url = await tm.start([]);
 
       expect(url).toBe("https://my-tunnel.trycloudflare.com");
@@ -340,7 +355,7 @@ describe("TunnelManager", () => {
         throwOnSpawn: new Deno.errors.NotFound("not found"),
       });
 
-      const tm = new TunnelManager(mockLogger as never, 3000, 4040);
+      const tm = makeTunnelManager();
 
       await expect(tm.start([])).rejects.toThrow(
         "cloudflared binary not found",
@@ -357,7 +372,7 @@ describe("TunnelManager", () => {
         throwOnSpawn: new Error("permission denied"),
       });
 
-      const tm = new TunnelManager(mockLogger as never, 3000, 4040);
+      const tm = makeTunnelManager();
 
       await expect(tm.start([])).rejects.toThrow("permission denied");
       expect(mockServerShutdownCalled).toBe(true);
@@ -370,7 +385,7 @@ describe("TunnelManager", () => {
         stubDenoServe();
         stubDenoCommand({ mockProcess: process });
 
-        const tm = new TunnelManager(mockLogger as never, 3000, 4040);
+        const tm = makeTunnelManager();
         const startPromise = tm.start([]);
 
         // Advance past the 15-second timeout
@@ -393,7 +408,7 @@ describe("TunnelManager", () => {
         stubDenoServe();
         stubDenoCommand({ mockProcess: process });
 
-        const tm = new TunnelManager(mockLogger as never, 3000, 4040);
+        const tm = makeTunnelManager();
         const startPromise = tm.start([]);
 
         // Advance past the 15-second timeout
@@ -419,7 +434,7 @@ describe("TunnelManager", () => {
       stubDenoServe();
       stubDenoCommand({ mockProcess: process });
 
-      const tm = new TunnelManager(mockLogger as never, 3000, 4040);
+      const tm = makeTunnelManager();
       await tm.start([]);
       expect(tm.isRunning).toBe(true);
 
@@ -437,7 +452,7 @@ describe("TunnelManager", () => {
 
   describe("stop()", () => {
     it("is safe to call when not running", async () => {
-      const tm = new TunnelManager(mockLogger as never, 3000);
+      const tm = makeTunnelManager();
       await tm.stop();
       expect(tm.isRunning).toBe(false);
       expect(tm.tunnelUrl).toBeNull();
@@ -453,7 +468,7 @@ describe("TunnelManager", () => {
       stubDenoServe();
       stubDenoCommand({ mockProcess: process });
 
-      const tm = new TunnelManager(mockLogger as never, 3000, 4040);
+      const tm = makeTunnelManager();
       await tm.start([]);
       expect(tm.isRunning).toBe(true);
 
@@ -474,7 +489,7 @@ describe("TunnelManager", () => {
       stubDenoServe();
       stubDenoCommand({ mockProcess: process });
 
-      const tm = new TunnelManager(mockLogger as never, 3000, 4040);
+      const tm = makeTunnelManager();
       await tm.start([]);
 
       // stop() should not throw even when kill throws
@@ -496,7 +511,7 @@ describe("TunnelManager", () => {
       });
       stubDenoServe();
       stubDenoCommand({ mockProcess: process });
-      tm = new TunnelManager(mockLogger as never, 3000, 4040);
+      tm = makeTunnelManager();
     });
 
     afterEach(async () => {
@@ -710,7 +725,7 @@ describe("TunnelManager", () => {
       stubDenoServe();
       stubDenoCommand({ mockProcess: process });
 
-      const tm = new TunnelManager(mockLogger as never, 3000, 4040);
+      const tm = makeTunnelManager();
       await tm.start([]);
 
       // Allow pipeStderr to encounter the error
@@ -737,7 +752,7 @@ describe("TunnelManager", () => {
       stubDenoServe();
       stubDenoCommand({ mockProcess: process });
 
-      const tm = new TunnelManager(loggerWithCapture as never, 3000, 4040);
+      const tm = makeTunnelManager(loggerWithCapture);
       await tm.start([]);
 
       // Allow pipeStderr to process remaining chunks
@@ -761,7 +776,7 @@ describe("TunnelManager", () => {
       stubDenoServe();
       stubDenoCommand({ mockProcess: process });
 
-      const tm = new TunnelManager(mockLogger as never, 3000, 4040);
+      const tm = makeTunnelManager();
       await tm.start([]);
 
       await tm.stop();
@@ -770,7 +785,7 @@ describe("TunnelManager", () => {
 
     it("is safe when no middleware server exists", async () => {
       mockServerShutdownCalled = false;
-      const tm = new TunnelManager(mockLogger as never, 3000);
+      const tm = makeTunnelManager();
       // No start() called — no middleware server
       await tm.stop();
       expect(mockServerShutdownCalled).toBe(false);
