@@ -9,6 +9,7 @@ import { TeslaProxyManager } from "./vehicles/tesla/server/TeslaProxyManager.ts"
 import { SimulatedVehiclePlugin } from "./vehicles/simulated/server/index.ts";
 import { FroniusLocalPlugin } from "./energy/fronius-local/server/index.ts";
 import { FroniusCloudPlugin } from "./energy/fronius-cloud/server/index.ts";
+import { SimulatedEnergyPlugin } from "./energy/simulated/server/index.ts";
 
 /**
  * Instantiate every plugin the app supports and register each with its
@@ -38,4 +39,7 @@ export function registerPlugins(
   vehicleRegistry.register(new SimulatedVehiclePlugin(make("simulated")));
   energyRegistry.register(new FroniusLocalPlugin(make("fronius_local")));
   energyRegistry.register(new FroniusCloudPlugin(make("fronius_cloud")));
+  energyRegistry.register(
+    new SimulatedEnergyPlugin(make("simulated_energy")),
+  );
 }

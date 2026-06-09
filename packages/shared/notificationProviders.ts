@@ -1,0 +1,44 @@
+// Notification provider config-field metadata. Shared so both the server
+// (notifications router / NotificationService) and the client (settings UI,
+// demo handlers) can use it without crossing the server/client boundary.
+
+export interface ProviderConfigField {
+  key: string;
+  label: string;
+  help: string;
+  type: "text" | "toggle";
+  placeholder?: string;
+}
+
+export const PROVIDER_CONFIG_FIELDS: Record<string, ProviderConfigField[]> = {
+  telegram: [
+    {
+      key: "notificationTelegramBotToken",
+      label: "Bot Token",
+      help: "Create a bot via @BotFather on Telegram to get a token.",
+      type: "text",
+      placeholder: "123456:ABC-DEF...",
+    },
+    {
+      key: "notificationTelegramChatId",
+      label: "Chat ID",
+      help: "Your user or group chat ID. Use @userinfobot to find it.",
+      type: "text",
+      placeholder: "-1001234567890",
+    },
+    {
+      key: "notificationTelegramTopicId",
+      label: "Topic ID (optional)",
+      help:
+        "For supergroups with topics enabled. Leave empty for normal chats.",
+      type: "text",
+      placeholder: "",
+    },
+    {
+      key: "notificationTelegramSilent",
+      label: "Send Silently",
+      help: "Send notifications without sound on the recipient's device.",
+      type: "toggle",
+    },
+  ],
+};

@@ -49,6 +49,18 @@ vi.mock("../../../trpc.ts", () => ({
   },
 }));
 
+const { mockIsDemoMode } = vi.hoisted(() => ({
+  mockIsDemoMode: vi.fn(() => false),
+}));
+
+vi.mock("../../../lib/featureFlags.ts", async (orig) => {
+  const actual = await orig() as typeof import("../../../lib/featureFlags.ts");
+  return {
+    ...actual,
+    demoMode: { ...actual.demoMode, isActive: mockIsDemoMode },
+  };
+});
+
 // ---- Tests ----
 
 describe("VehicleTypeStep", () => {
@@ -63,6 +75,7 @@ describe("VehicleTypeStep", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockIsDemoMode.mockReturnValue(false);
     captured.demoOnSuccess = undefined;
     mockDemoMutate.mockImplementation(() => {
       captured.demoOnSuccess?.();
@@ -84,6 +97,14 @@ describe("VehicleTypeStep", () => {
     expect(screen.getByText(/Tesla Fleet API/)).toBeInTheDocument();
     expect(screen.getByText(/virtual vehicle for testing/))
       .toBeInTheDocument();
+  });
+
+  it("disables Tesla but not Simulated in demo mode", () => {
+    mockIsDemoMode.mockReturnValue(true);
+    renderWithProviders(<VehicleTypeStep {...makeStepProps()} />);
+
+    expect(screen.getByRole("button", { name: /Tesla/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Simulated/ })).toBeEnabled();
   });
 
   // ---- User interactions ----

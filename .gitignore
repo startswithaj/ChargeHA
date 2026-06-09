@@ -17,7 +17,7 @@ coverage_*/
 # Devtools build artifacts
 devtools/output/
 
-# Local dev / test output
+# Local dev-server logs + test output
 *.log
 .test-out.txt
 

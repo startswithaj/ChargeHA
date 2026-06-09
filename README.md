@@ -9,6 +9,12 @@
   forget.
 </p>
 
+<p align="center">
+  ChargeHA has a demo mode that lets you review the features without installing.
+  It runs entirely in the browser.
+  <a href="https://startswithaj.github.io/ChargeHA/">Try it here</a>.
+</p>
+
 ## ChargeHQ.net
 
 ChargeHA is a self-hosted app that aims to have feature parity with

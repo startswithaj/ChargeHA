@@ -16,6 +16,7 @@ import {
 } from "@radix-ui/themes";
 import { Shield } from "lucide-react";
 import { trpc } from "../../../trpc.ts";
+import { demoMode, Feature } from "../../../lib/featureFlags.ts";
 import { SettingsRow, SettingsSection } from "./SettingsLayout.tsx";
 
 type AuthMode = "none" | "local" | "oidc";
@@ -737,8 +738,9 @@ function useAuthSettingsHandlers(
 }
 
 function AuthModeRow(
-  { value, onValueChange }: {
+  { value, oidcEnabled, onValueChange }: {
     value: string;
+    oidcEnabled: boolean;
     onValueChange: (v: string) => void;
   },
 ) {
@@ -749,7 +751,9 @@ function AuthModeRow(
         <Select.Content>
           <Select.Item value="none">No Authentication</Select.Item>
           <Select.Item value="local">Username &amp; Password</Select.Item>
-          <Select.Item value="oidc">OpenID Connect (OIDC)</Select.Item>
+          <Select.Item value="oidc" disabled={!oidcEnabled}>
+            OpenID Connect (OIDC){oidcEnabled ? "" : " — n/a in demo"}
+          </Select.Item>
         </Select.Content>
       </Select.Root>
     </SettingsRow>
@@ -860,6 +864,7 @@ export function AuthSettings() {
     >
       <AuthModeRow
         value={targetMode ?? currentMode}
+        oidcEnabled={demoMode.allows(Feature.OidcAuth)}
         onValueChange={handleModeSelect}
       />
 

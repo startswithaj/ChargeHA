@@ -1,5 +1,5 @@
 import { Text } from "@radix-ui/themes";
-import { Cloud, Server, SkipForward } from "lucide-react";
+import { Cloud, Monitor, Server, SkipForward } from "lucide-react";
 import { useWizardState } from "../../../hooks/useWizardState.ts";
 import {
   energyPluginOptions,
@@ -9,18 +9,21 @@ import {
   useEquipmentConfig,
   useEquipmentConfigMutation,
 } from "../../../hooks/useSectionConfig.ts";
+import { demoMode } from "../../../lib/featureFlags.ts";
 import type { StepProps } from "../WizardShell.tsx";
 import styles from "./steps.module.css";
 
 const icons = {
   server: Server,
   cloud: Cloud,
+  monitor: Monitor,
 } as const;
 
 export function InverterTypeStep(_props: StepProps) {
   const { data: equipmentConfig } = useEquipmentConfig();
   const currentAdapter = equipmentConfig?.energyAdapterType ?? "";
   const wizardState = useWizardState();
+  const inDemo = demoMode.isActive();
 
   const mutation = useEquipmentConfigMutation();
 
@@ -52,6 +55,7 @@ export function InverterTypeStep(_props: StepProps) {
       <div className={styles.optionCards}>
         {energyPluginOptions.map((option) => {
           const Icon = icons[option.iconKey];
+          const demoBlocked = inDemo && !option.demoAvailable;
           return (
             <div
               key={option.id}
@@ -59,9 +63,16 @@ export function InverterTypeStep(_props: StepProps) {
                 currentAdapter === option.id ? styles.optionCardSelected : ""
               }`}
               role="button"
-              tabIndex={0}
-              onClick={() => selectAdapter(option.id)}
+              aria-disabled={demoBlocked}
+              tabIndex={demoBlocked ? -1 : 0}
+              style={demoBlocked
+                ? { opacity: 0.5, cursor: "not-allowed" }
+                : undefined}
+              onClick={() => {
+                if (!demoBlocked) selectAdapter(option.id);
+              }}
               onKeyDown={(e) => {
+                if (demoBlocked) return;
                 if (e.key === "Enter" || e.key === " ") {
                   selectAdapter(option.id);
                 }
