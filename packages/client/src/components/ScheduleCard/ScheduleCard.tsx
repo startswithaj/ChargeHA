@@ -1,5 +1,5 @@
 import { Pencil, Trash2 } from "lucide-react";
-import { Button, Card, Switch, Text } from "@radix-ui/themes";
+import { Card, IconButton, Switch, Text } from "@radix-ui/themes";
 import type { Schedule } from "@chargeha/shared";
 import { formatDays, formatTime12h } from "../../utils/Format.ts";
 import styles from "./ScheduleCard.module.css";
@@ -69,23 +69,23 @@ export function ScheduleCard({
           <Text size="1" color="gray">{detailText}</Text>
         </div>
         <div className={styles.actions}>
-          <Button
-            variant="ghost"
+          <IconButton
+            variant="soft"
             size="1"
             aria-label="Edit schedule"
             onClick={() => onEdit(schedule)}
           >
             <Pencil size={14} />
-          </Button>
-          <Button
-            variant="ghost"
+          </IconButton>
+          <IconButton
+            variant="soft"
             color="red"
             size="1"
             aria-label="Delete schedule"
             onClick={() => onDelete(schedule.id)}
           >
             <Trash2 size={14} />
-          </Button>
+          </IconButton>
         </div>
       </div>
     </Card>

@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Button, Heading, Text, Tooltip } from "@radix-ui/themes";
 import {
   type ControllerEvent,
+  DEFAULT_SOLAR_CONFIG,
   runSimulation,
   type SimResult,
   type SimulationOutput,
@@ -53,19 +54,19 @@ interface SimConfig {
 }
 
 const DEFAULTS: SimConfig = {
-  seed: 69,
+  seed: DEFAULT_SOLAR_CONFIG.seed,
   vehicleCount: 2,
   waterfall: false,
   minGenKw: "1",
   graceMin: "6",
   cooldownMin: "15",
-  peakSolarKw: 8,
+  peakSolarKw: DEFAULT_SOLAR_CONFIG.peakKw,
   minExcessKw: "",
-  cloudiness: 30,
-  storms: 0,
-  homeLoad: 1500,
-  sunrise: 6.5,
-  sunset: 18,
+  cloudiness: DEFAULT_SOLAR_CONFIG.cloudiness,
+  storms: DEFAULT_SOLAR_CONFIG.storms,
+  homeLoad: DEFAULT_SOLAR_CONFIG.homeBaseW,
+  sunrise: DEFAULT_SOLAR_CONFIG.sunrise,
+  sunset: DEFAULT_SOLAR_CONFIG.sunset,
   ev1Start: 40,
   ev2Start: 60,
   ev1CapacityKwh: 75,

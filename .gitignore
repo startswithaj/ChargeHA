@@ -17,6 +17,9 @@ coverage_*/
 # Devtools build artifacts
 devtools/output/
 
+# Local dev-server log (browser-error relay output)
+devserver.log
+
 
 
 .scratch/

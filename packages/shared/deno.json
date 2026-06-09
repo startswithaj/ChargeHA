@@ -11,6 +11,8 @@
     "./simulation": "./simulation/mod.ts",
     "./engine": "./engine/mod.ts",
     "./async": "./async.ts",
-    "./geo": "./geo.ts"
+    "./geo": "./geo.ts",
+    "./geocode": "./geocode.ts",
+    "./notifications": "./notificationProviders.ts"
   }
 }

@@ -14,6 +14,18 @@ export class Rng {
   }
 }
 
+/** Default solar simulation knobs, shared by the Simulator UI and the
+ *  Simulated energy plugin so the two never drift. */
+export const DEFAULT_SOLAR_CONFIG: SolarConfig = {
+  seed: 69,
+  peakKw: 8,
+  cloudiness: 30,
+  storms: 0,
+  homeBaseW: 1500,
+  sunrise: 6.5,
+  sunset: 18,
+};
+
 /** Generate a full 24-hour solar day at 1-minute resolution. */
 export function generateSolarDay(config: SolarConfig): EnergyReading[] {
   const random = new Rng(config.seed);
