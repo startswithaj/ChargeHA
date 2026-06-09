@@ -1,19 +1,14 @@
+import type { Logger } from "@chargeha/server/lib/Logger";
+import { discoverFronius } from "../discovery.ts";
+
 export interface DiscoveryStubs {
   setArpOutput(out: string): void;
   setArpThrows(v: boolean): void;
   setInterfaces(ifs: Deno.NetworkInterfaceInfo[]): void;
   setInterfacesThrow(v: boolean): void;
-  restore(): void;
+  /** Run discovery with the fake `arp` command + network interfaces injected. */
+  discover(logger: Logger, subnet?: string): ReturnType<typeof discoverFronius>;
 }
-
-const setDenoGlobal = <K extends keyof typeof Deno>(
-  key: K,
-  value: typeof Deno[K],
-): typeof Deno[K] => {
-  const original = Deno[key];
-  (Deno as Record<string, unknown>)[key as string] = value;
-  return original;
-};
 
 export const installDiscoveryStubs = (): DiscoveryStubs => {
   const state = {
@@ -23,8 +18,8 @@ export const installDiscoveryStubs = (): DiscoveryStubs => {
     networkInterfacesShouldThrow: false,
   };
 
-  const MockCommand = class {
-    constructor(_cmd: string, _opts?: unknown) {}
+  const command = class {
+    constructor(_cmd: string | URL, _opts?: Deno.CommandOptions) {}
     output() {
       if (state.arpShouldThrow) throw new Error("arp not available");
       return {
@@ -34,16 +29,10 @@ export const installDiscoveryStubs = (): DiscoveryStubs => {
     }
   } as unknown as typeof Deno.Command;
 
-  const mockNetworkInterfaces = (() => {
+  const networkInterfaces = (() => {
     if (state.networkInterfacesShouldThrow) throw new Error("not available");
     return state.networkInterfacesResult;
   }) as typeof Deno.networkInterfaces;
-
-  const originalCommand = setDenoGlobal("Command", MockCommand);
-  const originalNetworkInterfaces = setDenoGlobal(
-    "networkInterfaces",
-    mockNetworkInterfaces,
-  );
 
   return {
     setArpOutput: (out) => {
@@ -58,9 +47,7 @@ export const installDiscoveryStubs = (): DiscoveryStubs => {
     setInterfacesThrow: (v) => {
       state.networkInterfacesShouldThrow = v;
     },
-    restore: () => {
-      setDenoGlobal("Command", originalCommand);
-      setDenoGlobal("networkInterfaces", originalNetworkInterfaces);
-    },
+    discover: (logger, subnet) =>
+      discoverFronius(logger, subnet, command, networkInterfaces),
   };
 };

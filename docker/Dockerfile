@@ -17,7 +17,7 @@ ARG TARGETOS TARGETARCH
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /tesla-http-proxy ./cmd/tesla-http-proxy
 
 # --- Stage 2: Build the client (static assets) ---
-FROM denoland/deno:2.7.1 AS client-builder
+FROM denoland/deno:2.8.2 AS client-builder
 WORKDIR /app
 COPY deno.json deno.lock* ./
 COPY packages/shared/ packages/shared/
@@ -28,7 +28,7 @@ RUN deno install
 RUN deno task build
 
 # --- Stage 3: Production runtime ---
-FROM denoland/deno:2.7.1
+FROM denoland/deno:2.8.2
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends openssl ca-certificates && \

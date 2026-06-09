@@ -19,6 +19,9 @@ export class TunnelManager {
     private mainServerPort: number,
     private middlewarePort = 4040,
     private cloudflaredPath = "cloudflared",
+    // Injected so tests can supply fakes instead of patching Deno globals.
+    private serve: typeof Deno.serve = Deno.serve,
+    private command: typeof Deno.Command = Deno.Command,
   ) {}
 
   /**
@@ -64,7 +67,7 @@ export class TunnelManager {
     const mainServerPort = this.mainServerPort;
     const logger = this.logger;
 
-    this.middlewareServer = Deno.serve(
+    this.middlewareServer = this.serve(
       { port: this.middlewarePort, onListen: () => {} },
       async (req: Request) => {
         const url = new URL(req.url);
@@ -113,7 +116,7 @@ export class TunnelManager {
 
     // Spawn cloudflared tunnel
     try {
-      const cmd = new Deno.Command(this.cloudflaredPath, {
+      const cmd = new this.command(this.cloudflaredPath, {
         args: ["tunnel", "--url", `http://localhost:${this.middlewarePort}`],
         stdout: "piped",
         stderr: "piped",

@@ -263,7 +263,7 @@ export const runLiveController = (now: Date = new Date()): DemoVehicle[] => {
 
 const emitter = new EventTarget();
 // deno-lint-ignore custom-no-let/no-let
-let timer: number | null = null;
+let timer: ReturnType<typeof setInterval> | null = null;
 
 /** Start emitting ticks (idempotent). */
 export const startDemoTick = (): void => {

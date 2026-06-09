@@ -48,6 +48,10 @@ class FroniusDiscovery {
   constructor(
     private readonly logger: Logger,
     private readonly subnet?: string,
+    // Injected so tests can supply fakes instead of patching Deno globals.
+    private readonly command: typeof Deno.Command = Deno.Command,
+    private readonly networkInterfaces: typeof Deno.networkInterfaces =
+      Deno.networkInterfaces,
   ) {}
 
   async discover(): Promise<Inverter[]> {
@@ -100,7 +104,7 @@ class FroniusDiscovery {
 
   private async getArpIps(): Promise<string[]> {
     try {
-      const proc = new Deno.Command("arp", {
+      const proc = new this.command("arp", {
         args: ["-a"],
         stdout: "piped",
         stderr: "piped",
@@ -119,7 +123,7 @@ class FroniusDiscovery {
   private candidatesFromInterfaces(): string[] {
     try {
       const subnets = extractSubnets(
-        Deno.networkInterfaces()
+        this.networkInterfaces()
           .filter((iface) =>
             iface.family === "IPv4" && !iface.address.startsWith("127.")
           )
@@ -195,6 +199,9 @@ class FroniusDiscovery {
 export function discoverFronius(
   logger: Logger,
   subnet?: string,
+  command: typeof Deno.Command = Deno.Command,
+  networkInterfaces: typeof Deno.networkInterfaces = Deno.networkInterfaces,
 ): Promise<Inverter[]> {
-  return new FroniusDiscovery(logger, subnet).discover();
+  return new FroniusDiscovery(logger, subnet, command, networkInterfaces)
+    .discover();
 }

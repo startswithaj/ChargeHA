@@ -10,18 +10,16 @@ function raceWithTimeout(
   task: Promise<HealthCheckResult>,
   timeoutMs: number,
 ): Promise<HealthCheckResult> {
-  const ref = { timer: 0 };
-  const timeout = new Promise<HealthCheckResult>((resolve) => {
-    ref.timer = setTimeout(
-      () =>
-        resolve({
-          status: "timeout",
-          message: `Timed out after ${timeoutMs}ms`,
-        }),
-      timeoutMs,
-    );
-  });
-  return Promise.race([task, timeout]).finally(() => clearTimeout(ref.timer));
+  const { promise, resolve } = Promise.withResolvers<HealthCheckResult>();
+  const timer = setTimeout(
+    () =>
+      resolve({
+        status: "timeout",
+        message: `Timed out after ${timeoutMs}ms`,
+      }),
+    timeoutMs,
+  );
+  return Promise.race([task, promise]).finally(() => clearTimeout(timer));
 }
 
 export interface EncryptionCheckResult {
