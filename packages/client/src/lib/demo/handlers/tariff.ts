@@ -6,6 +6,7 @@ import {
   rateForMinute,
 } from "../demoTariff.ts";
 import { minuteOfDay } from "../demoDates.ts";
+import { demoNow } from "../demoClock.ts";
 
 const num = (v: string | undefined, fallback: number): number =>
   v != null ? Number(v) : fallback;
@@ -25,7 +26,7 @@ export const tariffHandlers: Record<string, QueryHandler> = {
   }),
 
   "tariff.currentRate": (_i, s) => {
-    const now = new Date();
+    const now = demoNow();
     const min = minuteOfDay(now);
     const rate = rateForMinute(min);
     const boundaries = [PEAK_START_HOUR * 60, PEAK_END_HOUR * 60];

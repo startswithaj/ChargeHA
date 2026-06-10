@@ -1,6 +1,7 @@
 import type { QueryHandler } from "./types.ts";
 import type { DemoState } from "../demoState.ts";
 import { dateForOffset } from "../demoDates.ts";
+import { demoNow } from "../demoClock.ts";
 
 interface Page {
   limit?: number;
@@ -18,7 +19,7 @@ const parseChecks = (json: string): Record<string, unknown> => {
 const controllerLogs = (s: DemoState) =>
   s.series.days
     .flatMap((day, di) => {
-      const date = dateForOffset(day.offset);
+      const date = dateForOffset(day.offset, demoNow());
       return day.logs.map((l, li) => ({
         id: di * 100_000 + li,
         timestamp: `${date}T${l.time}:00`,
@@ -38,7 +39,7 @@ const controllerLogs = (s: DemoState) =>
 const energyReads = (s: DemoState) =>
   s.series.days
     .flatMap((day, di) => {
-      const date = dateForOffset(day.offset);
+      const date = dateForOffset(day.offset, demoNow());
       return day.readings.map((r, li) => ({
         id: di * 100_000 + li,
         timestamp: `${date}T${r.time}:00`,
@@ -61,7 +62,7 @@ const vehicleUpdates = (s: DemoState) => {
   const vById = new Map(s.series.vehicles.map((v) => [v.id, v]));
   return s.series.days
     .flatMap((day, di) => {
-      const date = dateForOffset(day.offset);
+      const date = dateForOffset(day.offset, demoNow());
       return day.readings.flatMap((r, ri) =>
         r.charge.map((c, ci) => {
           const v = vById.get(c.vehicleId);

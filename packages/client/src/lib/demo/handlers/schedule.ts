@@ -2,6 +2,7 @@ import type { DayOfWeek } from "@chargeha/shared";
 import type { QueryHandler } from "./types.ts";
 import type { DemoSchedule } from "../demoState.ts";
 import { minuteOfDay } from "../demoDates.ts";
+import { demoNow } from "../demoClock.ts";
 
 const DAY_ABBRS: DayOfWeek[] = [
   "sun",
@@ -51,5 +52,5 @@ export const isActiveNow = (r: DemoSchedule, now: Date): boolean => {
 export const scheduleHandlers: Record<string, QueryHandler> = {
   "schedule.list": (_i, s) => ({ schedules: s.schedules.map(toSchedule) }),
   "schedule.active": (_i, s) =>
-    s.schedules.filter((r) => isActiveNow(r, new Date())).map(toSchedule),
+    s.schedules.filter((r) => isActiveNow(r, demoNow())).map(toSchedule),
 };

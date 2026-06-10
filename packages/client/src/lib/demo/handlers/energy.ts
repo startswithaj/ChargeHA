@@ -6,6 +6,7 @@ import { simulatedEnergyConfigDef } from "../../../../../plugins/energy/simulate
 import type { DemoState } from "../demoState.ts";
 import { currentSnapshot } from "../demoTick.ts";
 import { dateForOffset } from "../demoDates.ts";
+import { demoNow } from "../demoClock.ts";
 
 const GRID_VOLTAGE_V = 230;
 const BUCKETS_PER_DAY = 96;
@@ -14,13 +15,14 @@ type DatedReading = EnergyData & { timestamp: string };
 
 /** Most-recent-first energy readings across the series, up to `limit`. */
 const datedReadings = (s: DemoState, limit: number): DatedReading[] => {
+  const now = demoNow();
   const daysNeeded = s.series.days.slice(
     0,
     Math.ceil(limit / BUCKETS_PER_DAY) + 1,
   );
   return daysNeeded
     .flatMap((day) => {
-      const date = dateForOffset(day.offset);
+      const date = dateForOffset(day.offset, now);
       return day.readings.map((r): DatedReading => {
         const ts = `${date}T${r.time}:00`;
         return {
@@ -40,7 +42,7 @@ const datedReadings = (s: DemoState, limit: number): DatedReading[] => {
 };
 
 export const energyHandlers: Record<string, QueryHandler> = {
-  "energy.realtime": (_i, s) => currentSnapshot(s),
+  "energy.realtime": (_i, s) => currentSnapshot(s, demoNow()),
   "energy.getPlugins": (_i, s) =>
     demoEnergyPluginSummaries.map((p) => ({
       ...p,
