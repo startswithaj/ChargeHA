@@ -12,6 +12,7 @@
     "./engine": "./engine/mod.ts",
     "./async": "./async.ts",
     "./geo": "./geo.ts",
+    "./solarAttribution": "./solarAttribution.ts",
     "./geocode": "./geocode.ts",
     "./notifications": "./notificationProviders.ts"
   }

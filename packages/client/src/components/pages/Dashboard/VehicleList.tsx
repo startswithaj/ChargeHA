@@ -13,6 +13,7 @@ import { useToast } from "../../../hooks/useToast.tsx";
 import { useControllerStatuses } from "../../../hooks/controllerStatusStore.ts";
 import { VehicleCard } from "../../VehicleCard/VehicleCard.tsx";
 import { trpc } from "../../../trpc.ts";
+import { useVehicleSolarGrid } from "./energyHelpers.ts";
 
 type VehicleCardProps = ComponentProps<typeof VehicleCard>;
 
@@ -125,39 +126,6 @@ function NoVehiclesCard(
       </div>
     </Card>
   );
-}
-
-function useVehicleSolarGrid(
-  realtime:
-    | NonNullable<ReturnType<typeof useEnergyData>["data"]>["realtime"]
-    | null,
-  vehicles: ReturnType<typeof useVehicles>["vehicles"],
-) {
-  return useMemo(() => {
-    if (!realtime) return {};
-    const chargingVehicles = vehicles.filter(
-      (v): v is typeof v & { state: NonNullable<typeof v.state> } =>
-        v.state != null && v.state.isCharging && v.state.chargePowerKw > 0,
-    );
-    const totalChargePowerW = chargingVehicles.reduce(
-      (sum, v) => sum + (v.state.chargePowerKw * 1000),
-      0,
-    );
-    return Object.fromEntries(
-      chargingVehicles.map((v) => {
-        const chargePowerW = v.state.chargePowerKw * 1000;
-        const availableSolar = Math.max(
-          0,
-          realtime.solarProductionW - realtime.homeConsumptionW + chargePowerW,
-        );
-        const vehicleShare = totalChargePowerW > 0
-          ? chargePowerW / totalChargePowerW
-          : 1;
-        const solarW = Math.min(chargePowerW, availableSolar * vehicleShare);
-        return [v.id, { solarW, gridW: chargePowerW - solarW }];
-      }),
-    );
-  }, [realtime, vehicles]);
 }
 
 function useAllocationStatus(

@@ -5,6 +5,7 @@ import type { TariffService } from "./TariffService.ts";
 import type { TypedEventEmitter } from "./TypedEventEmitter.ts";
 import type { Logger } from "../lib/Logger.ts";
 import { isHome as computeIsHome, parseHomeCoords } from "@chargeha/shared/geo";
+import { calculateSolarAttribution } from "@chargeha/shared/solarAttribution";
 
 const DEFAULT_INTERVAL_SECONDS = 60;
 const DEFAULT_DATA_RETENTION_DAYS = 730;
@@ -200,43 +201,12 @@ export class DataRecorder {
     if (energyPollFailed) {
       return { solarContributionW: 0, gridContributionW: chargePowerW };
     }
-    return this.calculateSolarAttribution(
+    const { solarW, gridW } = calculateSolarAttribution(
       chargePowerW,
       totalChargePowerW,
       solarProductionW,
       homeConsumptionW,
     );
-  }
-
-  /** Solar attribution: correct for the fact that the meter already
-   *  includes EV draw in homeConsumption. */
-  private calculateSolarAttribution(
-    chargePowerW: number,
-    totalChargePowerW: number,
-    solarProductionW: number,
-    homeConsumptionW: number,
-  ): { solarContributionW: number; gridContributionW: number } {
-    const availableSolar = Math.max(
-      0,
-      solarProductionW - homeConsumptionW + chargePowerW,
-    );
-    // Proportional split for multi-vehicle charging
-    const vehicleShare = totalChargePowerW > 0
-      ? chargePowerW / totalChargePowerW
-      : 1;
-    // Cap by actual solar production: when the home meter under-reports the
-    // car's draw (e.g. a stuck/stale inverter), `availableSolar` can spike
-    // beyond what the panels actually produced. Solar→car can never exceed
-    // `solarProduction * vehicleShare` because that is the upper bound of
-    // generation available to this vehicle.
-    const solarContributionW = Math.min(
-      chargePowerW,
-      availableSolar * vehicleShare,
-      Math.max(0, solarProductionW) * vehicleShare,
-    );
-    return {
-      solarContributionW,
-      gridContributionW: chargePowerW - solarContributionW,
-    };
+    return { solarContributionW: solarW, gridContributionW: gridW };
   }
 }

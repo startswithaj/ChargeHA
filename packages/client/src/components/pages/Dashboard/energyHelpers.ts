@@ -4,6 +4,7 @@ import type {
   VehicleChargeState,
   VehicleWithState,
 } from "@chargeha/shared";
+import { calculateSolarAttribution } from "@chargeha/shared/solarAttribution";
 import type { ChargingVehicleFlow } from "../../EnergyFlowDiagram/EnergyFlowDiagram.tsx";
 
 /** Format minutes until a future time as a human-readable string (e.g., "2h 15m", "45m"). */
@@ -16,17 +17,12 @@ export function formatTimeUntil(isoString: string): string {
   return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
 }
 
-/**
- * Compute solar vs grid split per charging vehicle and build the
- * ChargingVehicleFlow[] list for the energy flow diagram.
- * Same formula as data-recorder.ts:140-155
- */
-export function useChargingVehicleFlows(
+/** Per-vehicle { solarW, gridW } map for currently-charging vehicles. */
+export function useVehicleSolarGrid(
   realtime: EnergyData | null,
   vehicles: VehicleWithState[],
-): ChargingVehicleFlow[] {
-  // Compute solar vs grid split per charging vehicle
-  const vehicleSolarGrid = useMemo(() => {
+): Record<string, { solarW: number; gridW: number }> {
+  return useMemo(() => {
     if (!realtime) return {};
 
     const chargingVehicles = vehicles.filter(
@@ -39,21 +35,28 @@ export function useChargingVehicleFlows(
     );
 
     return Object.fromEntries(
-      chargingVehicles.map((v) => {
-        const chargePowerW = v.state.chargePowerKw * 1000;
-        // Solar attribution: meter already includes EV draw in homeConsumption
-        const availableSolar = Math.max(
-          0,
-          realtime.solarProductionW - realtime.homeConsumptionW + chargePowerW,
-        );
-        const vehicleShare = totalChargePowerW > 0
-          ? chargePowerW / totalChargePowerW
-          : 1;
-        const solarW = Math.min(chargePowerW, availableSolar * vehicleShare);
-        return [v.id, { solarW, gridW: chargePowerW - solarW }];
-      }),
+      chargingVehicles.map((v) => [
+        v.id,
+        calculateSolarAttribution(
+          v.state.chargePowerKw * 1000,
+          totalChargePowerW,
+          realtime.solarProductionW,
+          realtime.homeConsumptionW,
+        ),
+      ]),
     );
   }, [realtime, vehicles]);
+}
+
+/**
+ * Compute solar vs grid split per charging vehicle and build the
+ * ChargingVehicleFlow[] list for the energy flow diagram.
+ */
+export function useChargingVehicleFlows(
+  realtime: EnergyData | null,
+  vehicles: VehicleWithState[],
+): ChargingVehicleFlow[] {
+  const vehicleSolarGrid = useVehicleSolarGrid(realtime, vehicles);
 
   // Build charging vehicles list for the energy flow diagram
   return useMemo(() => {
