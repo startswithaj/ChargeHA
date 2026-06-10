@@ -19,6 +19,8 @@ export interface WizardStepConfig {
   /** Unique string identifier for this step (persisted to the database). */
   id: string;
   label: string;
+  /** Hide the generic Back/Next nav bar — e.g. the Done step has its own CTA. */
+  hideNav?: boolean;
   render: (props: StepProps) => ReactNode;
 }
 
@@ -199,13 +201,15 @@ export function WizardShell({ steps, onComplete }: WizardShellProps) {
           : <Text color="gray">{label} — not yet implemented</Text>}
       </div>
 
-      <WizardNav
-        isFirstStep={isFirstStep}
-        isLastStep={isLastStep}
-        onBack={handleBack}
-        onSkip={handleSkip}
-        onNext={handleNext}
-      />
+      {!stepConfig?.hideNav && (
+        <WizardNav
+          isFirstStep={isFirstStep}
+          isLastStep={isLastStep}
+          onBack={handleBack}
+          onSkip={handleSkip}
+          onNext={handleNext}
+        />
+      )}
     </div>
   );
 }

@@ -323,4 +323,25 @@ describe("WizardShell", () => {
 
     expect(screen.getByText("Step 1 of 6")).toBeInTheDocument();
   });
+
+  it("hides the Back/Finish nav bar on a step flagged hideNav", () => {
+    const steps = makeCoreOnlySteps();
+    steps[steps.length - 1] = { ...steps[steps.length - 1], hideNav: true };
+    setMockStepId("done");
+    renderWithProviders(<WizardShell steps={steps} />);
+
+    expect(screen.queryByRole("button", { name: "Finish" }))
+      .not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Back" }))
+      .not.toBeInTheDocument();
+    // Step content still renders.
+    expect(screen.getByTestId("step-content-5")).toBeInTheDocument();
+  });
+
+  it("shows the nav bar on the same step without hideNav", () => {
+    setMockStepId("done");
+    renderWithProviders(<WizardShell steps={makeCoreOnlySteps()} />);
+
+    expect(screen.getByRole("button", { name: "Finish" })).toBeInTheDocument();
+  });
 });
