@@ -61,7 +61,12 @@ const CORE_STEPS_AFTER: WizardStepConfig[] = [
     label: "Grid Voltage",
     render: (props) => <GridVoltageStep {...props} />,
   },
-  { id: "done", label: "Done", render: (props) => <DoneStep {...props} /> },
+  {
+    id: "done",
+    label: "Done",
+    hideNext: true,
+    render: (props) => <DoneStep {...props} />,
+  },
 ];
 
 /**
