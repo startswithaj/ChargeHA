@@ -148,9 +148,6 @@ describe("AuthSettings", () => {
   const pushStateSpy = () =>
     vi.spyOn(globalThis.history, "pushState").mockImplementation(() => {});
 
-  const dispatchEventSpy = () =>
-    vi.spyOn(globalThis, "dispatchEvent").mockImplementation(() => true);
-
   // Open the auth mode Select and click an option by its role
   const selectMode = async (optionName: string) => {
     const trigger = screen.getByRole("combobox");
@@ -462,7 +459,6 @@ describe("AuthSettings", () => {
 
   it("redirects to login after switching to authenticated mode", async () => {
     const pushState = pushStateSpy();
-    const dispatch = dispatchEventSpy();
 
     renderWithProviders(<AuthSettings />);
 
@@ -480,13 +476,11 @@ describe("AuthSettings", () => {
     await waitFor(() => {
       expect(mockSessionInvalidate).toHaveBeenCalled();
       expect(pushState).toHaveBeenCalledWith(null, "", "/login");
-      expect(dispatch).toHaveBeenCalled();
     });
   });
 
   it("redirects to dashboard after switching to none mode", async () => {
     const pushState = pushStateSpy();
-    const dispatch = dispatchEventSpy();
 
     renderWithProviders(<AuthSettings />);
 
@@ -513,7 +507,6 @@ describe("AuthSettings", () => {
     await waitFor(() => {
       expect(mockSessionInvalidate).toHaveBeenCalled();
       expect(pushState).toHaveBeenCalledWith(null, "", "/");
-      expect(dispatch).toHaveBeenCalled();
     });
   });
 

@@ -262,16 +262,13 @@ describe("useVehicleSettings", () => {
 
   it("handleStartOnboarding navigates to setup path", () => {
     const pushStateSpy = vi.spyOn(globalThis.history, "pushState");
-    const dispatchSpy = vi.spyOn(globalThis, "dispatchEvent");
     const { result } = renderHook(() => useVehicleSettings());
 
     result.current.handleStartOnboarding("tesla");
 
     expect(pushStateSpy).toHaveBeenCalledWith(null, "", "/setup/tesla");
-    expect(dispatchSpy).toHaveBeenCalled();
 
     pushStateSpy.mockRestore();
-    dispatchSpy.mockRestore();
   });
 
   it("handleAddSimulatedVehicle creates simulated vehicle without home location", async () => {

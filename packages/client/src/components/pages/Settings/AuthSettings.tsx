@@ -16,6 +16,7 @@ import {
 } from "@radix-ui/themes";
 import { Shield } from "lucide-react";
 import { trpc } from "../../../trpc.ts";
+import { useRouter } from "../../../hooks/useRouter.ts";
 import { demoMode, Feature } from "../../../lib/featureFlags.ts";
 import { SettingsRow, SettingsSection } from "./SettingsLayout.tsx";
 
@@ -689,6 +690,7 @@ function useAuthSettingsHandlers(
   },
 ) {
   const queryClient = trpc.useUtils();
+  const { navigate } = useRouter();
 
   const handleModeSelect = useCallback((value: string) => {
     const mode = value as AuthMode;
@@ -716,11 +718,9 @@ function useAuthSettingsHandlers(
     queryClient.auth.session.invalidate();
     setTargetMode(null);
     if (targetMode === "none") {
-      globalThis.history.pushState(null, "", "/");
-      globalThis.dispatchEvent(new PopStateEvent("popstate"));
+      navigate({ type: "app", page: "dashboard" });
     } else {
-      globalThis.history.pushState(null, "", "/login");
-      globalThis.dispatchEvent(new PopStateEvent("popstate"));
+      navigate({ type: "login" });
     }
   }, [targetMode, queryClient, setTargetMode]);
 

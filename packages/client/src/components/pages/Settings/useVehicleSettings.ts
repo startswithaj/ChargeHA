@@ -4,6 +4,7 @@ import type { VehicleWithState } from "@chargeha/shared";
 import { vehiclePluginOptions } from "@chargeha/plugins/componentRegistry";
 import { useHomeConfig } from "../../../hooks/useSectionConfig.ts";
 import { trpc } from "../../../trpc.ts";
+import { useRouter } from "../../../hooks/useRouter.ts";
 
 const demoPlugin = vehiclePluginOptions.find((o) => o.demoSetup);
 
@@ -93,6 +94,7 @@ function computePriorityUpdates(
 }
 
 export function useVehicleSettings() {
+  const { navigate } = useRouter();
   const { data: homeConfig } = useHomeConfig();
 
   // --- Queries (read side) ---
@@ -149,8 +151,7 @@ export function useVehicleSettings() {
   const vehiclePlugins = vehiclePluginsQuery.data ?? [];
 
   const handleStartOnboarding = useCallback((pluginId: string) => {
-    globalThis.history.pushState(null, "", `/setup/${pluginId}`);
-    globalThis.dispatchEvent(new PopStateEvent("popstate"));
+    navigate({ type: "pluginSetup", pluginId });
   }, []);
 
   // Combine query and mutation errors for display

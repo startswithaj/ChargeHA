@@ -7,11 +7,10 @@ import {
   vehiclePluginSteps,
 } from "@chargeha/plugins/componentRegistry";
 import { PluginOnboardingWizard } from "./PluginOnboardingWizard/PluginOnboardingWizard.tsx";
-import type { Route } from "../hooks/useRouter.ts";
+import { useRouter } from "../hooks/useRouter.ts";
 
 interface PluginSetupRouterProps {
   pluginId: string;
-  navigate: (route: Route) => void;
 }
 
 /**
@@ -21,8 +20,9 @@ interface PluginSetupRouterProps {
  * startup, so no on-demand init call is needed here.
  */
 export function PluginSetupRouter(
-  { pluginId, navigate }: PluginSetupRouterProps,
+  { pluginId }: PluginSetupRouterProps,
 ) {
+  const { navigate } = useRouter();
   const utils = trpc.useUtils();
 
   const isVehiclePlugin = !!(vehiclePluginSteps[pluginId]);
