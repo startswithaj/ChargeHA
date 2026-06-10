@@ -323,4 +323,23 @@ describe("WizardShell", () => {
 
     expect(screen.getByText("Step 1 of 6")).toBeInTheDocument();
   });
+
+  it("hides the Finish button but keeps Back on a step flagged hideNext", () => {
+    const steps = makeCoreOnlySteps();
+    steps[steps.length - 1] = { ...steps[steps.length - 1], hideNext: true };
+    setMockStepId("done");
+    renderWithProviders(<WizardShell steps={steps} />);
+
+    expect(screen.queryByRole("button", { name: "Finish" }))
+      .not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
+    expect(screen.getByTestId("step-content-5")).toBeInTheDocument();
+  });
+
+  it("shows the Finish button on the same step without hideNext", () => {
+    setMockStepId("done");
+    renderWithProviders(<WizardShell steps={makeCoreOnlySteps()} />);
+
+    expect(screen.getByRole("button", { name: "Finish" })).toBeInTheDocument();
+  });
 });
