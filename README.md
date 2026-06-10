@@ -182,6 +182,13 @@ Images are published to `ghcr.io/startswithaj/chargeha`:
 - `branch-<name>` — per branch, `pr-<n>` per pull request
 - `sha-<short>` — every build
 
+## Mobile & Home Screen
+
+Fully responsive and installable to your home screen (web manifest, standalone):
+
+- **Android (Chrome):** ⋮ menu → **Add to Home screen**.
+- **iOS (Safari):** **Share** → **Add to Home Screen**.
+
 ## Getting Started
 
 ### Docker (recommended)
