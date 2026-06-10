@@ -31,3 +31,11 @@ jobs:
     permissions:
       contents: write
       packages: write
+
+  deploy-demo:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/demo.yml
+    permissions:
+      pages: write
+      id-token: write
