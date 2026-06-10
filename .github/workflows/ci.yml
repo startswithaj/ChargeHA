@@ -37,5 +37,6 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     uses: ./.github/workflows/demo.yml
     permissions:
+      contents: read
       pages: write
       id-token: write
