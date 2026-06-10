@@ -1,6 +1,15 @@
 import { useMemo, useState } from "react";
-import { Badge, Button, Card, Select, Slider, Text } from "@radix-ui/themes";
+import {
+  Badge,
+  Button,
+  Card,
+  Link,
+  Select,
+  Slider,
+  Text,
+} from "@radix-ui/themes";
 import { RotateCcw } from "lucide-react";
+import { useRouter } from "../../hooks/useRouter.ts";
 import type { DayOfWeek, EnergyData, Schedule } from "@chargeha/shared";
 import type { VehicleWithState } from "@chargeha/shared";
 import {
@@ -501,6 +510,7 @@ function useSolarSimState(
 }
 
 export function SolarSimulation(props: SolarSimulationProps) {
+  const { navigate } = useRouter();
   const {
     solarKw,
     setSolarKw,
@@ -544,7 +554,12 @@ export function SolarSimulation(props: SolarSimulationProps) {
           Preview how your settings would affect charging — adjusting these
           knobs has no real effect, it's only for understanding the settings.
           For a full day-by-day simulation, visit the{" "}
-          <a href="/simulator">Simulator page</a>.
+          <Link
+            onClick={() => navigate({ type: "app", page: "simulator" })}
+            style={{ cursor: "pointer" }}
+          >
+            Simulator page
+          </Link>.
         </Text>
         <InputControls
           solarKw={solarKw}

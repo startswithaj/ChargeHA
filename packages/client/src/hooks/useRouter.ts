@@ -82,6 +82,15 @@ const navigate = (target: Route): void => {
   setRoute(target);
 };
 
+/**
+ * Replace the URL with an in-app path (e.g. a wizard sub-step), base-prefixed
+ * and without adding a history entry. Keeps the store's route in sync.
+ */
+const replacePath = (path: string): void => {
+  globalThis.history.replaceState(null, "", withBase(path));
+  setRoute(routeFromPath(path));
+};
+
 // Browser back/forward: re-derive the route from the URL.
 globalThis.addEventListener("popstate", () => setRoute(routeFromUrl()));
 
@@ -95,5 +104,5 @@ const subscribe = (notify: () => void): () => void => {
 
 export function useRouter() {
   const route = useSyncExternalStore(subscribe, () => currentRoute);
-  return { route, navigate };
+  return { route, navigate, replacePath };
 }
