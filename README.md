@@ -259,10 +259,6 @@ enabling support for non-Tesla EVs through smart EVSE chargers.
   no vehicle adapter is present (no SOC or charge limit, but charging still
   optimises for solar)
 
-See
-[`prds/prd-smart-charger-architecture.md`](prds/prd-smart-charger-architecture.md)
-for the full PRD.
-
 ## Tech Stack
 
 | Layer    | Technology                      |
