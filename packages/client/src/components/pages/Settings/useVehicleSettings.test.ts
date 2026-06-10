@@ -297,4 +297,58 @@ describe("useVehicleSettings", () => {
     expect(parsed.homeLat).toBe(-33.86);
     expect(parsed.homeLng).toBe(151.20);
   });
+
+  it("handleAddSimulatedVehicle assigns DEMO-001 when no demo vehicles exist", async () => {
+    mockCreateMutate.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useVehicleSettings());
+    await act(() => {
+      result.current.handleAddSimulatedVehicle();
+    });
+    const callArg = mockCreateMutate.mock.calls[0]?.[0] as {
+      id: string;
+      name: string;
+    };
+    expect(callArg.id).toBe("DEMO-001");
+    expect(callArg.name).toBe("Demo EV");
+  });
+
+  it("handleAddSimulatedVehicle continues the wizard's DEMO sequence", async () => {
+    mockCreateMutate.mockResolvedValue(undefined);
+    m.vehiclesData = {
+      vehicles: [
+        { id: "DEMO-001", name: "Demo EV", adapterType: "sim", priority: 1 },
+      ],
+    };
+    const { result } = renderHook(() => useVehicleSettings());
+    await act(() => {
+      result.current.handleAddSimulatedVehicle();
+    });
+    const callArg = mockCreateMutate.mock.calls[0]?.[0] as {
+      id: string;
+      name: string;
+    };
+    expect(callArg.id).toBe("DEMO-002");
+    expect(callArg.name).toBe("Demo EV 2");
+  });
+
+  it("handleAddSimulatedVehicle numbers past the highest existing DEMO id", async () => {
+    mockCreateMutate.mockResolvedValue(undefined);
+    m.vehiclesData = {
+      vehicles: [
+        { id: "DEMO-001", name: "Demo EV", adapterType: "sim", priority: 1 },
+        { id: "DEMO-003", name: "Demo EV 3", adapterType: "sim", priority: 2 },
+        { id: "5YJ3E1EA", name: "Model 3", adapterType: "tesla", priority: 3 },
+      ],
+    };
+    const { result } = renderHook(() => useVehicleSettings());
+    await act(() => {
+      result.current.handleAddSimulatedVehicle();
+    });
+    const callArg = mockCreateMutate.mock.calls[0]?.[0] as {
+      id: string;
+      name: string;
+    };
+    expect(callArg.id).toBe("DEMO-004");
+    expect(callArg.name).toBe("Demo EV 4");
+  });
 });

@@ -541,8 +541,9 @@ describe("Dashboard", () => {
   });
 
   it("renders multiple charging vehicles and computes individual solar/grid splits", () => {
-    // solar 8000W, home 1000W → available 7000W; two vehicles charging at 3000W each
-    // → each gets vehicleShare = 0.5 → solarW = min(3000, 7000*0.5) = 3000, gridW = 0
+    // solar 8000W, home 1000W, two vehicles charging at 3000W each
+    // → each gets vehicleShare = 0.5 → solarW = min(3000, 13000*0.5, 8000*0.5)
+    //   = 3000, gridW = 0
     h.setEnergy({
       realtime: {
         solarProductionW: 8000,

@@ -8,6 +8,14 @@ import { useRouter } from "../../../hooks/useRouter.ts";
 
 const demoPlugin = vehiclePluginOptions.find((o) => o.demoSetup);
 
+// Wizard creates "Demo EV" / DEMO-001; settings-added vehicles continue
+// the sequence: "Demo EV 2" / DEMO-002, "Demo EV 3" / DEMO-003, ...
+const nextDemoNumber = (vehicles: VehicleWithState[]): number =>
+  vehicles.reduce((max, v) => {
+    const match = v.id.match(/^DEMO-(\d+)$/);
+    return match ? Math.max(max, parseInt(match[1], 10)) : max;
+  }, 0) + 1;
+
 function useAddSimulatedVehicleMutation(
   { utils, vehicles, homeConfig, setRecentlyAddedVins }: {
     utils: ReturnType<typeof trpc.useUtils>;
@@ -21,7 +29,8 @@ function useAddSimulatedVehicleMutation(
   return useMutation({
     mutationFn: async () => {
       if (!demoPlugin) throw new Error("No demo plugin available");
-      const id = `sim-ev-${Math.random().toString(36).slice(2, 10)}`;
+      const n = nextDemoNumber(vehicles);
+      const id = `DEMO-${String(n).padStart(3, "0")}`;
       const homeLat = homeConfig?.homeLatitude ?? NaN;
       const homeLng = homeConfig?.homeLongitude ?? NaN;
       const simConfig: Record<string, unknown> = {
@@ -31,13 +40,7 @@ function useAddSimulatedVehicleMutation(
         simConfig.homeLat = homeLat;
         simConfig.homeLng = homeLng;
       }
-      const baseName = `${demoPlugin.label} EV`;
-      const existingCount = vehicles.filter(
-        (v) => v.adapterType === demoPlugin.id,
-      ).length;
-      const name = existingCount === 0
-        ? baseName
-        : `${baseName} ${existingCount + 1}`;
+      const name = n === 1 ? "Demo EV" : `Demo EV ${n}`;
       await utils.client.vehicle.create.mutate({
         id,
         name,

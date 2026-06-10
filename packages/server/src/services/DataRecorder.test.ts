@@ -618,12 +618,11 @@ describe("DataRecorder", () => {
     });
 
     it("splits solar proportionally for multiple home-charging vehicles", async () => {
-      // solar=5000, home=4000
+      // solar=5000, home=4000 (home meter includes both EVs' draw)
       // VIN1: 3700W, VIN2: 2000W, total=5700W
-      // availableSolar for VIN1 = max(0, 5000-4000+3700) = 4700
-      // VIN1 share = 3700/5700 ≈ 0.649
-      // VIN1 solar = min(3700, 4700 * 0.649) ≈ min(3700, 3050.9) = 3050.9
-      // VIN1 grid = 3700 - 3050.9 = 649.1
+      // availableSolar = max(0, 5000-4000+5700) = 6700
+      // capped by production: VIN1 solar = 5000 * 3700/5700 ≈ 3245.6
+      //                       VIN2 solar = 5000 * 2000/5700 ≈ 1754.4
       await setHomeConfig(db);
       feedEnergy(emitter, ENERGY_DATA);
       vehicleManager.setVehicleState("VIN1", {
@@ -646,7 +645,10 @@ describe("DataRecorder", () => {
 
       await testable(recorder).recordVehicleCharges(null);
       expect(capturedReadings).toHaveLength(2);
-      // Both should have some solar and some grid
+      expect(capturedReadings[0].solarContributionW).toBeCloseTo(3245.6, 0);
+      expect(capturedReadings[0].gridContributionW).toBeCloseTo(454.4, 0);
+      expect(capturedReadings[1].solarContributionW).toBeCloseTo(1754.4, 0);
+      expect(capturedReadings[1].gridContributionW).toBeCloseTo(245.6, 0);
       const totalSolar = capturedReadings[0].solarContributionW +
         capturedReadings[1].solarContributionW;
       const totalGrid = capturedReadings[0].gridContributionW +
