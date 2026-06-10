@@ -1,6 +1,7 @@
 import { Wand2, Zap } from "lucide-react";
-import { Button, Switch, Text } from "@radix-ui/themes";
+import { Button, Link, Switch, Text } from "@radix-ui/themes";
 import { trpc } from "../../../trpc.ts";
+import { version } from "../../../lib/version.ts";
 import { useRouter } from "../../../hooks/useRouter.ts";
 import {
   useChargingConfig,
@@ -16,6 +17,20 @@ import { BatterySettings } from "./BatterySettings.tsx";
 import { TariffSettings } from "./TariffSettings.tsx";
 import { GeneralSettings } from "./GeneralSettings.tsx";
 import { NotificationSettings } from "./NotificationSettings.tsx";
+
+function VersionFooter() {
+  const label = `version ${version.sha}`;
+  if (!version.commitUrl) {
+    return <Text size="1" color="gray" align="center">{label}</Text>;
+  }
+  return (
+    <Text size="1" color="gray" align="center">
+      <Link href={version.commitUrl} target="_blank" rel="noreferrer">
+        {label}
+      </Link>
+    </Text>
+  );
+}
 
 // ── Main Settings Component ──
 
@@ -108,6 +123,8 @@ export function Settings() {
 
       {/* ═══ Authentication ═══ */}
       <AuthSettings />
+
+      <VersionFooter />
     </div>
   );
 }
