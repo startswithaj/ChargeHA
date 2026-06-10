@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { Button, Text } from "@radix-ui/themes";
 import { ArrowLeft, ArrowRight, SkipForward } from "lucide-react";
 import { useWizardState } from "../../hooks/useWizardState.ts";
+import { useRouter } from "../../hooks/useRouter.ts";
 import { StepIndicator } from "./StepIndicator.tsx";
 import styles from "./WizardShell.module.css";
 import type { ReactNode } from "react";
@@ -104,6 +105,7 @@ function WizardNav(
 
 export function WizardShell({ steps, onComplete }: WizardShellProps) {
   const wizardState = useWizardState();
+  const { replacePath } = useRouter();
   const stepsTotal = steps?.length ?? 0;
 
   // Resolve current step index from DB-persisted step ID.
@@ -136,10 +138,8 @@ export function WizardShell({ steps, onComplete }: WizardShellProps) {
   useEffect(() => {
     if (!steps || steps.length === 0) return;
     const stepId = steps[currentStep]?.id;
-    if (stepId) {
-      globalThis.history.replaceState(null, "", `/wizard/${stepId}`);
-    }
-  }, [steps, currentStep]);
+    if (stepId) replacePath(`/wizard/${stepId}`);
+  }, [steps, currentStep, replacePath]);
 
   const { goToStep, handleNext, handleBack, handleSkip, handleSkipToEnd } =
     useWizardCallbacks({ steps, currentStep, wizardState, onComplete });

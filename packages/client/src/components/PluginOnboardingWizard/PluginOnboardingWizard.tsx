@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { Button, Text } from "@radix-ui/themes";
 import { ArrowLeft, ArrowRight, SkipForward } from "lucide-react";
 import { usePluginOnboardingState } from "../../hooks/usePluginOnboardingState.ts";
+import { useRouter } from "../../hooks/useRouter.ts";
 import { pluginComponents } from "@chargeha/plugins/componentRegistry";
 import type { PluginWizardStep } from "@chargeha/plugins/componentRegistry";
 import type { StepProps } from "../Wizard/WizardShell.tsx";
@@ -105,6 +106,7 @@ export function PluginOnboardingWizard({
 }: PluginOnboardingWizardProps) {
   const defaultStepId = steps.length > 0 ? steps[0].id : "";
   const onboardingState = usePluginOnboardingState(pluginId, defaultStepId);
+  const { replacePath } = useRouter();
 
   const currentStep = useMemo(() => {
     if (steps.length === 0) return 0;
@@ -116,14 +118,8 @@ export function PluginOnboardingWizard({
   useEffect(() => {
     if (steps.length === 0) return;
     const stepId = steps[currentStep]?.id;
-    if (stepId) {
-      globalThis.history.replaceState(
-        null,
-        "",
-        `/setup/${pluginId}/${stepId}`,
-      );
-    }
-  }, [steps, currentStep, pluginId]);
+    if (stepId) replacePath(`/setup/${pluginId}/${stepId}`);
+  }, [steps, currentStep, pluginId, replacePath]);
 
   const { goToStep, handleNext, handleBack, handleSkip, handleSkipToEnd } =
     useStepCallbacks({
