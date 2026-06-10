@@ -68,8 +68,9 @@ describe("EnergyFlowDiagram", () => {
 
       expect(screen.getByText("5.2 kW")).toBeInTheDocument();
       expect(screen.getByText("3.7 kW")).toBeInTheDocument();
-      // Grid shows "Import 200 W"
-      expect(screen.getByText(/Import\s+200 W/)).toBeInTheDocument();
+      // Grid shows an "Import" pill with the value below
+      expect(screen.getByText("Import")).toBeInTheDocument();
+      expect(screen.getByText("200 W")).toBeInTheDocument();
     });
   });
 
@@ -116,14 +117,15 @@ describe("EnergyFlowDiagram", () => {
   // ---- grid direction ----
 
   describe("grid direction", () => {
-    it.each<[string, number, RegExp]>([
-      ["Export", -1500, /Export\s+1\.5 kW/],
-      ["Import", 2000, /Import\s+2\.0 kW/],
-    ])("shows %s when gridPowerW is %d", (_label, gridPowerW, expected) => {
+    it.each<[string, number, string]>([
+      ["Export", -1500, "1.5 kW"],
+      ["Import", 2000, "2.0 kW"],
+    ])("shows %s when gridPowerW is %d", (label, gridPowerW, expected) => {
       renderWithProviders(
         <EnergyFlowDiagram data={makeEnergyData({ gridPowerW })} />,
       );
 
+      expect(screen.getByText(label)).toBeInTheDocument();
       expect(screen.getByText(expected)).toBeInTheDocument();
     });
   });
