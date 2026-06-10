@@ -18,6 +18,8 @@ RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /tesla-http-proxy ./cmd/te
 
 # --- Stage 2: Build the client (static assets) ---
 FROM denoland/deno:2.8.2 AS client-builder
+ARG GIT_SHA
+ENV VITE_GIT_SHA=$GIT_SHA
 WORKDIR /app
 COPY deno.json deno.lock* ./
 COPY packages/shared/ packages/shared/

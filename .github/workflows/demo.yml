@@ -25,6 +25,8 @@ jobs:
         with:
           deno-version: v2.8.2
       - run: deno task build:demo
+        env:
+          VITE_GIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
