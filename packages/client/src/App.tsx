@@ -29,9 +29,8 @@ const ReactQueryDevtools = viteMeta.env?.DEV
 type Appearance = "light" | "dark";
 
 /** Redirects to wizard on first run. Rendered inside AuthGate so it only queries when authenticated. */
-function FirstRunRedirect(
-  { route, navigate }: { route: Route; navigate: (r: Route) => void },
-) {
+function FirstRunRedirect() {
+  const { route, navigate } = useRouter();
   const wizardStatusQuery = trpc.wizard.status.useQuery(undefined, {
     enabled: route.type !== "wizard",
     retry: false,
@@ -56,7 +55,7 @@ function renderRoute(
   },
 ) {
   if (route.type === "pluginSetup") {
-    return <PluginSetupRouter pluginId={route.pluginId} navigate={navigate} />;
+    return <PluginSetupRouter pluginId={route.pluginId} />;
   }
   if (route.type === "wizard") {
     return (
@@ -100,11 +99,11 @@ function AppContent() {
   return (
     <Theme appearance={appearance}>
       <ToastProvider>
-        <AuthGate navigate={navigate}>
+        <AuthGate>
           {({ authMode, onLogout }) => (
             <>
               <RealtimeSync />
-              <FirstRunRedirect route={route} navigate={navigate} />
+              <FirstRunRedirect />
               {renderRoute(route, navigate, {
                 appearance,
                 onToggleAppearance: toggleAppearance,

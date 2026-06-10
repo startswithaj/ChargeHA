@@ -1,6 +1,7 @@
 import { Wand2, Zap } from "lucide-react";
 import { Button, Switch, Text } from "@radix-ui/themes";
 import { trpc } from "../../../trpc.ts";
+import { useRouter } from "../../../hooks/useRouter.ts";
 import {
   useChargingConfig,
   useChargingConfigMutation,
@@ -19,6 +20,7 @@ import { NotificationSettings } from "./NotificationSettings.tsx";
 // ── Main Settings Component ──
 
 export function Settings() {
+  const { navigate } = useRouter();
   const { data: charging, isLoading: chargingLoading } = useChargingConfig();
   const chargingMutation = useChargingConfigMutation();
   const {
@@ -58,8 +60,7 @@ export function Settings() {
           size="2"
           variant="soft"
           onClick={() => {
-            globalThis.history.pushState(null, "", "/wizard");
-            globalThis.dispatchEvent(new PopStateEvent("popstate"));
+            navigate({ type: "wizard" });
           }}
         >
           <Wand2 size={14} />

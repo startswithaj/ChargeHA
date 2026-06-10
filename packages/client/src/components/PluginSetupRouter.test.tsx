@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   invalidateVehicleList: vi.fn(),
   invalidateVehiclePlugins: vi.fn(),
   invalidateEnergyPlugins: vi.fn(),
+  navigate: vi.fn(),
 }));
 
 vi.mock("../trpc.ts", () => ({
@@ -86,17 +87,21 @@ vi.mock(
   }),
 );
 
+vi.mock("../hooks/useRouter.ts", () => ({
+  useRouter: () => ({
+    route: { type: "app", page: "dashboard" },
+    navigate: mocks.navigate,
+  }),
+}));
+
 import { PluginSetupRouter } from "./PluginSetupRouter.tsx";
-import type { Route } from "../hooks/useRouter.ts";
 
 describe("PluginSetupRouter", () => {
-  const mockNavigate = vi.fn<(route: Route) => void>();
-
   beforeEach(() => {
     mocks.invalidateVehicleList.mockClear();
     mocks.invalidateVehiclePlugins.mockClear();
     mocks.invalidateEnergyPlugins.mockClear();
-    mockNavigate.mockClear();
+    mocks.navigate.mockClear();
   });
 
   afterEach(() => {
@@ -106,7 +111,7 @@ describe("PluginSetupRouter", () => {
   describe("vehicle plugin", () => {
     it("renders with correct plugin name and step count from registry", () => {
       render(
-        <PluginSetupRouter pluginId="tesla" navigate={mockNavigate} />,
+        <PluginSetupRouter pluginId="tesla" />,
       );
 
       expect(screen.getByTestId("plugin-name")).toHaveTextContent("Tesla");
@@ -116,7 +121,7 @@ describe("PluginSetupRouter", () => {
 
     it("invalidates vehicle caches and navigates to settings on complete", async () => {
       render(
-        <PluginSetupRouter pluginId="tesla" navigate={mockNavigate} />,
+        <PluginSetupRouter pluginId="tesla" />,
       );
 
       await userEvent.click(screen.getByText("Complete"));
@@ -124,7 +129,7 @@ describe("PluginSetupRouter", () => {
       expect(mocks.invalidateVehicleList).toHaveBeenCalled();
       expect(mocks.invalidateVehiclePlugins).toHaveBeenCalled();
       expect(mocks.invalidateEnergyPlugins).not.toHaveBeenCalled();
-      expect(mockNavigate).toHaveBeenCalledWith({
+      expect(mocks.navigate).toHaveBeenCalledWith({
         type: "app",
         page: "settings",
       });
@@ -134,10 +139,7 @@ describe("PluginSetupRouter", () => {
   describe("energy plugin", () => {
     it("renders with correct plugin name and step count from registry", () => {
       render(
-        <PluginSetupRouter
-          pluginId="fronius_local"
-          navigate={mockNavigate}
-        />,
+        <PluginSetupRouter pluginId="fronius_local" />,
       );
 
       expect(screen.getByTestId("plugin-name")).toHaveTextContent(
@@ -151,10 +153,7 @@ describe("PluginSetupRouter", () => {
 
     it("invalidates energy caches and navigates to settings on complete", async () => {
       render(
-        <PluginSetupRouter
-          pluginId="fronius_local"
-          navigate={mockNavigate}
-        />,
+        <PluginSetupRouter pluginId="fronius_local" />,
       );
 
       await userEvent.click(screen.getByText("Complete"));
@@ -162,7 +161,7 @@ describe("PluginSetupRouter", () => {
       expect(mocks.invalidateEnergyPlugins).toHaveBeenCalled();
       expect(mocks.invalidateVehicleList).not.toHaveBeenCalled();
       expect(mocks.invalidateVehiclePlugins).not.toHaveBeenCalled();
-      expect(mockNavigate).toHaveBeenCalledWith({
+      expect(mocks.navigate).toHaveBeenCalledWith({
         type: "app",
         page: "settings",
       });
@@ -172,12 +171,12 @@ describe("PluginSetupRouter", () => {
   describe("cancel", () => {
     it("navigates to settings on cancel", async () => {
       render(
-        <PluginSetupRouter pluginId="tesla" navigate={mockNavigate} />,
+        <PluginSetupRouter pluginId="tesla" />,
       );
 
       await userEvent.click(screen.getByText("Cancel"));
 
-      expect(mockNavigate).toHaveBeenCalledWith({
+      expect(mocks.navigate).toHaveBeenCalledWith({
         type: "app",
         page: "settings",
       });
@@ -187,10 +186,7 @@ describe("PluginSetupRouter", () => {
   describe("unknown plugin", () => {
     it("falls back to pluginId as name when not in registry", () => {
       render(
-        <PluginSetupRouter
-          pluginId="unknown_plugin"
-          navigate={mockNavigate}
-        />,
+        <PluginSetupRouter pluginId="unknown_plugin" />,
       );
 
       expect(screen.getByTestId("plugin-name")).toHaveTextContent(
@@ -200,10 +196,7 @@ describe("PluginSetupRouter", () => {
 
     it("renders empty steps for unknown plugin", () => {
       render(
-        <PluginSetupRouter
-          pluginId="unknown_plugin"
-          navigate={mockNavigate}
-        />,
+        <PluginSetupRouter pluginId="unknown_plugin" />,
       );
 
       expect(screen.getByTestId("step-count")).toHaveTextContent("0");
@@ -211,10 +204,7 @@ describe("PluginSetupRouter", () => {
 
     it("treats unknown plugin as energy and invalidates energy caches", async () => {
       render(
-        <PluginSetupRouter
-          pluginId="unknown_plugin"
-          navigate={mockNavigate}
-        />,
+        <PluginSetupRouter pluginId="unknown_plugin" />,
       );
 
       await userEvent.click(screen.getByText("Complete"));
@@ -229,10 +219,7 @@ describe("PluginSetupRouter", () => {
   describe("simulated vehicle plugin", () => {
     it("uses simulated vehicle steps (empty array)", () => {
       render(
-        <PluginSetupRouter
-          pluginId="simulated"
-          navigate={mockNavigate}
-        />,
+        <PluginSetupRouter pluginId="simulated" />,
       );
 
       expect(screen.getByTestId("plugin-name")).toHaveTextContent("Simulated");
@@ -241,10 +228,7 @@ describe("PluginSetupRouter", () => {
 
     it("invalidates vehicle caches on complete (simulated is a vehicle plugin)", async () => {
       render(
-        <PluginSetupRouter
-          pluginId="simulated"
-          navigate={mockNavigate}
-        />,
+        <PluginSetupRouter pluginId="simulated" />,
       );
 
       await userEvent.click(screen.getByText("Complete"));

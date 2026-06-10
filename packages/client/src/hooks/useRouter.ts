@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import type { Page } from "../components/Layout/AppLayout.tsx";
+import { stripBase, withBase } from "../lib/basePath.ts";
 
 export type Route =
   | { type: "app"; page: Page }
@@ -56,28 +57,43 @@ function pathFromRoute(route: Route): string {
   }
 }
 
+// ── Navigation store ────────────────────────────────────────────────────────
+// A module singleton so any component can navigate without prop-drilling, and
+// so updates are synchronous (no dependence on effect order — a child can
+// navigate during its mount and the mounted router still sees it).
+const routeFromUrl = (): Route =>
+  routeFromPath(stripBase(globalThis.location.pathname));
+
+// deno-lint-ignore custom-no-let/no-let
+let currentRoute: Route = routeFromUrl();
+const listeners = new Set<() => void>();
+
+const setRoute = (next: Route): void => {
+  currentRoute = next;
+  listeners.forEach((notify) => notify());
+};
+
 /**
- * URL-based router hook with discriminated union route types.
- * Manages URL parsing, navigation via pushState, and popstate handling.
+ * Navigate from anywhere. Updates the URL (base-prefixed for GitHub Pages) and
+ * the store; every mounted useRouter re-renders.
  */
+const navigate = (target: Route): void => {
+  globalThis.history.pushState(null, "", withBase(pathFromRoute(target)));
+  setRoute(target);
+};
+
+// Browser back/forward: re-derive the route from the URL.
+globalThis.addEventListener("popstate", () => setRoute(routeFromUrl()));
+
+const subscribe = (notify: () => void): () => void => {
+  // First subscriber after a fresh mount re-syncs from the URL, so a direct
+  // history change (e.g. between tests) is reflected.
+  if (listeners.size === 0) currentRoute = routeFromUrl();
+  listeners.add(notify);
+  return () => listeners.delete(notify);
+};
+
 export function useRouter() {
-  const [route, setRoute] = useState<Route>(
-    () => routeFromPath(globalThis.location.pathname),
-  );
-
-  const navigate = useCallback((target: Route) => {
-    const path = pathFromRoute(target);
-    globalThis.history.pushState(null, "", path);
-    setRoute(target);
-  }, []);
-
-  // Handle browser back/forward buttons
-  useEffect(() => {
-    const onPopState = () =>
-      setRoute(routeFromPath(globalThis.location.pathname));
-    globalThis.addEventListener("popstate", onPopState);
-    return () => globalThis.removeEventListener("popstate", onPopState);
-  }, []);
-
+  const route = useSyncExternalStore(subscribe, () => currentRoute);
   return { route, navigate };
 }

@@ -3,7 +3,7 @@ import { Text } from "@radix-ui/themes";
 import { AlertTriangle } from "lucide-react";
 import { trpc } from "../trpc.ts";
 import { queryClient } from "../lib/trpcSetup.ts";
-import type { Route } from "../hooks/useRouter.ts";
+import { useRouter } from "../hooks/useRouter.ts";
 import { LoginPage } from "./Login/LoginPage.tsx";
 import { Spinner } from "./ui/Spinner.tsx";
 
@@ -13,7 +13,6 @@ export interface AuthInfo {
 }
 
 interface AuthGateProps {
-  navigate: (route: Route) => void;
   children: (auth: AuthInfo) => ReactNode;
 }
 
@@ -49,7 +48,8 @@ function ResetAuthBanner() {
  * Uses render props: children receives `{ authMode, onLogout }` so
  * downstream components can access auth info without extra context.
  */
-export function AuthGate({ navigate, children }: AuthGateProps) {
+export function AuthGate({ children }: AuthGateProps) {
+  const { navigate } = useRouter();
   const authSessionQuery = trpc.auth.session.useQuery(undefined, {
     retry: false,
   });
@@ -75,7 +75,7 @@ export function AuthGate({ navigate, children }: AuthGateProps) {
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
       queryClient.clear();
-      globalThis.history.pushState(null, "", "/login");
+      navigate({ type: "login" });
       // Force re-fetch of auth session to trigger login page render
       queryClient.invalidateQueries({ queryKey: [["auth", "session"]] });
     },

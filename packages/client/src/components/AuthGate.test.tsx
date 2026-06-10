@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   invalidateQueries: vi.fn(),
   clear: vi.fn(),
   capturedLogout: {} as { onSuccess?: () => void },
+  navigate: vi.fn(),
 }));
 
 vi.mock("../trpc.ts", () => ({
@@ -72,11 +73,16 @@ vi.mock("./ui/Spinner.tsx", () => ({
   Spinner: () => <div data-testid="spinner">Loading...</div>,
 }));
 
+vi.mock("../hooks/useRouter.ts", () => ({
+  useRouter: () => ({
+    route: { type: "app", page: "dashboard" },
+    navigate: mocks.navigate,
+  }),
+}));
+
 import { AuthGate } from "./AuthGate.tsx";
-import type { Route } from "../hooks/useRouter.ts";
 
 describe("AuthGate", () => {
-  const mockNavigate = vi.fn<(route: Route) => void>();
   const mockChildren = vi.fn(({ authMode, onLogout }) => (
     <div>
       Authenticated Content
@@ -130,7 +136,7 @@ describe("AuthGate", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    mockNavigate.mockClear();
+    mocks.navigate.mockClear();
     mockChildren.mockClear();
   });
 
@@ -138,7 +144,7 @@ describe("AuthGate", () => {
     setAuthPending();
 
     render(
-      <AuthGate navigate={mockNavigate}>{mockChildren}</AuthGate>,
+      <AuthGate>{mockChildren}</AuthGate>,
     );
 
     expect(screen.getByTestId("spinner")).toBeInTheDocument();
@@ -150,7 +156,7 @@ describe("AuthGate", () => {
     setAuth({ authenticated: false, authMode: "local" });
 
     render(
-      <AuthGate navigate={mockNavigate}>{mockChildren}</AuthGate>,
+      <AuthGate>{mockChildren}</AuthGate>,
     );
 
     expect(screen.getByText("Login Page")).toBeInTheDocument();
@@ -162,7 +168,7 @@ describe("AuthGate", () => {
     setAuth({ authenticated: true, authMode: "none" });
 
     render(
-      <AuthGate navigate={mockNavigate}>{mockChildren}</AuthGate>,
+      <AuthGate>{mockChildren}</AuthGate>,
     );
 
     expect(screen.getByText("Authenticated Content")).toBeInTheDocument();
@@ -173,7 +179,7 @@ describe("AuthGate", () => {
     setAuth({ authenticated: true, authMode: "local" });
 
     render(
-      <AuthGate navigate={mockNavigate}>{mockChildren}</AuthGate>,
+      <AuthGate>{mockChildren}</AuthGate>,
     );
 
     expect(screen.getByText("Authenticated Content")).toBeInTheDocument();
@@ -184,7 +190,7 @@ describe("AuthGate", () => {
     setAuth({ authenticated: false, authMode: "none" });
 
     render(
-      <AuthGate navigate={mockNavigate}>{mockChildren}</AuthGate>,
+      <AuthGate>{mockChildren}</AuthGate>,
     );
 
     // authMode "none" means no auth required, so children render regardless
@@ -195,7 +201,7 @@ describe("AuthGate", () => {
     setAuth({ authenticated: true, authMode: "local", resetAuthActive: true });
 
     render(
-      <AuthGate navigate={mockNavigate}>{mockChildren}</AuthGate>,
+      <AuthGate>{mockChildren}</AuthGate>,
     );
 
     expect(
@@ -215,7 +221,7 @@ describe("AuthGate", () => {
       setAuth({ authenticated: true, authMode: "local", resetAuthActive });
 
       render(
-        <AuthGate navigate={mockNavigate}>{mockChildren}</AuthGate>,
+        <AuthGate>{mockChildren}</AuthGate>,
       );
 
       expect(
@@ -231,7 +237,7 @@ describe("AuthGate", () => {
     setAuth({ authenticated: false, authMode: "oidc" });
 
     render(
-      <AuthGate navigate={mockNavigate}>{mockChildren}</AuthGate>,
+      <AuthGate>{mockChildren}</AuthGate>,
     );
 
     expect(screen.getByTestId("error-code")).toHaveTextContent(
@@ -243,7 +249,7 @@ describe("AuthGate", () => {
     setAuth({ authenticated: false, authMode: "local" });
 
     render(
-      <AuthGate navigate={mockNavigate}>{mockChildren}</AuthGate>,
+      <AuthGate>{mockChildren}</AuthGate>,
     );
 
     await userEvent.click(screen.getByText("Login"));
@@ -251,7 +257,7 @@ describe("AuthGate", () => {
     expect(mocks.invalidateQueries).toHaveBeenCalledWith({
       queryKey: [["auth", "session"]],
     });
-    expect(mockNavigate).toHaveBeenCalledWith({
+    expect(mocks.navigate).toHaveBeenCalledWith({
       type: "app",
       page: "dashboard",
     });
@@ -261,7 +267,7 @@ describe("AuthGate", () => {
     setAuth({ authenticated: true, authMode: "local" });
 
     render(
-      <AuthGate navigate={mockNavigate}>{mockChildren}</AuthGate>,
+      <AuthGate>{mockChildren}</AuthGate>,
     );
 
     await userEvent.click(screen.getByText("Logout"));
@@ -272,7 +278,7 @@ describe("AuthGate", () => {
     setAuth({ authenticated: true, authMode: "local" });
 
     render(
-      <AuthGate navigate={mockNavigate}>{mockChildren}</AuthGate>,
+      <AuthGate>{mockChildren}</AuthGate>,
     );
 
     // Invoke the captured onSuccess callback
@@ -280,7 +286,7 @@ describe("AuthGate", () => {
     mocks.capturedLogout.onSuccess();
 
     expect(mocks.clear).toHaveBeenCalled();
-    expect(globalThis.location.pathname).toBe("/login");
+    expect(mocks.navigate).toHaveBeenCalledWith({ type: "login" });
     expect(mocks.invalidateQueries).toHaveBeenCalledWith({
       queryKey: [["auth", "session"]],
     });
@@ -290,7 +296,7 @@ describe("AuthGate", () => {
     setAuthUndefined();
 
     render(
-      <AuthGate navigate={mockNavigate}>{mockChildren}</AuthGate>,
+      <AuthGate>{mockChildren}</AuthGate>,
     );
 
     // authData is undefined, authMode defaults to "none", canProceed is true

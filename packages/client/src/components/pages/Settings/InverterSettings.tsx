@@ -9,6 +9,7 @@ import {
 import { useDraftConfig } from "../../../hooks/useDraftConfig.ts";
 import { SettingsRow, SettingsSection } from "./SettingsLayout.tsx";
 import { trpc } from "../../../trpc.ts";
+import { useRouter } from "../../../hooks/useRouter.ts";
 import {
   energyPluginOptions,
   energyPluginSteps,
@@ -55,6 +56,7 @@ function PluginSelect(
 }
 
 export function InverterSettings() {
+  const { navigate } = useRouter();
   const { data: config } = useEquipmentConfig();
   const mutation = useEquipmentConfigMutation();
   const { fields, setField, isDirty, save, saveStatus } = useDraftConfig(
@@ -64,8 +66,7 @@ export function InverterSettings() {
   const { data: plugins } = trpc.energy.getPlugins.useQuery();
 
   const handleStartOnboarding = useCallback((pluginId: string) => {
-    globalThis.history.pushState(null, "", `/setup/${pluginId}`);
-    globalThis.dispatchEvent(new PopStateEvent("popstate"));
+    navigate({ type: "pluginSetup", pluginId });
   }, []);
 
   if (!fields) return null;

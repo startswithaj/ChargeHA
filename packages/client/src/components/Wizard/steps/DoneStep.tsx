@@ -8,6 +8,7 @@ import {
   useSystemConfig,
 } from "../../../hooks/useSectionConfig.ts";
 import { trpc } from "../../../trpc.ts";
+import { useRouter } from "../../../hooks/useRouter.ts";
 import type { StepProps } from "../WizardShell.tsx";
 import styles from "./steps.module.css";
 
@@ -97,6 +98,7 @@ function buildChecklist(
 }
 
 export function DoneStep({ onSkipTo }: StepProps) {
+  const { navigate } = useRouter();
   const { data: systemConfig, isLoading: systemLoading } = useSystemConfig();
   const { data: equipmentConfig, isLoading: equipmentLoading } =
     useEquipmentConfig();
@@ -123,8 +125,7 @@ export function DoneStep({ onSkipTo }: StepProps) {
         completed: true,
         firstRun: false,
       });
-      globalThis.history.pushState(null, "", "/");
-      globalThis.dispatchEvent(new PopStateEvent("popstate"));
+      navigate({ type: "app", page: "dashboard" });
     },
   });
 
