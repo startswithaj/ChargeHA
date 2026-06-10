@@ -767,7 +767,7 @@ describe("WizardService", () => {
         config: JSON.stringify({ batteryCapacityKwh: 60 }),
         mode: "auto",
       });
-      expect(configSet["energy_adapter_type"]).toBe("");
+      expect(configSet["energy_adapter_type"]).toBe("simulated_energy");
       expect(configSet["home_latitude"]).toBe("-33.8688");
       expect(configSet["home_longitude"]).toBe("151.2093");
       expect(configSet["timezone"]).toBe("Australia/Sydney");
