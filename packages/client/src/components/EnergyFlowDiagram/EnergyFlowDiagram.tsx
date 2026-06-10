@@ -18,12 +18,12 @@ interface EnergyFlowDiagramProps {
   chargingVehicles?: ChargingVehicleFlow[];
 }
 
-const DOT_COUNT = 3;
+const DOT_COUNT = 2;
 
 // Dot travel time shrinks as power grows so big flows visibly move faster
 function flowDurationS(powerW: number): number {
   const kw = Math.abs(powerW) / 1000;
-  return Math.min(2.4, Math.max(0.9, 2.6 - kw * 0.2));
+  return Math.min(4, Math.max(2, 4.2 - kw * 0.2));
 }
 
 function FlowConnector(
