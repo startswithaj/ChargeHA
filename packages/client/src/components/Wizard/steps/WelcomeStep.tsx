@@ -64,13 +64,13 @@ export function WelcomeStep({ onNext, onSkipToEnd }: StepProps) {
 
       <Text as="p" size="2" color="gray">
         <strong>Full Setup</strong>{" "}
-        guides you through connecting to your vehicle and energy inverter or
-        smart meter step by step.
+        walks you through authentication, timezone, your vehicle, energy source,
+        and home location — step by step.
       </Text>
       <Text as="p" size="2" color="gray">
         <strong>Demo Mode</strong>{" "}
-        creates a simulated vehicle so you can explore the dashboard without
-        connecting real hardware.
+        skips the wizard and adds a simulated energy source and vehicle so you
+        can explore the full app with no manual setup.
       </Text>
 
       {error && (

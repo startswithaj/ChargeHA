@@ -95,9 +95,9 @@ describe("WelcomeStep", () => {
       .toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Demo Mode/ }))
       .toBeInTheDocument();
-    expect(screen.getByText(/guides you through connecting/))
+    expect(screen.getByText(/walks you through authentication/))
       .toBeInTheDocument();
-    expect(screen.getByText(/creates a simulated vehicle/))
+    expect(screen.getByText(/skips the wizard and adds a simulated/))
       .toBeInTheDocument();
   });
 
