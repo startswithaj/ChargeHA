@@ -19,8 +19,8 @@ export interface WizardStepConfig {
   /** Unique string identifier for this step (persisted to the database). */
   id: string;
   label: string;
-  /** Hide the generic Back/Next nav bar — e.g. the Done step has its own CTA. */
-  hideNav?: boolean;
+  /** Hide the Next/Finish button (Back stays) — e.g. the Done step completes via its own CTA. */
+  hideNext?: boolean;
   render: (props: StepProps) => ReactNode;
 }
 
@@ -70,9 +70,10 @@ function useWizardCallbacks(
 }
 
 function WizardNav(
-  { isFirstStep, isLastStep, onBack, onSkip, onNext }: {
+  { isFirstStep, isLastStep, hideNext, onBack, onSkip, onNext }: {
     isFirstStep: boolean;
     isLastStep: boolean;
+    hideNext: boolean;
     onBack: () => void;
     onSkip: () => void;
     onNext: () => void;
@@ -96,10 +97,12 @@ function WizardNav(
             <SkipForward size={16} />
           </Button>
         )}
-        <Button onClick={onNext} aria-label={isLastStep ? "Finish" : "Next"}>
-          {isLastStep ? "Finish" : "Next"}
-          {!isLastStep && <ArrowRight size={16} />}
-        </Button>
+        {!hideNext && (
+          <Button onClick={onNext} aria-label={isLastStep ? "Finish" : "Next"}>
+            {isLastStep ? "Finish" : "Next"}
+            {!isLastStep && <ArrowRight size={16} />}
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -201,15 +204,14 @@ export function WizardShell({ steps, onComplete }: WizardShellProps) {
           : <Text color="gray">{label} — not yet implemented</Text>}
       </div>
 
-      {!stepConfig?.hideNav && (
-        <WizardNav
-          isFirstStep={isFirstStep}
-          isLastStep={isLastStep}
-          onBack={handleBack}
-          onSkip={handleSkip}
-          onNext={handleNext}
-        />
-      )}
+      <WizardNav
+        isFirstStep={isFirstStep}
+        isLastStep={isLastStep}
+        hideNext={!!stepConfig?.hideNext}
+        onBack={handleBack}
+        onSkip={handleSkip}
+        onNext={handleNext}
+      />
     </div>
   );
 }

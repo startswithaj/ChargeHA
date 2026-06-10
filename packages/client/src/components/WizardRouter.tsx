@@ -64,7 +64,7 @@ const CORE_STEPS_AFTER: WizardStepConfig[] = [
   {
     id: "done",
     label: "Done",
-    hideNav: true,
+    hideNext: true,
     render: (props) => <DoneStep {...props} />,
   },
 ];
