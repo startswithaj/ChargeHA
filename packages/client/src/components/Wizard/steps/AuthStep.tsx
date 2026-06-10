@@ -215,10 +215,14 @@ function useAuthEffects(
     const params = new URLSearchParams(globalThis.location?.search);
     if (params.get("error")) return;
     sessionRefetch().then((result) => {
-      if (
-        result.data?.authenticated && result.data?.authMode === "oidc"
-      ) {
+      const authMode = result.data?.authMode;
+      if (result.data?.authenticated && authMode === "oidc") {
         onNext();
+        return;
+      }
+      // Pre-select whatever auth mode is already configured.
+      if (authMode === "none" || authMode === "local" || authMode === "oidc") {
+        setSelectedMode(authMode);
       }
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

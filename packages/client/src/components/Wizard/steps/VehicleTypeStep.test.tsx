@@ -5,12 +5,21 @@ import { renderWithProviders } from "../../../test-utils.tsx";
 import { VehicleTypeStep } from "./VehicleTypeStep.tsx";
 import type { StepProps } from "../WizardShell.tsx";
 
-const { mockSetStepId, mockSetVehicleType, mockDemoMutate, captured } = vi
+const {
+  mockSetStepId,
+  mockSetVehicleType,
+  mockDemoMutate,
+  captured,
+  mockVehicleList,
+} = vi
   .hoisted(() => ({
     mockSetStepId: vi.fn(),
     mockSetVehicleType: vi.fn(),
     mockDemoMutate: vi.fn(),
     captured: { demoOnSuccess: undefined as (() => void) | undefined },
+    mockVehicleList: vi.fn(() => ({
+      data: { vehicles: [] as { adapterType: string }[] },
+    })),
   }));
 
 vi.mock("../../../hooks/useWizardState.ts", () => ({
@@ -32,6 +41,9 @@ vi.mock("../../../trpc.ts", () => ({
       getConfig: {
         useQuery: vi.fn(() => ({ data: {}, isLoading: false, error: null })),
       },
+    },
+    vehicle: {
+      list: { useQuery: mockVehicleList },
     },
     wizard: {
       demoSetup: {
@@ -76,6 +88,7 @@ describe("VehicleTypeStep", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsDemoMode.mockReturnValue(false);
+    mockVehicleList.mockReturnValue({ data: { vehicles: [] } });
     captured.demoOnSuccess = undefined;
     mockDemoMutate.mockImplementation(() => {
       captured.demoOnSuccess?.();
@@ -124,6 +137,19 @@ describe("VehicleTypeStep", () => {
     fireEvent.click(screen.getByRole("button", { name: /Simulated/ }));
 
     expect(mockDemoMutate).toHaveBeenCalledWith({ adapterType: "simulated" });
+    expect(mockSetVehicleType).toHaveBeenCalledWith("simulated");
+    expect(mockSetStepId).toHaveBeenCalledWith("inverter-type");
+  });
+
+  it("reselecting the already-configured vehicle type proceeds without recreating it", () => {
+    mockVehicleList.mockReturnValue({
+      data: { vehicles: [{ adapterType: "simulated" }] },
+    });
+    renderWithProviders(<VehicleTypeStep {...makeStepProps()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Simulated/ }));
+
+    expect(mockDemoMutate).not.toHaveBeenCalled();
     expect(mockSetVehicleType).toHaveBeenCalledWith("simulated");
     expect(mockSetStepId).toHaveBeenCalledWith("inverter-type");
   });
