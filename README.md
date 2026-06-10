@@ -2,18 +2,15 @@
   <img src="packages/client/public/social-card-rounded.png" alt="ChargeHA" />
 </p>
 
-<p align="center">
-  Solar-aware EV charge controller for home automation. ChargeHA monitors your
-  solar production and intelligently manages EV charging to maximise
-  self-consumption — with advanced scheduling and notifications. Set and
-  forget.
-</p>
+Solar-aware EV charge controller for home automation. ChargeHA monitors your
+solar production and intelligently manages EV charging to maximise
+self-consumption — with advanced scheduling and notifications. Set and forget.
 
-<p align="center">
-  ChargeHA has a demo mode that lets you review the features without installing.
-  It runs entirely in the browser.
-  <a href="https://startswithaj.github.io/ChargeHA/">Try it here</a>.
-</p>
+## Demo
+
+ChargeHA has a demo mode that lets you review the features without installing.
+It runs entirely in the browser.
+[Try it here](https://startswithaj.github.io/ChargeHA/).
 
 ## ChargeHQ.net
 
@@ -36,18 +33,39 @@ ChargeHA is not affiliated with, endorsed by, or associated with ChargeHQ.
 - **Charge scheduling** — time-based schedules with day-of-week selection,
   per-vehicle amperage, and target charge limits
 - **Blockout schedules** — prevent charging during peak tariff windows
-- **Tariff-aware cost tracking** — records the active electricity rate per
-  reading and breaks down charging costs by tariff period
 - **Real-time dashboard** — live energy flow diagram showing solar, grid,
   battery, and EV power with vehicle status cards
-- **Historical stats** — day/month/year charts for energy production,
-  consumption, and charging costs with per-vehicle breakdowns
 - **Notifications** — Telegram alerts for charge start/stop, plug events, low
   solar, energy outages, and errors
 - **Setup wizard** — guided first-run configuration for vehicles, inverters,
   location, and auth
 - **Plugin architecture** — modular adapters for vehicles and energy sources,
   extensible without touching core code
+
+### Reporting
+
+- **Tariff-aware cost tracking** — records the active electricity rate per
+  reading and breaks down charging costs by tariff period
+- **Historical stats** — day/month/year charts for energy production,
+  consumption, and charging costs with per-vehicle breakdowns
+
+## Supported Integrations
+
+| Category      | Integration         | Details                                                                         |
+| ------------- | ------------------- | ------------------------------------------------------------------------------- |
+| Vehicles      | **Tesla**           | Fleet API with virtual key pairing, charge control, wake, and location tracking |
+| Vehicles      | **Simulated**       | Demo/dev adapter with adjustable SOC and plug state                             |
+| Energy        | **Fronius (local)** | Direct HTTP polling of inverters on your LAN, with auto-discovery               |
+| Energy        | **Fronius (cloud)** | Remote monitoring via the Fronius Solar API                                     |
+| Notifications | **Telegram**        | Alerts for charging events, errors, and energy outages                          |
+| Auth          | **OIDC**            | Single sign-on via any OpenID Connect provider                                  |
+
+### Coming Soon
+
+| Category | Integration                    | Details                                                                          |
+| -------- | ------------------------------ | -------------------------------------------------------------------------------- |
+| Energy   | **More inverters**             | SolarEdge, Sungrow, GoodWe, and Growatt — the most popular brands beyond Fronius |
+| Chargers | **Smart Chargers (OCPP 1.6J)** | Wallbox, ZJ Beny, MG Chargehub, and 20+ OCPP-compatible brands over LAN          |
 
 ## Notes about Tesla
 
@@ -88,7 +106,7 @@ Consequences:
 ### Online probe (transition detection)
 
 The free `/vehicles` endpoint is polled **every controller loop** (or every
-minute which ever is less frequent) which is used to discover transitions where
+minute, whichever is less frequent) which is used to discover transitions where
 the car wakes itself — plug-in, drive home, the user opening the Tesla app —
 without paying for a wake. When an asleep→online transition is detected, we
 immediately pull a fresh `vehicle_data` read so the cache reflects the new
@@ -125,17 +143,6 @@ Both thresholds are configurable in Settings. The more frequently amps are
 updated (lower threshold, shorter settle time), the tighter solar tracking
 follows real-time production — at the cost of more API calls.
 
-## Supported Integrations
-
-| Category      | Integration         | Details                                                                         |
-| ------------- | ------------------- | ------------------------------------------------------------------------------- |
-| Vehicles      | **Tesla**           | Fleet API with virtual key pairing, charge control, wake, and location tracking |
-| Vehicles      | **Simulated**       | Demo/dev adapter with adjustable SOC and plug state                             |
-| Energy        | **Fronius (local)** | Direct HTTP polling of inverters on your LAN, with auto-discovery               |
-| Energy        | **Fronius (cloud)** | Remote monitoring via the Fronius Solar API                                     |
-| Notifications | **Telegram**        | Alerts for charging events, errors, and energy outages                          |
-| Auth          | **OIDC**            | Single sign-on via any OpenID Connect provider                                  |
-
 ## How It Works
 
 ChargeHA runs a **configurable decision loop** (default 10 seconds) that
@@ -154,13 +161,34 @@ A configurable grace period (default 6 min) keeps the charger running at the
 minimum charge rate through brief solar dips, and a cooldown period (default 15
 min) prevents rapid on/off cycling.
 
+## Quick Start
+
+Run the prebuilt image from GitHub Container Registry — no build required:
+
+```bash
+docker run -d --name chargeha \
+  -p 8000:8000 \
+  -v chargeha-data:/app/data \
+  -e ENCRYPTION_KEY=$(openssl rand -base64 32) \
+  ghcr.io/startswithaj/chargeha:latest
+```
+
+Open `http://localhost:8000` and follow the setup wizard.
+
+Images are published to `ghcr.io/startswithaj/chargeha`:
+
+- `latest` / `main` — current `main` branch
+- `v2026.06.10` — date-based release tags
+- `branch-<name>` — per branch, `pr-<n>` per pull request
+- `sha-<short>` — every build
+
 ## Getting Started
 
 ### Docker (recommended)
 
 ```bash
 # Build
-docker buildx build --platform linux/amd64 -t chargeha .
+docker buildx build -f docker/Dockerfile --platform linux/amd64 -t chargeha .
 
 # Run
 docker run -d --name chargeha \
@@ -185,6 +213,26 @@ deno task dev
 deno task dev:server
 deno task dev:client
 ```
+
+To test **Tesla commands** locally (start/stop, set amps), install Tesla's HTTP
+proxy so it's on your `PATH` — ChargeHA spawns and manages it automatically on
+port 4443 (requires Go):
+
+```bash
+go install github.com/teslamotors/vehicle-command/cmd/tesla-http-proxy@latest
+```
+
+Vehicle _data_ works without it; if the binary is missing the server logs
+`tesla-http-proxy binary not found … skipping proxy start` and commands fail.
+
+Before committing, run the full quality gate:
+
+```bash
+deno task check:all
+```
+
+It runs formatting, linting, type-checking, plugin-ref checks, unused-file
+detection, and all tests.
 
 ### Devtools
 
