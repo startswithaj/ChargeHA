@@ -31,7 +31,7 @@ export const wizardMutations: WizardMutations = {
       ...m,
       config: {
         ...m.config,
-        energy_adapter_type: "",
+        energy_adapter_type: "simulated_energy",
         timezone: input.timezone ?? m.config.timezone,
       },
       vehicles: [{

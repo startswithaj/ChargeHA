@@ -2,11 +2,6 @@ import { useMemo } from "react";
 import { Button, Callout, Text } from "@radix-ui/themes";
 import { AlertTriangle, CheckCircle, PartyPopper, Pencil } from "lucide-react";
 import type { VehicleWithState } from "@chargeha/shared";
-import {
-  useEquipmentConfig,
-  useHomeConfig,
-  useSystemConfig,
-} from "../../../hooks/useSectionConfig.ts";
 import { trpc } from "../../../trpc.ts";
 import { useRouter } from "../../../hooks/useRouter.ts";
 import type { StepProps } from "../WizardShell.tsx";
@@ -99,17 +94,19 @@ function buildChecklist(
 
 export function DoneStep({ onSkipTo }: StepProps) {
   const { navigate } = useRouter();
-  const { data: systemConfig, isLoading: systemLoading } = useSystemConfig();
-  const { data: equipmentConfig, isLoading: equipmentLoading } =
-    useEquipmentConfig();
-  const { data: homeConfig, isLoading: homeLoading } = useHomeConfig();
-  const { data: authSession, isLoading: authLoading } = trpc.auth.session
-    .useQuery();
-
-  const {
-    data: vehiclesData,
-    isLoading: vehiclesLoading,
-  } = trpc.vehicle.list.useQuery();
+  // Always refetch on mount so the summary reflects the just-finished setup,
+  // not a stale cache from an earlier step or the quick demo setup.
+  const fresh = { refetchOnMount: "always" } as const;
+  const { data: systemConfig, isFetching: systemFetching } = trpc.config.system
+    .get.useQuery(undefined, fresh);
+  const { data: equipmentConfig, isFetching: equipmentFetching } = trpc.config
+    .equipment.get.useQuery(undefined, fresh);
+  const { data: homeConfig, isFetching: homeFetching } = trpc.config.home.get
+    .useQuery(undefined, fresh);
+  const { data: authSession, isFetching: authFetching } = trpc.auth.session
+    .useQuery(undefined, fresh);
+  const { data: vehiclesData, isFetching: vehiclesFetching } = trpc.vehicle.list
+    .useQuery(undefined, fresh);
   const vehicles = useMemo(
     () => (vehiclesData?.vehicles ?? []) as VehicleWithState[],
     [vehiclesData],
@@ -131,8 +128,8 @@ export function DoneStep({ onSkipTo }: StepProps) {
 
   const authMode = authSession?.authMode ?? "none";
 
-  const loading = systemLoading || equipmentLoading || homeLoading ||
-    vehiclesLoading || authLoading;
+  const loading = systemFetching || equipmentFetching || homeFetching ||
+    vehiclesFetching || authFetching;
 
   const checklist = buildChecklist({
     authMode,
