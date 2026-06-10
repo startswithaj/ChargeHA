@@ -23,7 +23,7 @@ const DOT_COUNT = 2;
 // Dot travel time shrinks as power grows so big flows visibly move faster
 function flowDurationS(powerW: number): number {
   const kw = Math.abs(powerW) / 1000;
-  return Math.min(4, Math.max(2, 4.2 - kw * 0.2));
+  return Math.min(3, Math.max(1.4, 3.2 - kw * 0.2));
 }
 
 function FlowConnector(

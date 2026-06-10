@@ -361,6 +361,11 @@
     margin-top: 21px;
   }
 
+  /* vertical connectors hang off the rail, not the badge centre */
+  .connectorVertical {
+    margin-top: 0;
+  }
+
   .nodeValue {
     font-size: 15px;
     white-space: normal;
