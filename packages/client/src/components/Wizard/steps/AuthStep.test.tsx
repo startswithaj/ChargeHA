@@ -465,6 +465,19 @@ describe("AuthStep", () => {
     expect(onNext).not.toHaveBeenCalled();
   });
 
+  it("pre-selects the already-configured auth mode on return", async () => {
+    mockSessionRefetch.mockResolvedValue({
+      data: { authenticated: false, authMode: "local" },
+    });
+    renderWithProviders(<AuthStep {...makeStepProps()} />);
+
+    // The local form renders only when "local" is the selected mode, so its
+    // presence proves the configured mode was pre-selected on mount.
+    await waitFor(() => {
+      expect(screen.getByTestId("local-form")).toBeInTheDocument();
+    });
+  });
+
   // ---- Redirect URI display ----
 
   it("shows computed redirect URI when base URL is entered", () => {

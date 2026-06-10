@@ -33,6 +33,11 @@ export function VehicleTypeStep({ onNext: _onNext }: StepProps) {
 
   const utils = trpc.useUtils();
 
+  const { data: vehiclesData } = trpc.vehicle.list.useQuery();
+  const existingType = vehiclesData?.vehicles?.[0]?.adapterType ?? "";
+  const selectedType = wizardState.vehicleType || existingType;
+  const primaryId = selectedType || vehiclePluginOptions[0]?.id;
+
   // Demo setup mutation — creates a vehicle for plugins that declare demoSetup
   const demoSetupMutation = trpc.wizard.demoSetup.useMutation({
     onSuccess: () => {
@@ -46,6 +51,12 @@ export function VehicleTypeStep({ onNext: _onNext }: StepProps) {
 
   const handleSelect = (id: string) => {
     const option = vehiclePluginOptions.find((o) => o.id === id);
+    if (id === selectedType) {
+      // Already set up with this type — continue without recreating.
+      wizardState.setVehicleType(id);
+      navigateAfterSelection(id);
+      return;
+    }
     if (option?.demoSetup) {
       pendingIdRef.current = id;
       demoSetupMutation.mutate({ adapterType: id });
@@ -62,7 +73,7 @@ export function VehicleTypeStep({ onNext: _onNext }: StepProps) {
       </Text>
 
       <div className={styles.welcomeButtons}>
-        {vehiclePluginOptions.map((option, idx) => {
+        {vehiclePluginOptions.map((option) => {
           const Icon = icons[option.iconKey];
           const isDemoSetup = !!option.demoSetup;
           const demoBlocked = inDemo && !option.demoAvailable;
@@ -70,7 +81,7 @@ export function VehicleTypeStep({ onNext: _onNext }: StepProps) {
             <Button
               key={option.id}
               size="3"
-              variant={idx === 0 ? "solid" : "soft"}
+              variant={option.id === primaryId ? "solid" : "soft"}
               disabled={demoBlocked ||
                 (isDemoSetup && demoSetupMutation.isPending)}
               onClick={() => handleSelect(option.id)}
