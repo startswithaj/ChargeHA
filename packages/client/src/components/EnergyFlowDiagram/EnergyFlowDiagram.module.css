@@ -227,13 +227,47 @@
   }
 }
 
-/* Vehicle row: side by side when multiple vehicles */
-.vehicleRow {
+/* Multi-vehicle T-branch: stem from Home, rail, then a drop per vehicle */
+.vehicleGroup {
   grid-column: 1 / -1;
   display: flex;
-  justify-content: center;
-  gap: 24px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.branchStem {
+  align-self: center;
+  height: 28px;
+}
+
+.vehicleRow {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  width: 100%;
+}
+
+.branchRail {
+  position: absolute;
+  top: -1px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--color-charging);
+  opacity: 0.3;
+}
+
+.vehicleColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+.branchDrop {
+  align-self: center;
+  height: 24px;
 }
 
 /* Single vehicle: stays in Home column */

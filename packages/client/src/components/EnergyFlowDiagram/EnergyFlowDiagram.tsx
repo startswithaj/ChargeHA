@@ -128,18 +128,59 @@ function VehicleNodes(
     baseRow: number;
   },
 ) {
+  const totalW = chargingVehicles.reduce((sum, v) => sum + v.chargePowerW, 0);
   if (chargingVehicles.length === 1) {
     return (
-      <VehicleNode
-        v={chargingVehicles[0]}
-        className={styles.vehicleSingle}
-        gridRow={baseRow + 1}
-      />
+      <>
+        <FlowConnector
+          className={styles.toVehicles}
+          active
+          color="var(--color-charging)"
+          direction="down"
+          powerW={totalW}
+          gridRow={baseRow}
+        />
+        <VehicleNode
+          v={chargingVehicles[0]}
+          className={styles.vehicleSingle}
+          gridRow={baseRow + 1}
+        />
+      </>
     );
   }
+  // T-branch: stem from Home, horizontal rail, then a drop into each vehicle.
+  // Equal-width columns put the rail insets exactly on each vehicle's centre.
+  const railInsetPct = 50 / chargingVehicles.length;
   return (
-    <div className={styles.vehicleRow} style={{ gridRow: baseRow + 1 }}>
-      {chargingVehicles.map((v) => <VehicleNode key={v.id} v={v} />)}
+    <div className={styles.vehicleGroup} style={{ gridRow: baseRow }}>
+      <FlowConnector
+        className={styles.branchStem}
+        active
+        color="var(--color-charging)"
+        direction="down"
+        powerW={totalW}
+      />
+      <div
+        className={styles.vehicleRow}
+        style={{ maxWidth: `${chargingVehicles.length * 240}px` }}
+      >
+        <div
+          className={styles.branchRail}
+          style={{ left: `${railInsetPct}%`, right: `${railInsetPct}%` }}
+        />
+        {chargingVehicles.map((v) => (
+          <div key={v.id} className={styles.vehicleColumn}>
+            <FlowConnector
+              className={styles.branchDrop}
+              active
+              color="var(--color-charging)"
+              direction="down"
+              powerW={v.chargePowerW}
+            />
+            <VehicleNode v={v} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -158,10 +199,6 @@ export function EnergyFlowDiagram(
   const gridActive = Math.abs(gridW) > 10;
   const batteryActive = Math.abs(batteryW) > 10;
   const baseRow = hasBattery ? 3 : 2;
-  const totalVehicleW = chargingVehicles.reduce(
-    (sum, v) => sum + v.chargePowerW,
-    0,
-  );
   const gridColor = isExporting
     ? "var(--color-grid-export)"
     : "var(--color-grid-import)";
@@ -230,22 +267,12 @@ export function EnergyFlowDiagram(
         </FlowNode>
       )}
 
-      {/* Charging vehicles: single connector + vehicle(s) */}
+      {/* Charging vehicles: connector(s) + vehicle node(s) */}
       {chargingVehicles.length > 0 && (
-        <>
-          <FlowConnector
-            className={styles.toVehicles}
-            active
-            color="var(--color-charging)"
-            direction="down"
-            powerW={totalVehicleW}
-            gridRow={baseRow}
-          />
-          <VehicleNodes
-            chargingVehicles={chargingVehicles}
-            baseRow={baseRow}
-          />
-        </>
+        <VehicleNodes
+          chargingVehicles={chargingVehicles}
+          baseRow={baseRow}
+        />
       )}
     </div>
   );
