@@ -23,6 +23,33 @@ import { teslaRouter } from "./router.ts";
 const DEFAULT_PROXY_URL = "https://localhost:4443";
 
 /**
+ * Reachability check for the tesla-proxy health check. Returns "ok" (no
+ * warning) when Tesla isn't set up — the proxy only runs once a private key
+ * exists, so an unreachable proxy is only worth warning about then.
+ */
+export async function checkTeslaProxyHealth(
+  deps: {
+    getSecret(key: "ec_private_key"): Promise<string | null>;
+    getConfig(key: "proxy_url"): Promise<string | null>;
+  },
+): Promise<HealthCheckResult> {
+  if (!(await deps.getSecret("ec_private_key"))) {
+    return { status: "ok" };
+  }
+  try {
+    const proxyUrlStr = (await deps.getConfig("proxy_url")) ??
+      DEFAULT_PROXY_URL;
+    const url = new URL(proxyUrlStr);
+    const port = parseInt(url.port || "4443", 10);
+    const conn = await Deno.connect({ hostname: url.hostname, port });
+    conn.close();
+    return { status: "ok" };
+  } catch {
+    return { status: "error", message: "Tesla proxy not reachable" };
+  }
+}
+
+/**
  * Tesla vehicle plugin — owns Tesla OAuth, Fleet API proxy, EC key
  * lifecycle, and vehicle adapter creation behind the VehiclePlugin interface.
  *
@@ -180,22 +207,7 @@ export class TeslaVehiclePlugin implements VehiclePlugin {
         warningTitle: "Tesla Proxy Unreachable",
         warningMessage:
           "Vehicle commands will fail. Make sure tesla-http-proxy is running on port 4443.",
-        async run(): Promise<HealthCheckResult> {
-          try {
-            const proxyUrlStr = (await deps.getConfig("proxy_url")) ??
-              DEFAULT_PROXY_URL;
-            const url = new URL(proxyUrlStr);
-            const port = parseInt(url.port || "4443", 10);
-            const conn = await Deno.connect({
-              hostname: url.hostname,
-              port,
-            });
-            conn.close();
-            return { status: "ok" };
-          } catch {
-            return { status: "error", message: "Tesla proxy not reachable" };
-          }
-        },
+        run: () => checkTeslaProxyHealth(deps),
       },
     ];
   }

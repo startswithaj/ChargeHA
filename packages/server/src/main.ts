@@ -1,4 +1,8 @@
+import { loadEnv } from "./lib/loadEnv.ts";
 import { bootstrap } from "./bootstrap/bootstrap.ts";
+
+// Load .env into the environment before bootstrap reads it.
+await loadEnv();
 
 const { shutdown } = await bootstrap();
 
