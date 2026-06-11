@@ -1,15 +1,11 @@
-import { useState } from "react";
-import { Button, TextField } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
-import { SettingsRow } from "../../../../client/src/components/pages/Settings/SettingsLayout.tsx";
-import type { SimulatedEnergyConfig as SimulatedEnergyConfigShape } from "../server/config.ts";
+import {
+  type PluginConfigField,
+  PluginConfigForm,
+} from "../../../../client/src/components/pages/Settings/PluginConfigForm.tsx";
 
 /** Editable solar knobs, mirroring the Simulator page. */
-const FIELDS: {
-  key: keyof SimulatedEnergyConfigShape;
-  label: string;
-  help: string;
-}[] = [
+const FIELDS: PluginConfigField[] = [
   {
     key: "peakKw",
     label: "Peak solar (kW)",
@@ -47,47 +43,11 @@ const FIELDS: {
   },
 ];
 
-export function SimulatedEnergyConfig(): JSX.Element | null {
-  const { data: config } = trpc.energy.simulated_energy.getConfig.useQuery();
+export function SimulatedEnergyConfig(): JSX.Element {
+  const { data } = trpc.energy.simulated_energy.getConfig.useQuery();
   const utils = trpc.useUtils();
-  const [draft, setDraft] = useState<Partial<Record<string, string>>>({});
-  const configMutation = trpc.energy.simulated_energy.setConfig.useMutation({
-    onSuccess: () => {
-      utils.energy.simulated_energy.getConfig.invalidate();
-      setDraft({});
-    },
+  const { mutate } = trpc.energy.simulated_energy.setConfig.useMutation({
+    onSuccess: () => utils.energy.simulated_energy.getConfig.invalidate(),
   });
-
-  if (!config) return null;
-
-  const isDirty = Object.keys(draft).length > 0;
-  const valueOf = (key: keyof SimulatedEnergyConfigShape): string =>
-    draft[key] ?? String(config[key]);
-
-  return (
-    <>
-      {FIELDS.map((field) => (
-        <SettingsRow key={field.key} label={field.label} help={field.help}>
-          <TextField.Root
-            size="2"
-            value={valueOf(field.key)}
-            onChange={(e: { target: { value: string } }) =>
-              setDraft((d) => ({ ...d, [field.key]: e.target.value }))}
-            style={{ width: 100 }}
-          />
-        </SettingsRow>
-      ))}
-      <div
-        style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}
-      >
-        <Button
-          size="1"
-          disabled={!isDirty || configMutation.isPending}
-          onClick={() => configMutation.mutate(draft)}
-        >
-          {configMutation.isPending ? "Saving…" : "Save"}
-        </Button>
-      </div>
-    </>
-  );
+  return <PluginConfigForm data={data} fields={FIELDS} onSave={mutate} />;
 }

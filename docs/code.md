@@ -25,6 +25,13 @@
 Deno workspace with four members: `packages/shared/`, `packages/server/`,
 `packages/client/`, `packages/plugins/`.
 
+### Dev server flag
+
+The client `dev` / `dev:demo` tasks pass `--unstable-no-legacy-abort`. Without
+it, Vite's dev server throws uncaught `AbortError`s under Deno's legacy abort
+behavior when the browser cancels in-flight requests (HMR, page reload, proxy) —
+see denoland/deno#28632. Remove once this behavior becomes Deno's default.
+
 ## Project Structure
 
 ```

@@ -1,13 +1,18 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { Plus, Zap } from "lucide-react";
 import { Button, Select, Text } from "@radix-ui/themes";
 import { ErrorBoundary } from "../../ui/ErrorBoundary.tsx";
 import {
+  type SaveStatus,
   useEquipmentConfig,
   useEquipmentConfigMutation,
 } from "../../../hooks/useSectionConfig.ts";
 import { useDraftConfig } from "../../../hooks/useDraftConfig.ts";
 import { SettingsRow, SettingsSection } from "./SettingsLayout.tsx";
+import {
+  PluginSettingsHostProvider,
+  type PluginSettingsState,
+} from "./pluginSettingsHost.ts";
 import { trpc } from "../../../trpc.ts";
 import { useRouter } from "../../../hooks/useRouter.ts";
 import {
@@ -55,6 +60,46 @@ function PluginSelect(
   );
 }
 
+/** Merge the panel's own draft save state with a plugin settings component's. */
+function useCombinedSaveState(
+  baseIsDirty: boolean,
+  baseSave: () => void,
+  baseSaveStatus: SaveStatus,
+): {
+  setPluginState: (s: PluginSettingsState | null) => void;
+  isDirty: boolean;
+  save: () => void;
+  saveStatus: SaveStatus;
+} {
+  const [pluginState, setPluginState] = useState<PluginSettingsState | null>(
+    null,
+  );
+  const save = useCallback(() => {
+    if (baseIsDirty) baseSave();
+    pluginState?.save();
+  }, [baseIsDirty, baseSave, pluginState]);
+  const isDirty = baseIsDirty || !!pluginState?.isDirty;
+  const saveStatus = pluginState && pluginState.saveStatus.state !== "idle"
+    ? pluginState.saveStatus
+    : baseSaveStatus;
+  return { setPluginState, isDirty, save, saveStatus };
+}
+
+type VendorPlugin = { id: string; displayName: string; vendor: string };
+
+/** Group energy plugins by vendor for the dropdown's grouped options. */
+function groupPluginsByVendor(
+  plugins: VendorPlugin[],
+): Record<string, Array<{ id: string; displayName: string }>> {
+  return plugins.reduce<
+    Record<string, Array<{ id: string; displayName: string }>>
+  >((acc, plugin) => {
+    if (!acc[plugin.vendor]) acc[plugin.vendor] = [];
+    acc[plugin.vendor].push({ id: plugin.id, displayName: plugin.displayName });
+    return acc;
+  }, {});
+}
+
 export function InverterSettings() {
   const { navigate } = useRouter();
   const { data: config } = useEquipmentConfig();
@@ -69,19 +114,21 @@ export function InverterSettings() {
     navigate({ type: "pluginSetup", pluginId });
   }, []);
 
+  // A plugin settings component (e.g. simulated solar) reports its own dirty/
+  // save state, so this panel's header Save + dirty highlight cover it too.
+  const {
+    setPluginState,
+    isDirty: combinedDirty,
+    save: combinedSave,
+    saveStatus: combinedSaveStatus,
+  } = useCombinedSaveState(isDirty, save, saveStatus);
+
   if (!fields) return null;
 
   const adapterConfigured = !!fields.energyAdapterType;
 
   // Group plugins by vendor for the dropdown
-  const pluginsByVendor = (plugins ?? []).reduce<
-    Record<string, Array<{ id: string; displayName: string }>>
-  >((acc, plugin) => {
-    const vendor = plugin.vendor;
-    if (!acc[vendor]) acc[vendor] = [];
-    acc[vendor].push({ id: plugin.id, displayName: plugin.displayName });
-    return acc;
-  }, {});
+  const pluginsByVendor = groupPluginsByVendor(plugins ?? []);
 
   // In demo, disable energy plugins the demo can't serve (Fronius local/cloud).
   const disabledIds = demoMode.blockedPlugins(energyPluginOptions);
@@ -112,9 +159,9 @@ export function InverterSettings() {
       icon={<Zap size={18} />}
       title="My Equipment"
       description="Configure your inverter or smart meter for energy monitoring."
-      saveStatus={saveStatus}
-      isDirty={isDirty}
-      onSave={save}
+      saveStatus={combinedSaveStatus}
+      isDirty={combinedDirty}
+      onSave={combinedSave}
     >
       <SettingsRow label="Energy source">
         <PluginSelect
@@ -149,7 +196,9 @@ export function InverterSettings() {
       {/* Render plugin settings component dynamically */}
       {SettingsComponent && (
         <ErrorBoundary label="Plugin Settings">
-          <SettingsComponent />
+          <PluginSettingsHostProvider value={setPluginState}>
+            <SettingsComponent />
+          </PluginSettingsHostProvider>
         </ErrorBoundary>
       )}
 
