@@ -7,30 +7,7 @@ import {
 } from "../../../hooks/useSectionConfig.ts";
 import type { StepProps } from "../WizardShell.tsx";
 import styles from "./steps.module.css";
-
-// All IANA timezones supported by the browser
-function getTimezones(): string[] {
-  try {
-    return Intl.supportedValuesOf("timeZone");
-  } catch {
-    // Fallback for environments that don't support supportedValuesOf
-    return [
-      "UTC",
-      "America/New_York",
-      "America/Chicago",
-      "America/Denver",
-      "America/Los_Angeles",
-      "Europe/London",
-      "Europe/Berlin",
-      "Europe/Paris",
-      "Asia/Tokyo",
-      "Asia/Shanghai",
-      "Australia/Sydney",
-      "Australia/Melbourne",
-      "Pacific/Auckland",
-    ];
-  }
-}
+import { buildTimezoneOptions } from "../../../lib/timezones.ts";
 
 function detectTimezone(): string {
   try {
@@ -43,7 +20,7 @@ function detectTimezone(): string {
 export function TimezoneStep({ onNext }: StepProps) {
   const { data: systemConfig } = useSystemConfig();
   const detectedTimezone = useMemo(detectTimezone, []);
-  const timezones = useMemo(getTimezones, []);
+  const timezoneOptions = useMemo(buildTimezoneOptions, []);
   const [selectedTimezone, setSelectedTimezone] = useState(
     systemConfig?.timezone || detectedTimezone,
   );
@@ -79,9 +56,9 @@ export function TimezoneStep({ onNext }: StepProps) {
         >
           <Select.Trigger aria-label="Timezone" />
           <Select.Content>
-            {timezones.map((tz) => (
-              <Select.Item key={tz} value={tz}>
-                {tz}
+            {timezoneOptions.map((opt) => (
+              <Select.Item key={opt.value} value={opt.value}>
+                {opt.label}
               </Select.Item>
             ))}
           </Select.Content>

@@ -5,6 +5,7 @@ import type { SSEEvent } from "@chargeha/shared";
 import { resolveDemoMutation, resolveDemoQuery } from "./resolveDemoOp.ts";
 import { getDemoState } from "./demoState.ts";
 import { currentSnapshot, onDemoTick, runLiveController } from "./demoTick.ts";
+import { demoNow } from "./demoClock.ts";
 import { buildVehicleState } from "./handlers/vehicleState.ts";
 
 /**
@@ -35,7 +36,7 @@ export const demoLink =
     observable((observer) => {
       if (op.type === "subscription") {
         const emit = () =>
-          tickEvents(new Date()).forEach((data) =>
+          tickEvents(demoNow()).forEach((data) =>
             observer.next({ result: { type: "data", data } })
           );
         observer.next({ result: { type: "started" } });

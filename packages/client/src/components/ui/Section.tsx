@@ -34,17 +34,8 @@ export function Section({
   const cardClass = cardClassMap[saveStatus?.state ?? ""] ??
     (isDirty ? styles.dirtyCard : undefined);
 
-  const cardKeyMap: Record<string, string> = {
-    saved: `s-${saveStatus?.tick}`,
-    error: `e-${saveStatus?.tick}`,
-  };
-  const cardKey = cardKeyMap[saveStatus?.state ?? ""] ?? "i";
-
   return (
-    <Card
-      className={cardClass}
-      key={cardKey}
-    >
+    <Card className={cardClass}>
       <div className={styles.wrapper}>
         <div>
           <div className={styles.header}>

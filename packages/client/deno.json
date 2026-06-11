@@ -32,6 +32,7 @@
   },
   "tasks": {
     "dev": "deno run -A --unstable-no-legacy-abort npm:vite@^6 dev",
+    "dev:demo": "VITE_DEMO_MODE=1 deno run -A --unstable-no-legacy-abort npm:vite@^6 dev",
     "build": "deno run -A npm:vite@^6 build",
     "build:demo": "VITE_DEMO_MODE=1 deno run -A npm:vite@^6 build --base=/ChargeHA/ && cp ../server/dist/index.html ../server/dist/404.html",
     "test": "deno run -A npm:vitest@^3 run",
