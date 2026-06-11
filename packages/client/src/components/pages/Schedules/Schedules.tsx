@@ -9,6 +9,7 @@ import type {
 import { vehicleScheduleNotes } from "@chargeha/plugins/componentRegistry";
 import { useSchedules } from "../../../hooks/useSchedules.ts";
 import { useVehicles } from "../../../hooks/useVehicles.ts";
+import { useSystemConfig } from "../../../hooks/useSectionConfig.ts";
 import { ScheduleCard } from "../../ScheduleCard/ScheduleCard.tsx";
 import { ScheduleForm } from "../../ScheduleDialog/ScheduleDialog.tsx";
 import { EmptyState } from "../../ui/EmptyState.tsx";
@@ -305,7 +306,10 @@ export function Schedules({ onNavigateSettings }: SchedulesProps) {
 
   const [formTarget, setFormTarget] = useState<FormTarget | null>(null);
 
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Configured zone schedules are evaluated in (reactive); else the browser's.
+  const { data: systemConfig } = useSystemConfig();
+  const timezone = systemConfig?.timezone ||
+    Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const {
     closeForm,
