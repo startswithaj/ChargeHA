@@ -1,5 +1,5 @@
 import type { MutationHandlers } from "../types.ts";
-import { updateDemoState } from "../../demoState.ts";
+import { ALL_DAYS, updateDemoState } from "../../demoState.ts";
 
 type WizardMutations = Pick<
   MutationHandlers,
@@ -46,6 +46,18 @@ export const wizardMutations: WizardMutations = {
         isCharging: false,
         isPluggedIn: true,
         chargeAmps: 16,
+      }],
+      // Seed an overnight off-peak charge schedule so the demo shows scheduling.
+      schedules: [{
+        id: "demo-overnight-charge",
+        vehicleId: "DEMO-001",
+        scheduleType: "charge",
+        startTime: "00:00",
+        endTime: "06:00",
+        days: ALL_DAYS,
+        chargeAmps: 16,
+        chargeLimitPct: 80,
+        enabled: true,
       }],
     }));
     return { success: true as const };

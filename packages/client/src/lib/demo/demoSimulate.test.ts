@@ -6,14 +6,11 @@ describe("demoSimulate", () => {
   const now = new Date(2026, 5, 3, 10, 0); // 10:00 local
 
   describe("buildDemoSeries", () => {
-    it("builds 90 days with two vehicles at 15-minute buckets", () => {
+    it("builds 90 days with the demo vehicle at 15-minute buckets", () => {
       const series = buildDemoSeries(now);
       expect(series.days).toHaveLength(90);
       expect(series.bucketMinutes).toBe(15);
-      expect(series.vehicles.map((v) => v.name)).toEqual([
-        "Model 3 SR+",
-        "Model Y LR",
-      ]);
+      expect(series.vehicles.map((v) => v.name)).toEqual(["Demo EV"]);
     });
 
     it("truncates today (offset 0) to the current time-of-day", () => {
