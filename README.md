@@ -11,6 +11,7 @@ self-consumption — with advanced scheduling and notifications. Set and forget.
 ChargeHA has a demo mode that lets you review the features without installing.
 It runs entirely in the browser.
 [Try it here](https://startswithaj.github.io/ChargeHA/).
+Or view the [app tour video](#app-tour-video) below.
 
 ## ChargeHQ.net
 
@@ -325,3 +326,9 @@ enabling support for non-Tesla EVs through smart EVSE chargers.
 | Client   | React 18, Vite, TypeScript      |
 | UI       | Radix UI Themes, Recharts       |
 | Auth     | Argon2 (local), OIDC (SSO)      |
+
+## App Tour Video
+
+<p align="center">
+  <img src="docs/chargeha-tour.webp" alt="Animated tour of ChargeHA: dashboard, stats, schedules, logs, simulator, and settings" width="800" />
+</p>
