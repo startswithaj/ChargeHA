@@ -63,7 +63,15 @@ export interface DemoState extends DemoMutable {
   series: DemoSeries;
 }
 
-const ALL_DAYS: DayOfWeek[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+export const ALL_DAYS: DayOfWeek[] = [
+  "mon",
+  "tue",
+  "wed",
+  "thu",
+  "fri",
+  "sat",
+  "sun",
+];
 const SEED_AT = "2026-01-01T00:00:00.000Z";
 
 /** Default config — lands on the first-run wizard (no adapter, no vehicles). */

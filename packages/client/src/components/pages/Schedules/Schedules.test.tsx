@@ -52,6 +52,10 @@ vi.mock("../../../hooks/useVehicles.ts", () => ({
   })),
 }));
 
+vi.mock("../../../hooks/useSectionConfig.ts", () => ({
+  useSystemConfig: vi.fn(() => ({ data: { timezone: "Australia/Brisbane" } })),
+}));
+
 vi.mock("../../../hooks/useToast.tsx", async (importOriginal) => ({
   ...await importOriginal<typeof import("../../../hooks/useToast.tsx")>(),
   useToast: vi.fn(() => ({

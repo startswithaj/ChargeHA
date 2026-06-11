@@ -19,22 +19,16 @@ import { hash01 } from "./hash.ts";
 const DEMO_DAYS = 90;
 const BUCKET_MINUTES = 15;
 
+// The demo's single vehicle — matches the one created by wizard.demoSetup so
+// the live dashboard and the historical reports show the same car.
 export const DEMO_VEHICLES = [
   {
-    id: "SIM-DEMO-001",
-    name: "Model 3 SR+",
+    id: "DEMO-001",
+    name: "Demo EV",
     capacityKwh: 60,
     start: 55,
     limit: 80,
     priority: 1,
-  },
-  {
-    id: "SIM-DEMO-002",
-    name: "Model Y LR",
-    capacityKwh: 75,
-    start: 45,
-    limit: 90,
-    priority: 2,
   },
 ] as const;
 
@@ -80,7 +74,7 @@ const dayProfile = (offset: number): DayProfile => {
 
 const simOptions = (profile: DayProfile): SimulationOptions => ({
   seed: profile.seed,
-  vehicleCount: 2,
+  vehicleCount: 1,
   waterfall: false,
   minGenKw: "1",
   graceMin: "6",
@@ -95,7 +89,8 @@ const simOptions = (profile: DayProfile): SimulationOptions => ({
   ev1Start: profile.ev1Start,
   ev2Start: profile.ev2Start,
   ev1CapacityKwh: DEMO_VEHICLES[0].capacityKwh,
-  ev2CapacityKwh: DEMO_VEHICLES[1].capacityKwh,
+  // Unused at vehicleCount 1 (the engine slices to SIM_V1) but type-required.
+  ev2CapacityKwh: DEMO_VEHICLES[0].capacityKwh,
 });
 
 interface ChargingVehicle {
@@ -158,20 +153,17 @@ const buildDay = (offset: number): DemoDay => {
     };
   });
 
-  const logs = out.events
-    .filter((e) => !profile.away[e.vehicleId === "SIM_V1" ? 0 : 1])
-    .map((e) => {
-      const idx = e.vehicleId === "SIM_V1" ? 0 : 1;
-      return {
-        time: timeOfDay(e.minute),
-        vehicleId: DEMO_VEHICLES[idx].id,
-        vehicleName: DEMO_VEHICLES[idx].name,
-        action: e.action,
-        detail: e.detail,
-        amps: e.targetAmps,
-        checksJson: e.checksJson,
-      };
-    });
+  const mapped = out.events.map((e) => ({
+    time: timeOfDay(e.minute),
+    vehicleId: DEMO_VEHICLES[0].id,
+    vehicleName: DEMO_VEHICLES[0].name,
+    action: e.action,
+    detail: e.detail,
+    amps: e.targetAmps,
+    checksJson: e.checksJson,
+  }));
+  // A car that's away that day logs nothing.
+  const logs = profile.away[0] ? [] : mapped;
 
   return { offset, readings, logs };
 };
