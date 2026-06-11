@@ -176,7 +176,9 @@ describe("TimezoneStep", () => {
       // Check for IANA timezone options — Africa/Abidjan is first alphabetically
       const options = screen.getAllByRole("option");
       expect(options.length).toBeGreaterThan(10);
-      expect(screen.getByText("Africa/Abidjan")).toBeInTheDocument();
+      // Each option ends with its UTC offset, e.g. "Africa/Abidjan (GMT+00:00)".
+      expect(screen.getByText(/Africa\/Abidjan\s*\(GMT/))
+        .toBeInTheDocument();
     });
   });
 
@@ -187,12 +189,12 @@ describe("TimezoneStep", () => {
     fireEvent.click(trigger);
 
     await waitFor(() => {
-      expect(screen.getByText("Africa/Abidjan")).toBeInTheDocument();
+      expect(screen.getByText(/Africa\/Abidjan/)).toBeInTheDocument();
     });
 
     // Stubbed detected zone is Australia/Sydney, so picking Africa/Abidjan
     // is guaranteed to change selection and remove the auto-detected hint.
-    fireEvent.click(screen.getByText("Africa/Abidjan"));
+    fireEvent.click(screen.getByText(/Africa\/Abidjan/));
 
     await waitFor(() => {
       expect(screen.queryByText(/Auto-detected from your browser/)).not

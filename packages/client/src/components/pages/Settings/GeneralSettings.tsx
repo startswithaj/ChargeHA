@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Server } from "lucide-react";
 import { Select } from "@radix-ui/themes";
 import {
@@ -12,6 +13,7 @@ import {
   SettingsSection,
 } from "./SettingsLayout.tsx";
 import { HomeLocationSection } from "./HomeLocationSection.tsx";
+import { buildTimezoneOptions } from "../../../lib/timezones.ts";
 
 export function GeneralSettings() {
   const { data: config } = useSystemConfig();
@@ -21,6 +23,8 @@ export function GeneralSettings() {
     config,
     mutation,
   );
+
+  const timezoneOptions = useMemo(buildTimezoneOptions, []);
 
   if (!fields) return null;
 
@@ -104,9 +108,9 @@ export function GeneralSettings() {
           >
             <Select.Trigger style={{ minWidth: 240 }} />
             <Select.Content>
-              {Intl.supportedValuesOf("timeZone").map((tz) => (
-                <Select.Item key={tz} value={tz}>
-                  {tz.replace(/_/g, " ")}
+              {timezoneOptions.map((opt) => (
+                <Select.Item key={opt.value} value={opt.value}>
+                  {opt.label}
                 </Select.Item>
               ))}
             </Select.Content>
