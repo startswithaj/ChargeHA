@@ -58,6 +58,10 @@ COPY --from=client-builder /app/packages/server/dist packages/server/dist/
 
 # Install deps and cache compilation
 RUN deno install
+# See stage 2: drop the age check + purge packuments so runtime `deno run` stays
+# lean (~800MB->~70MB RAM). deno.lock keeps versions pinned/vetted.
+RUN sed -i '/minimumDependencyAge/d' deno.json
+RUN find "${DENO_DIR}/npm/registry.npmjs.org" -name registry.json -delete
 RUN deno cache packages/server/src/main.ts
 
 # Create data directory
