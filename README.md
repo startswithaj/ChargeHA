@@ -10,8 +10,8 @@ self-consumption — with advanced scheduling and notifications. Set and forget.
 
 ChargeHA has a demo mode that lets you review the features without installing.
 It runs entirely in the browser.
-[Try it here](https://startswithaj.github.io/ChargeHA/).
-Or view the [app tour video](#app-tour-video) below.
+[Try it here](https://startswithaj.github.io/ChargeHA/). Or view the
+[app tour video](#app-tour-video) below.
 
 ## ChargeHQ.net
 
@@ -85,6 +85,34 @@ rather than using the telemetry API, which is cheaper but requires exposing a
 public HTTPS endpoint for Tesla to push updates to. Telemetry may be supported
 in the future — for now ChargeHA schedules API calls to balance cost (under
 $10/month) and charge responsiveness.
+
+### Onboarding (setup wizard)
+
+Connecting a Tesla is a two-part process:
+
+1. **Tesla developer registration** (manual, one-time) — create a free developer
+   account at [developer.tesla.com](https://developer.tesla.com/), register an
+   application, and note your Client ID and Client Secret. The wizard shows the
+   exact Allowed Origin URL and Redirect URI to whitelist when you reach that
+   step.
+2. **ChargeHA setup wizard** (guided) — walks through the rest:
+
+   1. **Key Generation** — generate or import an EC P-256 key pair (private key
+      stored encrypted when `ENCRYPTION_KEY` is set)
+   2. **Public Key Hosting** — Tesla must fetch your public key from an HTTPS
+      URL; the wizard offers Cloudflare Tunnel (recommended, no account needed),
+      self-hosting, or GitHub Pages
+   3. **Tesla Credentials** — enter Client ID, Client Secret, and region (NA,
+      EU, or CN)
+   4. **Partner Registration** — runs automatically; safe to re-run
+   5. **Tesla Authorization** — OAuth login and consent via Tesla's site
+   6. **Vehicle Selection** — pick which vehicles to manage, with priority
+      ordering for solar allocation on multi-vehicle accounts
+   7. **Virtual Key Pairing** — scan a QR code near the vehicle, approve in the
+      Tesla app, and confirm on the car's screen
+
+See [docs/tesla.md](docs/tesla.md) for the full step-by-step guide, including
+recommended OAuth scopes and a manual (no-wizard) setup path.
 
 ### Polling cadence (data calls)
 
