@@ -34,6 +34,13 @@
     "./energy/fronius-cloud/server/config": "./energy/fronius-cloud/server/config.ts",
     "./energy/fronius-cloud/client/FroniusCloudConfig": "./energy/fronius-cloud/client/FroniusCloudConfig.tsx",
     "./energy/fronius-cloud/client/FroniusCloudForm": "./energy/fronius-cloud/client/FroniusCloudForm.tsx",
+    "./energy/sigenergy/server": "./energy/sigenergy/server/index.ts",
+    "./energy/sigenergy/server/SigenergyAdapter": "./energy/sigenergy/server/SigenergyAdapter.ts",
+    "./energy/sigenergy/server/SigenergyModbusClient": "./energy/sigenergy/server/SigenergyModbusClient.ts",
+    "./energy/sigenergy/server/router": "./energy/sigenergy/server/router.ts",
+    "./energy/sigenergy/server/config": "./energy/sigenergy/server/config.ts",
+    "./energy/sigenergy/client/SigenergyConfig": "./energy/sigenergy/client/SigenergyConfig.tsx",
+    "./energy/sigenergy/client/SigenergyForm": "./energy/sigenergy/client/SigenergyForm.tsx",
     "./energy/InverterSetupShared": "./energy/InverterSetupShared.tsx",
     "./componentRegistry": "./componentRegistry.ts",
     "./demoPluginSummaries": "./demoPluginSummaries.ts"

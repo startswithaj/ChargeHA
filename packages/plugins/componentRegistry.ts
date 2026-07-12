@@ -21,6 +21,7 @@ import { VirtualKeyPairingStep } from "./vehicles/tesla/client/VirtualKeyPairing
 // Energy wizard step components (one per plugin)
 import { FroniusLocalSetupStep } from "./energy/fronius-local/client/FroniusLocalSetupStep.tsx";
 import { FroniusCloudSetupStep } from "./energy/fronius-cloud/client/FroniusCloudSetupStep.tsx";
+import { SigenergySetupStep } from "./energy/sigenergy/client/SigenergySetupStep.tsx";
 
 // Simulated energy settings component
 import { SimulatedEnergyConfig } from "./energy/simulated/client/SimulatedEnergyConfig.tsx";
@@ -35,6 +36,9 @@ import { SimulatedVehicleSettings } from "./vehicles/simulated/client/SimulatedV
 import { FroniusCloudConfig } from "./energy/fronius-cloud/client/FroniusCloudConfig.tsx";
 import { FroniusLocalConfig } from "./energy/fronius-local/client/FroniusLocalConfig.tsx";
 
+// Sigenergy settings component
+import { SigenergyConfig } from "./energy/sigenergy/client/SigenergyConfig.tsx";
+
 // Plugin wizard step definitions — imported from each plugin's client folder
 import {
   froniusCloudOption,
@@ -44,6 +48,10 @@ import {
   froniusLocalOption,
   froniusLocalWizardSteps,
 } from "./energy/fronius-local/client/wizardSteps.ts";
+import {
+  sigenergyOption,
+  sigenergyWizardSteps,
+} from "./energy/sigenergy/client/wizardSteps.ts";
 import {
   simulatedEnergyOption,
   simulatedEnergyWizardSteps,
@@ -76,6 +84,7 @@ export interface EnergyPluginOption {
 export const energyPluginOptions: EnergyPluginOption[] = [
   froniusLocalOption,
   froniusCloudOption,
+  sigenergyOption,
   simulatedEnergyOption,
 ];
 
@@ -133,6 +142,7 @@ export const vehiclePluginSteps: Record<string, PluginWizardStep[]> = {
 export const energyPluginSteps: Record<string, PluginWizardStep[]> = {
   fronius_local: froniusLocalWizardSteps,
   fronius_cloud: froniusCloudWizardSteps,
+  sigenergy: sigenergyWizardSteps,
   simulated_energy: simulatedEnergyWizardSteps,
 };
 
@@ -150,6 +160,7 @@ export const pluginComponents: Record<string, ComponentType<StepProps>> = {
   "tesla-virtual-key-pairing": VirtualKeyPairingStep,
   "fronius-local-setup": FroniusLocalSetupStep,
   "fronius-cloud-setup": FroniusCloudSetupStep,
+  "sigenergy-setup": SigenergySetupStep,
 };
 
 /**
@@ -161,5 +172,6 @@ export const pluginSettingsComponents: Record<string, ComponentType> = {
   "simulated-settings": SimulatedVehicleSettings,
   "fronius-local-config": FroniusLocalConfig,
   "fronius-cloud-config": FroniusCloudConfig,
+  "sigenergy-config": SigenergyConfig,
   "simulated-energy-config": SimulatedEnergyConfig,
 };
