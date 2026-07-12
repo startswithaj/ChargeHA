@@ -53,11 +53,12 @@ ChargeHA is not affiliated with, endorsed by, or associated with ChargeHQ.
 ## Supported Integrations
 
 | Category      | Integration         | Details                                                                         |
-| ------------- | ------------------- | ------------------------------------------------------------------------------- |
+| ------------- |---------------------|---------------------------------------------------------------------------------|
 | Vehicles      | **Tesla**           | Fleet API with virtual key pairing, charge control, wake, and location tracking |
 | Vehicles      | **Simulated**       | Demo/dev adapter with adjustable SOC and plug state                             |
 | Energy        | **Fronius (local)** | Direct HTTP polling of inverters on your LAN, with auto-discovery               |
 | Energy        | **Fronius (cloud)** | Remote monitoring via the Fronius Solar API                                     |
+| Energy        | **Sigenergy**       | Requires local connectivity and modbus to be enabled by your installerl         |
 | Notifications | **Telegram**        | Alerts for charging events, errors, and energy outages                          |
 | Auth          | **OIDC**            | Single sign-on via any OpenID Connect provider                                  |
 
