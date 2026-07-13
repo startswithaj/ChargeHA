@@ -24,6 +24,8 @@ export function RealtimeSync() {
           batterySoc: data.batterySoc,
           gridVoltageV: data.gridVoltageV,
           lastUpdated: data.lastUpdated,
+          pollFailed: data.pollFailed,
+          pollError: data.pollError,
         },
         cumulative: {
           solarProducedWh: data.solarProducedWh,
