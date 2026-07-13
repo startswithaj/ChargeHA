@@ -95,7 +95,7 @@ jobs:
           build-args: |
             GIT_SHA=${{ steps.pr.outputs.sha }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=max,ignore-error=true
 
       - name: Update status comment with result
         if: always() && steps.ack.outputs.comment_id
