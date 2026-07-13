@@ -1,7 +1,7 @@
 import { beforeEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { Logger } from "@chargeha/server/lib/Logger";
-import { isSigenergyModel } from "./discovery.ts";
+import { isSigenergyModel } from "./SigenergyDiscovery.ts";
 import {
   installSigenergyDiscoveryStubs,
   type SigenergyDiscoveryStubs,

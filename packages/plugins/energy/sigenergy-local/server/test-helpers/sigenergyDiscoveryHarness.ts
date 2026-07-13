@@ -1,6 +1,9 @@
 import type { Logger } from "@chargeha/server/lib/Logger";
 import type { ModbusReader } from "../SigenergyModbusClient.ts";
-import { discoverSigenergy, type ReaderFactory } from "../discovery.ts";
+import {
+  discoverSigenergy,
+  type ReaderFactory,
+} from "../SigenergyDiscovery.ts";
 import { FakeModbusReader } from "./sigenergyModbusHarness.ts";
 
 const PLANT_UNIT = 247;

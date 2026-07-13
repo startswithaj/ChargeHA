@@ -3,7 +3,7 @@ import { Logger } from "@chargeha/server/lib/Logger";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
 import { SigenergyLocalAdapter } from "./SigenergyLocalAdapter.ts";
 import { JsmodbusReader } from "./SigenergyModbusClient.ts";
-import { discoverSigenergy } from "./discovery.ts";
+import { discoverSigenergy } from "./SigenergyDiscovery.ts";
 import { sigenergyLocalConfigDef } from "./config.ts";
 import { createPluginConfigProcedures } from "../../../createPluginConfigProcedures.ts";
 
