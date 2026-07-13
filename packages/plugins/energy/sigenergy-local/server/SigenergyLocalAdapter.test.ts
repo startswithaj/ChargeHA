@@ -14,8 +14,6 @@ describe("SigenergyLocalAdapter", () => {
   const PLANT_PV_POWER = 30035;
   const PLANT_BATTERY_POWER = 30037;
   const DEVICE_PHASE_A_VOLTAGE = 31011;
-  const DEVICE_ACC_EXPORT_ENERGY = 30556;
-  const DEVICE_ACC_IMPORT_ENERGY = 30562;
   const DEVICE_MODEL_TYPE = 30500;
   const DEVICE_SERIAL = 30515;
 
@@ -27,8 +25,6 @@ describe("SigenergyLocalAdapter", () => {
       .setS32(PLANT, PLANT_BATTERY_POWER, -3000) // Sigenergy <0 = discharging
       .setU16(PLANT, PLANT_ESS_SOC, 555) // 55.5 %
       .setU32(DEVICE, DEVICE_PHASE_A_VOLTAGE, 24010) // 240.1 V
-      .setU64(DEVICE, DEVICE_ACC_EXPORT_ENERGY, 20000) // 200 kWh
-      .setU64(DEVICE, DEVICE_ACC_IMPORT_ENERGY, 10000) // 100 kWh
       .setString(DEVICE, DEVICE_MODEL_TYPE, "SigenStor", 15)
       .setString(DEVICE, DEVICE_SERIAL, "SN123456", 10);
 
@@ -106,18 +102,6 @@ describe("SigenergyLocalAdapter", () => {
     it("throws when a required register (PV) read fails", async () => {
       reader.failAt(PLANT, PLANT_PV_POWER);
       await expect(makeAdapter().getRealtimeData()).rejects.toThrow();
-    });
-  });
-
-  describe("getCumulativeData", () => {
-    it("returns grid totals and leaves solar/daily fields at zero", async () => {
-      const data = await makeAdapter().getCumulativeData();
-      expect(data.gridImportedWh).toBe(100000); // 10000 × 0.01 kWh → Wh
-      expect(data.gridExportedWh).toBe(200000);
-      expect(data.solarProducedWh).toBe(0);
-      expect(data.dailySolarProducedWh).toBe(0);
-      expect(data.dailyGridImportWh).toBe(0);
-      expect(data.dailyGridExportWh).toBe(0);
     });
   });
 

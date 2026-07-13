@@ -28,16 +28,6 @@ describe("NullEnergyAdapter", () => {
     expect(data.batterySoc).toBeNull();
   });
 
-  it("returns zeroed cumulative data", async () => {
-    const data = await adapter.getCumulativeData();
-    expect(data.solarProducedWh).toBe(0);
-    expect(data.gridImportedWh).toBe(0);
-    expect(data.gridExportedWh).toBe(0);
-    expect(data.dailySolarProducedWh).toBe(0);
-    expect(data.dailyGridImportWh).toBe(0);
-    expect(data.dailyGridExportWh).toBe(0);
-  });
-
   it("returns placeholder device info", async () => {
     const info = await adapter.getDeviceInfo();
     expect(info.id).toBe("none");

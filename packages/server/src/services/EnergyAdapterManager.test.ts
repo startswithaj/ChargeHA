@@ -1,7 +1,6 @@
 import { beforeEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import type {
-  CumulativeEnergyData,
   DeviceInfo,
   EnergyData,
   EnergySourceAdapter,
@@ -25,15 +24,6 @@ describe("EnergyAdapterManager", () => {
     batterySoc: null,
     gridVoltageV: null,
     lastUpdated: "2024-01-01T00:00:00.000Z",
-  };
-
-  const BASE_CUMULATIVE: CumulativeEnergyData = {
-    solarProducedWh: 50000,
-    gridImportedWh: 10000,
-    gridExportedWh: 20000,
-    dailySolarProducedWh: 5000,
-    dailyGridImportWh: 1000,
-    dailyGridExportWh: 2000,
   };
 
   const DEVICE_INFO: DeviceInfo = {
@@ -71,7 +61,6 @@ describe("EnergyAdapterManager", () => {
   }> {
     const inner = new MockEnergyAdapter(
       BASE_REALTIME,
-      BASE_CUMULATIVE,
       DEVICE_INFO,
     );
     const plugin = makeMockPlugin("test-mock", () => Promise.resolve(inner));
@@ -111,11 +100,6 @@ describe("EnergyAdapterManager", () => {
     it("delegates disconnect to inner adapter", async () => {
       await manager.disconnect();
       expect(inner.disconnectCalled).toBe(true);
-    });
-
-    it("delegates getCumulativeData to inner adapter", async () => {
-      const data = await manager.getCumulativeData();
-      expect(data).toEqual(BASE_CUMULATIVE);
     });
 
     it("delegates getDeviceInfo to inner adapter", async () => {
@@ -161,7 +145,7 @@ describe("EnergyAdapterManager", () => {
         "fronius-local",
         () =>
           Promise.resolve(
-            new MockEnergyAdapter(BASE_REALTIME, BASE_CUMULATIVE, DEVICE_INFO),
+            new MockEnergyAdapter(BASE_REALTIME, DEVICE_INFO),
           ),
       );
       const registry = new EnergyPluginRegistry();
@@ -234,7 +218,6 @@ describe("EnergyAdapterManager", () => {
         connect: () => Promise.reject(connectError),
         disconnect: () => Promise.resolve(),
         getRealtimeData: () => Promise.resolve({ ...BASE_REALTIME }),
-        getCumulativeData: () => Promise.resolve({ ...BASE_CUMULATIVE }),
         getDeviceInfo: () => Promise.resolve({ ...DEVICE_INFO }),
       };
       const mockPlugin = makeMockPlugin(
@@ -258,7 +241,6 @@ describe("EnergyAdapterManager", () => {
     it("rebuilds the adapter from current config", async () => {
       const mockAdapter = new MockEnergyAdapter(
         BASE_REALTIME,
-        BASE_CUMULATIVE,
         DEVICE_INFO,
       );
       const mockPlugin = makeMockPlugin(
@@ -336,7 +318,7 @@ describe("EnergyAdapterManager", () => {
         "test-energy",
         () =>
           Promise.resolve(
-            new MockEnergyAdapter(BASE_REALTIME, BASE_CUMULATIVE, DEVICE_INFO),
+            new MockEnergyAdapter(BASE_REALTIME, DEVICE_INFO),
           ),
       );
       const registry = new EnergyPluginRegistry();
@@ -358,7 +340,7 @@ describe("EnergyAdapterManager", () => {
         "test-energy",
         () =>
           Promise.resolve(
-            new MockEnergyAdapter(BASE_REALTIME, BASE_CUMULATIVE, DEVICE_INFO),
+            new MockEnergyAdapter(BASE_REALTIME, DEVICE_INFO),
           ),
       );
       const registry = new EnergyPluginRegistry();
