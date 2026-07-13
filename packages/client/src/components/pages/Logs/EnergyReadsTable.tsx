@@ -20,6 +20,30 @@ function fmt(w: number): string {
   return `${Math.round(w).toLocaleString()}W`;
 }
 
+function ReadingCells({ r }: { r: EnergyReadingEntry }) {
+  if (r.pollFailed) {
+    return (
+      <td colSpan={6}>
+        <Text size="2" color="red">
+          Poll failed — no data (see Plugin Logs for the error)
+        </Text>
+      </td>
+    );
+  }
+  return (
+    <>
+      <td>{fmt(r.solarProductionW)}</td>
+      <td>{fmt(r.gridPowerW)}</td>
+      <td>{fmt(r.homeConsumptionW)}</td>
+      <td>{r.batteryPowerW !== null ? fmt(r.batteryPowerW) : "—"}</td>
+      <td>{r.batterySoc !== null ? `${r.batterySoc}%` : "—"}</td>
+      <td>
+        {r.ratePerKwh !== null ? `${r.ratePerKwh}¢` : "—"}
+      </td>
+    </>
+  );
+}
+
 interface EnergyReadsTableProps {
   readings: EnergyReadingEntry[];
   loading: boolean;
@@ -83,14 +107,7 @@ export function EnergyReadsTable({
                 <td className={styles.timestamp}>
                   {formatTimestamp(r.timestamp)}
                 </td>
-                <td>{fmt(r.solarProductionW)}</td>
-                <td>{fmt(r.gridPowerW)}</td>
-                <td>{fmt(r.homeConsumptionW)}</td>
-                <td>{r.batteryPowerW !== null ? fmt(r.batteryPowerW) : "—"}</td>
-                <td>{r.batterySoc !== null ? `${r.batterySoc}%` : "—"}</td>
-                <td>
-                  {r.ratePerKwh !== null ? `${r.ratePerKwh}¢` : "—"}
-                </td>
+                <ReadingCells r={r} />
               </tr>
             ))}
           </tbody>

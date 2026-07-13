@@ -18,6 +18,7 @@ describe("EnergyReadsTable", () => {
       batteryPowerW: 500,
       batterySoc: 72,
       ratePerKwh: 25.5,
+      pollFailed: 0,
       ...overrides,
     };
   };
@@ -120,5 +121,18 @@ describe("EnergyReadsTable", () => {
       50,
       "Page 1 of 4 (200 entries)",
     );
+  });
+
+  it("renders a poll-failed marker instead of zero values", () => {
+    renderWithProviders(
+      <EnergyReadsTable
+        {...defaultProps}
+        readings={[makeReading({ pollFailed: 1, solarProductionW: 0 })]}
+        total={1}
+      />,
+    );
+
+    expect(screen.getByText(/Poll failed — no data/)).toBeInTheDocument();
+    expect(screen.queryByText("0W")).not.toBeInTheDocument();
   });
 });
