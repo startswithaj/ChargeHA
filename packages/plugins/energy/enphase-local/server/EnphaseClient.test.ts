@@ -110,6 +110,24 @@ describe("EnphaseClient", () => {
     expect(persisted).toEqual([fresh]);
   });
 
+  it("pauses cloud refreshes after a freshly fetched token is also rejected", async () => {
+    const fresh = makeJwt(NOW, YEAR_MS);
+    http.setRaw("/data", "denied", 401);
+    const cloud = makeFakeCloud({ token: fresh });
+    const client = makeClient(
+      { email: "a@b.c", password: "pw", cachedToken: makeJwt(NOW, YEAR_MS) },
+      cloud.fetchFn,
+    );
+
+    await expect(client.getJson("/data")).rejects.toThrow("HTTP 401");
+    expect(cloud.calls).toHaveLength(2); // login + entrez
+
+    await expect(client.getJson("/data")).rejects.toThrow(
+      EnphaseAuthError,
+    );
+    expect(cloud.calls).toHaveLength(2); // no further cloud logins
+  });
+
   it("throws EnphaseAuthError on bad credentials", async () => {
     const cloud = makeFakeCloud({ token: "x", loginOk: false });
     const client = makeClient(

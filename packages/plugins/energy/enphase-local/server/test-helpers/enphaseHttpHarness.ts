@@ -36,11 +36,17 @@ export class FakeEnvoyHttp implements EnvoyHttp {
   }
 }
 
-/** Build an unsigned JWT whose `exp` lands `msFromNow` past `nowMs`. */
+/** Build an unsigned JWT whose `exp` lands `msFromNow` past `nowMs`.
+ *  Encoded as base64url (no padding, `-`/`_` alphabet) like real JWTs. */
 export const makeJwt = (nowMs: number, msFromNow: number): string => {
   const payload = btoa(
-    JSON.stringify({ exp: Math.floor((nowMs + msFromNow) / 1000) }),
-  );
+    // The `aud` filler pushes the encoding to produce `-`/`_` characters,
+    // so tests exercise the base64url → base64 conversion.
+    JSON.stringify({
+      aud: "ÿþ?>",
+      exp: Math.floor((nowMs + msFromNow) / 1000),
+    }),
+  ).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   return `header.${payload}.sig`;
 };
 

@@ -7,6 +7,9 @@ const ENTREZ_TOKEN_URL = "https://entrez.enphaseenergy.com/tokens";
 const REQUEST_TIMEOUT_MS = 10000;
 // Refresh the (1-year) owner token when less than this remains before expiry.
 const TOKEN_RENEW_MARGIN_MS = 7 * 24 * 60 * 60 * 1000;
+// After the Envoy rejects a freshly fetched token, hold off further cloud
+// logins for this long — repeated logins risk an Enphase account lockout.
+const AUTH_RETRY_COOLDOWN_MS = 5 * 60 * 1000;
 
 export class EnphaseAuthError extends Error {
   constructor(message: string, cause?: Error) {
@@ -16,7 +19,7 @@ export class EnphaseAuthError extends Error {
 }
 
 export class EnphaseConnectionError extends Error {
-  constructor(message: string, cause?: Error) {
+  constructor(message: string, cause?: Error, readonly status?: number) {
     super(message, { cause });
     this.name = "EnphaseConnectionError";
   }
@@ -93,7 +96,9 @@ function concat(chunks: Uint8Array[]): Uint8Array {
 /** Decode a JWT's `exp` claim (ms since epoch), or null if unparseable. */
 export function tokenExpiryMs(token: string): number | null {
   try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
+    // JWT payloads are base64url; atob only accepts the standard alphabet.
+    const b64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(atob(b64));
     return typeof payload.exp === "number" ? payload.exp * 1000 : null;
   } catch {
     return null;
@@ -120,6 +125,7 @@ export interface EnphaseAuth {
  */
 export class EnphaseClient {
   private cachedToken: string;
+  private refreshRejectedUntil = 0;
 
   constructor(
     private readonly host: string,
@@ -141,6 +147,8 @@ export class EnphaseClient {
     if (res.status < 200 || res.status >= 300) {
       throw new EnphaseConnectionError(
         `Envoy ${path} returned HTTP ${res.status}`,
+        undefined,
+        res.status,
       );
     }
     return res.body;
@@ -155,9 +163,17 @@ export class EnphaseClient {
         "Envoy rejected the configured token (401). Generate a new token and update the plugin settings.",
       );
     }
+    if (this.now() < this.refreshRejectedUntil) {
+      throw new EnphaseAuthError(
+        "Envoy rejected a freshly fetched token — pausing token refresh to avoid an Enphase account lockout",
+      );
+    }
     this.logger.info("Envoy returned 401 — refreshing owner token");
     this.cachedToken = "";
     const retry = await this.request(path, await this.token());
+    if (retry.status === 401) {
+      this.refreshRejectedUntil = this.now() + AUTH_RETRY_COOLDOWN_MS;
+    }
     return this.parse(path, retry);
   }
 
@@ -194,6 +210,7 @@ export class EnphaseClient {
         serial_num: this.serial,
         username: this.auth.email,
       }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     if (!res.ok) {
       throw new EnphaseAuthError(
@@ -214,13 +231,14 @@ export class EnphaseClient {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: form.toString(),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     if (!res.ok) {
       throw new EnphaseAuthError(
         `Enphase login failed: HTTP ${res.status} — check email/password`,
       );
     }
-    const json = await res.json();
+    const json = await res.json().catch(() => null);
     if (!json?.session_id) {
       throw new EnphaseAuthError("Enphase login response had no session_id");
     }
@@ -241,6 +259,8 @@ export class EnphaseClient {
     if (res.status < 200 || res.status >= 300) {
       throw new EnphaseConnectionError(
         `Envoy ${path} returned HTTP ${res.status}`,
+        undefined,
+        res.status,
       );
     }
     try {

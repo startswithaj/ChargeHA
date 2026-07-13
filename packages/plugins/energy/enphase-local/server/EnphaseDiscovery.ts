@@ -2,6 +2,7 @@
 import type { Logger } from "@chargeha/server/lib/Logger";
 import { NetworkDiscovery } from "../../NetworkDiscovery.ts";
 import { type EnvoyHttp, makeNodeHttpsEnvoyHttp } from "./EnphaseClient.ts";
+import { INFO_PATH, isEnvoyInfo, tagValue } from "./envoyInfo.ts";
 
 export type EnphaseDevice = {
   host: string;
@@ -11,20 +12,6 @@ export type EnphaseDevice = {
 };
 
 const DISCOVERY_TIMEOUT_MS = 1500;
-const INFO_PATH = "/info";
-
-/** Extract the first XML tag value, e.g. tagValue(xml, "sn"). */
-function tagValue(xml: string, tag: string): string {
-  return xml.match(new RegExp(`<${tag}>([^<]*)</${tag}>`))?.[1] ?? "";
-}
-
-/**
- * Fingerprint check: `/info` needs no auth on every firmware and only an
- * Envoy answers it with an `<envoy_info>` document carrying a serial.
- */
-export function isEnvoyInfo(xml: string): boolean {
-  return xml.includes("<envoy_info") && tagValue(xml, "sn") !== "";
-}
 
 class EnphaseDiscovery extends NetworkDiscovery<EnphaseDevice> {
   // Probes are full TLS handshakes; one gateway per site, so stop early.

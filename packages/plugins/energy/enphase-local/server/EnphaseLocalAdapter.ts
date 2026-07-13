@@ -4,7 +4,9 @@ import type {
   EnergySourceAdapter,
 } from "@chargeha/shared";
 import type { Logger } from "@chargeha/server/lib/Logger";
+import { EnphaseConnectionError } from "./EnphaseClient.ts";
 import type { EnphaseClient } from "./EnphaseClient.ts";
+import { INFO_PATH, tagValue } from "./envoyInfo.ts";
 
 // ── Envoy local API endpoints (firmware 7+) ─────────────────────────────────
 // Response shapes follow the community-documented local API as implemented by
@@ -19,25 +21,22 @@ const METER_READINGS_PATH = "/ivp/meters/readings";
 const PRODUCTION_FALLBACK_PATH = "/api/v1/production";
 const ENSEMBLE_POWER_PATH = "/ivp/ensemble/power";
 const ENSEMBLE_SECCTRL_PATH = "/ivp/ensemble/secctrl";
-const INFO_PATH = "/info";
 
-type MeterConfig = { eid: number; measurementType: string };
+type MeterConfig = { eid: number; state: string; measurementType: string };
 type MeterReading = { eid: number; activePower: number };
 
 /** eid → measurementType map from `/ivp/meters`, or null when no CT meters. */
 type MeterMap = { production: number; netConsumption: number } | null;
 
 function meterMapFrom(meters: MeterConfig[]): MeterMap {
-  const production = meters.find((m) => m.measurementType === "production");
-  const net = meters.find((m) => m.measurementType === "net-consumption");
+  // A metered Envoy without CTs actually wired still lists the meters, with
+  // state "disabled" — using those eids would read garbage as grid power.
+  const enabled = meters.filter((m) => m.state === "enabled");
+  const production = enabled.find((m) => m.measurementType === "production");
+  const net = enabled.find((m) => m.measurementType === "net-consumption");
   return production && net
     ? { production: production.eid, netConsumption: net.eid }
     : null;
-}
-
-/** Extract the first XML tag value, e.g. tagValue(xml, "sn"). */
-function tagValue(xml: string, tag: string): string {
-  return xml.match(new RegExp(`<${tag}>([^<]*)</${tag}>`))?.[1] ?? "";
 }
 
 /**
@@ -56,6 +55,7 @@ function tagValue(xml: string, tag: string): string {
 export class EnphaseLocalAdapter implements EnergySourceAdapter {
   private meterMap: MeterMap = null;
   private metersProbed = false;
+  private ensembleAbsent = false;
 
   constructor(
     private readonly client: EnphaseClient,
@@ -77,9 +77,12 @@ export class EnphaseLocalAdapter implements EnergySourceAdapter {
   }
 
   async getRealtimeData(): Promise<EnergyData> {
-    const { solarProductionW, gridPowerW } = await this.readPower();
-    const batteryPowerW = await this.readBatteryPowerW();
-    const batterySoc = await this.readBatterySoc();
+    const [{ solarProductionW, gridPowerW }, batteryPowerW, batterySoc] =
+      await Promise.all([
+        this.readPower(),
+        this.readBatteryPowerW(),
+        this.readBatterySoc(),
+      ]);
 
     const homeConsumptionW = Math.max(
       0,
@@ -174,11 +177,21 @@ export class EnphaseLocalAdapter implements EnergySourceAdapter {
   }
 
   /** Optional read — ensemble endpoints 404 on battery-less systems; a
-   *  failure here never fails the whole poll. */
+   *  failure here never fails the whole poll. A 404 marks the ensemble as
+   *  absent so battery-less systems aren't re-probed (and re-logged) every
+   *  poll. */
   private async tryGetJson(path: string): Promise<unknown> {
+    if (this.ensembleAbsent) return null;
     try {
       return await this.client.getJson(path);
     } catch (err) {
+      if (err instanceof EnphaseConnectionError && err.status === 404) {
+        this.ensembleAbsent = true;
+        this.logger.info(
+          "Envoy has no battery (ensemble endpoints absent) — skipping battery readings",
+        );
+        return null;
+      }
       this.logger.warn(`Envoy optional read ${path} failed: ${err}`);
       return null;
     }

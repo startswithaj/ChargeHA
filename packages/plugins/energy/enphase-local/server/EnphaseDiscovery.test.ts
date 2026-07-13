@@ -1,7 +1,7 @@
 import { beforeEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { Logger } from "@chargeha/server/lib/Logger";
-import { isEnvoyInfo } from "./EnphaseDiscovery.ts";
+import { isEnvoyInfo } from "./envoyInfo.ts";
 import {
   type EnphaseDiscoveryStubs,
   installEnphaseDiscoveryStubs,

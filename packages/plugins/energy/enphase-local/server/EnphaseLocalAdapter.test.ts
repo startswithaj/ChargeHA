@@ -25,8 +25,8 @@ describe("EnphaseLocalAdapter", () => {
   const seedMetered = (h: FakeEnvoyHttp): FakeEnvoyHttp =>
     h
       .setJson("/ivp/meters", [
-        { eid: 101, measurementType: "production" },
-        { eid: 102, measurementType: "net-consumption" },
+        { eid: 101, state: "enabled", measurementType: "production" },
+        { eid: 102, state: "enabled", measurementType: "net-consumption" },
       ])
       .setJson("/ivp/meters/readings", [
         { eid: 101, activePower: 5000.4 },
@@ -67,6 +67,16 @@ describe("EnphaseLocalAdapter", () => {
       expect(data.batterySoc).toBeNull();
     });
 
+    it("stops probing ensemble endpoints after the first 404", async () => {
+      const adapter = makeAdapter();
+      await adapter.getRealtimeData();
+      await adapter.getRealtimeData();
+      const ensembleProbes = http.requests.filter((r) =>
+        r.path.startsWith("/ivp/ensemble/")
+      );
+      expect(ensembleProbes).toHaveLength(2); // power + secctrl, first poll only
+    });
+
     it("throws when the readings endpoint fails", async () => {
       http.setRaw("/ivp/meters/readings", "boom", 500);
       const adapter = makeAdapter();
@@ -86,6 +96,16 @@ describe("EnphaseLocalAdapter", () => {
       expect(data.solarProductionW).toBe(3211);
       expect(data.gridPowerW).toBe(0);
       expect(data.homeConsumptionW).toBe(3211);
+    });
+
+    it("ignores meters whose CTs are not enabled", async () => {
+      http.setJson("/ivp/meters", [
+        { eid: 101, state: "disabled", measurementType: "production" },
+        { eid: 102, state: "disabled", measurementType: "net-consumption" },
+      ]);
+      const data = await makeAdapter().getRealtimeData();
+      expect(data.solarProductionW).toBe(3211);
+      expect(data.gridPowerW).toBe(0);
     });
   });
 
