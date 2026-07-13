@@ -1,6 +1,5 @@
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { FakeTime } from "@std/testing/time";
 import { SimulatedEnergyAdapter } from "./SimulatedEnergyAdapter.ts";
 import { Logger } from "@chargeha/server/lib/Logger";
 import { DEFAULT_SOLAR_CONFIG } from "@chargeha/shared/simulation";
@@ -54,24 +53,6 @@ describe("SimulatedEnergyAdapter", () => {
       const a = await makeAdapter(() => noon).getRealtimeData();
       const b = await makeAdapter(() => nextDay).getRealtimeData();
       expect(a.solarProductionW).not.toBe(b.solarProductionW);
-    });
-  });
-
-  describe("getCumulativeData", () => {
-    it("accumulates solar over elapsed time and zeroes the DB-owned daily grid fields", async () => {
-      using time = new FakeTime(noon);
-      const adapter = new SimulatedEnergyAdapter(
-        { ...DEFAULT_SOLAR_CONFIG },
-        log,
-      );
-
-      time.tick(60 * 60 * 1000); // one hour at midday
-      const data = await adapter.getCumulativeData();
-
-      expect(data.solarProducedWh).toBeGreaterThan(0);
-      expect(data.dailySolarProducedWh).toBeGreaterThan(0);
-      expect(data.dailyGridImportWh).toBe(0);
-      expect(data.dailyGridExportWh).toBe(0);
     });
   });
 });

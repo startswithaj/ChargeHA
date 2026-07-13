@@ -45,6 +45,7 @@
     "npm:esbuild@*": "0.25.12",
     "npm:esbuild@0.25.12": "0.25.12",
     "npm:jsdom@25": "25.0.1",
+    "npm:jsmodbus@4": "4.0.10",
     "npm:lucide-react@0.460": "0.460.0_react@18.3.1",
     "npm:oauth4webapi@3": "3.8.5",
     "npm:qrcode.react@4": "4.2.0_react@18.3.1",
@@ -194,7 +195,7 @@
         "@babel/types",
         "@jridgewell/remapping",
         "convert-source-map",
-        "debug",
+        "debug@4.4.3",
         "gensync",
         "json5",
         "semver@6.3.1"
@@ -299,7 +300,7 @@
         "@babel/parser",
         "@babel/template",
         "@babel/types",
-        "debug"
+        "debug@4.4.3"
       ]
     },
     "@babel/types@7.29.0": {
@@ -2051,7 +2052,7 @@
         "@ampproject/remapping",
         "@bcoe/v8-coverage",
         "ast-v8-to-istanbul",
-        "debug",
+        "debug@4.4.3",
         "istanbul-lib-coverage",
         "istanbul-lib-report",
         "istanbul-lib-source-maps",
@@ -2296,6 +2297,9 @@
     "convert-source-map@2.0.0": {
       "integrity": "sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg=="
     },
+    "crc@3.4.0": {
+      "integrity": "sha512-ycVC2+4/DLgXXq7QweYi2znhqDuZz6P5TQXnkQo8v15XY/5p/IWeZwsSE31Ifo8w15b8TWLsqhXOjXyilHuQxw=="
+    },
     "cross-fetch@4.1.0": {
       "integrity": "sha512-uKm5PU+MHTootlWEY+mZ4vvXoCn4fLQxT9dSc1sXVMSFkINTJVN8cAQROpwcKm8bJ/c7rgZVIBWzH5T78sNZZw=="
     },
@@ -2380,6 +2384,12 @@
       "dependencies": [
         "whatwg-mimetype",
         "whatwg-url"
+      ]
+    },
+    "debug@3.2.7": {
+      "integrity": "sha512-CFjzYYAi4ThfiQvizrFQevTTXHtnCqWfe7x1AhgEscTz6ZbLbfoLRLPugTQyBth6f8ZERVUSyWHFD/7Wu4t1XQ==",
+      "dependencies": [
+        "ms"
       ]
     },
     "debug@4.4.3": {
@@ -2510,7 +2520,7 @@
     "esbuild-register@3.6.0_esbuild@0.25.12": {
       "integrity": "sha512-H2/S7Pm8a9CL1uhp9OvjwrBh5Pvx0H8qVOxNu8Wed9Y7qv56MPtq+GGM8RJpq6glYJn9Wspr8uw7l55uyinNeg==",
       "dependencies": [
-        "debug",
+        "debug@4.4.3",
         "esbuild@0.25.12"
       ]
     },
@@ -2721,14 +2731,14 @@
       "integrity": "sha512-T1gkAiYYDWYx3V5Bmyu7HcfcvL7mUrTWiM6yOfa3PIphViJ/gFPbvidQ+veqSOHci/PxBcDabeUNCzpOODJZig==",
       "dependencies": [
         "agent-base",
-        "debug"
+        "debug@4.4.3"
       ]
     },
     "https-proxy-agent@7.0.6": {
       "integrity": "sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==",
       "dependencies": [
         "agent-base",
-        "debug"
+        "debug@4.4.3"
       ]
     },
     "iconv-lite@0.6.3": {
@@ -2776,7 +2786,7 @@
       "integrity": "sha512-yg2d+Em4KizZC5niWhQaIomgf5WlL4vOOjZ5xGCmF8SnPE/mDWWXgvRExdcpCgh9lLRRa1/fSYp2ymmbJ1pI+A==",
       "dependencies": [
         "@jridgewell/trace-mapping",
-        "debug",
+        "debug@4.4.3",
         "istanbul-lib-coverage"
       ]
     },
@@ -2836,6 +2846,14 @@
     },
     "jsesc@3.1.0": {
       "integrity": "sha512-/sM3dO2FOzXjKQhJuo0Q173wf2KOo8t4I8vHy6lF9poUp7bKT0/NHE8fPX23PwfhnykfqnC2xRxOnVw5XuGIaA==",
+      "bin": true
+    },
+    "jsmodbus@4.0.10": {
+      "integrity": "sha512-ea2VfDamQVI7RE8X9i9KU+cYoobSaemaXhaKik9FTAZJnkgslc4LoRupzepl3DywFVR3rxqjhcS2wk1BDsIe+Q==",
+      "dependencies": [
+        "crc",
+        "debug@3.2.7"
+      ],
       "bin": true
     },
     "json5@2.2.3": {
@@ -3266,7 +3284,8 @@
         "recharts-scale",
         "tiny-invariant",
         "victory-vendor"
-      ]
+      ],
+      "deprecated": true
     },
     "redent@3.0.0": {
       "integrity": "sha512-6tDA8g98We0zd0GvVeMT9arEOnTw9qM03L9cJXaCjrip1OO764RDBLBfrB4cwzNGDj5OA5ioymC9GkizgWJDUg==",
@@ -3527,6 +3546,7 @@
     },
     "tsc@2.0.4": {
       "integrity": "sha512-fzoSieZI5KKJVBYGvwbVZs/J5za84f2lSTLPYf6AGiIf43tZ3GNrI1QzTLcjtyDDP4aLxd46RTZq1nQxe7+k5Q==",
+      "deprecated": true,
       "bin": true
     },
     "tslib@2.8.1": {
@@ -3609,7 +3629,7 @@
       "integrity": "sha512-EbKSKh+bh1E1IFxeO0pg1n4dvoOTt0UDiXMd/qn++r98+jPO1xtJilvXldeuQ8giIB5IkpjCgMleHMNEsGH6pg==",
       "dependencies": [
         "cac",
-        "debug",
+        "debug@4.4.3",
         "es-module-lexer",
         "pathe",
         "vite"
@@ -3643,7 +3663,7 @@
         "@vitest/spy",
         "@vitest/utils",
         "chai",
-        "debug",
+        "debug@4.4.3",
         "expect-type",
         "jsdom",
         "magic-string",
@@ -3833,6 +3853,7 @@
       "jsr:@ts-rex/argon2@^1.0.3",
       "npm:drizzle-kit@~0.31.1",
       "npm:drizzle-orm@~0.45.1",
+      "npm:jsmodbus@4",
       "npm:oauth4webapi@3",
       "npm:zod@^3.24.0"
     ],

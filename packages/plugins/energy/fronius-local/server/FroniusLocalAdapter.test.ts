@@ -83,16 +83,6 @@ describe("FroniusLocalAdapter", () => {
     });
   });
 
-  describe("getCumulativeData", () => {
-    it("returns parsed cumulative data", async () => {
-      const data = await makeAdapter().getCumulativeData();
-      expect(data.solarProducedWh).toBe(50000);
-      expect(data.gridImportedWh).toBe(10000);
-      expect(data.gridExportedWh).toBe(20000);
-      expect(data.dailySolarProducedWh).toBe(5000);
-    });
-  });
-
   describe("getDeviceInfo", () => {
     it("returns parsed device info", async () => {
       const info = await makeAdapter().getDeviceInfo();

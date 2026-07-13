@@ -43,6 +43,7 @@
     "drizzle-orm": "npm:drizzle-orm@^0.45.1",
     "drizzle-kit": "npm:drizzle-kit@^0.31.1",
     "@ts-rex/argon2": "jsr:@ts-rex/argon2@^1.0.3",
+    "jsmodbus": "npm:jsmodbus@^4",
     "oauth4webapi": "npm:oauth4webapi@^3",
     "zod": "npm:zod@^3.24"
   },

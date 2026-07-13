@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { Logger } from "@chargeha/server/lib/Logger";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
-import { discoverFronius } from "./discovery.ts";
+import { discoverFronius } from "./FroniusDiscovery.ts";
 import { FroniusLocalAdapter } from "./FroniusLocalAdapter.ts";
 import { froniusLocalConfigDef } from "./config.ts";
 import { createPluginConfigProcedures } from "../../../createPluginConfigProcedures.ts";

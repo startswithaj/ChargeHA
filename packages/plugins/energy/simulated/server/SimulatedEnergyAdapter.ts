@@ -1,5 +1,4 @@
 import type {
-  CumulativeEnergyData,
   DeviceInfo,
   EnergyData,
   EnergySourceAdapter,
@@ -27,13 +26,6 @@ export class SimulatedEnergyAdapter implements EnergySourceAdapter {
   private curve: EnergyReading[] = [];
   private curveDayKey = "";
 
-  // Lifetime + daily accumulators, advanced by wall-clock delta on each read.
-  private lifetimeSolarWh = 0;
-  private lifetimeGridImportWh = 0;
-  private lifetimeGridExportWh = 0;
-  private dailySolarWh = 0;
-  private accumDayKey = "";
-  private lastAccumTime: number;
   private now: () => Date;
 
   constructor(
@@ -44,7 +36,6 @@ export class SimulatedEnergyAdapter implements EnergySourceAdapter {
     this.options = options;
     this.logger = logger;
     this.now = now;
-    this.lastAccumTime = now().getTime();
   }
 
   pollIntervalSeconds(): number {
@@ -73,18 +64,6 @@ export class SimulatedEnergyAdapter implements EnergySourceAdapter {
       batterySoc: null,
       gridVoltageV: GRID_VOLTAGE_V,
       lastUpdated: new Date().toISOString(),
-    });
-  }
-
-  getCumulativeData(): Promise<CumulativeEnergyData> {
-    this.accumulate(this.now());
-    return Promise.resolve({
-      solarProducedWh: Math.round(this.lifetimeSolarWh),
-      gridImportedWh: Math.round(this.lifetimeGridImportWh),
-      gridExportedWh: Math.round(this.lifetimeGridExportWh),
-      dailySolarProducedWh: Math.round(this.dailySolarWh),
-      dailyGridImportWh: 0, // Overridden by EnergyPoller from DB
-      dailyGridExportWh: 0, // Overridden by EnergyPoller from DB
     });
   }
 
@@ -127,28 +106,5 @@ export class SimulatedEnergyAdapter implements EnergySourceAdapter {
   private currentReading(now: Date): EnergyReading {
     this.ensureCurve(now);
     return this.curve[this.minuteOfDay(now)];
-  }
-
-  /** Advance lifetime/daily energy counters by wall-clock delta. */
-  private accumulate(now: Date): void {
-    const reading = this.currentReading(now);
-    const nowMs = now.getTime();
-    const elapsedHours = (nowMs - this.lastAccumTime) / (1000 * 60 * 60);
-    this.lastAccumTime = nowMs;
-
-    const key = this.dayKey(now);
-    if (key !== this.accumDayKey) {
-      this.dailySolarWh = 0;
-      this.accumDayKey = key;
-    }
-    if (elapsedHours <= 0) return;
-
-    this.lifetimeSolarWh += reading.solarW * elapsedHours;
-    this.dailySolarWh += reading.solarW * elapsedHours;
-    if (reading.gridW > 0) {
-      this.lifetimeGridImportWh += reading.gridW * elapsedHours;
-    } else {
-      this.lifetimeGridExportWh += -reading.gridW * elapsedHours;
-    }
   }
 }

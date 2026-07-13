@@ -1,5 +1,4 @@
 import type {
-  CumulativeEnergyData,
   DeviceInfo,
   EnergyData,
   EnergySourceAdapter,
@@ -90,14 +89,6 @@ export class EnergyAdapterManager implements EnergySourceAdapter {
     }
 
     return data;
-  }
-
-  async getCumulativeData(): Promise<CumulativeEnergyData> {
-    await this.initializationPromise;
-    if (!this.adapter) {
-      throw new Error("EnergyAdapterManager not initialized");
-    }
-    return this.adapter.getCumulativeData();
   }
 
   async getDeviceInfo(): Promise<DeviceInfo> {

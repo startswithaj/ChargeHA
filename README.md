@@ -52,14 +52,15 @@ ChargeHA is not affiliated with, endorsed by, or associated with ChargeHQ.
 
 ## Supported Integrations
 
-| Category      | Integration         | Details                                                                         |
-| ------------- | ------------------- | ------------------------------------------------------------------------------- |
-| Vehicles      | **Tesla**           | Fleet API with virtual key pairing, charge control, wake, and location tracking |
-| Vehicles      | **Simulated**       | Demo/dev adapter with adjustable SOC and plug state                             |
-| Energy        | **Fronius (local)** | Direct HTTP polling of inverters on your LAN, with auto-discovery               |
-| Energy        | **Fronius (cloud)** | Remote monitoring via the Fronius Solar API                                     |
-| Notifications | **Telegram**        | Alerts for charging events, errors, and energy outages                          |
-| Auth          | **OIDC**            | Single sign-on via any OpenID Connect provider                                  |
+| Category      | Integration           | Details                                                                                                         |
+| ------------- | --------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Vehicles      | **Tesla**             | Fleet API with virtual key pairing, charge control, wake, and location tracking                                 |
+| Vehicles      | **Simulated**         | Demo/dev adapter with adjustable SOC and plug state                                                             |
+| Energy        | **Fronius (local)**   | Direct HTTP polling of inverters on your LAN, with auto-discovery                                               |
+| Energy        | **Fronius (cloud)**   | Remote monitoring via the Fronius Solar API                                                                     |
+| Energy        | **Sigenergy (local)** | Direct Modbus TCP integration on your LAN, with auto-discovery; requires Modbus to be enabled by your installer |
+| Notifications | **Telegram**          | Alerts for charging events, errors, and energy outages                                                          |
+| Auth          | **OIDC**              | Single sign-on via any OpenID Connect provider                                                                  |
 
 ### Coming Soon
 
@@ -360,3 +361,17 @@ enabling support for non-Tesla EVs through smart EVSE chargers.
 <p align="center">
   <img src="docs/chargeha-tour.webp" alt="Animated tour of ChargeHA: dashboard, stats, schedules, logs, simulator, and settings" width="800" />
 </p>
+
+## Contributors
+
+<table>
+  <tr>
+    <td align="center" width="120">
+      <a href="https://github.com/mukaibot">
+        <img src="https://images.weserv.nl/?url=github.com/mukaibot.png&mask=circle&w=64" width="64" alt="mukaibot"/>
+        <br /><sub><b>mukaibot</b></sub>
+      </a>
+    </td>
+    <td>Sigenergy Local Plugin</td>
+  </tr>
+</table>
