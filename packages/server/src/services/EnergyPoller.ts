@@ -165,6 +165,7 @@ export class EnergyPoller {
         gridVoltageV: null,
         lastUpdated: new Date().toISOString(),
         pollFailed: true,
+        pollError: error instanceof Error ? error.message : String(error),
       };
       const failedCumulative = await this.buildCumulativeFromDb();
 

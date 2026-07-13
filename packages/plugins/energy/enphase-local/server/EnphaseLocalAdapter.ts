@@ -69,7 +69,12 @@ export class EnphaseLocalAdapter implements EnergySourceAdapter {
   async connect(): Promise<void> {
     // Probing the meter config both verifies auth/reachability and caches the
     // eid map used by every subsequent poll.
-    await this.resolveMeterMap();
+    const map = await this.resolveMeterMap();
+    this.logger.info(
+      `Connected to Envoy at ${this.client.host} — ${
+        map ? "using CT meter readings" : "solar-only fallback"
+      }`,
+    );
   }
 
   disconnect(): Promise<void> {

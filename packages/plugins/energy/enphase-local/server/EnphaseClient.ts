@@ -68,14 +68,14 @@ export const makeNodeHttpsEnvoyHttp = (
         },
       );
       req.on("timeout", () => {
-        req.destroy(new Error(`Timed out requesting ${path}`));
+        req.destroy(new Error(`timed out after ${timeoutMs}ms`));
       });
       req.on(
         "error",
         (err: Error) =>
           reject(
             new EnphaseConnectionError(
-              `Envoy request failed: ${err.message}`,
+              `Envoy request to https://${host}${path} failed: ${err.message}`,
               err,
             ),
           ),
@@ -129,7 +129,7 @@ export class EnphaseClient {
   private refreshRejectedUntil = 0;
 
   constructor(
-    private readonly host: string,
+    readonly host: string,
     private readonly auth: EnphaseAuth,
     private readonly persistToken: (token: string) => Promise<void>,
     private readonly logger: Logger,
@@ -146,7 +146,7 @@ export class EnphaseClient {
     const res = await this.http.get(this.host, path, {});
     if (res.status < 200 || res.status >= 300) {
       throw new EnphaseConnectionError(
-        `Envoy ${path} returned HTTP ${res.status}`,
+        `Envoy ${this.host}${path} returned HTTP ${res.status}`,
         undefined,
         res.status,
       );
@@ -190,7 +190,13 @@ export class EnphaseClient {
 
   private isExpiring(token: string): boolean {
     const expiry = tokenExpiryMs(token);
-    return expiry === null || expiry - this.now() < TOKEN_RENEW_MARGIN_MS;
+    if (expiry === null) {
+      this.logger.warn(
+        "Cached Enphase token payload is unparseable — treating it as expiring and fetching a fresh one",
+      );
+      return true;
+    }
+    return expiry - this.now() < TOKEN_RENEW_MARGIN_MS;
   }
 
   /** Login to Enlighten, then exchange the session for an owner token. */
@@ -216,8 +222,11 @@ export class EnphaseClient {
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     if (!res.ok) {
+      const detail = (await res.text().catch(() => "")).slice(0, 200);
       throw new EnphaseAuthError(
-        `Token request failed: HTTP ${res.status} from entrez`,
+        `Token request failed: HTTP ${res.status} from entrez${
+          detail ? ` — ${detail}` : ""
+        }`,
       );
     }
     const token = (await res.text()).trim();
@@ -245,8 +254,11 @@ export class EnphaseClient {
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     if (!res.ok) {
+      const detail = (await res.text().catch(() => "")).slice(0, 200);
       throw new EnphaseAuthError(
-        `Enphase login failed: HTTP ${res.status} — check email/password`,
+        `Enphase login failed: HTTP ${res.status} — check email/password${
+          detail ? ` (${detail})` : ""
+        }`,
       );
     }
     const json = await res.json().catch(() => null);
@@ -269,7 +281,7 @@ export class EnphaseClient {
   ): unknown {
     if (res.status < 200 || res.status >= 300) {
       throw new EnphaseConnectionError(
-        `Envoy ${path} returned HTTP ${res.status}`,
+        `Envoy ${this.host}${path} returned HTTP ${res.status}`,
         undefined,
         res.status,
       );
@@ -278,7 +290,9 @@ export class EnphaseClient {
       return JSON.parse(res.body);
     } catch (err) {
       throw new EnphaseConnectionError(
-        `Envoy ${path} returned invalid JSON`,
+        `Envoy ${this.host}${path} returned invalid JSON: ${
+          res.body.slice(0, 200)
+        }`,
         err instanceof Error ? err : undefined,
       );
     }

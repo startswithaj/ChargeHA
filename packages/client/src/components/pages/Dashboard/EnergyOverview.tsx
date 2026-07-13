@@ -249,6 +249,16 @@ export function EnergyOverview({ pluginWarnings }: EnergyOverviewProps) {
         chargingVehicles={chargingVehicles}
       />
 
+      {realtime?.pollFailed && (
+        <PluginWarningCard
+          warning={{
+            title: "Energy source offline",
+            message: realtime.pollError ??
+              "Energy data poll failed — see the Logs page for details.",
+          }}
+        />
+      )}
+
       {pluginWarnings.map((warning) => (
         <PluginWarningCard key={warning.title} warning={warning} />
       ))}
