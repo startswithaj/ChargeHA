@@ -1,0 +1,115 @@
+name: build-pr
+
+on:
+  issue_comment:
+    types: [created]
+
+env:
+  REGISTRY: ghcr.io
+jobs:
+  build:
+    name: build & push PR image on /build comment
+    if: github.event.issue.pull_request && github.event.comment.body == '/build'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Require write access for commenter
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              username: context.actor,
+            });
+            if (!['admin', 'write'].includes(data.permission)) {
+              core.setFailed(`@${context.actor} does not have write access`);
+            }
+
+      - name: Acknowledge with rocket and status comment
+        id: ack
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'rocket',
+            });
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const { data: comment } = await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `🚀 Building image — [view run](${runUrl})`,
+            });
+            core.setOutput('comment_id', comment.id);
+            core.setOutput('run_url', runUrl);
+
+      - name: Resolve PR head SHA
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            core.setOutput('sha', pr.head.sha);
+            core.setOutput('number', pr.number);
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.sha }}
+
+      # Docker tags must be lowercase; github.repository is ChargeHA.
+      - name: Lowercase image name
+        id: image
+        run: echo "name=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:pr-${{ steps.pr.outputs.number }}
+          labels: org.opencontainers.image.revision=${{ steps.pr.outputs.sha }}
+          build-args: |
+            GIT_SHA=${{ steps.pr.outputs.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max,ignore-error=true
+
+      - name: Update status comment with result
+        if: always() && steps.ack.outputs.comment_id
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ok = '${{ job.status }}' === 'success';
+            const runUrl = '${{ steps.ack.outputs.run_url }}';
+            const body = ok
+              ? '✅ Pushed `${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:pr-${{ steps.pr.outputs.number }}` — [view run](' + runUrl + ')'
+              : '❌ Build failed — [view run](' + runUrl + ')';
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: ${{ steps.ack.outputs.comment_id }},
+              body,
+            });
