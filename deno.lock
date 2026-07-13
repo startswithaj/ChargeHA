@@ -46,7 +46,6 @@
     "npm:esbuild@0.25.12": "0.25.12",
     "npm:jsdom@25": "25.0.1",
     "npm:jsmodbus@4": "4.0.10",
-    "npm:jsmodbus@4.0.10": "4.0.10",
     "npm:lucide-react@0.460": "0.460.0_react@18.3.1",
     "npm:oauth4webapi@3": "3.8.5",
     "npm:qrcode.react@4": "4.2.0_react@18.3.1",
