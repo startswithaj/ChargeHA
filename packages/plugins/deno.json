@@ -41,6 +41,13 @@
     "./energy/sigenergy-local/server/config": "./energy/sigenergy-local/server/config.ts",
     "./energy/sigenergy-local/client/SigenergyLocalConfig": "./energy/sigenergy-local/client/SigenergyLocalConfig.tsx",
     "./energy/sigenergy-local/client/SigenergyLocalForm": "./energy/sigenergy-local/client/SigenergyLocalForm.tsx",
+    "./energy/enphase-local/server": "./energy/enphase-local/server/index.ts",
+    "./energy/enphase-local/server/EnphaseLocalAdapter": "./energy/enphase-local/server/EnphaseLocalAdapter.ts",
+    "./energy/enphase-local/server/EnphaseClient": "./energy/enphase-local/server/EnphaseClient.ts",
+    "./energy/enphase-local/server/router": "./energy/enphase-local/server/router.ts",
+    "./energy/enphase-local/server/config": "./energy/enphase-local/server/config.ts",
+    "./energy/enphase-local/client/EnphaseLocalConfig": "./energy/enphase-local/client/EnphaseLocalConfig.tsx",
+    "./energy/enphase-local/client/EnphaseLocalForm": "./energy/enphase-local/client/EnphaseLocalForm.tsx",
     "./energy/InverterSetupShared": "./energy/InverterSetupShared.tsx",
     "./componentRegistry": "./componentRegistry.ts",
     "./demoPluginSummaries": "./demoPluginSummaries.ts"

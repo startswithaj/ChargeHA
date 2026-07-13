@@ -16,6 +16,13 @@ export type SigenergyDevice = {
   serial: string;
 };
 
+export type EnphaseDevice = {
+  host: string;
+  name: string;
+  model: string;
+  serial: string;
+};
+
 export function TestResultBadge(
   { testResult }: { testResult: TestStatus },
 ): JSX.Element | null {
