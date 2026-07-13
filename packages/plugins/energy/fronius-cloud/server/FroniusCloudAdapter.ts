@@ -1,5 +1,4 @@
 import type {
-  CumulativeEnergyData,
   DeviceInfo,
   EnergyData,
   EnergySourceAdapter,
@@ -136,18 +135,6 @@ export class FroniusCloudAdapter implements EnergySourceAdapter {
       gridVoltageV: null,
       lastUpdated: new Date().toISOString(),
     };
-  }
-
-  /** Returns zeros — all cumulative/daily values are calculated from local DB recordings. */
-  getCumulativeData(): Promise<CumulativeEnergyData> {
-    return Promise.resolve({
-      solarProducedWh: 0,
-      gridImportedWh: 0,
-      gridExportedWh: 0,
-      dailySolarProducedWh: 0,
-      dailyGridImportWh: 0,
-      dailyGridExportWh: 0,
-    });
   }
 
   /** Fetch device/system info from Solar.web. */

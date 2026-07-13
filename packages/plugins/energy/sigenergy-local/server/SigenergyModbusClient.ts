@@ -94,6 +94,12 @@ export class JsmodbusReader implements ModbusReader {
     return new Promise<void>((resolve, reject) => {
       const onConnect = () => {
         cleanup();
+        // Keep a persistent error handler for the socket's lifetime — an
+        // unhandled 'error' event (e.g. ECONNRESET when the inverter reboots)
+        // would otherwise crash the process.
+        socket.on("error", (err: Error) => {
+          this.logger.warn(`Sigenergy socket error: ${err.message}`);
+        });
         this.logger.info(`Connected to Sigenergy at ${this.host}:${this.port}`);
         resolve();
       };

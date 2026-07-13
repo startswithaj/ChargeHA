@@ -1,5 +1,5 @@
 import type { Logger } from "@chargeha/server/lib/Logger";
-import { discoverFronius } from "../discovery.ts";
+import { discoverFronius } from "../FroniusDiscovery.ts";
 
 export interface DiscoveryStubs {
   setArpOutput(out: string): void;

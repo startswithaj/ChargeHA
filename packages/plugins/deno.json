@@ -24,7 +24,7 @@
     "./energy/fronius-local/server": "./energy/fronius-local/server/index.ts",
     "./energy/fronius-local/server/FroniusLocalAdapter": "./energy/fronius-local/server/FroniusLocalAdapter.ts",
     "./energy/fronius-local/server/router": "./energy/fronius-local/server/router.ts",
-    "./energy/fronius-local/server/discovery": "./energy/fronius-local/server/discovery.ts",
+    "./energy/fronius-local/server/FroniusDiscovery": "./energy/fronius-local/server/FroniusDiscovery.ts",
     "./energy/fronius-local/server/config": "./energy/fronius-local/server/config.ts",
     "./energy/fronius-local/client/FroniusLocalConfig": "./energy/fronius-local/client/FroniusLocalConfig.tsx",
     "./energy/fronius-local/client/FroniusLocalForm": "./energy/fronius-local/client/FroniusLocalForm.tsx",
