@@ -50,6 +50,8 @@ jobs:
           context: .
           file: docker/Dockerfile
           platforms: linux/amd64
+          # Fork PRs have a read-only GITHUB_TOKEN, so build without pushing.
+          # Maintainers can comment /build on the PR to push (build-pr.yml).
           push: ${{ !github.event.pull_request.head.repo.fork }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
