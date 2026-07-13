@@ -30,6 +30,18 @@ export class SolarAllocator {
     return energy?.gridVoltageV ?? config.gridVoltage;
   }
 
+  /** Resolve charger phases: a live single-phase reading while charging
+   *  overrides the threePhaseCharger flag (e.g. a three-phase install
+   *  charging from a regular wall socket). Vehicles only report phases while
+   *  charging, so the flag stands until a real reading arrives. */
+  static resolvePhases(
+    state: VehicleChargeState,
+    config: ControllerConfig,
+  ): number {
+    if (state.isCharging && state.chargerPhases === 1) return 1;
+    return config.threePhaseCharger ? 3 : state.chargerPhases;
+  }
+
   /** Calculate available solar power in watts for a single vehicle's charging.
    *
    *  When the meter includes EV load in consumption (the default), we add back
@@ -172,7 +184,7 @@ export class SolarAllocator {
       .map((v) => {
         const state = v.state;
         const voltage = SolarAllocator.resolveVoltage(state, energy, config);
-        const phases = config.threePhaseCharger ? 3 : state.chargerPhases;
+        const phases = SolarAllocator.resolvePhases(state, config);
         return {
           id: v.id,
           name: v.name,

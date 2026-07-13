@@ -216,6 +216,27 @@ describe("ControllerEngine", () => {
       expect(d?.targetAmps).toBe(5);
       expect(d?.detail).toContain("solar+grid");
     });
+
+    it("uses reported single-phase over threePhaseCharger flag while charging", () => {
+      const engine = new ControllerEngine();
+      const output = engine.decide(makeInput({
+        configOverrides: {
+          threePhaseCharger: true,
+          consumptionExcludesCharging: true,
+        },
+        vehicle: {
+          state: {
+            isCharging: true,
+            chargeAmps: 5,
+            chargeAmpsMax: 10,
+            chargerPhases: 1,
+          },
+        },
+        energyOverrides: { solarProductionW: 3000, gridPowerW: -2300 },
+      }));
+      const d = output.decisions.get("V1");
+      expect(d?.targetAmps).toBe(10);
+    });
   });
 
   describe("amp debouncing", () => {
