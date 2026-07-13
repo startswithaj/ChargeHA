@@ -16,7 +16,6 @@ import { TestResultBadge } from "../../InverterSetupShared.tsx";
 
 export interface EnphaseLocalFormValues {
   host: string;
-  serial: string;
   email: string;
   password: string;
   token: string;
@@ -240,11 +239,29 @@ function AuthFields(
   );
 }
 
+function TestConnectionRow(
+  { pending, disabled, onTest, testResult }: {
+    pending: boolean;
+    disabled: boolean;
+    onTest: () => void;
+    testResult: TestStatus;
+  },
+) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <Button size="2" variant="soft" disabled={disabled} onClick={onTest}>
+        {pending && <Loader2 size={14} className={styles.spinner} />}
+        {pending ? "Testing..." : "Test Connection"}
+      </Button>
+      <TestResultBadge testResult={testResult} />
+    </div>
+  );
+}
+
 export function EnphaseLocalForm(
   { initial, onTestSuccess }: EnphaseLocalFormProps,
 ): JSX.Element {
   const [host, setHost] = useState(initial.host);
-  const [serial, setSerial] = useState(initial.serial);
   const [email, setEmail] = useState(initial.email);
   const [password, setPassword] = useState(initial.password);
   const [token, setToken] = useState(initial.token);
@@ -253,6 +270,9 @@ export function EnphaseLocalForm(
   );
   const [subnet, setSubnet] = useState("");
   const [searchResults, setSearchResults] = useState<EnphaseDevice[]>([]);
+  // Read from the device's /info by discovery or the connection test —
+  // shown for confirmation, never typed or stored.
+  const [detectedSerial, setDetectedSerial] = useState("");
 
   const searchMutation = trpc.energy.enphase_local.discover.useMutation({
     onSuccess: (result: { found: EnphaseDevice[] }) =>
@@ -267,11 +287,17 @@ export function EnphaseLocalForm(
     : { email: "", password: "", token };
 
   const testMutation = trpc.energy.enphase_local.testConnection.useMutation({
-    onSuccess: (data: { success: boolean; fetchedToken?: string | null }) => {
+    onSuccess: (
+      data: {
+        success: boolean;
+        serial?: string;
+        fetchedToken?: string | null;
+      },
+    ) => {
       if (!data.success) return;
+      if (data.serial) setDetectedSerial(data.serial);
       onTestSuccess({
         host,
-        serial,
         email: active.email,
         password: active.password,
         // Persist the owner token fetched during the test so the first poll
@@ -282,12 +308,12 @@ export function EnphaseLocalForm(
   });
 
   const testResult = useTestStatus(testMutation);
-  const canTest = host && serial &&
+  const canTest = host &&
     (method === "credentials" ? email && password : token);
 
   const handleSelectDevice = (device: EnphaseDevice) => {
     setHost(device.host);
-    setSerial(device.serial);
+    setDetectedSerial(device.serial);
     setSearchResults([]);
     searchMutation.reset();
   };
@@ -298,19 +324,6 @@ export function EnphaseLocalForm(
         Connect to your Enphase Envoy / IQ Gateway on your local network
         (firmware 7+).
       </Text>
-
-      <AuthFields
-        method={method}
-        setMethod={setMethod}
-        email={email}
-        setEmail={setEmail}
-        password={password}
-        setPassword={setPassword}
-        token={token}
-        setToken={setToken}
-      />
-
-      <Separator size="4" />
 
       <LabelledField
         label="Envoy IP address"
@@ -327,28 +340,31 @@ export function EnphaseLocalForm(
         onSelectDevice={handleSelectDevice}
       />
 
-      <LabelledField
-        label="Envoy serial number"
-        help="Filled automatically by discovery; also printed on the gateway."
-        value={serial}
-        onChange={setSerial}
-        placeholder="122233334444"
+      {detectedSerial && (
+        <Text size="1" color="gray">
+          Gateway serial: {detectedSerial}
+        </Text>
+      )}
+
+      <Separator size="4" />
+
+      <AuthFields
+        method={method}
+        setMethod={setMethod}
+        email={email}
+        setEmail={setEmail}
+        password={password}
+        setPassword={setPassword}
+        token={token}
+        setToken={setToken}
       />
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <Button
-          size="2"
-          variant="soft"
-          disabled={!canTest || testMutation.isPending}
-          onClick={() => testMutation.mutate({ host, serial, ...active })}
-        >
-          {testMutation.isPending && (
-            <Loader2 size={14} className={styles.spinner} />
-          )}
-          {testMutation.isPending ? "Testing..." : "Test Connection"}
-        </Button>
-        <TestResultBadge testResult={testResult} />
-      </div>
+      <TestConnectionRow
+        pending={testMutation.isPending}
+        disabled={!canTest || testMutation.isPending}
+        onTest={() => testMutation.mutate({ host, ...active })}
+        testResult={testResult}
+      />
     </>
   );
 }

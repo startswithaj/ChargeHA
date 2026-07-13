@@ -19,11 +19,6 @@ export const enphaseLocalConfigDef = defineSection({
     schema: z.string(),
     default: "",
   },
-  serial: {
-    key: "enphase_local.serial",
-    schema: z.string(),
-    default: "",
-  },
   email: {
     key: "enphase_local.email",
     schema: z.string(),

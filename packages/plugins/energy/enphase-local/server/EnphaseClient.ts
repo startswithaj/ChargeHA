@@ -1,5 +1,6 @@
 import https from "node:https";
 import type { Logger } from "@chargeha/server/lib/Logger";
+import { INFO_PATH, tagValue } from "./envoyInfo.ts";
 
 const ENLIGHTEN_LOGIN_URL =
   "https://enlighten.enphaseenergy.com/login/login.json";
@@ -129,7 +130,6 @@ export class EnphaseClient {
 
   constructor(
     private readonly host: string,
-    private readonly serial: string,
     private readonly auth: EnphaseAuth,
     private readonly persistToken: (token: string) => Promise<void>,
     private readonly logger: Logger,
@@ -201,13 +201,16 @@ export class EnphaseClient {
       );
     }
     this.logger.info("Fetching Enphase owner token from cloud");
+    // Entrez issues tokens per gateway serial; the device at `host` knows its
+    // own serial, so read it from /info rather than storing it as config.
+    const serial = await this.resolveSerial();
     const sessionId = await this.login();
     const res = await this.fetchFn(ENTREZ_TOKEN_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         session_id: sessionId,
-        serial_num: this.serial,
+        serial_num: serial,
         username: this.auth.email,
       }),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -220,6 +223,14 @@ export class EnphaseClient {
     const token = (await res.text()).trim();
     if (!token) throw new EnphaseAuthError("Entrez returned an empty token");
     return token;
+  }
+
+  private async resolveSerial(): Promise<string> {
+    const serial = tagValue(await this.getRaw(INFO_PATH), "sn");
+    if (!serial) {
+      throw new EnphaseConnectionError("Envoy /info returned no serial");
+    }
+    return serial;
   }
 
   private async login(): Promise<string> {

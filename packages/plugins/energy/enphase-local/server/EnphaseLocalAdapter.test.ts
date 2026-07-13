@@ -12,7 +12,6 @@ describe("EnphaseLocalAdapter", () => {
   const makeAdapter = () => {
     const client = new EnphaseClient(
       "10.0.0.7",
-      "SN1",
       { email: "", password: "", manualToken: "tok", cachedToken: "" },
       () => Promise.resolve(),
       logger,

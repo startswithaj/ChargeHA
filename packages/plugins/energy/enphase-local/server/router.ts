@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { Logger } from "@chargeha/server/lib/Logger";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
-import { EnphaseClient } from "./EnphaseClient.ts";
+import { EnphaseClient, makeNodeHttpsEnvoyHttp } from "./EnphaseClient.ts";
+import { INFO_PATH, isEnvoyInfo, tagValue } from "./envoyInfo.ts";
 import { EnphaseLocalAdapter } from "./EnphaseLocalAdapter.ts";
 import { discoverEnphase } from "./EnphaseDiscovery.ts";
 import { ENPHASE_LOCAL_SECRET_KEYS, enphaseLocalConfigDef } from "./config.ts";
@@ -15,7 +16,6 @@ const discoverInput = z.object({
 
 const testConnectionInput = z.object({
   host: z.string(),
-  serial: z.string(),
   email: z.string().optional(),
   password: z.string().optional(),
   token: z.string().optional(),
@@ -37,49 +37,65 @@ export const enphaseLocalRouter = router({
       return { found };
     }),
 
-  // Validates the connection end-to-end. When credentials are supplied the
-  // owner token fetched along the way is returned so the wizard can persist
-  // it, saving a second cloud round-trip on first poll.
+  // Validates the connection end-to-end. The host is first fingerprinted via
+  // the unauthenticated /info, whose serial is returned for display. When
+  // credentials are supplied the owner token fetched along the way is also
+  // returned so the wizard can persist it, saving a second cloud round-trip
+  // on first poll.
   testConnection: publicProcedure
     .input(testConnectionInput)
     .mutation(async ({ input }) => {
       const logger = new Logger("Enphase", "error");
-      const fetchedTokens: string[] = [];
-      const client = new EnphaseClient(
-        input.host,
-        input.serial,
-        {
-          email: input.email ?? "",
-          password: input.password ?? "",
-          manualToken: input.token ?? "",
-          cachedToken: "",
-        },
-        (token) => {
-          fetchedTokens.push(token);
-          return Promise.resolve();
-        },
-        logger,
-      );
-      const adapter = new EnphaseLocalAdapter(client, logger);
       try {
-        await adapter.connect();
-        const [device, realtime] = await Promise.all([
-          adapter.getDeviceInfo(),
-          adapter.getRealtimeData(),
-        ]);
-        return {
-          success: true as const,
-          device,
-          realtime,
-          fetchedToken: fetchedTokens.at(-1) ?? null,
-        };
+        const info = await makeNodeHttpsEnvoyHttp().get(
+          input.host,
+          INFO_PATH,
+          {},
+        );
+        if (info.status !== 200 || !isEnvoyInfo(info.body)) {
+          return {
+            success: false as const,
+            error: `No Enphase Envoy found at ${input.host}`,
+          };
+        }
+        const serial = tagValue(info.body, "sn");
+        const fetchedTokens: string[] = [];
+        const client = new EnphaseClient(
+          input.host,
+          {
+            email: input.email ?? "",
+            password: input.password ?? "",
+            manualToken: input.token ?? "",
+            cachedToken: "",
+          },
+          (token) => {
+            fetchedTokens.push(token);
+            return Promise.resolve();
+          },
+          logger,
+        );
+        const adapter = new EnphaseLocalAdapter(client, logger);
+        try {
+          await adapter.connect();
+          const [device, realtime] = await Promise.all([
+            adapter.getDeviceInfo(),
+            adapter.getRealtimeData(),
+          ]);
+          return {
+            success: true as const,
+            device,
+            realtime,
+            serial,
+            fetchedToken: fetchedTokens.at(-1) ?? null,
+          };
+        } finally {
+          await adapter.disconnect();
+        }
       } catch (err) {
         return {
           success: false as const,
           error: err instanceof Error ? err.message : "Connection failed",
         };
-      } finally {
-        await adapter.disconnect();
       }
     }),
 });

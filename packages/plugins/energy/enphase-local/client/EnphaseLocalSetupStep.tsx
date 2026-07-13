@@ -25,7 +25,6 @@ export function EnphaseLocalSetupStep({ onNext }: StepProps) {
     saveMutation.mutate(
       {
         host: validated.host,
-        serial: validated.serial,
         email: validated.email,
         password: validated.password,
         token: validated.token,
@@ -39,7 +38,6 @@ export function EnphaseLocalSetupStep({ onNext }: StepProps) {
       <EnphaseLocalForm
         initial={{
           host: config?.host || "",
-          serial: config?.serial || "",
           email: config?.email || "",
           password: config?.password || "",
           token: config?.token || "",

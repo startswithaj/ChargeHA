@@ -28,14 +28,12 @@ export class EnphaseLocalPlugin implements EnergyPlugin {
     if (!host) {
       throw new Error("Enphase host not configured");
     }
-    const serial = (await this.deps.getConfig("serial")) ?? "";
     const email = (await this.deps.getConfig("email")) ?? "";
     const password = (await this.deps.getSecret("password")) ?? "";
     const token = (await this.deps.getSecret("token")) ?? "";
 
     const client = new EnphaseClient(
       host,
-      serial,
       {
         email,
         password,

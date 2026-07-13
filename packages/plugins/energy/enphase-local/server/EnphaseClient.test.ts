@@ -18,7 +18,13 @@ describe("EnphaseClient", () => {
   let persisted: string[];
 
   beforeEach(() => {
-    http = new FakeEnvoyHttp().setJson("/info", { ok: true });
+    http = new FakeEnvoyHttp()
+      .setRaw(
+        "/info",
+        "<envoy_info><device><sn>SN1</sn></device></envoy_info>",
+        200,
+      )
+      .setJson("/production", { ok: true });
     persisted = [];
   });
 
@@ -33,7 +39,6 @@ describe("EnphaseClient", () => {
   ) =>
     new EnphaseClient(
       "10.0.0.7",
-      "SN1",
       {
         email: auth.email ?? "",
         password: auth.password ?? "",
@@ -54,7 +59,7 @@ describe("EnphaseClient", () => {
     const cloud = makeFakeCloud({ token: "should-not-be-fetched" });
     const client = makeClient({ manualToken: "pasted-token" }, cloud.fetchFn);
 
-    await client.getJson("/info");
+    await client.getJson("/production");
 
     expect(http.requests[0].token).toBe("pasted-token");
     expect(cloud.calls).toEqual([]);
@@ -68,7 +73,7 @@ describe("EnphaseClient", () => {
       cloud.fetchFn,
     );
 
-    await client.getJson("/info");
+    await client.getJson("/production");
 
     expect(http.requests[0].token).toBe(cached);
     expect(cloud.calls).toEqual([]);
@@ -87,9 +92,10 @@ describe("EnphaseClient", () => {
       cloud.fetchFn,
     );
 
-    await client.getJson("/info");
+    await client.getJson("/production");
 
-    expect(http.requests[0].token).toBe(fresh);
+    // The token fetch first reads the serial from the unauthenticated /info.
+    expect(http.requests.at(-1)?.token).toBe(fresh);
     expect(persisted).toEqual([fresh]);
     expect(cloud.calls).toHaveLength(2); // login + entrez
   });
@@ -106,7 +112,10 @@ describe("EnphaseClient", () => {
 
     await expect(client.getJson("/data")).rejects.toThrow("HTTP 401");
 
-    expect(http.requests.map((r) => r.token)).toEqual([cached, fresh]);
+    const dataTokens = http.requests
+      .filter((r) => r.path === "/data")
+      .map((r) => r.token);
+    expect(dataTokens).toEqual([cached, fresh]);
     expect(persisted).toEqual([fresh]);
   });
 
@@ -135,8 +144,10 @@ describe("EnphaseClient", () => {
       cloud.fetchFn,
     );
 
-    await expect(client.getJson("/info")).rejects.toThrow(EnphaseAuthError);
-    await expect(client.getJson("/info")).rejects.toThrow(
+    await expect(client.getJson("/production")).rejects.toThrow(
+      EnphaseAuthError,
+    );
+    await expect(client.getJson("/production")).rejects.toThrow(
       "check email/password",
     );
   });
@@ -153,7 +164,7 @@ describe("EnphaseClient", () => {
   it("throws when no token and no credentials are configured", async () => {
     const client = makeClient({});
 
-    await expect(client.getJson("/info")).rejects.toThrow(
+    await expect(client.getJson("/production")).rejects.toThrow(
       "no Enphase credentials",
     );
   });
