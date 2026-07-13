@@ -82,7 +82,7 @@ function energyToWh(raw: number): number {
  * Home consumption has no dedicated register; it is derived from the node
  * balance: PV + grid import + battery discharge.
  */
-export class SigenergyAdapter implements EnergySourceAdapter {
+export class SigenergyLocalAdapter implements EnergySourceAdapter {
   constructor(
     private readonly reader: ModbusReader,
     private readonly plantUnitId: number,

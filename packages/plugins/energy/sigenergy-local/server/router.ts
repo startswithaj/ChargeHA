@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { Logger } from "@chargeha/server/lib/Logger";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
-import { SigenergyAdapter } from "./SigenergyAdapter.ts";
+import { SigenergyLocalAdapter } from "./SigenergyLocalAdapter.ts";
 import { JsmodbusReader } from "./SigenergyModbusClient.ts";
 import { discoverSigenergy } from "./discovery.ts";
-import { sigenergyConfigDef } from "./config.ts";
+import { sigenergyLocalConfigDef } from "./config.ts";
 import { createPluginConfigProcedures } from "../../../createPluginConfigProcedures.ts";
 
 // ── Typed Zod schemas for the Sigenergy plugin procedures ───────────────────
@@ -22,8 +22,12 @@ const testConnectionInput = z.object({
 
 // ── Sigenergy plugin tRPC router ────────────────────────────────────────────
 
-export const sigenergyRouter = router({
-  ...createPluginConfigProcedures("sigenergy", sigenergyConfigDef, []),
+export const sigenergyLocalRouter = router({
+  ...createPluginConfigProcedures(
+    "sigenergy_local",
+    sigenergyLocalConfigDef,
+    [],
+  ),
 
   discover: publicProcedure
     .input(discoverInput)
@@ -44,7 +48,7 @@ export const sigenergyRouter = router({
         [plantUnitId, deviceUnitId],
         logger,
       );
-      const adapter = new SigenergyAdapter(
+      const adapter = new SigenergyLocalAdapter(
         reader,
         plantUnitId,
         deviceUnitId,

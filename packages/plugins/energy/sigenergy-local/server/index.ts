@@ -2,21 +2,21 @@ import type { AnyRouter } from "@trpc/server";
 import type { EnergySourceAdapter } from "@chargeha/shared";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import type { EnergyPlugin } from "@chargeha/plugins/types";
-import { sigenergyConfigDef } from "./config.ts";
-import { SigenergyAdapter } from "./SigenergyAdapter.ts";
+import { sigenergyLocalConfigDef } from "./config.ts";
+import { SigenergyLocalAdapter } from "./SigenergyLocalAdapter.ts";
 import { JsmodbusReader } from "./SigenergyModbusClient.ts";
-import { sigenergyRouter } from "./router.ts";
+import { sigenergyLocalRouter } from "./router.ts";
 
 /**
  * Sigenergy energy plugin — reads a Sigenergy inverter / energy-storage system
  * on the local network over Modbus TCP (no authentication).
  */
-export class SigenergyPlugin implements EnergyPlugin {
-  readonly id = "sigenergy";
-  readonly displayName = "Sigenergy";
+export class SigenergyLocalPlugin implements EnergyPlugin {
+  readonly id = "sigenergy_local";
+  readonly displayName = "Sigenergy (Local)";
   readonly vendor = "Sigenergy";
-  readonly settingsComponentKey = "sigenergy-config";
-  readonly configDef = sigenergyConfigDef;
+  readonly settingsComponentKey = "sigenergy-local-config";
+  readonly configDef = sigenergyLocalConfigDef;
   readonly secretKeys: readonly string[] = [];
 
   constructor(private readonly deps: PluginDependencies) {
@@ -44,7 +44,7 @@ export class SigenergyPlugin implements EnergyPlugin {
       [plantUnitId, deviceUnitId],
       this.deps.log,
     );
-    return new SigenergyAdapter(
+    return new SigenergyLocalAdapter(
       reader,
       plantUnitId,
       deviceUnitId,
@@ -57,6 +57,6 @@ export class SigenergyPlugin implements EnergyPlugin {
   }
 
   getRouter(): AnyRouter {
-    return sigenergyRouter;
+    return sigenergyLocalRouter;
   }
 }

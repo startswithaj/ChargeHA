@@ -10,16 +10,16 @@ import type {
 } from "../../InverterSetupShared.tsx";
 import { TestResultBadge } from "../../InverterSetupShared.tsx";
 
-export interface SigenergyFormValues {
+export interface SigenergyLocalFormValues {
   host: string;
   port: string;
   plantUnitId: string;
   deviceUnitId: string;
 }
 
-interface SigenergyFormProps {
-  initial: SigenergyFormValues;
-  onTestSuccess: (values: SigenergyFormValues) => void;
+interface SigenergyLocalFormProps {
+  initial: SigenergyLocalFormValues;
+  onTestSuccess: (values: SigenergyLocalFormValues) => void;
 }
 
 function AdvancedFields(
@@ -92,7 +92,7 @@ function SearchSection(
     subnet: string;
     setSubnet: (v: string) => void;
     searchMutation: ReturnType<
-      typeof trpc.energy.sigenergy.discover.useMutation
+      typeof trpc.energy.sigenergy_local.discover.useMutation
     >;
     searchResults: SigenergyDevice[];
     onSelectDevice: (host: string) => void;
@@ -170,7 +170,7 @@ function SearchSection(
 
 function useTestStatus(
   testMutation: ReturnType<
-    typeof trpc.energy.sigenergy.testConnection.useMutation
+    typeof trpc.energy.sigenergy_local.testConnection.useMutation
   >,
 ): TestStatus {
   return useMemo(() => {
@@ -205,7 +205,7 @@ type TestVariables = {
 };
 
 /** Build the test-connection mutation input from the form's string fields. */
-function testArgs(values: SigenergyFormValues) {
+function testArgs(values: SigenergyLocalFormValues) {
   return {
     host: values.host,
     port: parseInt(values.port || "502", 10),
@@ -216,7 +216,7 @@ function testArgs(values: SigenergyFormValues) {
 
 /** On a successful test, echo the validated values (as strings) upward. */
 const onTestSuccessHandler =
-  (onTestSuccess: (values: SigenergyFormValues) => void) =>
+  (onTestSuccess: (values: SigenergyLocalFormValues) => void) =>
   (data: { success: boolean }, variables: TestVariables) => {
     if (!data.success) return;
     onTestSuccess({
@@ -246,8 +246,8 @@ function TestConnectionRow(
   );
 }
 
-export function SigenergyForm(
-  { initial, onTestSuccess }: SigenergyFormProps,
+export function SigenergyLocalForm(
+  { initial, onTestSuccess }: SigenergyLocalFormProps,
 ): JSX.Element {
   const [host, setHost] = useState(initial.host);
   const [port, setPort] = useState(initial.port || "502");
@@ -264,13 +264,13 @@ export function SigenergyForm(
   });
   const [searchResults, setSearchResults] = useState<SigenergyDevice[]>([]);
 
-  const searchMutation = trpc.energy.sigenergy.discover.useMutation({
+  const searchMutation = trpc.energy.sigenergy_local.discover.useMutation({
     onSuccess: (result: { found: SigenergyDevice[] }) =>
       setSearchResults(result.found),
     onError: () => setSearchResults([]),
   });
 
-  const testMutation = trpc.energy.sigenergy.testConnection.useMutation({
+  const testMutation = trpc.energy.sigenergy_local.testConnection.useMutation({
     onSuccess: onTestSuccessHandler(onTestSuccess),
   });
 

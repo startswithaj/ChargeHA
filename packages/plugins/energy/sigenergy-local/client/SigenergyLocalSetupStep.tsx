@@ -3,15 +3,20 @@ import { Button } from "@radix-ui/themes";
 import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
 import { trpc } from "./trpc.ts";
 import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
-import { SigenergyForm, type SigenergyFormValues } from "./SigenergyForm.tsx";
+import {
+  SigenergyLocalForm,
+  type SigenergyLocalFormValues,
+} from "./SigenergyLocalForm.tsx";
 
-export function SigenergySetupStep({ onNext }: StepProps) {
-  const { data: config } = trpc.energy.sigenergy.getConfig.useQuery();
-  const saveMutation = trpc.energy.sigenergy.setConfig.useMutation();
+export function SigenergyLocalSetupStep({ onNext }: StepProps) {
+  const { data: config } = trpc.energy.sigenergy_local.getConfig.useQuery();
+  const saveMutation = trpc.energy.sigenergy_local.setConfig.useMutation();
 
-  const [validated, setValidated] = useState<SigenergyFormValues | null>(null);
+  const [validated, setValidated] = useState<SigenergyLocalFormValues | null>(
+    null,
+  );
 
-  const handleTestSuccess = useCallback((values: SigenergyFormValues) => {
+  const handleTestSuccess = useCallback((values: SigenergyLocalFormValues) => {
     setValidated(values);
   }, []);
 
@@ -30,7 +35,7 @@ export function SigenergySetupStep({ onNext }: StepProps) {
 
   return (
     <div className={styles.stepContainer}>
-      <SigenergyForm
+      <SigenergyLocalForm
         initial={{
           host: config?.host || "",
           port: config?.port || "502",

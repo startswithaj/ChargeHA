@@ -2,7 +2,7 @@ import { Badge, Button, Text, TextField } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
 import { SettingsRow } from "../../../../client/src/components/pages/Settings/SettingsLayout.tsx";
 
-interface SigenergyConfigValues {
+interface SigenergyLocalConfigValues {
   host: string;
   port: string;
   plantUnitId: string;
@@ -38,17 +38,17 @@ function RealtimePreview(
   );
 }
 
-export function SigenergyConfig(): JSX.Element | null {
-  const { data: config } = trpc.energy.sigenergy.getConfig.useQuery();
+export function SigenergyLocalConfig(): JSX.Element | null {
+  const { data: config } = trpc.energy.sigenergy_local.getConfig.useQuery();
   const utils = trpc.useUtils();
-  const configMutation = trpc.energy.sigenergy.setConfig.useMutation({
-    onSuccess: () => utils.energy.sigenergy.getConfig.invalidate(),
+  const configMutation = trpc.energy.sigenergy_local.setConfig.useMutation({
+    onSuccess: () => utils.energy.sigenergy_local.getConfig.invalidate(),
   });
-  const testMutation = trpc.energy.sigenergy.testConnection.useMutation();
+  const testMutation = trpc.energy.sigenergy_local.testConnection.useMutation();
 
   if (!config) return null;
 
-  const cfg = config as SigenergyConfigValues;
+  const cfg = config as SigenergyLocalConfigValues;
   const testSuccess = testMutation.isSuccess && testMutation.data.success
     ? testMutation.data
     : null;

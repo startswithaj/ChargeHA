@@ -1,14 +1,14 @@
 import { beforeEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { SigenergyAdapter } from "./SigenergyAdapter.ts";
+import { SigenergyLocalAdapter } from "./SigenergyLocalAdapter.ts";
 import { Logger } from "@chargeha/server/lib/Logger";
 import { FakeModbusReader } from "./test-helpers/sigenergyModbusHarness.ts";
 
-describe("SigenergyAdapter", () => {
+describe("SigenergyLocalAdapter", () => {
   const PLANT = 247;
   const DEVICE = 1;
 
-  // Register addresses (must match SigenergyAdapter's private constants).
+  // Register addresses (must match SigenergyLocalAdapter's private constants).
   const PLANT_GRID_POWER = 30005;
   const PLANT_ESS_SOC = 30014;
   const PLANT_PV_POWER = 30035;
@@ -34,7 +34,8 @@ describe("SigenergyAdapter", () => {
 
   const logger = new Logger("Sigenergy", "error");
   let reader: FakeModbusReader;
-  const makeAdapter = () => new SigenergyAdapter(reader, PLANT, DEVICE, logger);
+  const makeAdapter = () =>
+    new SigenergyLocalAdapter(reader, PLANT, DEVICE, logger);
 
   beforeEach(() => {
     reader = seedHealthy(new FakeModbusReader());

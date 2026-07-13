@@ -251,7 +251,7 @@ class SigenergyDiscovery {
       this.logger.info(
         `Sigenergy discovery: found ${hit.name} at ${hit.host}, stopping scan`,
       );
-      // Just return the first device found to speed up discovery. How likely is it that a user would have multiple 
+      // Just return the first device found to speed up discovery. How likely is it that a user would have multiple
       // Sigenergy inverters?? If they do, they will have to specify the host manually. They are clearly an edge case!
       return [hit];
     }
