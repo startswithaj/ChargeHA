@@ -20,7 +20,6 @@ const { makeHookReturn, hookRef } = vi.hoisted(() => {
     loadFailed: false,
     error: null as string | null,
     recentlyAddedVins: new Set<string>(),
-    encryptionMissing: false,
     handleDelete: vi.fn(),
     handleMovePriority: vi.fn(),
     handleAddSimulatedVehicle: vi.fn(),
@@ -124,22 +123,6 @@ describe("VehicleSettings", () => {
     hookRef.current = makeHookReturn({ error: "Something went wrong" });
     renderWithProviders(<VehicleSettings />);
     expect(screen.getByText("Something went wrong")).toBeInTheDocument();
-  });
-
-  it("renders encryption missing warning", () => {
-    hookRef.current = makeHookReturn({ encryptionMissing: true });
-    renderWithProviders(<VehicleSettings />);
-    expect(
-      screen.getByText("Encryption Key Not Configured"),
-    ).toBeInTheDocument();
-  });
-
-  it("does not render encryption warning when configured", () => {
-    hookRef.current = makeHookReturn({ encryptionMissing: false });
-    renderWithProviders(<VehicleSettings />);
-    expect(
-      screen.queryByText("Encryption Key Not Configured"),
-    ).not.toBeInTheDocument();
   });
 
   it("renders vehicle list", () => {

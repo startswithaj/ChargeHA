@@ -1,5 +1,5 @@
-import { Wand2, Zap } from "lucide-react";
-import { Button, Link, Switch, Text } from "@radix-ui/themes";
+import { Key, Wand2, Zap } from "lucide-react";
+import { Button, Card, Link, Switch, Text } from "@radix-ui/themes";
 import { trpc } from "../../../trpc.ts";
 import { version } from "../../../lib/version.ts";
 import { useRouter } from "../../../hooks/useRouter.ts";
@@ -17,6 +17,27 @@ import { BatterySettings } from "./BatterySettings.tsx";
 import { TariffSettings } from "./TariffSettings.tsx";
 import { GeneralSettings } from "./GeneralSettings.tsx";
 import { NotificationSettings } from "./NotificationSettings.tsx";
+
+function EncryptionWarning() {
+  return (
+    <Card style={{ borderLeft: "3px solid var(--orange-9)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <Key size={20} style={{ color: "var(--orange-9)", flexShrink: 0 }} />
+        <div>
+          <Text size="2" weight="bold" style={{ display: "block" }}>
+            Encryption Key Not Configured
+          </Text>
+          <Text size="2" color="gray">
+            Secrets (API keys, tokens, passwords) will be stored in plain text
+            instead of encrypted. Add <code>ENCRYPTION_KEY</code> to your{" "}
+            <code>.env</code> file. Generate with:{" "}
+            <code>openssl rand -base64 32</code>
+          </Text>
+        </div>
+      </div>
+    </Card>
+  );
+}
 
 function VersionFooter() {
   const label = `version ${version.sha}`;
@@ -47,6 +68,10 @@ export function Settings() {
   } = useDraftConfig(charging, chargingMutation);
 
   const { data: wizardStatus = null } = trpc.wizard.status.useQuery();
+  const { data: encryptionHealth } = trpc.health.encryption.useQuery();
+  const encryptionMissing = encryptionHealth
+    ? !encryptionHealth.configured
+    : false;
 
   if (chargingLoading) {
     return (
@@ -68,6 +93,8 @@ export function Settings() {
       >
         <Text size="5" weight="bold">Settings</Text>
       </div>
+
+      {encryptionMissing && <EncryptionWarning />}
 
       {/* ═══ Setup Wizard ═══ */}
       {wizardStatus !== null && (

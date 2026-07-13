@@ -1,4 +1,4 @@
-import { Car, FlaskConical, Key, Plus, Trash2 } from "lucide-react";
+import { Car, FlaskConical, Plus, Trash2 } from "lucide-react";
 import { ArrowDownIcon, ArrowUpIcon } from "@radix-ui/react-icons";
 import { Badge, Button, Card, Switch, Text } from "@radix-ui/themes";
 import { ErrorBoundary } from "../../ui/ErrorBoundary.tsx";
@@ -19,27 +19,6 @@ type Vehicle = ReturnType<typeof useVehicleSettings>["vehicles"][number];
 type VehiclePlugin = ReturnType<
   typeof useVehicleSettings
 >["vehiclePlugins"][number];
-
-function EncryptionWarning() {
-  return (
-    <Card style={{ borderLeft: "3px solid var(--orange-9)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <Key size={20} style={{ color: "var(--orange-9)", flexShrink: 0 }} />
-        <div>
-          <Text size="2" weight="bold" style={{ display: "block" }}>
-            Encryption Key Not Configured
-          </Text>
-          <Text size="2" color="gray">
-            Secrets (API keys, tokens, passwords) will be stored in plain text
-            instead of encrypted. Add <code>ENCRYPTION_KEY</code> to your{" "}
-            <code>.env</code> file. Generate with:{" "}
-            <code>openssl rand -base64 32</code>
-          </Text>
-        </div>
-      </div>
-    </Card>
-  );
-}
 
 function VehicleRow(
   {
@@ -290,7 +269,6 @@ export function VehicleSettings() {
     loadFailed,
     error,
     recentlyAddedVins,
-    encryptionMissing,
     handleDelete,
     handleMovePriority,
     handleAddSimulatedVehicle,
@@ -330,8 +308,6 @@ export function VehicleSettings() {
 
   return (
     <>
-      {encryptionMissing && <EncryptionWarning />}
-
       {error && (
         <Card style={{ borderLeft: "3px solid var(--red-9)" }}>
           <div
