@@ -52,6 +52,18 @@ vi.mock("@chargeha/plugins/componentRegistry", () => ({
   } as Record<string, React.FC>,
 }));
 
+vi.mock("../trpc.ts", () => ({
+  trpc: {
+    wizard: {
+      status: {
+        useQuery: vi.fn(() => ({
+          data: { completed: true, firstRun: false },
+        })),
+      },
+    },
+  },
+}));
+
 vi.mock("../hooks/useWizardState.ts", () => ({
   useWizardState: vi.fn(() => ({
     stepId: "welcome",
@@ -66,9 +78,10 @@ vi.mock("../hooks/useWizardState.ts", () => ({
 
 vi.mock("./Wizard/WizardShell.tsx", () => ({
   WizardShell: (
-    { steps, onComplete }: {
+    { steps, onComplete, onExit }: {
       steps: Array<{ id: string; label: string }>;
       onComplete: () => void;
+      onExit?: () => void;
     },
   ) => (
     <div>
@@ -77,6 +90,7 @@ vi.mock("./Wizard/WizardShell.tsx", () => ({
         <div key={s.id} data-testid={`step-${s.id}`}>{s.label}</div>
       ))}
       <button type="button" onClick={onComplete}>Complete</button>
+      {onExit && <button type="button" onClick={onExit}>Exit</button>}
     </div>
   ),
 }));
@@ -233,6 +247,13 @@ describe("WizardRouter", () => {
 
       await userEvent.click(screen.getByText("Complete"));
       expect(onComplete).toHaveBeenCalled();
+    });
+
+    it("passes onExit to WizardShell when the wizard was previously completed", () => {
+      render(<WizardRouter onComplete={vi.fn()} />);
+
+      // wizard.status mock returns completed: true
+      expect(screen.getByText("Exit")).toBeInTheDocument();
     });
   });
 });

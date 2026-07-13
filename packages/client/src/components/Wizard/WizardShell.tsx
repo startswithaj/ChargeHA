@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { Button, Text } from "@radix-ui/themes";
-import { ArrowLeft, ArrowRight, SkipForward } from "lucide-react";
+import { ArrowLeft, ArrowRight, SkipForward, X } from "lucide-react";
 import { useWizardState } from "../../hooks/useWizardState.ts";
 import { useRouter } from "../../hooks/useRouter.ts";
 import { StepIndicator } from "./StepIndicator.tsx";
@@ -27,6 +27,9 @@ export interface WizardStepConfig {
 interface WizardShellProps {
   steps?: WizardStepConfig[];
   onComplete?: () => void;
+  /** When set, an "Exit setup" button is shown that abandons the wizard —
+   *  provided only when the wizard was previously completed. */
+  onExit?: () => void;
 }
 
 function useWizardCallbacks(
@@ -108,7 +111,23 @@ function WizardNav(
   );
 }
 
-export function WizardShell({ steps, onComplete }: WizardShellProps) {
+function ExitRow({ onExit }: { onExit: () => void }) {
+  return (
+    <div className={styles.exitRow}>
+      <Button
+        variant="ghost"
+        color="gray"
+        onClick={onExit}
+        aria-label="Exit setup"
+      >
+        <X size={16} />
+        Exit setup
+      </Button>
+    </div>
+  );
+}
+
+export function WizardShell({ steps, onComplete, onExit }: WizardShellProps) {
   const wizardState = useWizardState();
   const { replacePath } = useRouter();
   const stepsTotal = steps?.length ?? 0;
@@ -181,6 +200,7 @@ export function WizardShell({ steps, onComplete }: WizardShellProps) {
 
   return (
     <div className={styles.container}>
+      {onExit && <ExitRow onExit={onExit} />}
       <StepIndicator
         total={stepsTotal}
         current={currentStep}
