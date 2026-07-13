@@ -130,7 +130,10 @@ describe("EnphaseLocalAdapter", () => {
     it("writes a connected entry to the plugin log", async () => {
       await makeAdapter().connect();
       expect(dbEntries).toEqual([
-        { level: "info", message: "Connected to Envoy at 10.0.0.7" },
+        {
+          level: "info",
+          message: "Connected to Envoy at 10.0.0.7 — using CT meter readings",
+        },
       ]);
     });
   });

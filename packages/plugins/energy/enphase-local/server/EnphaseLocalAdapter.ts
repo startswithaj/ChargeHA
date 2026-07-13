@@ -81,12 +81,10 @@ export class EnphaseLocalAdapter implements EnergySourceAdapter {
     try {
       const map = await this.resolveMeterMap();
       const mode = map ? "CT meter readings" : "solar-only fallback";
-      this.logger.info(
-        `Connected to Envoy at ${this.client.host} — using ${mode}`,
-      );
-      await this.dbLog.info(`Connected to Envoy at ${this.client.host}`, {
-        payload: { mode },
-      });
+      const message =
+        `Connected to Envoy at ${this.client.host} — using ${mode}`;
+      this.logger.info(message);
+      await this.dbLog.info(message);
     } catch (err) {
       await this.recordPollError(err);
       throw err;
@@ -152,12 +150,10 @@ export class EnphaseLocalAdapter implements EnergySourceAdapter {
     this.meterMap = meterMapFrom(meters);
     this.metersProbed = true;
     if (!this.meterMap) {
-      this.logger.info(
-        "Envoy has no production + net-consumption CT meters — falling back to solar-only readings",
-      );
-      await this.dbLog.info(
-        "No enabled production + net-consumption CT meters — using solar-only readings (grid reported as 0)",
-      );
+      const message =
+        "Envoy has no enabled production + net-consumption CT meters — falling back to solar-only readings (grid reported as 0)";
+      this.logger.info(message);
+      await this.dbLog.info(message);
     }
     return this.meterMap;
   }
@@ -239,12 +235,10 @@ export class EnphaseLocalAdapter implements EnergySourceAdapter {
     } catch (err) {
       if (err instanceof EnphaseConnectionError && err.status === 404) {
         this.ensembleAbsent = true;
-        this.logger.info(
-          "Envoy has no battery (ensemble endpoints absent) — skipping battery readings",
-        );
-        await this.dbLog.info(
-          "No battery detected (ensemble endpoints absent) — battery fields will be empty",
-        );
+        const message =
+          "Envoy has no battery (ensemble endpoints absent) — skipping battery readings";
+        this.logger.info(message);
+        await this.dbLog.info(message);
         return null;
       }
       this.logger.warn(`Envoy optional read ${path} failed: ${err}`);
