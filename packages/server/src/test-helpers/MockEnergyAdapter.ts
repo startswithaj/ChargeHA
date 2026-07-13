@@ -1,5 +1,4 @@
 import type {
-  CumulativeEnergyData,
   DeviceInfo,
   EnergyData,
   EnergySourceAdapter,
@@ -17,7 +16,6 @@ export class MockEnergyAdapter implements EnergySourceAdapter {
 
   constructor(
     private realtime: EnergyData,
-    private cumulative: CumulativeEnergyData,
     private deviceInfo: DeviceInfo,
   ) {}
 
@@ -37,10 +35,6 @@ export class MockEnergyAdapter implements EnergySourceAdapter {
 
   getRealtimeData(): Promise<EnergyData> {
     return Promise.resolve({ ...this.realtime });
-  }
-
-  getCumulativeData(): Promise<CumulativeEnergyData> {
-    return Promise.resolve({ ...this.cumulative });
   }
 
   getDeviceInfo(): Promise<DeviceInfo> {

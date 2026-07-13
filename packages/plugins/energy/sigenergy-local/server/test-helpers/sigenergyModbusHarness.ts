@@ -37,13 +37,6 @@ export class FakeModbusReader implements ModbusReader {
     return this;
   }
 
-  setU64(unitId: number, address: number, value: number): this {
-    const buf = Buffer.alloc(8);
-    buf.writeBigUInt64BE(BigInt(value), 0);
-    this.responses.set(this.key(unitId, address), buf);
-    return this;
-  }
-
   setString(
     unitId: number,
     address: number,

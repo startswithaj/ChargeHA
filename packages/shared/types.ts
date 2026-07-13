@@ -101,9 +101,6 @@ export interface EnergySourceAdapter {
   /** Returns current energy state. */
   getRealtimeData(): Promise<EnergyData>;
 
-  /** Returns cumulative energy counters. */
-  getCumulativeData(): Promise<CumulativeEnergyData>;
-
   /** Returns adapter/device identification info. */
   getDeviceInfo(): Promise<DeviceInfo>;
 

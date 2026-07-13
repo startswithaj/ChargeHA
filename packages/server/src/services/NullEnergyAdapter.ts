@@ -1,5 +1,4 @@
 import type {
-  CumulativeEnergyData,
   DeviceInfo,
   EnergyData,
   EnergySourceAdapter,
@@ -38,17 +37,6 @@ export class NullEnergyAdapter implements EnergySourceAdapter {
       batterySoc: null,
       gridVoltageV: null,
       lastUpdated: new Date().toISOString(),
-    });
-  }
-
-  getCumulativeData(): Promise<CumulativeEnergyData> {
-    return Promise.resolve({
-      solarProducedWh: 0,
-      gridImportedWh: 0,
-      gridExportedWh: 0,
-      dailySolarProducedWh: 0,
-      dailyGridImportWh: 0,
-      dailyGridExportWh: 0,
     });
   }
 

@@ -284,18 +284,6 @@ describe("FroniusCloudAdapter", () => {
     });
   });
 
-  describe("getCumulativeData", () => {
-    it("returns zeros — cumulative data is built from local DB by the poller", async () => {
-      const data = await makeAdapter().getCumulativeData();
-      expect(data.solarProducedWh).toBe(0);
-      expect(data.gridImportedWh).toBe(0);
-      expect(data.gridExportedWh).toBe(0);
-      expect(data.dailySolarProducedWh).toBe(0);
-      expect(data.dailyGridImportWh).toBe(0);
-      expect(data.dailyGridExportWh).toBe(0);
-    });
-  });
-
   describe("getDeviceInfo", () => {
     it("returns system name and inverter model", async () => {
       const adapter = makeAdapter();

@@ -1,5 +1,4 @@
 import type {
-  CumulativeEnergyData,
   DeviceInfo,
   EnergyData,
   EnergySourceAdapter,
@@ -90,42 +89,6 @@ export class FroniusLocalAdapter implements EnergySourceAdapter {
       batterySoc: site.SOC ?? null,
       gridVoltageV,
       lastUpdated: new Date().toISOString(),
-    };
-  }
-
-  async getCumulativeData(): Promise<CumulativeEnergyData> {
-    // Fetch both endpoints for cumulative data
-    const [powerFlowRes, meterRes] = await Promise.all([
-      this.fetch("/solar_api/v1/GetPowerFlowRealtimeData.fcgi"),
-      this.fetch(
-        `/solar_api/v1/GetMeterRealtimeData.cgi?Scope=Device&DeviceId=${this.meterDeviceId}`,
-      ),
-    ]);
-
-    const powerFlow = await powerFlowRes.json();
-    const meter = await meterRes.json();
-
-    const site = powerFlow?.Body?.Data?.Site;
-    if (!site) {
-      throw new FroniusParseError(
-        "Missing Body.Data.Site in PowerFlow response",
-      );
-    }
-
-    const meterData = meter?.Body?.Data;
-    if (!meterData) {
-      throw new FroniusParseError(
-        "Missing Body.Data in MeterRealtime response",
-      );
-    }
-
-    return {
-      solarProducedWh: site.E_Total ?? 0,
-      gridImportedWh: meterData.EnergyReal_WAC_Sum_Consumed ?? 0,
-      gridExportedWh: meterData.EnergyReal_WAC_Sum_Produced ?? 0,
-      dailySolarProducedWh: site.E_Day ?? 0,
-      dailyGridImportWh: 0, // Overridden by EnergyPoller from DB
-      dailyGridExportWh: 0, // Overridden by EnergyPoller from DB
     };
   }
 

@@ -1,6 +1,5 @@
 import { Buffer } from "node:buffer";
 import type {
-  CumulativeEnergyData,
   DeviceInfo,
   EnergyData,
   EnergySourceAdapter,
@@ -21,8 +20,6 @@ const PLANT_ESS_SOC = 30014; // uint16, % ×0.1
 const PLANT_PV_POWER = 30035; // int32, kW ×0.001
 const PLANT_BATTERY_POWER = 30037; // int32, kW ×0.001. >0 = charging
 const DEVICE_PHASE_A_VOLTAGE = 31011; // uint32, V ×0.01
-const DEVICE_ACC_EXPORT_ENERGY = 30556; // uint64, kWh ×0.01
-const DEVICE_ACC_IMPORT_ENERGY = 30562; // uint64, kWh ×0.01
 const DEVICE_MODEL_TYPE = 30500; // string, 15 registers
 const DEVICE_SERIAL = 30515; // string, 10 registers
 
@@ -38,10 +35,6 @@ function readU16(buf: Buffer): number {
 
 function readU32(buf: Buffer): number {
   return buf.readUInt32BE(0);
-}
-
-function readU64(buf: Buffer): number {
-  return Number(buf.readBigUInt64BE(0));
 }
 
 /** Decode NUL-padded ASCII packed two chars per register. */
@@ -62,11 +55,6 @@ function socPercent(raw: number): number {
 /** Voltage register (scale 0.01) → volts. */
 function voltageToVolts(raw: number): number {
   return raw * 0.01;
-}
-
-/** kWh counter (scale 0.01) → watt-hours. */
-function energyToWh(raw: number): number {
-  return raw * 0.01 * 1000;
 }
 
 /**
@@ -129,28 +117,6 @@ export class SigenergyLocalAdapter implements EnergySourceAdapter {
       batterySoc,
       gridVoltageV,
       lastUpdated: new Date().toISOString(),
-    };
-  }
-
-  async getCumulativeData(): Promise<CumulativeEnergyData> {
-    const gridExportedWh = energyToWh(
-      readU64(await this.read(this.deviceUnitId, DEVICE_ACC_EXPORT_ENERGY, 4)),
-    );
-    const gridImportedWh = energyToWh(
-      readU64(await this.read(this.deviceUnitId, DEVICE_ACC_IMPORT_ENERGY, 4)),
-    );
-
-    // Sigenergy exposes no cumulative/daily PV-generation register (Home
-    // Assistant integrates it from power). ChargeHA's EnergyPoller derives
-    // daily solar and daily grid totals from DB recordings anyway, so the solar
-    // and daily fields are left at 0 here.
-    return {
-      solarProducedWh: 0,
-      gridImportedWh,
-      gridExportedWh,
-      dailySolarProducedWh: 0,
-      dailyGridImportWh: 0,
-      dailyGridExportWh: 0,
     };
   }
 
