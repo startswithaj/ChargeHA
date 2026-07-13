@@ -3,10 +3,15 @@ import { Logger } from "@chargeha/server/lib/Logger";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
 import { SigenergyAdapter } from "./SigenergyAdapter.ts";
 import { JsmodbusReader } from "./SigenergyModbusClient.ts";
+import { discoverSigenergy } from "./discovery.ts";
 import { sigenergyConfigDef } from "./config.ts";
 import { createPluginConfigProcedures } from "../../../createPluginConfigProcedures.ts";
 
-// ── Typed Zod schema for the Sigenergy test-connection procedure ────────────
+// ── Typed Zod schemas for the Sigenergy plugin procedures ───────────────────
+
+const discoverInput = z.object({
+  subnet: z.string().optional(),
+});
 
 const testConnectionInput = z.object({
   host: z.string(),
@@ -19,6 +24,13 @@ const testConnectionInput = z.object({
 
 export const sigenergyRouter = router({
   ...createPluginConfigProcedures("sigenergy", sigenergyConfigDef, []),
+
+  discover: publicProcedure
+    .input(discoverInput)
+    .mutation(async ({ ctx, input }) => {
+      const found = await discoverSigenergy(ctx.logger, input.subnet);
+      return { found };
+    }),
 
   testConnection: publicProcedure
     .input(testConnectionInput)

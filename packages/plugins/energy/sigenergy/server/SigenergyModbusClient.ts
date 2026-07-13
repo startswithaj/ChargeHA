@@ -6,6 +6,13 @@ import type { Logger } from "@chargeha/server/lib/Logger";
 const CONNECT_TIMEOUT_MS = 5000;
 const READ_TIMEOUT_MS = 5000;
 
+/** Per-reader connect/read timeout overrides. Network discovery uses short
+ *  values so a full subnet sweep doesn't stall on silent hosts. */
+export interface ModbusTimeouts {
+  connectMs: number;
+  readMs: number;
+}
+
 export class SigenergyConnectionError extends Error {
   constructor(message: string, cause?: Error) {
     super(message, { cause });
@@ -61,6 +68,10 @@ export class JsmodbusReader implements ModbusReader {
     private readonly unitIds: readonly number[],
     private readonly logger: Logger,
     private readonly socketFactory: SocketFactory = () => new Socket(),
+    private readonly timeouts: ModbusTimeouts = {
+      connectMs: CONNECT_TIMEOUT_MS,
+      readMs: READ_TIMEOUT_MS,
+    },
   ) {}
 
   connect(): Promise<void> {
@@ -103,7 +114,7 @@ export class JsmodbusReader implements ModbusReader {
             `Timed out connecting to Sigenergy at ${this.host}:${this.port}`,
           ),
         );
-      }, CONNECT_TIMEOUT_MS);
+      }, this.timeouts.connectMs);
       const cleanup = () => {
         clearTimeout(timer);
         socket.removeListener("connect", onConnect);
@@ -161,7 +172,7 @@ export class JsmodbusReader implements ModbusReader {
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         reject(new SigenergyConnectionError(`Timed out on Modbus ${what}`));
-      }, READ_TIMEOUT_MS);
+      }, this.timeouts.readMs);
       promise.then(
         (value) => {
           clearTimeout(timer);

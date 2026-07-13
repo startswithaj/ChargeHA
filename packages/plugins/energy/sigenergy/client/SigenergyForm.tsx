@@ -1,9 +1,13 @@
 import { useMemo, useState } from "react";
-import { Button, Text, TextField } from "@radix-ui/themes";
-import { Loader2 } from "lucide-react";
+import { Button, Code, Text, TextField } from "@radix-ui/themes";
+import { Loader2, Search } from "lucide-react";
 import { trpc } from "./trpc.ts";
+import { Spinner } from "../../../../client/src/components/ui/Spinner.tsx";
 import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
-import type { TestStatus } from "../../InverterSetupShared.tsx";
+import type {
+  SigenergyDevice,
+  TestStatus,
+} from "../../InverterSetupShared.tsx";
 import { TestResultBadge } from "../../InverterSetupShared.tsx";
 
 export interface SigenergyFormValues {
@@ -83,6 +87,87 @@ function AdvancedFields(
   );
 }
 
+function SearchSection(
+  { subnet, setSubnet, searchMutation, searchResults, onSelectDevice }: {
+    subnet: string;
+    setSubnet: (v: string) => void;
+    searchMutation: ReturnType<
+      typeof trpc.energy.sigenergy.discover.useMutation
+    >;
+    searchResults: SigenergyDevice[];
+    onSelectDevice: (host: string) => void;
+  },
+) {
+  return (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <Button
+          size="1"
+          variant="soft"
+          disabled={searchMutation.isPending}
+          onClick={() => searchMutation.mutate({ subnet: subnet || undefined })}
+        >
+          {searchMutation.isPending ? <Spinner /> : <Search size={14} />}
+          {searchMutation.isPending ? "Scanning..." : "Search Network"}
+        </Button>
+        <Text size="1" color="gray">or enter subnet:</Text>
+        <TextField.Root
+          size="1"
+          placeholder="e.g. 192.168.0"
+          value={subnet}
+          onChange={(e: { target: { value: string } }) =>
+            setSubnet(e.target.value)}
+          style={{ width: 100 }}
+          aria-label="Subnet"
+        />
+      </div>
+      {searchMutation.isPending && (
+        <Text size="1" color="gray">
+          Scanning {subnet ? `subnet ${subnet}.*` : "your local network"}{" "}
+          for Sigenergy devices...
+        </Text>
+      )}
+      {!searchMutation.isPending && searchResults.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {searchResults.map((d) => (
+            <div
+              key={d.host}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "6px 10px",
+                borderRadius: 6,
+                background: "var(--gray-a2)",
+              }}
+            >
+              <div>
+                <Text size="2" weight="medium">{d.name}</Text>
+                <Text size="1" color="gray" style={{ display: "block" }}>
+                  {d.host}
+                </Text>
+              </div>
+              <Button
+                size="1"
+                variant="soft"
+                onClick={() => onSelectDevice(d.host)}
+              >
+                Use
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+      {searchMutation.isSuccess && searchResults.length === 0 && (
+        <Text size="2" color="orange">
+          No Sigenergy devices found. Try entering your subnet above (check your
+          router settings or run <Code size="1">ifconfig</Code>).
+        </Text>
+      )}
+    </>
+  );
+}
+
 function useTestStatus(
   testMutation: ReturnType<
     typeof trpc.energy.sigenergy.testConnection.useMutation
@@ -112,6 +197,55 @@ function useTestStatus(
   ]);
 }
 
+type TestVariables = {
+  host: string;
+  port?: number;
+  plantUnitId?: number;
+  deviceUnitId?: number;
+};
+
+/** Build the test-connection mutation input from the form's string fields. */
+function testArgs(values: SigenergyFormValues) {
+  return {
+    host: values.host,
+    port: parseInt(values.port || "502", 10),
+    plantUnitId: parseInt(values.plantUnitId || "247", 10),
+    deviceUnitId: parseInt(values.deviceUnitId || "1", 10),
+  };
+}
+
+/** On a successful test, echo the validated values (as strings) upward. */
+const onTestSuccessHandler =
+  (onTestSuccess: (values: SigenergyFormValues) => void) =>
+  (data: { success: boolean }, variables: TestVariables) => {
+    if (!data.success) return;
+    onTestSuccess({
+      host: variables.host,
+      port: String(variables.port ?? 502),
+      plantUnitId: String(variables.plantUnitId ?? 247),
+      deviceUnitId: String(variables.deviceUnitId ?? 1),
+    });
+  };
+
+function TestConnectionRow(
+  { disabled, isPending, testResult, onTest }: {
+    disabled: boolean;
+    isPending: boolean;
+    testResult: TestStatus;
+    onTest: () => void;
+  },
+) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <Button size="2" variant="soft" disabled={disabled} onClick={onTest}>
+        {isPending && <Loader2 size={14} className={styles.spinner} />}
+        {isPending ? "Testing..." : "Test Connection"}
+      </Button>
+      <TestResultBadge testResult={testResult} />
+    </div>
+  );
+}
+
 export function SigenergyForm(
   { initial, onTestSuccess }: SigenergyFormProps,
 ): JSX.Element {
@@ -122,16 +256,34 @@ export function SigenergyForm(
     initial.deviceUnitId || "1",
   );
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [subnet, setSubnet] = useState(() => {
+    // Auto-detect subnet from browser hostname if it's an IP address.
+    const hostname = globalThis.location?.hostname ?? "";
+    const match = hostname.match(/^(\d+\.\d+\.\d+)\.\d+$/);
+    return match ? match[1] : "";
+  });
+  const [searchResults, setSearchResults] = useState<SigenergyDevice[]>([]);
+
+  const searchMutation = trpc.energy.sigenergy.discover.useMutation({
+    onSuccess: (result: { found: SigenergyDevice[] }) =>
+      setSearchResults(result.found),
+    onError: () => setSearchResults([]),
+  });
 
   const testMutation = trpc.energy.sigenergy.testConnection.useMutation({
-    onSuccess: (data: { success: boolean }) => {
-      if (data.success) {
-        onTestSuccess({ host, port, plantUnitId, deviceUnitId });
-      }
-    },
+    onSuccess: onTestSuccessHandler(onTestSuccess),
   });
 
   const testResult = useTestStatus(testMutation);
+
+  const handleSelectDevice = (selectedHost: string) => {
+    setHost(selectedHost);
+    setSearchResults([]);
+    searchMutation.reset();
+    testMutation.mutate(
+      testArgs({ host: selectedHost, port, plantUnitId, deviceUnitId }),
+    );
+  };
 
   return (
     <>
@@ -157,6 +309,14 @@ export function SigenergyForm(
         />
       </div>
 
+      <SearchSection
+        subnet={subnet}
+        setSubnet={setSubnet}
+        searchMutation={searchMutation}
+        searchResults={searchResults}
+        onSelectDevice={handleSelectDevice}
+      />
+
       <Button
         size="1"
         variant="ghost"
@@ -176,26 +336,15 @@ export function SigenergyForm(
         />
       )}
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <Button
-          size="2"
-          variant="soft"
-          disabled={!host || testMutation.isPending}
-          onClick={() =>
-            testMutation.mutate({
-              host,
-              port: parseInt(port || "502", 10),
-              plantUnitId: parseInt(plantUnitId || "247", 10),
-              deviceUnitId: parseInt(deviceUnitId || "1", 10),
-            })}
-        >
-          {testMutation.isPending && (
-            <Loader2 size={14} className={styles.spinner} />
+      <TestConnectionRow
+        disabled={!host || testMutation.isPending}
+        isPending={testMutation.isPending}
+        testResult={testResult}
+        onTest={() =>
+          testMutation.mutate(
+            testArgs({ host, port, plantUnitId, deviceUnitId }),
           )}
-          {testMutation.isPending ? "Testing..." : "Test Connection"}
-        </Button>
-        <TestResultBadge testResult={testResult} />
-      </div>
+      />
     </>
   );
 }
