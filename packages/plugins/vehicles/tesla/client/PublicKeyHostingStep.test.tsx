@@ -7,6 +7,7 @@ import { trpc } from "./trpc.ts";
 import { makeStepProps } from "./test-helpers/stepProps.ts";
 
 const mocks = vi.hoisted(() => ({
+  teslaSetConfigMutate: vi.fn(),
   teslaSetConfigMutateAsync: vi.fn(),
 }));
 
@@ -22,7 +23,7 @@ vi.mock("./trpc.ts", () => ({
       },
       setConfig: {
         useMutation: vi.fn(() => ({
-          mutate: vi.fn(),
+          mutate: mocks.teslaSetConfigMutate,
           mutateAsync: mocks.teslaSetConfigMutateAsync,
           isPending: false,
           isSuccess: false,
@@ -228,6 +229,50 @@ describe("PublicKeyHostingStep", () => {
     expect(
       screen.queryByLabelText("No, not internet accessible"),
     ).not.toBeInTheDocument();
+  });
+
+  it("persists the live tunnel URL to public_key_domain when it differs from the saved one", async () => {
+    // DB holds a stale URL from a previous tunnel session; the live tunnel is new.
+    vi.mocked(trpc.tesla.getConfig.useQuery).mockReturnValue({
+      data: {
+        teslaPublicKeyDomain: "https://old-tunnel.trycloudflare.com",
+        ecPublicKeyPem: TEST_PUBLIC_KEY,
+      },
+      isLoading: false,
+      error: null,
+    } as never);
+    setTunnel(true, "https://new-tunnel.trycloudflare.com");
+
+    renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
+
+    await waitFor(() => {
+      expect(mocks.teslaSetConfigMutate).toHaveBeenCalledWith({
+        teslaPublicKeyDomain: "https://new-tunnel.trycloudflare.com",
+      });
+    });
+  });
+
+  it("does not re-save when the saved domain already matches the live tunnel URL", async () => {
+    vi.mocked(trpc.tesla.getConfig.useQuery).mockReturnValue({
+      data: {
+        teslaPublicKeyDomain: "https://same-tunnel.trycloudflare.com",
+        ecPublicKeyPem: TEST_PUBLIC_KEY,
+      },
+      isLoading: false,
+      error: null,
+    } as never);
+    setTunnel(true, "https://same-tunnel.trycloudflare.com");
+
+    renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          /Your public key is being served via the Cloudflare Tunnel/,
+        ),
+      ).toBeInTheDocument();
+    });
+    expect(mocks.teslaSetConfigMutate).not.toHaveBeenCalled();
   });
 
   it("shows 'Use Cloudflare Tunnel' as a hosting option in No flow", async () => {

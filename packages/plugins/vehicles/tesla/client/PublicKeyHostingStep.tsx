@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Callout, Text } from "@radix-ui/themes";
 import { CheckCircle, Globe, Loader2 } from "lucide-react";
 import { useTeslaConfig, useTeslaConfigMutation } from "./useTeslaConfig.ts";
@@ -35,8 +35,8 @@ function TunnelActiveView(
         </Callout.Icon>
         <Callout.Text>
           Your public key is being served via the Cloudflare Tunnel at{" "}
-          <strong>{tunnelUrl}/{WELL_KNOWN_PATH}</strong>. The domain has already
-          been saved — no additional hosting setup needed.
+          <strong>{tunnelUrl}/{WELL_KNOWN_PATH}</strong>. This domain is saved
+          automatically — no additional hosting setup needed.
         </Callout.Text>
       </Callout.Root>
       <div className={styles.stepActions}>
@@ -212,6 +212,21 @@ export function PublicKeyHostingStep({ onNext }: StepProps): JSX.Element {
   const publicKeyUrl = `${browserOrigin}/${WELL_KNOWN_PATH}`;
 
   const saveDomainMutation = useTeslaConfigMutation();
+
+  // Keep the persisted public-key domain in sync with the live tunnel URL.
+  // The Cloudflare tunnel URL is ephemeral — a new one is minted every time the
+  // tunnel starts (e.g. restarting the wizard) — while partner registration
+  // reads tesla.public_key_domain from the DB. Without this, the DB keeps a
+  // stale tunnel URL and Tesla rejects it with "domain not registered".
+  const savedDomain = teslaConfig?.teslaPublicKeyDomain;
+  const lastSavedTunnelUrl = useRef<string | null>(null);
+  useEffect(() => {
+    if (!tunnelActive || !tunnelUrl) return;
+    if (tunnelUrl === savedDomain) return; // already persisted
+    if (tunnelUrl === lastSavedTunnelUrl.current) return; // saved, awaiting refetch
+    lastSavedTunnelUrl.current = tunnelUrl;
+    saveDomainMutation.mutate({ teslaPublicKeyDomain: tunnelUrl });
+  }, [tunnelActive, tunnelUrl, savedDomain, saveDomainMutation.mutate]);
 
   if (tunnelActive && tunnelUrl) {
     return <TunnelActiveView tunnelUrl={tunnelUrl} onNext={onNext} />;
