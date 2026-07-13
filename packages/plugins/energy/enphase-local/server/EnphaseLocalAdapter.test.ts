@@ -1,6 +1,7 @@
 import { beforeEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { Logger } from "@chargeha/server/lib/Logger";
+import { PluginDbLogger } from "../../../PluginDbLogger.ts";
 import { EnphaseClient } from "./EnphaseClient.ts";
 import { EnphaseLocalAdapter } from "./EnphaseLocalAdapter.ts";
 import { FakeEnvoyHttp } from "./test-helpers/enphaseHttpHarness.ts";
@@ -8,6 +9,8 @@ import { FakeEnvoyHttp } from "./test-helpers/enphaseHttpHarness.ts";
 describe("EnphaseLocalAdapter", () => {
   const logger = new Logger("EnphaseTest", "error");
   let http: FakeEnvoyHttp;
+  let dbEntries: { level: string; message: string }[];
+  let clock: number;
 
   const makeAdapter = () => {
     const client = new EnphaseClient(
@@ -17,7 +20,11 @@ describe("EnphaseLocalAdapter", () => {
       logger,
       http,
     );
-    return new EnphaseLocalAdapter(client, logger);
+    const dbLog = new PluginDbLogger((entry) => {
+      dbEntries.push({ level: entry.level, message: entry.message });
+      return Promise.resolve();
+    }, logger);
+    return new EnphaseLocalAdapter(client, logger, dbLog, () => clock);
   };
 
   /** CT-metered system: 5 kW solar, 2 kW import. */
@@ -34,6 +41,8 @@ describe("EnphaseLocalAdapter", () => {
 
   beforeEach(() => {
     http = seedMetered(new FakeEnvoyHttp());
+    dbEntries = [];
+    clock = 0;
   });
 
   describe("getRealtimeData with CT meters", () => {
@@ -116,6 +125,43 @@ describe("EnphaseLocalAdapter", () => {
     it("propagates auth/reachability failures", async () => {
       http.setRaw("/ivp/meters", "denied", 401);
       await expect(makeAdapter().connect()).rejects.toThrow();
+    });
+
+    it("writes a connected entry to the plugin log", async () => {
+      await makeAdapter().connect();
+      expect(dbEntries).toEqual([
+        { level: "info", message: "Connected to Envoy at 10.0.0.7" },
+      ]);
+    });
+  });
+
+  describe("plugin log on poll failure", () => {
+    it("records the error once, then again after the re-log window", async () => {
+      http.setRaw("/ivp/meters/readings", "boom", 500);
+      const adapter = makeAdapter();
+
+      clock = 0;
+      await expect(adapter.getRealtimeData()).rejects.toThrow("HTTP 500");
+      clock = 60_000; // inside the 5-min window — suppressed
+      await expect(adapter.getRealtimeData()).rejects.toThrow("HTTP 500");
+      clock = 6 * 60_000; // window elapsed — logged again
+      await expect(adapter.getRealtimeData()).rejects.toThrow("HTTP 500");
+
+      const errors = dbEntries.filter((e) => e.level === "error");
+      expect(errors).toHaveLength(2);
+      expect(errors[0].message).toContain("HTTP 500");
+    });
+
+    it("resets the dedupe after a successful poll", async () => {
+      const adapter = makeAdapter();
+      http.setRaw("/ivp/meters/readings", "boom", 500);
+      await expect(adapter.getRealtimeData()).rejects.toThrow();
+      seedMetered(http);
+      await adapter.getRealtimeData();
+      http.setRaw("/ivp/meters/readings", "boom", 500);
+      await expect(adapter.getRealtimeData()).rejects.toThrow();
+
+      expect(dbEntries.filter((e) => e.level === "error")).toHaveLength(2);
     });
   });
 

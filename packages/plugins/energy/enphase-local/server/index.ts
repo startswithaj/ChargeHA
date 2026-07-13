@@ -46,7 +46,7 @@ export class EnphaseLocalPlugin implements EnergyPlugin {
       (fresh) => this.deps.setSecret("token", fresh),
       this.deps.log,
     );
-    return new EnphaseLocalAdapter(client, this.deps.log);
+    return new EnphaseLocalAdapter(client, this.deps.log, this.deps.dbLog);
   }
 
   shutdown(): Promise<void> {

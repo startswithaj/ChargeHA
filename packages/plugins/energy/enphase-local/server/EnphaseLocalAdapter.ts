@@ -4,6 +4,7 @@ import type {
   EnergySourceAdapter,
 } from "@chargeha/shared";
 import type { Logger } from "@chargeha/server/lib/Logger";
+import type { PluginDbLogger } from "@chargeha/plugins/PluginDbLogger";
 import { EnphaseConnectionError } from "./EnphaseClient.ts";
 import type { EnphaseClient } from "./EnphaseClient.ts";
 import { INFO_PATH, tagValue } from "./envoyInfo.ts";
@@ -21,6 +22,9 @@ const METER_READINGS_PATH = "/ivp/meters/readings";
 const PRODUCTION_FALLBACK_PATH = "/api/v1/production";
 const ENSEMBLE_POWER_PATH = "/ivp/ensemble/power";
 const ENSEMBLE_SECCTRL_PATH = "/ivp/ensemble/secctrl";
+// An identical poll error repeats every poll; persist one plugin-log entry
+// per this window instead of one per poll (poll interval is configurable).
+const POLL_ERROR_RELOG_MS = 5 * 60 * 1000;
 
 type MeterConfig = { eid: number; state: string; measurementType: string };
 type MeterReading = { eid: number; activePower: number };
@@ -56,10 +60,15 @@ export class EnphaseLocalAdapter implements EnergySourceAdapter {
   private meterMap: MeterMap = null;
   private metersProbed = false;
   private ensembleAbsent = false;
+  private lastPollError = "";
+  private lastPollErrorLoggedAt = 0;
+  private pollErrorRepeats = 0;
 
   constructor(
     private readonly client: EnphaseClient,
     private readonly logger: Logger,
+    private readonly dbLog: PluginDbLogger,
+    private readonly now: () => number = Date.now,
   ) {}
 
   pollIntervalSeconds(): number {
@@ -69,12 +78,19 @@ export class EnphaseLocalAdapter implements EnergySourceAdapter {
   async connect(): Promise<void> {
     // Probing the meter config both verifies auth/reachability and caches the
     // eid map used by every subsequent poll.
-    const map = await this.resolveMeterMap();
-    this.logger.info(
-      `Connected to Envoy at ${this.client.host} — ${
-        map ? "using CT meter readings" : "solar-only fallback"
-      }`,
-    );
+    try {
+      const map = await this.resolveMeterMap();
+      const mode = map ? "CT meter readings" : "solar-only fallback";
+      this.logger.info(
+        `Connected to Envoy at ${this.client.host} — using ${mode}`,
+      );
+      await this.dbLog.info(`Connected to Envoy at ${this.client.host}`, {
+        payload: { mode },
+      });
+    } catch (err) {
+      await this.recordPollError(err);
+      throw err;
+    }
   }
 
   disconnect(): Promise<void> {
@@ -82,12 +98,23 @@ export class EnphaseLocalAdapter implements EnergySourceAdapter {
   }
 
   async getRealtimeData(): Promise<EnergyData> {
+    try {
+      return await this.readRealtimeData();
+    } catch (err) {
+      await this.recordPollError(err);
+      throw err;
+    }
+  }
+
+  private async readRealtimeData(): Promise<EnergyData> {
     const [{ solarProductionW, gridPowerW }, batteryPowerW, batterySoc] =
       await Promise.all([
         this.readPower(),
         this.readBatteryPowerW(),
         this.readBatterySoc(),
       ]);
+    this.lastPollError = "";
+    this.pollErrorRepeats = 0;
 
     const homeConsumptionW = Math.max(
       0,
@@ -127,6 +154,9 @@ export class EnphaseLocalAdapter implements EnergySourceAdapter {
     if (!this.meterMap) {
       this.logger.info(
         "Envoy has no production + net-consumption CT meters — falling back to solar-only readings",
+      );
+      await this.dbLog.info(
+        "No enabled production + net-consumption CT meters — using solar-only readings (grid reported as 0)",
       );
     }
     return this.meterMap;
@@ -181,6 +211,23 @@ export class EnphaseLocalAdapter implements EnergySourceAdapter {
     return secctrl?.agg_soc ?? null;
   }
 
+  /** Persist a poll failure to the plugin log. An unchanged error message is
+   *  re-logged at most once per POLL_ERROR_RELOG_MS, not every poll. */
+  private async recordPollError(err: unknown): Promise<void> {
+    const message = err instanceof Error ? err.message : String(err);
+    const repeated = message === this.lastPollError;
+    this.pollErrorRepeats = repeated ? this.pollErrorRepeats + 1 : 0;
+    this.lastPollError = message;
+    const nowMs = this.now();
+    if (repeated && nowMs - this.lastPollErrorLoggedAt < POLL_ERROR_RELOG_MS) {
+      return;
+    }
+    this.lastPollErrorLoggedAt = nowMs;
+    await this.dbLog.error(`Envoy poll failed: ${message}`, {
+      payload: repeated ? { consecutiveFailures: this.pollErrorRepeats } : {},
+    });
+  }
+
   /** Optional read — ensemble endpoints 404 on battery-less systems; a
    *  failure here never fails the whole poll. A 404 marks the ensemble as
    *  absent so battery-less systems aren't re-probed (and re-logged) every
@@ -194,6 +241,9 @@ export class EnphaseLocalAdapter implements EnergySourceAdapter {
         this.ensembleAbsent = true;
         this.logger.info(
           "Envoy has no battery (ensemble endpoints absent) — skipping battery readings",
+        );
+        await this.dbLog.info(
+          "No battery detected (ensemble endpoints absent) — battery fields will be empty",
         );
         return null;
       }

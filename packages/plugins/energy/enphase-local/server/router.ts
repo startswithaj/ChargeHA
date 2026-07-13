@@ -7,6 +7,7 @@ import { EnphaseLocalAdapter } from "./EnphaseLocalAdapter.ts";
 import { discoverEnphase } from "./EnphaseDiscovery.ts";
 import { ENPHASE_LOCAL_SECRET_KEYS, enphaseLocalConfigDef } from "./config.ts";
 import { createPluginConfigProcedures } from "../../../createPluginConfigProcedures.ts";
+import { PluginDbLogger } from "../../../PluginDbLogger.ts";
 
 // ── Typed Zod schemas for the Enphase plugin procedures ─────────────────────
 
@@ -74,7 +75,10 @@ export const enphaseLocalRouter = router({
           },
           logger,
         );
-        const adapter = new EnphaseLocalAdapter(client, logger);
+        // Connection tests are interactive — results go back to the caller,
+        // so nothing is persisted to the plugin log.
+        const noopDbLog = new PluginDbLogger(() => Promise.resolve(), logger);
+        const adapter = new EnphaseLocalAdapter(client, logger, noopDbLog);
         try {
           await adapter.connect();
           const [device, realtime] = await Promise.all([
