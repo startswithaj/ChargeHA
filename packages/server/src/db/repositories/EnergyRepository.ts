@@ -58,6 +58,7 @@ export class EnergyRepository {
       batteryPowerW: number | null;
       batterySoc: number | null;
       ratePerKwh: number | null;
+      pollFailed: number;
     }>;
     total: number;
   }> {

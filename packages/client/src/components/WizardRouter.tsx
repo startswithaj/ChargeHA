@@ -1,5 +1,7 @@
 import type React from "react";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
+import { trpc } from "../trpc.ts";
+import { useRouter } from "../hooks/useRouter.ts";
 import { WizardShell, type WizardStepConfig } from "./Wizard/WizardShell.tsx";
 import { WelcomeStep } from "./Wizard/steps/WelcomeStep.tsx";
 import { TimezoneStep } from "./Wizard/steps/TimezoneStep.tsx";
@@ -125,5 +127,20 @@ export function WizardRouter({ onComplete }: { onComplete: () => void }) {
     [wizardState.vehicleType, wizardState.energyType],
   );
 
-  return <WizardShell steps={wizardSteps} onComplete={onComplete} />;
+  // A re-opened wizard (already completed once) can be exited early; on first
+  // run there is no configured app to fall back to, so no exit is offered.
+  const { navigate } = useRouter();
+  const { data: wizardStatus } = trpc.wizard.status.useQuery();
+  const handleExit = useCallback(
+    () => navigate({ type: "app", page: "settings" }),
+    [navigate],
+  );
+
+  return (
+    <WizardShell
+      steps={wizardSteps}
+      onComplete={onComplete}
+      onExit={wizardStatus?.completed ? handleExit : undefined}
+    />
+  );
 }

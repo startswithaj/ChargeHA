@@ -1,3 +1,11 @@
+# On-demand PR image via a maintainer commenting /build on a PR.
+#
+# Exists for FORK PRs: ci.yml/build.yml can't push their images (fork PR
+# tokens are read-only), so a maintainer triggers this instead. It runs with
+# this repo's token, builds the PR's HEAD commit, and pushes pr-<n>.
+# Same-repo PRs don't normally need it — build.yml already pushes pr-<n>
+# automatically (from the merge commit; /build here would overwrite that tag
+# with a head-commit image).
 name: build-pr
 
 on:

@@ -106,13 +106,8 @@ export function useVehicleSettings() {
     select: (data) => data.vehicles as VehicleWithState[],
   });
 
-  const encryptionHealthQuery = trpc.health.encryption.useQuery();
-
   // --- Derived values from queries ---
   const vehicles = vehiclesQuery.data ?? [];
-  const encryptionMissing = encryptionHealthQuery.data
-    ? !encryptionHealthQuery.data.configured
-    : false;
 
   // --- Local UI state ---
   const [recentlyAddedVins, setRecentlyAddedVins] = useState<Set<string>>(
@@ -168,7 +163,6 @@ export function useVehicleSettings() {
     loadFailed: vehiclesQuery.isError,
     error: displayError,
     recentlyAddedVins,
-    encryptionMissing,
     handleDelete,
     handleMovePriority,
     handleAddSimulatedVehicle,

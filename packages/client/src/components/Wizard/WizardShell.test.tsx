@@ -342,4 +342,21 @@ describe("WizardShell", () => {
 
     expect(screen.getByRole("button", { name: "Finish" })).toBeInTheDocument();
   });
+
+  it("shows an Exit setup button when onExit is provided and calls it on click", () => {
+    const onExit = vi.fn();
+    renderWithProviders(
+      <WizardShell steps={makeCoreOnlySteps()} onExit={onExit} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Exit setup" }));
+    expect(onExit).toHaveBeenCalled();
+  });
+
+  it("hides the Exit setup button when onExit is not provided", () => {
+    renderWithProviders(<WizardShell steps={makeCoreOnlySteps()} />);
+
+    expect(screen.queryByRole("button", { name: "Exit setup" }))
+      .not.toBeInTheDocument();
+  });
 });

@@ -59,6 +59,7 @@ ChargeHA is not affiliated with, endorsed by, or associated with ChargeHQ.
 | Energy        | **Fronius (local)**   | Direct HTTP polling of inverters on your LAN, with auto-discovery                                               |
 | Energy        | **Fronius (cloud)**   | Remote monitoring via the Fronius Solar API                                                                     |
 | Energy        | **Sigenergy (local)** | Direct Modbus TCP integration on your LAN, with auto-discovery; requires Modbus to be enabled by your installer |
+| Energy        | **Enphase (local)**   | Direct HTTPS polling of the Envoy / IQ Gateway on your LAN (firmware 7+), with auto-discovery and token renewal |
 | Notifications | **Telegram**          | Alerts for charging events, errors, and energy outages                                                          |
 | Auth          | **OIDC**              | Single sign-on via any OpenID Connect provider                                                                  |
 
@@ -193,17 +194,29 @@ min) prevents rapid on/off cycling.
 
 ## Quick Start
 
-Run the prebuilt image from GitHub Container Registry — no build required:
+Run the prebuilt image from GitHub Container Registry — no build required.
+
+Generate an encryption key once and keep it — it encrypts the secrets stored in
+the database, and the same key must be passed to every future container
+(upgrades included) or those secrets can no longer be decrypted:
+
+```bash
+openssl rand -base64 32 > chargeha.key
+```
 
 ```bash
 docker run -d --name chargeha \
   -p 8000:8000 \
   -v chargeha-data:/app/data \
-  -e ENCRYPTION_KEY=$(openssl rand -base64 32) \
+  -e ENCRYPTION_KEY=$(cat chargeha.key) \
   ghcr.io/startswithaj/chargeha:latest
 ```
 
 Open `http://localhost:8000` and follow the setup wizard.
+
+`-v chargeha-data:/app/data` stores the SQLite database (all settings, secrets,
+and energy history) in a named Docker volume so it survives container removal
+and image upgrades. Without it, the database is deleted with the container.
 
 Images are published to `ghcr.io/startswithaj/chargeha`:
 
@@ -227,11 +240,11 @@ Fully responsive and installable to your home screen (web manifest, standalone):
 # Build
 docker buildx build -f docker/Dockerfile --platform linux/amd64 -t chargeha .
 
-# Run
+# Run (generate chargeha.key once: openssl rand -base64 32 > chargeha.key)
 docker run -d --name chargeha \
   -p 8000:8000 \
   -v chargeha-data:/app/data \
-  -e ENCRYPTION_KEY=$(openssl rand -base64 32) \
+  -e ENCRYPTION_KEY=$(cat chargeha.key) \
   chargeha
 ```
 

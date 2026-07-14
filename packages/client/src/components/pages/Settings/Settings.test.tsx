@@ -64,6 +64,7 @@ const {
   mockConfigGetAllUseQuery,
   mockInvalidateConfig,
   mockWizardStatusUseQuery,
+  mockEncryptionHealthUseQuery,
 } = vi.hoisted(() => ({
   mockLocationFetch: vi.fn().mockResolvedValue({
     latitude: -33.86882,
@@ -85,6 +86,11 @@ const {
     isLoading: false,
     error: null,
   })),
+  mockEncryptionHealthUseQuery: vi.fn(
+    (): { data: { configured: boolean } | undefined } => ({
+      data: { configured: true },
+    }),
+  ),
 }));
 
 vi.mock("../../../trpc.ts", () => ({
@@ -123,6 +129,11 @@ vi.mock("../../../trpc.ts", () => ({
     wizard: {
       status: {
         useQuery: () => mockWizardStatusUseQuery(),
+      },
+    },
+    health: {
+      encryption: {
+        useQuery: () => mockEncryptionHealthUseQuery(),
       },
     },
     useUtils: vi.fn(() => ({
@@ -268,6 +279,35 @@ describe("Settings", () => {
           expect.objectContaining({ chargingEnabled: false }),
         );
       });
+    });
+  });
+
+  describe("Encryption warning", () => {
+    it("renders the warning at the top when the key is not configured", async () => {
+      mockEncryptionHealthUseQuery.mockReturnValue({
+        data: { configured: false },
+      });
+
+      renderWithProviders(<Settings />);
+      await waitFor(() => {
+        expect(
+          screen.getByText("Encryption Key Not Configured"),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("hides the warning when the key is configured", async () => {
+      mockEncryptionHealthUseQuery.mockReturnValue({
+        data: { configured: true },
+      });
+
+      renderWithProviders(<Settings />);
+      await waitFor(() => {
+        expect(screen.getByText("Settings")).toBeInTheDocument();
+      });
+      expect(
+        screen.queryByText("Encryption Key Not Configured"),
+      ).not.toBeInTheDocument();
     });
   });
 

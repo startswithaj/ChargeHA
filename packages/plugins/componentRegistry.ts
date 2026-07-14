@@ -22,6 +22,7 @@ import { VirtualKeyPairingStep } from "./vehicles/tesla/client/VirtualKeyPairing
 import { FroniusLocalSetupStep } from "./energy/fronius-local/client/FroniusLocalSetupStep.tsx";
 import { FroniusCloudSetupStep } from "./energy/fronius-cloud/client/FroniusCloudSetupStep.tsx";
 import { SigenergyLocalSetupStep } from "./energy/sigenergy-local/client/SigenergyLocalSetupStep.tsx";
+import { EnphaseLocalSetupStep } from "./energy/enphase-local/client/EnphaseLocalSetupStep.tsx";
 
 // Simulated energy settings component
 import { SimulatedEnergyConfig } from "./energy/simulated/client/SimulatedEnergyConfig.tsx";
@@ -39,6 +40,9 @@ import { FroniusLocalConfig } from "./energy/fronius-local/client/FroniusLocalCo
 // Sigenergy settings component
 import { SigenergyLocalConfig } from "./energy/sigenergy-local/client/SigenergyLocalConfig.tsx";
 
+// Enphase settings component
+import { EnphaseLocalConfig } from "./energy/enphase-local/client/EnphaseLocalConfig.tsx";
+
 // Plugin wizard step definitions — imported from each plugin's client folder
 import {
   froniusCloudOption,
@@ -52,6 +56,10 @@ import {
   sigenergyLocalOption,
   sigenergyLocalWizardSteps,
 } from "./energy/sigenergy-local/client/wizardSteps.ts";
+import {
+  enphaseLocalOption,
+  enphaseLocalWizardSteps,
+} from "./energy/enphase-local/client/wizardSteps.ts";
 import {
   simulatedEnergyOption,
   simulatedEnergyWizardSteps,
@@ -85,6 +93,7 @@ export const energyPluginOptions: EnergyPluginOption[] = [
   froniusLocalOption,
   froniusCloudOption,
   sigenergyLocalOption,
+  enphaseLocalOption,
   simulatedEnergyOption,
 ];
 
@@ -143,6 +152,7 @@ export const energyPluginSteps: Record<string, PluginWizardStep[]> = {
   fronius_local: froniusLocalWizardSteps,
   fronius_cloud: froniusCloudWizardSteps,
   sigenergy_local: sigenergyLocalWizardSteps,
+  enphase_local: enphaseLocalWizardSteps,
   simulated_energy: simulatedEnergyWizardSteps,
 };
 
@@ -161,6 +171,7 @@ export const pluginComponents: Record<string, ComponentType<StepProps>> = {
   "fronius-local-setup": FroniusLocalSetupStep,
   "fronius-cloud-setup": FroniusCloudSetupStep,
   "sigenergy-local-setup": SigenergyLocalSetupStep,
+  "enphase-local-setup": EnphaseLocalSetupStep,
 };
 
 /**
@@ -173,5 +184,6 @@ export const pluginSettingsComponents: Record<string, ComponentType> = {
   "fronius-local-config": FroniusLocalConfig,
   "fronius-cloud-config": FroniusCloudConfig,
   "sigenergy-local-config": SigenergyLocalConfig,
+  "enphase-local-config": EnphaseLocalConfig,
   "simulated-energy-config": SimulatedEnergyConfig,
 };

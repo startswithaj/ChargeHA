@@ -31,7 +31,6 @@ const {
     vehiclesPending: false,
     vehiclesError: null as { message: string } | null,
     vehiclesIsError: false,
-    encryptionData: undefined as { configured: boolean } | undefined,
     pluginsData: undefined as unknown[] | undefined,
     homeConfigData: undefined as
       | { homeLatitude?: number; homeLongitude?: number }
@@ -94,13 +93,6 @@ vi.mock("../../../trpc.ts", () => ({
         })),
       },
     },
-    health: {
-      encryption: {
-        useQuery: vi.fn(() => ({
-          data: m.encryptionData,
-        })),
-      },
-    },
   },
 }));
 
@@ -144,7 +136,6 @@ describe("useVehicleSettings", () => {
     m.vehiclesPending = false;
     m.vehiclesError = null;
     m.vehiclesIsError = false;
-    m.encryptionData = undefined;
     m.pluginsData = undefined;
     m.homeConfigData = undefined;
     m.deleteError = null;
@@ -180,18 +171,6 @@ describe("useVehicleSettings", () => {
     const { result } = renderHook(() => useVehicleSettings());
     expect(result.current.vehicles).toHaveLength(1);
     expect(result.current.vehicles[0].id).toBe("VIN1");
-  });
-
-  it("returns encryptionMissing when not configured", () => {
-    m.encryptionData = { configured: false };
-    const { result } = renderHook(() => useVehicleSettings());
-    expect(result.current.encryptionMissing).toBe(true);
-  });
-
-  it("returns encryptionMissing false when configured", () => {
-    m.encryptionData = { configured: true };
-    const { result } = renderHook(() => useVehicleSettings());
-    expect(result.current.encryptionMissing).toBe(false);
   });
 
   it("handleDelete calls delete mutation", () => {
