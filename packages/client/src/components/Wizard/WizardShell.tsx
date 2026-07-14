@@ -1,9 +1,13 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Text } from "@radix-ui/themes";
 import { ArrowLeft, ArrowRight, SkipForward, X } from "lucide-react";
 import { useWizardState } from "../../hooks/useWizardState.ts";
 import { useRouter } from "../../hooks/useRouter.ts";
 import { StepIndicator } from "./StepIndicator.tsx";
+import {
+  type WizardNextControl,
+  WizardNextProvider,
+} from "./wizardNextControl.ts";
 import styles from "./WizardShell.module.css";
 import type { ReactNode } from "react";
 
@@ -73,13 +77,28 @@ function useWizardCallbacks(
 }
 
 function WizardNav(
-  { isFirstStep, isLastStep, hideNext, onBack, onSkip, onNext }: {
+  {
+    isFirstStep,
+    isLastStep,
+    hideNext,
+    onBack,
+    onSkip,
+    onNext,
+    nextDisabled,
+    nextBlocked,
+    busyLabel,
+    hint,
+  }: {
     isFirstStep: boolean;
     isLastStep: boolean;
     hideNext: boolean;
     onBack: () => void;
     onSkip: () => void;
     onNext: () => void;
+    nextDisabled: boolean;
+    nextBlocked: boolean;
+    busyLabel: string | null;
+    hint: string | null;
   },
 ) {
   return (
@@ -94,6 +113,15 @@ function WizardNav(
         Back
       </Button>
       <div className={styles.navigationRight}>
+        {hint && (
+          <Text
+            size="2"
+            color={nextBlocked ? "orange" : "gray"}
+            weight="medium"
+          >
+            {hint}
+          </Text>
+        )}
         {!isLastStep && (
           <Button variant="ghost" onClick={onSkip} aria-label="Skip">
             Skip
@@ -101,14 +129,48 @@ function WizardNav(
           </Button>
         )}
         {!hideNext && (
-          <Button onClick={onNext} aria-label={isLastStep ? "Finish" : "Next"}>
-            {isLastStep ? "Finish" : "Next"}
-            {!isLastStep && <ArrowRight size={16} />}
+          <Button
+            onClick={onNext}
+            disabled={nextDisabled}
+            aria-label={isLastStep ? "Finish" : "Next"}
+          >
+            {busyLabel ?? (isLastStep ? "Finish" : "Next")}
+            {!busyLabel && !isLastStep && <ArrowRight size={16} />}
           </Button>
         )}
       </div>
     </div>
   );
+}
+
+/** Holds the active step's Next-button control and runs its onBeforeNext
+ *  when Next is clicked, advancing only when the handler resolves true. */
+function useNextControlState(advance: () => void) {
+  const [control, setControl] = useState<WizardNextControl | null>(null);
+  const [pending, setPending] = useState(false);
+
+  const handleNextClick = useCallback(async () => {
+    if (!control?.onBeforeNext) {
+      advance();
+      return;
+    }
+    setPending(true);
+    try {
+      if (await control.onBeforeNext()) advance();
+    } finally {
+      setPending(false);
+    }
+  }, [control, advance]);
+
+  return {
+    setControl,
+    handleNextClick,
+    disabled: pending || (control ? !control.canProceed : false),
+    // Blocked (missing input) is highlighted; merely busy is not.
+    blocked: control ? !control.canProceed : false,
+    busyLabel: pending ? control?.pendingLabel ?? "Working..." : null,
+    hint: control?.hint ?? null,
+  };
 }
 
 function ExitRow({ onExit }: { onExit: () => void }) {
@@ -127,12 +189,14 @@ function ExitRow({ onExit }: { onExit: () => void }) {
   );
 }
 
-export function WizardShell({ steps, onComplete, onExit }: WizardShellProps) {
-  const wizardState = useWizardState();
+/** Resolve the current step index from the DB-persisted step ID, syncing the
+ *  DB and URL when the stored ID is invalid or belongs to a removed step. */
+function useResolvedStep(
+  steps: WizardStepConfig[] | undefined,
+  wizardState: ReturnType<typeof useWizardState>,
+) {
   const { replacePath } = useRouter();
-  const stepsTotal = steps?.length ?? 0;
 
-  // Resolve current step index from DB-persisted step ID.
   // If step ID is not found (plugin steps removed or invalid ID), fall back to 0.
   // Normal selection changes are handled by VehicleTypeStep/InverterTypeStep
   // which navigate directly to the correct step ID after changing selections.
@@ -165,8 +229,19 @@ export function WizardShell({ steps, onComplete, onExit }: WizardShellProps) {
     if (stepId) replacePath(`/wizard/${stepId}`);
   }, [steps, currentStep, replacePath]);
 
+  return currentStep;
+}
+
+export function WizardShell({ steps, onComplete, onExit }: WizardShellProps) {
+  const wizardState = useWizardState();
+  const stepsTotal = steps?.length ?? 0;
+
+  const currentStep = useResolvedStep(steps, wizardState);
+
   const { goToStep, handleNext, handleBack, handleSkip, handleSkipToEnd } =
     useWizardCallbacks({ steps, currentStep, wizardState, onComplete });
+
+  const nextControl = useNextControlState(handleNext);
 
   const stepProps: StepProps = {
     onNext: handleNext,
@@ -219,9 +294,11 @@ export function WizardShell({ steps, onComplete, onExit }: WizardShellProps) {
 
       {/* Step content */}
       <div className={styles.stepContent}>
-        {stepConfig
-          ? stepConfig.render(stepProps)
-          : <Text color="gray">{label} — not yet implemented</Text>}
+        <WizardNextProvider value={nextControl.setControl}>
+          {stepConfig
+            ? stepConfig.render(stepProps)
+            : <Text color="gray">{label} — not yet implemented</Text>}
+        </WizardNextProvider>
       </div>
 
       <WizardNav
@@ -230,7 +307,11 @@ export function WizardShell({ steps, onComplete, onExit }: WizardShellProps) {
         hideNext={!!stepConfig?.hideNext}
         onBack={handleBack}
         onSkip={handleSkip}
-        onNext={handleNext}
+        onNext={nextControl.handleNextClick}
+        nextDisabled={nextControl.disabled}
+        nextBlocked={nextControl.blocked}
+        busyLabel={nextControl.busyLabel}
+        hint={nextControl.hint}
       />
     </div>
   );

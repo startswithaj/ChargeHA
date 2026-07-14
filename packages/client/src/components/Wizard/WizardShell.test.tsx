@@ -4,6 +4,10 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../test-utils.tsx";
 import { WizardShell, type WizardStepConfig } from "./WizardShell.tsx";
 import {
+  useWizardNextControl,
+  type WizardNextControl,
+} from "./wizardNextControl.ts";
+import {
   useWizardState,
   type WizardState,
 } from "../../hooks/useWizardState.ts";
@@ -358,5 +362,80 @@ describe("WizardShell", () => {
 
     expect(screen.queryByRole("button", { name: "Exit setup" }))
       .not.toBeInTheDocument();
+  });
+
+  describe("step Next control", () => {
+    const makeControlledSteps = (
+      control: WizardNextControl,
+    ): WizardStepConfig[] => {
+      const ControlledStep = () => {
+        useWizardNextControl(control);
+        return <div>controlled step</div>;
+      };
+      const steps = makeCoreOnlySteps();
+      steps[0] = { ...steps[0], render: () => <ControlledStep /> };
+      return steps;
+    };
+
+    it("disables Next and shows the hint while canProceed is false", () => {
+      setMockStepId("welcome");
+      renderWithProviders(
+        <WizardShell
+          steps={makeControlledSteps({
+            canProceed: false,
+            hint: "Test the connection to continue",
+          })}
+        />,
+      );
+
+      expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+      expect(screen.getByText("Test the connection to continue"))
+        .toBeInTheDocument();
+    });
+
+    it("advances only after onBeforeNext resolves true, showing the pending label", async () => {
+      setMockStepId("welcome");
+      let resolveSave = (_ok: boolean) => {};
+      const onBeforeNext = () =>
+        new Promise<boolean>((resolve) => {
+          resolveSave = resolve;
+        });
+      renderWithProviders(
+        <WizardShell
+          steps={makeControlledSteps({
+            canProceed: true,
+            pendingLabel: "Saving...",
+            onBeforeNext,
+          })}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Next" }));
+      expect(await screen.findByText("Saving...")).toBeInTheDocument();
+      expect(mockSetStepId).not.toHaveBeenCalled();
+
+      resolveSave(true);
+      await waitFor(() =>
+        expect(mockSetStepId).toHaveBeenCalledWith("timezone")
+      );
+    });
+
+    it("stays on the step when onBeforeNext resolves false", async () => {
+      setMockStepId("welcome");
+      renderWithProviders(
+        <WizardShell
+          steps={makeControlledSteps({
+            canProceed: true,
+            onBeforeNext: () => Promise.resolve(false),
+          })}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Next" }));
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Next" })).toBeEnabled()
+      );
+      expect(mockSetStepId).not.toHaveBeenCalled();
+    });
   });
 });
