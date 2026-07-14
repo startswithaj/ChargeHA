@@ -211,6 +211,33 @@ describe("EnergyAdapterManager", () => {
   });
 
   describe("reconfigure", () => {
+    it("keeps the configured type relevant after createAdapter fails so a later config save retries", async () => {
+      let host = "";
+      const mockPlugin = makeMockPlugin("late-config", () => {
+        if (!host) return Promise.reject(new Error("host not configured"));
+        return Promise.resolve(
+          new MockEnergyAdapter(BASE_REALTIME, DEVICE_INFO),
+        );
+      });
+      const registry = new EnergyPluginRegistry();
+      registry.register(mockPlugin);
+      const mockDb = throwingMock<AppDatabase>("AppDatabase", {
+        getConfig: () => Promise.resolve("late-config"),
+      });
+      const mgr = new EnergyAdapterManager(mockDb, registry, testLogger);
+      // deno-lint-ignore no-explicit-any
+      await (mgr as any).initializationPromise;
+
+      // Source selected before host: build failed, but its keys must stay
+      // relevant or the wizard's later host save never triggers a rebuild.
+      expect(mgr.isRelevantConfigKey("late-config.host")).toBe(true);
+
+      host = "192.0.2.10"; // the wizard's setup step saves the host
+      await mgr.reconfigure();
+      const data = await mgr.getRealtimeData();
+      expect(data.solarProductionW).toBe(5000); // real adapter, not the null one
+    });
+
     it("catches connection failure on new adapter and continues", async () => {
       const connectError = new Error("connection refused");
       const failAdapter: EnergySourceAdapter = {
