@@ -173,6 +173,21 @@ export class TeslaVehiclePlugin implements VehiclePlugin {
     return createTeslaHttpRoutes(this.teslaTokenManager, this.deps);
   }
 
+  /** Tunnel URLs are minted fresh on every start — persist the live one as
+   *  the public key domain so partner registration never reads a stale
+   *  trycloudflare.com domain (issue #31). */
+  async onTunnelStarted(url: string): Promise<void> {
+    await this.deps.setConfig("public_key_domain", url);
+  }
+
+  /** A stopped tunnel's URL is dead — clear it so the hosting step doesn't
+   *  present a stale domain as configured. User-hosted domains are left alone. */
+  async onTunnelStopped(url: string): Promise<void> {
+    if ((await this.deps.getConfig("public_key_domain")) === url) {
+      await this.deps.setConfig("public_key_domain", "");
+    }
+  }
+
   getTunnelRoutes(): PluginTunnelRoute[] {
     const deps = this.deps;
     return [

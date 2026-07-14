@@ -48,6 +48,13 @@ vi.mock("./trpc.ts", () => ({
           error: null,
         })),
       },
+      stopTunnel: {
+        useMutation: vi.fn(() => ({
+          mutate: vi.fn(),
+          isPending: false,
+          error: null,
+        })),
+      },
     },
     useUtils: vi.fn(() => ({
       tesla: {

@@ -62,6 +62,11 @@ export interface VehiclePlugin extends BasePlugin {
   getHttpRoutes(): Hono | null;
   getHealthChecks(): PluginHealthCheck[];
   getTunnelRoutes(): PluginTunnelRoute[];
+  /** Tunnel lifecycle hooks — a fresh public URL is minted on every tunnel
+   *  start, so plugins that persist it (e.g. as their public key domain)
+   *  update their config here. */
+  onTunnelStarted?(url: string): Promise<void>;
+  onTunnelStopped?(url: string): Promise<void>;
 }
 
 // ── Vehicle Middleware ──────────────────────────────────────────────────────

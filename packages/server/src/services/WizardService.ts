@@ -95,6 +95,11 @@ export class WizardService {
         p.getTunnelRoutes()
       );
       const url = await this.tunnelManager.start(routes);
+      // Let plugins persist the fresh URL (e.g. Tesla's public key domain) —
+      // it changes on every tunnel start (issue #31).
+      await Promise.all(
+        this.vehiclePlugins.getAll().map((p) => p.onTunnelStarted?.(url)),
+      );
       this.logger.info(`Tunnel started: ${url}`);
       return { url };
     } catch (err) {
@@ -108,7 +113,13 @@ export class WizardService {
   }
 
   async stopTunnel() {
+    const url = this.tunnelManager.tunnelUrl;
     await this.tunnelManager.stop();
+    if (url) {
+      await Promise.all(
+        this.vehiclePlugins.getAll().map((p) => p.onTunnelStopped?.(url)),
+      );
+    }
     this.logger.info("Tunnel stopped");
     return { stopped: true };
   }

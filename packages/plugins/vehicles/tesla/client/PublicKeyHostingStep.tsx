@@ -5,6 +5,10 @@ import { useTeslaConfig, useTeslaConfigMutation } from "./useTeslaConfig.ts";
 import { trpc } from "./trpc.ts";
 import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
 import {
+  hintUnlessLoading,
+  useWizardNextControl,
+} from "../../../../client/src/components/Wizard/wizardNextControl.ts";
+import {
   AiPromptInstructions,
   GitHubPagesInstructions,
   SelfHostInstructions,
@@ -21,7 +25,11 @@ import styles from "../../../../client/src/components/Wizard/steps/steps.module.
 type HostingChoice = null | "yes" | "no";
 
 function TunnelActiveView(
-  { tunnelUrl, onNext }: { tunnelUrl: string; onNext: () => void },
+  { tunnelUrl, onStop, stopping }: {
+    tunnelUrl: string;
+    onStop: () => void;
+    stopping: boolean;
+  },
 ) {
   return (
     <div className={styles.stepContainer}>
@@ -40,7 +48,14 @@ function TunnelActiveView(
         </Callout.Text>
       </Callout.Root>
       <div className={styles.stepActions}>
-        <Button onClick={onNext}>Continue</Button>
+        <Button variant="soft" onClick={onStop} disabled={stopping}>
+          {stopping
+            ? <Loader2 size={14} className={styles.spinner} />
+            : <Globe size={14} />}
+          {stopping
+            ? "Stopping tunnel..."
+            : "Stop tunnel & choose another method"}
+        </Button>
       </div>
     </div>
   );
@@ -192,7 +207,7 @@ function HostingMethodSection(
   );
 }
 
-export function PublicKeyHostingStep({ onNext }: StepProps): JSX.Element {
+export function PublicKeyHostingStep(_props: StepProps): JSX.Element {
   const { data: teslaConfig } = useTeslaConfig();
   const browserOrigin = globalThis.location?.origin || "";
   const publicKey = teslaConfig?.ecPublicKeyPem || "";
@@ -204,6 +219,9 @@ export function PublicKeyHostingStep({ onNext }: StepProps): JSX.Element {
   const startTunnelMutation = trpc.wizard.startTunnel.useMutation({
     onSuccess: () => tunnelStatus.refetch(),
   });
+  const stopTunnelMutation = trpc.wizard.stopTunnel.useMutation({
+    onSuccess: () => tunnelStatus.refetch(),
+  });
 
   const [choice, setChoice] = useState<HostingChoice>(null);
   const [hostingMethod, setHostingMethod] = useState<HostingMethod>(null);
@@ -213,8 +231,26 @@ export function PublicKeyHostingStep({ onNext }: StepProps): JSX.Element {
 
   const saveDomainMutation = useTeslaConfigMutation();
 
+  const domainConfigured = (tunnelActive && !!tunnelUrl) ||
+    !!teslaConfig?.teslaPublicKeyDomain;
+  useWizardNextControl({
+    canProceed: domainConfigured,
+    hint: hintUnlessLoading(
+      teslaConfig === undefined || tunnelStatus.isLoading,
+      domainConfigured
+        ? "Public key hosting is configured — Next continues"
+        : "Configure public key hosting to continue",
+    ),
+  });
+
   if (tunnelActive && tunnelUrl) {
-    return <TunnelActiveView tunnelUrl={tunnelUrl} onNext={onNext} />;
+    return (
+      <TunnelActiveView
+        tunnelUrl={tunnelUrl}
+        onStop={() => stopTunnelMutation.mutate()}
+        stopping={stopTunnelMutation.isPending}
+      />
+    );
   }
 
   return (
@@ -225,21 +261,15 @@ export function PublicKeyHostingStep({ onNext }: StepProps): JSX.Element {
       </Text>
 
       {teslaConfig?.teslaPublicKeyDomain && (
-        <>
-          <Callout.Root color="green">
-            <Callout.Icon>
-              <CheckCircle size={16} />
-            </Callout.Icon>
-            <Callout.Text>
-              Public key domain is already configured as{" "}
-              <strong>{teslaConfig.teslaPublicKeyDomain}</strong>.
-            </Callout.Text>
-          </Callout.Root>
-
-          <div className={styles.stepActions}>
-            <Button onClick={onNext}>Continue</Button>
-          </div>
-        </>
+        <Callout.Root color="green">
+          <Callout.Icon>
+            <CheckCircle size={16} />
+          </Callout.Icon>
+          <Callout.Text>
+            Public key domain is already configured as{" "}
+            <strong>{teslaConfig.teslaPublicKeyDomain}</strong>.
+          </Callout.Text>
+        </Callout.Root>
       )}
 
       <ChoiceCards
