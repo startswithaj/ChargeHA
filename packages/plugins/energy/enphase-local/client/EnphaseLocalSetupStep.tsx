@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
-import { Button } from "@radix-ui/themes";
+import { Text } from "@radix-ui/themes";
 import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
+import { useWizardNextControl } from "../../../../client/src/components/Wizard/wizardNextControl.ts";
 import { trpc } from "./trpc.ts";
 import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
 import {
@@ -8,7 +9,7 @@ import {
   type EnphaseLocalFormValues,
 } from "./EnphaseLocalForm.tsx";
 
-export function EnphaseLocalSetupStep({ onNext }: StepProps) {
+export function EnphaseLocalSetupStep(_props: StepProps) {
   const { data: config } = trpc.energy.enphase_local.getConfig.useQuery();
   const saveMutation = trpc.energy.enphase_local.setConfig.useMutation();
 
@@ -20,18 +21,30 @@ export function EnphaseLocalSetupStep({ onNext }: StepProps) {
     setValidated(values);
   }, []);
 
-  const handleSave = useCallback(() => {
-    if (!validated) return;
-    saveMutation.mutate(
-      {
+  const save = useCallback(async () => {
+    if (!validated) return false;
+    try {
+      await saveMutation.mutateAsync({
         host: validated.host,
         email: validated.email,
         password: validated.password,
         token: validated.token,
-      },
-      { onSuccess: () => onNext() },
-    );
-  }, [validated, saveMutation, onNext]);
+      });
+      return true;
+    } catch {
+      // Stay on the step — the mutation error is rendered below the form.
+      return false;
+    }
+  }, [validated, saveMutation]);
+
+  useWizardNextControl({
+    canProceed: validated !== null,
+    hint: validated
+      ? "Next saves your Enphase settings"
+      : "Test the connection to continue",
+    pendingLabel: "Saving...",
+    onBeforeNext: save,
+  });
 
   return (
     <div className={styles.stepContainer}>
@@ -45,11 +58,9 @@ export function EnphaseLocalSetupStep({ onNext }: StepProps) {
         onTestSuccess={handleTestSuccess}
       />
 
-      <div className={styles.stepActions}>
-        <Button size="3" disabled={!validated} onClick={handleSave}>
-          Save & Continue
-        </Button>
-      </div>
+      {saveMutation.isError && (
+        <Text size="2" color="red">{saveMutation.error.message}</Text>
+      )}
     </div>
   );
 }

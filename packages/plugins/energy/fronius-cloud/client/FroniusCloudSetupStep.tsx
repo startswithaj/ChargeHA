@@ -1,11 +1,12 @@
 import { useCallback, useState } from "react";
-import { Button } from "@radix-ui/themes";
+import { Text } from "@radix-ui/themes";
 import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
+import { useWizardNextControl } from "../../../../client/src/components/Wizard/wizardNextControl.ts";
 import { trpc } from "./trpc.ts";
 import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
 import { FroniusCloudForm } from "./FroniusCloudForm.tsx";
 
-export function FroniusCloudSetupStep({ onNext }: StepProps) {
+export function FroniusCloudSetupStep(_props: StepProps) {
   const { data: config } = trpc.energy.fronius_cloud.getConfig.useQuery();
   const saveMutation = trpc.energy.fronius_cloud.setConfig.useMutation();
 
@@ -24,17 +25,29 @@ export function FroniusCloudSetupStep({ onNext }: StepProps) {
     [],
   );
 
-  const handleSave = useCallback(() => {
-    if (!validated) return;
-    saveMutation.mutate(
-      {
+  const save = useCallback(async () => {
+    if (!validated) return false;
+    try {
+      await saveMutation.mutateAsync({
         froniusCloudEmail: validated.email,
         froniusCloudPassword: validated.password,
         froniusCloudPvSystemId: validated.pvSystemId,
-      },
-      { onSuccess: () => onNext() },
-    );
-  }, [validated, saveMutation, onNext]);
+      });
+      return true;
+    } catch {
+      // Stay on the step — the mutation error is rendered below the form.
+      return false;
+    }
+  }, [validated, saveMutation]);
+
+  useWizardNextControl({
+    canProceed: validated !== null,
+    hint: validated
+      ? "Next saves your Solar.web settings"
+      : "Test the connection to continue",
+    pendingLabel: "Saving...",
+    onBeforeNext: save,
+  });
 
   return (
     <div className={styles.stepContainer}>
@@ -44,15 +57,9 @@ export function FroniusCloudSetupStep({ onNext }: StepProps) {
         onTestSuccess={handleTestSuccess}
       />
 
-      <div className={styles.stepActions}>
-        <Button
-          size="3"
-          disabled={!validated}
-          onClick={handleSave}
-        >
-          Save & Continue
-        </Button>
-      </div>
+      {saveMutation.isError && (
+        <Text size="2" color="red">{saveMutation.error.message}</Text>
+      )}
     </div>
   );
 }
