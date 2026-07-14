@@ -12,25 +12,35 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("./trpc.ts", () => ({
   trpc: {
-    tesla: {
-      getConfig: {
-        useQuery: vi.fn(() => ({
-          data: { ecPublicKeyPem: "", teslaPublicKeyDomain: "" },
-          isLoading: false,
-          error: null,
-        })),
-      },
-      setConfig: {
-        useMutation: vi.fn(() => ({
-          mutate: vi.fn(),
-          mutateAsync: mocks.teslaSetConfigMutateAsync,
-          isPending: false,
-          isSuccess: false,
-          isError: false,
-          error: null,
-          data: undefined,
-          reset: vi.fn(),
-        })),
+    plugin: {
+      vehicle: {
+        tesla: {
+          getConfig: {
+            useQuery: vi.fn(() => ({
+              data: { ecPublicKeyPem: "", teslaPublicKeyDomain: "" },
+              isLoading: false,
+              error: null,
+            })),
+          },
+          teslaStatus: {
+            useQuery: vi.fn(() => ({
+              data: { authenticated: false, keyPaired: null },
+              isLoading: false,
+            })),
+          },
+          setConfig: {
+            useMutation: vi.fn(() => ({
+              mutate: vi.fn(),
+              mutateAsync: mocks.teslaSetConfigMutateAsync,
+              isPending: false,
+              isSuccess: false,
+              isError: false,
+              error: null,
+              data: undefined,
+              reset: vi.fn(),
+            })),
+          },
+        },
       },
     },
     wizard: {
@@ -57,9 +67,13 @@ vi.mock("./trpc.ts", () => ({
       },
     },
     useUtils: vi.fn(() => ({
-      tesla: {
-        getConfig: {
-          invalidate: vi.fn(),
+      plugin: {
+        vehicle: {
+          tesla: {
+            getConfig: {
+              invalidate: vi.fn(),
+            },
+          },
         },
       },
     })),
@@ -90,9 +104,10 @@ describe("PublicKeyHostingStep", () => {
     vi.clearAllMocks();
     originalFetch = globalThis.fetch;
 
-    vi.mocked(trpc.tesla.getConfig.useQuery).mockReturnValue({
+    vi.mocked(trpc.plugin.vehicle.tesla.getConfig.useQuery).mockReturnValue({
       data: {
         teslaPublicKeyDomain: "https://chargeha.example.com",
+        teslaPublicKeyHosting: "custom",
         ecPublicKeyPem: TEST_PUBLIC_KEY,
       },
       isLoading: false,
@@ -323,6 +338,7 @@ describe("PublicKeyHostingStep", () => {
     await waitFor(() => {
       expect(mocks.teslaSetConfigMutateAsync).toHaveBeenCalledWith({
         teslaPublicKeyDomain: "https://myhost.example.com",
+        teslaPublicKeyHosting: "custom",
       });
     });
 

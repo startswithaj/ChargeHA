@@ -61,6 +61,7 @@ export function DomainVerifyForm({
         : stripped;
       await teslaMutation.mutateAsync({
         teslaPublicKeyDomain: cleanDomain,
+        teslaPublicKeyHosting: "custom",
       });
       setExternalDomain(cleanDomain);
 

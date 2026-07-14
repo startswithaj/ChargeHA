@@ -499,6 +499,7 @@ export async function bootstrap(): Promise<
     db,
     services.vehicleManager,
     services.energyManager,
+    () => services.tunnelManager.tunnelUrl,
     vehicleRegistry,
     energyRegistry,
   );

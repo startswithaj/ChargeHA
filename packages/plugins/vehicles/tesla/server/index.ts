@@ -85,13 +85,14 @@ export class TeslaVehiclePlugin implements VehiclePlugin {
   }
 
   private async startup(): Promise<void> {
-    // A quick-tunnel public key domain cannot survive a restart (the tunnel
-    // runs in-process), so a persisted trycloudflare domain is dead by
-    // definition here — clear it so the wizard doesn't present it as
-    // configured. Starting a new tunnel re-persists via onTunnelStarted.
+    // Migrate pre-hosting-mode data: tunnel URLs used to be persisted as the
+    // public key domain, but a quick-tunnel URL cannot survive a restart (the
+    // tunnel runs in-process). Clear the dead URL and record the intent as
+    // tunnel hosting so the wizard resumes on the right method.
     const domain = await this.deps.getConfig("public_key_domain");
     if (domain?.endsWith(".trycloudflare.com")) {
       await this.deps.setConfig("public_key_domain", "");
+      await this.deps.setConfig("public_key_hosting", "tunnel");
       this.deps.log.info(
         `Cleared expired tunnel public key domain ${domain}`,
       );
@@ -122,7 +123,9 @@ export class TeslaVehiclePlugin implements VehiclePlugin {
   }
 
   async shutdown(): Promise<void> {
-    await this.startupPromise.catch(() => {});
+    await this.startupPromise.catch((err) => {
+      this.deps.log.error("Startup had failed before shutdown:", err);
+    });
     this.teslaTokenManager.stopAutoRefresh();
     await this.teslaProxyManager.stop();
   }
@@ -183,21 +186,6 @@ export class TeslaVehiclePlugin implements VehiclePlugin {
 
   getHttpRoutes(): Hono | null {
     return createTeslaHttpRoutes(this.teslaTokenManager, this.deps);
-  }
-
-  /** Tunnel URLs are minted fresh on every start — persist the live one as
-   *  the public key domain so partner registration never reads a stale
-   *  trycloudflare.com domain (issue #31). */
-  async onTunnelStarted(url: string): Promise<void> {
-    await this.deps.setConfig("public_key_domain", url);
-  }
-
-  /** A stopped tunnel's URL is dead — clear it so the hosting step doesn't
-   *  present a stale domain as configured. User-hosted domains are left alone. */
-  async onTunnelStopped(url: string): Promise<void> {
-    if ((await this.deps.getConfig("public_key_domain")) === url) {
-      await this.deps.setConfig("public_key_domain", "");
-    }
   }
 
   getTunnelRoutes(): PluginTunnelRoute[] {

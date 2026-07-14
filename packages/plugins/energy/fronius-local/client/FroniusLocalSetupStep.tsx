@@ -7,8 +7,9 @@ import styles from "../../../../client/src/components/Wizard/steps/steps.module.
 import { FroniusLocalForm } from "./FroniusLocalForm.tsx";
 
 export function FroniusLocalSetupStep(_props: StepProps) {
-  const { data: config } = trpc.energy.fronius_local.getConfig.useQuery();
-  const saveMutation = trpc.energy.fronius_local.setConfig.useMutation();
+  const { data: config } = trpc.plugin.energy.fronius_local.getConfig
+    .useQuery();
+  const saveMutation = trpc.plugin.energy.fronius_local.setConfig.useMutation();
 
   const [validated, setValidated] = useState<
     {

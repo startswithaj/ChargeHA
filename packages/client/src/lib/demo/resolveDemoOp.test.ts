@@ -9,9 +9,10 @@ import {
 
 describe("resolveDemoQuery", () => {
   it("throws DemoGatedError for a gated path", () => {
-    expect(() => resolveDemoQuery("tesla.getConfig", undefined)).toThrow(
-      DemoGatedError,
-    );
+    expect(() => resolveDemoQuery("plugin.vehicle.tesla.getConfig", undefined))
+      .toThrow(
+        DemoGatedError,
+      );
   });
 
   it("throws DemoUnhandledError for an unknown path", () => {
@@ -23,7 +24,9 @@ describe("resolveDemoQuery", () => {
 
 describe("resolveDemoMutation", () => {
   it("throws DemoGatedError for a gated mutation", () => {
-    expect(() => resolveDemoMutation("tesla.setConfig", undefined)).toThrow(
+    expect(() =>
+      resolveDemoMutation("plugin.vehicle.tesla.setConfig", undefined)
+    ).toThrow(
       DemoGatedError,
     );
   });

@@ -25,11 +25,18 @@ export function registerPlugins(
   db: AppDatabase,
   vehicleManager: VehicleManager,
   energyManager: EnergyAdapterManager,
+  getTunnelUrl: () => string | null,
   vehicleRegistry: VehiclePluginRegistry,
   energyRegistry: EnergyPluginRegistry,
 ): void {
   const make = (id: string) =>
-    PluginDependencies.create(db, vehicleManager, energyManager, id);
+    PluginDependencies.create(
+      db,
+      vehicleManager,
+      energyManager,
+      getTunnelUrl,
+      id,
+    );
 
   const teslaDeps = make("tesla");
   vehicleRegistry.register(

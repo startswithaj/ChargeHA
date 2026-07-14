@@ -28,15 +28,25 @@ export class PluginDependencies<K extends string = string> {
     db: AppDatabase,
     vehicleManager: VehicleManager,
     energyManager: EnergyAdapterManager,
+    getTunnelUrl: () => string | null,
     pluginId: string,
   ): PluginDependencies {
-    return new PluginDependencies(db, vehicleManager, energyManager, pluginId);
+    return new PluginDependencies(
+      db,
+      vehicleManager,
+      energyManager,
+      getTunnelUrl,
+      pluginId,
+    );
   }
 
   private constructor(
     private readonly db: AppDatabase,
     private readonly vehicleManager: VehicleManager,
     private readonly energyManager: EnergyAdapterManager,
+    /** Live tunnel URL, or null when the tunnel is down. Never persisted —
+     *  quick-tunnel URLs change on every start. */
+    readonly getTunnelUrl: () => string | null,
     pluginId: string,
   ) {
     this.pluginId = pluginId;

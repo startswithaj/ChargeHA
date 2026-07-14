@@ -92,7 +92,7 @@ function SearchSection(
     subnet: string;
     setSubnet: (v: string) => void;
     searchMutation: ReturnType<
-      typeof trpc.energy.sigenergy_local.discover.useMutation
+      typeof trpc.plugin.energy.sigenergy_local.discover.useMutation
     >;
     searchResults: SigenergyDevice[];
     onSelectDevice: (host: string) => void;
@@ -170,7 +170,7 @@ function SearchSection(
 
 function useTestStatus(
   testMutation: ReturnType<
-    typeof trpc.energy.sigenergy_local.testConnection.useMutation
+    typeof trpc.plugin.energy.sigenergy_local.testConnection.useMutation
   >,
 ): TestStatus {
   return useMemo(() => {
@@ -264,15 +264,17 @@ export function SigenergyLocalForm(
   });
   const [searchResults, setSearchResults] = useState<SigenergyDevice[]>([]);
 
-  const searchMutation = trpc.energy.sigenergy_local.discover.useMutation({
-    onSuccess: (result: { found: SigenergyDevice[] }) =>
-      setSearchResults(result.found),
-    onError: () => setSearchResults([]),
-  });
+  const searchMutation = trpc.plugin.energy.sigenergy_local.discover
+    .useMutation({
+      onSuccess: (result: { found: SigenergyDevice[] }) =>
+        setSearchResults(result.found),
+      onError: () => setSearchResults([]),
+    });
 
-  const testMutation = trpc.energy.sigenergy_local.testConnection.useMutation({
-    onSuccess: onTestSuccessHandler(onTestSuccess),
-  });
+  const testMutation = trpc.plugin.energy.sigenergy_local.testConnection
+    .useMutation({
+      onSuccess: onTestSuccessHandler(onTestSuccess),
+    });
 
   const testResult = useTestStatus(testMutation);
 

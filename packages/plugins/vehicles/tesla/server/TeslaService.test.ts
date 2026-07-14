@@ -57,6 +57,7 @@ describe("TeslaService", () => {
       upsertVehicleRow: () => Promise.resolve(),
       addVehicle: () => Promise.resolve(),
       deleteVehicle: () => Promise.resolve(),
+      getTunnelUrl: () => null,
       setSimulatedLoad: () => {},
       log: mockLogger(),
       dbLog: mockLogger() as unknown as PluginDependencies["dbLog"],
@@ -281,6 +282,54 @@ describe("TeslaService", () => {
       await expect(service.registerPartner()).rejects.toThrow(
         "Failed to obtain partner token",
       );
+    });
+
+    const tunnelModeConfig = (key: string) => {
+      const config: Record<string, string> = {
+        client_id: "id",
+        region: "na",
+        public_key_hosting: "tunnel",
+      };
+      return Promise.resolve(config[key] ?? null);
+    };
+
+    it("throws with a start-tunnel hint in tunnel mode when the tunnel is down", async () => {
+      const service = makeService({
+        deps: {
+          getConfig: tunnelModeConfig,
+          getSecret: (key: string) =>
+            Promise.resolve(key === "client_secret" ? "secret" : null),
+          getTunnelUrl: () => null,
+        },
+      });
+      await expect(service.registerPartner()).rejects.toThrow(
+        "Tunnel is not running",
+      );
+    });
+
+    it("registers the live tunnel URL in tunnel mode", async () => {
+      const bodies: string[] = [];
+      const io = mockIo((url, init) => {
+        if (url.includes("oauth2")) {
+          return new Response(JSON.stringify({ access_token: "tok" }), {
+            status: 200,
+          });
+        }
+        bodies.push(String(init?.body));
+        return new Response(JSON.stringify({ response: {} }), { status: 200 });
+      });
+      const service = makeService({
+        deps: {
+          getConfig: tunnelModeConfig,
+          getSecret: (key: string) =>
+            Promise.resolve(key === "client_secret" ? "secret" : null),
+          getTunnelUrl: () => "https://abc.trycloudflare.com",
+        },
+        io,
+      });
+      const result = await service.registerPartner();
+      expect(result.success).toBe(true);
+      expect(bodies[0]).toContain("abc.trycloudflare.com");
     });
   });
 

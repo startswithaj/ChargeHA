@@ -9,7 +9,8 @@ import styles from "../../../../client/src/components/Wizard/steps/steps.module.
 export function PartnerRegistrationStep(_props: StepProps): JSX.Element {
   const calledRef = useRef(false);
 
-  const registerMutation = trpc.tesla.registerPartner.useMutation();
+  const registerMutation = trpc.plugin.vehicle.tesla.registerPartner
+    .useMutation();
 
   // Register partner on mount. The Tesla partner_accounts API is idempotent,
   // so re-registering on every visit is safe and avoids the need to track

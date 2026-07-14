@@ -10,8 +10,10 @@ import {
 } from "./SigenergyLocalForm.tsx";
 
 export function SigenergyLocalSetupStep(_props: StepProps) {
-  const { data: config } = trpc.energy.sigenergy_local.getConfig.useQuery();
-  const saveMutation = trpc.energy.sigenergy_local.setConfig.useMutation();
+  const { data: config } = trpc.plugin.energy.sigenergy_local.getConfig
+    .useQuery();
+  const saveMutation = trpc.plugin.energy.sigenergy_local.setConfig
+    .useMutation();
 
   const [validated, setValidated] = useState<SigenergyLocalFormValues | null>(
     null,

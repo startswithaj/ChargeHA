@@ -17,6 +17,7 @@ describe("TeslaTokenManager", () => {
       appDb,
       throwingMock<VehicleManager>("VehicleManager"),
       throwingMock<EnergyAdapterManager>("EnergyAdapterManager"),
+      () => null,
       "tesla",
     );
 
@@ -47,6 +48,7 @@ describe("TeslaTokenManager", () => {
       db,
       throwingMock<VehicleManager>("VehicleManager"),
       throwingMock<EnergyAdapterManager>("EnergyAdapterManager"),
+      () => null,
       "tesla",
     );
     manager = new TeslaTokenManager(deps, testLogger);
@@ -88,6 +90,20 @@ describe("TeslaTokenManager", () => {
       expect(scope).toContain("offline_access");
       expect(scope).toContain("vehicle_device_data");
       expect(scope).toContain("vehicle_charging_cmds");
+    });
+
+    it("records the origin per state for the callback, consumed on read", async () => {
+      await manager.getAuthorizationUrl(
+        "state-1",
+        "https://chargeha.example.com",
+      );
+
+      expect(manager.takeAuthOrigin("state-1")).toBe(
+        "https://chargeha.example.com",
+      );
+      // Consumed — a second read (or an unknown state) yields null.
+      expect(manager.takeAuthOrigin("state-1")).toBeNull();
+      expect(manager.takeAuthOrigin("unknown-state")).toBeNull();
     });
   });
 

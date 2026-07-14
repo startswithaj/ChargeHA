@@ -9,7 +9,7 @@ interface SaveStatus {
 const SAVING_DELAY_MS = 300;
 
 export function useTeslaConfig() {
-  return trpc.tesla.getConfig.useQuery();
+  return trpc.plugin.vehicle.tesla.getConfig.useQuery();
 }
 
 export function useTeslaConfigMutation() {
@@ -48,10 +48,10 @@ export function useTeslaConfigMutation() {
     );
   }, []);
 
-  const mutation = trpc.tesla.setConfig.useMutation({
+  const mutation = trpc.plugin.vehicle.tesla.setConfig.useMutation({
     onMutate,
     onSuccess: () => {
-      utils.tesla.getConfig.invalidate();
+      utils.plugin.vehicle.tesla.getConfig.invalidate();
       onSuccess();
     },
     onError,

@@ -3,6 +3,10 @@ import { TRPCError } from "@trpc/server";
 import { sleep } from "@chargeha/shared/async";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import type { TeslaTokenManager } from "./TeslaTokenManager.ts";
+import {
+  type PublicKeyHosting,
+  resolvePublicKeyDomain,
+} from "../shared/publicKeyDomain.ts";
 import type { Logger } from "@chargeha/server/lib/Logger";
 
 const TOKEN_URL = "https://fleet-auth.prd.vn.cloud.tesla.com/oauth2/v3/token";
@@ -106,34 +110,55 @@ export class TeslaService {
   async selectVehicle(
     input: { vin: string; name?: string },
   ): Promise<{ success: true; vin: string }> {
-    const row = {
-      id: input.vin,
-      name: input.name ?? "Tesla",
+    await this.selectVehicles({
+      vehicles: [{ vin: input.vin, name: input.name, priority: 1 }],
+    });
+    return { success: true as const, vin: input.vin };
+  }
+
+  /** Select and register multiple vehicles with their charging priorities in
+   *  one call — the wizard saves its whole selection server-side instead of
+   *  chaining per-vehicle mutations from the browser. */
+  async selectVehicles(
+    input: { vehicles: { vin: string; name?: string; priority: number }[] },
+  ): Promise<{ success: true; vins: string[] }> {
+    await input.vehicles.reduce(async (prev, vehicle) => {
+      await prev;
+      await this.saveVehicle(vehicle);
+    }, Promise.resolve());
+
+    // Trigger pairing check in the background after adding vehicles
+    this.checkKeyPairing().catch((err) => {
+      this.logger.error("Background key pairing check failed:", err);
+    });
+
+    return { success: true as const, vins: input.vehicles.map((v) => v.vin) };
+  }
+
+  private async saveVehicle(
+    vehicle: { vin: string; name?: string; priority: number },
+  ): Promise<void> {
+    await this.deps.upsertVehicleRow({
+      id: vehicle.vin,
+      name: vehicle.name ?? "Tesla",
       adapterType: "tesla" as const,
-      priority: 1,
+      priority: vehicle.priority,
       config: JSON.stringify({}),
       mode: "auto" as const,
-    };
-
-    await this.deps.upsertVehicleRow(row);
+    });
 
     // Register with VehicleManager via deps (idempotent; safe to call each time)
     try {
-      const vehicleRow = await this.deps.getVehicleRow(input.vin);
+      const vehicleRow = await this.deps.getVehicleRow(vehicle.vin);
       if (vehicleRow) {
         await this.deps.addVehicle(vehicleRow);
       }
     } catch (err) {
       this.logger.error(
-        `Failed to register vehicle ${input.vin} with manager:`,
+        `Failed to register vehicle ${vehicle.vin} with manager:`,
         err,
       );
     }
-
-    // Trigger pairing check in the background after adding a vehicle
-    this.checkKeyPairing().catch(() => {});
-
-    return { success: true as const, vin: input.vin };
   }
 
   /** Register as a Tesla partner (client_credentials grant + partner_accounts call). */
@@ -144,7 +169,12 @@ export class TeslaService {
   }> {
     const clientId = await this.deps.getConfig("client_id");
     const clientSecret = await this.deps.getSecret("client_secret");
-    const domain = await this.deps.getConfig("public_key_domain");
+    const hosting = (await this.deps.getConfig("public_key_hosting")) ?? "";
+    const domain = resolvePublicKeyDomain(
+      hosting as PublicKeyHosting,
+      await this.deps.getConfig("public_key_domain"),
+      this.deps.getTunnelUrl(),
+    );
 
     if (!clientId || !clientSecret) {
       throw new TRPCError({
@@ -156,7 +186,9 @@ export class TeslaService {
     if (!domain) {
       throw new TRPCError({
         code: "BAD_REQUEST",
-        message: "Tesla domain not configured",
+        message: hosting === "tunnel"
+          ? "Tunnel is not running — start it on the hosting step before registering"
+          : "Tesla domain not configured",
       });
     }
 

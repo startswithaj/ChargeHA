@@ -29,26 +29,40 @@ const mocks = vi.hoisted(() => {
 vi.mock("./trpc.ts", () => ({
   trpc: {
     useUtils: vi.fn(() => ({
-      tesla: {
-        getConfig: {
-          invalidate: vi.fn(),
+      plugin: {
+        vehicle: {
+          tesla: {
+            getConfig: {
+              invalidate: vi.fn(),
+            },
+          },
         },
       },
     })),
-    tesla: {
-      getConfig: {
-        useQuery: vi.fn(() => ({
-          data: {
-            teslaClientId: "",
-            teslaClientSecret: "",
-            teslaRegion: "na",
+    plugin: {
+      vehicle: {
+        tesla: {
+          getConfig: {
+            useQuery: vi.fn(() => ({
+              data: {
+                teslaClientId: "",
+                teslaClientSecret: "",
+                teslaRegion: "na",
+              },
+              isLoading: false,
+              error: null,
+            })),
           },
-          isLoading: false,
-          error: null,
-        })),
-      },
-      setConfig: {
-        useMutation: vi.fn(() => mocks.defaultResult),
+          setConfig: {
+            useMutation: vi.fn(() => mocks.defaultResult),
+          },
+          teslaStatus: {
+            useQuery: vi.fn(() => ({
+              data: { authenticated: false, keyPaired: null },
+              isLoading: false,
+            })),
+          },
+        },
       },
     },
     wizard: {
@@ -80,7 +94,7 @@ describe("TeslaCredentialsStep", () => {
   function setSetConfigState(
     overrides: Partial<typeof mocks.defaultResult>,
   ): void {
-    vi.mocked(trpc.tesla.setConfig.useMutation).mockReturnValue({
+    vi.mocked(trpc.plugin.vehicle.tesla.setConfig.useMutation).mockReturnValue({
       ...mocks.defaultResult,
       mutate: mocks.mutate,
       ...overrides,

@@ -7,8 +7,9 @@ import styles from "../../../../client/src/components/Wizard/steps/steps.module.
 import { FroniusCloudForm } from "./FroniusCloudForm.tsx";
 
 export function FroniusCloudSetupStep(_props: StepProps) {
-  const { data: config } = trpc.energy.fronius_cloud.getConfig.useQuery();
-  const saveMutation = trpc.energy.fronius_cloud.setConfig.useMutation();
+  const { data: config } = trpc.plugin.energy.fronius_cloud.getConfig
+    .useQuery();
+  const saveMutation = trpc.plugin.energy.fronius_cloud.setConfig.useMutation();
 
   const [validated, setValidated] = useState<
     {

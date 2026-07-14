@@ -8,7 +8,7 @@ function SearchControls(
     subnet: string;
     setSubnet: (v: string) => void;
     searchMutation: ReturnType<
-      typeof trpc.energy.fronius_local.discover.useMutation
+      typeof trpc.plugin.energy.fronius_local.discover.useMutation
     >;
   },
 ) {
@@ -90,7 +90,7 @@ function TestSection(
   { config, testMutation, testSuccess }: {
     config: { froniusHost: string; froniusMeterDeviceId: string };
     testMutation: ReturnType<
-      typeof trpc.energy.fronius_local.testConnection.useMutation
+      typeof trpc.plugin.energy.fronius_local.testConnection.useMutation
     >;
     testSuccess: {
       device?: { name: string };
@@ -148,7 +148,7 @@ function TestSection(
 function TestResultDisplay(
   { testMutation, testSuccess }: {
     testMutation: ReturnType<
-      typeof trpc.energy.fronius_local.testConnection.useMutation
+      typeof trpc.plugin.energy.fronius_local.testConnection.useMutation
     >;
     testSuccess: {
       device?: { name: string };
@@ -184,16 +184,21 @@ function TestResultDisplay(
 }
 
 export function FroniusLocalConfig(): JSX.Element | null {
-  const { data: config } = trpc.energy.fronius_local.getConfig.useQuery();
+  const { data: config } = trpc.plugin.energy.fronius_local.getConfig
+    .useQuery();
   const utils = trpc.useUtils();
-  const configMutation = trpc.energy.fronius_local.setConfig.useMutation({
-    onSuccess: () => utils.energy.fronius_local.getConfig.invalidate(),
-  });
+  const configMutation = trpc.plugin.energy.fronius_local.setConfig.useMutation(
+    {
+      onSuccess: () => utils.plugin.energy.fronius_local.getConfig.invalidate(),
+    },
+  );
   const [subnet, setSubnet] = useState("");
 
-  const testMutation = trpc.energy.fronius_local.testConnection.useMutation();
+  const testMutation = trpc.plugin.energy.fronius_local.testConnection
+    .useMutation();
 
-  const searchMutation = trpc.energy.fronius_local.discover.useMutation();
+  const searchMutation = trpc.plugin.energy.fronius_local.discover
+    .useMutation();
 
   const searchDone = searchMutation.isSuccess || searchMutation.isError;
   const searchResults = searchMutation.data?.found ?? [];

@@ -85,13 +85,14 @@ export function FroniusCloudForm({
   const [cloudPassword, setCloudPassword] = useState("");
   const [pvSystemId, setPvSystemId] = useState(initialPvSystemId);
 
-  const testMutation = trpc.energy.fronius_cloud.testConnection.useMutation({
-    onSuccess: (data: { success: boolean }) => {
-      if (data.success) {
-        onTestSuccess(cloudEmail, cloudPassword, pvSystemId);
-      }
-    },
-  });
+  const testMutation = trpc.plugin.energy.fronius_cloud.testConnection
+    .useMutation({
+      onSuccess: (data: { success: boolean }) => {
+        if (data.success) {
+          onTestSuccess(cloudEmail, cloudPassword, pvSystemId);
+        }
+      },
+    });
 
   const testResult: TestStatus = useMemo(() => {
     if (testMutation.isPending) return { status: "testing" };

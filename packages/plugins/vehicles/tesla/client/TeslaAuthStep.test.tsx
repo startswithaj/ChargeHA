@@ -22,24 +22,29 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("./trpc.ts", () => ({
   trpc: {
-    tesla: {
-      teslaStatus: {
-        useQuery: (...args: unknown[]) => mocks.teslaStatusUseQuery(...args),
-      },
-      getAuthUrl: {
-        useMutation: vi.fn((opts?: {
-          onSuccess?: (data: { url: string; state: string }) => void;
-          onError?: () => void;
-        }) => {
-          mocks.capturedOnSuccess.current = opts?.onSuccess;
-          mocks.capturedOnError.current = opts?.onError;
-          return {
-            mutate: mocks.getAuthUrlMutate,
-            error: mocks.authUrlError.current,
-            isPending: false,
-            reset: vi.fn(),
-          };
-        }),
+    plugin: {
+      vehicle: {
+        tesla: {
+          teslaStatus: {
+            useQuery: (...args: unknown[]) =>
+              mocks.teslaStatusUseQuery(...args),
+          },
+          getAuthUrl: {
+            useMutation: vi.fn((opts?: {
+              onSuccess?: (data: { url: string; state: string }) => void;
+              onError?: () => void;
+            }) => {
+              mocks.capturedOnSuccess.current = opts?.onSuccess;
+              mocks.capturedOnError.current = opts?.onError;
+              return {
+                mutate: mocks.getAuthUrlMutate,
+                error: mocks.authUrlError.current,
+                isPending: false,
+                reset: vi.fn(),
+              };
+            }),
+          },
+        },
       },
     },
     wizard: {

@@ -456,7 +456,9 @@ export class VehicleManager {
       this.getAllStates().then((allStates) => {
         if (abort.signal.aborted) return;
         allStates.forEach((state) => emit.next(state));
-      }).catch(() => {});
+      }).catch((err) => {
+        this.logger.error("Failed to emit initial states to subscriber:", err);
+      });
 
       const unsubscribe = this.eventEmitter.subscribe(
         "vehicle_update",

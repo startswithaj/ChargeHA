@@ -12,7 +12,7 @@ import { publicProcedure } from "../server/src/trpc/trpc.ts";
  * Creates reusable getConfig/setConfig tRPC procedures for a plugin.
  *
  * Each plugin spreads these into its own router so config I/O lives on
- * the plugin's own tRPC path (e.g. trpc.tesla.getConfig) instead of a
+ * the plugin's own tRPC path (e.g. trpc.plugin.vehicle.tesla.getConfig) instead of a
  * centralized pluginConfig router with hardcoded pluginId strings.
  *
  * No reconfigure callback: `AppDatabase.setConfig` / `storeSecret` emit

@@ -55,7 +55,11 @@ export class EnergyPoller {
     }
     // Wait for any in-flight poll so it can't emit events / touch the DB
     // after stop returns.
-    if (this.polling) await this.polling.catch(() => {});
+    if (this.polling) {
+      await this.polling.catch((err) => {
+        this.logger.error("In-flight poll failed during stop:", err);
+      });
+    }
     this.polling = null;
     // Reset snapshot so stop() returns us to the pre-started state — this
     // also means restart() starts with a null snapshot until the next poll

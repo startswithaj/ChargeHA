@@ -15,31 +15,38 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("./trpc.ts", () => ({
   trpc: {
-    tesla: {
-      getConfig: {
-        useQuery: vi.fn(() => ({
-          data: {
-            teslaPublicKeyDomain: "https://chargeha.example.com",
-            ecPublicKeyPem: "",
-          },
-          isLoading: false,
-          error: null,
-        })),
-      },
-      checkKeyPairing: {
-        useMutation: vi.fn(
-          (
-            opts?: { onSuccess?: (result: { paired: boolean | null }) => void },
-          ) => {
-            mocks.capturedCheckOnSuccess.current = opts?.onSuccess;
-            return {
-              mutate: mocks.checkKeyPairingMutate,
-              isPending: false,
+    plugin: {
+      vehicle: {
+        tesla: {
+          getConfig: {
+            useQuery: vi.fn(() => ({
+              data: {
+                teslaPublicKeyDomain: "https://chargeha.example.com",
+                teslaPublicKeyHosting: "custom",
+                ecPublicKeyPem: "",
+              },
+              isLoading: false,
               error: null,
-              data: null,
-            };
+            })),
           },
-        ),
+          checkKeyPairing: {
+            useMutation: vi.fn(
+              (
+                opts?: {
+                  onSuccess?: (result: { paired: boolean | null }) => void;
+                },
+              ) => {
+                mocks.capturedCheckOnSuccess.current = opts?.onSuccess;
+                return {
+                  mutate: mocks.checkKeyPairingMutate,
+                  isPending: false,
+                  error: null,
+                  data: null,
+                };
+              },
+            ),
+          },
+        },
       },
     },
     vehicle: {
@@ -48,6 +55,14 @@ vi.mock("./trpc.ts", () => ({
           data: { vehicles: [] },
           isLoading: false,
           error: null,
+        })),
+      },
+    },
+    wizard: {
+      tunnelStatus: {
+        useQuery: vi.fn(() => ({
+          data: { active: false, url: null },
+          isLoading: false,
         })),
       },
     },

@@ -15,7 +15,7 @@ interface FroniusLocalFormProps {
 
 function useTestStatus(
   testMutation: ReturnType<
-    typeof trpc.energy.fronius_local.testConnection.useMutation
+    typeof trpc.plugin.energy.fronius_local.testConnection.useMutation
   >,
 ): TestStatus {
   return useMemo(() => {
@@ -47,7 +47,7 @@ function SearchSection(
     subnet: string;
     setSubnet: (v: string) => void;
     searchMutation: ReturnType<
-      typeof trpc.energy.fronius_local.discover.useMutation
+      typeof trpc.plugin.energy.fronius_local.discover.useMutation
     >;
     searchResults: FroniusDevice[];
     handleSelectDevice: (host: string) => void;
@@ -138,22 +138,23 @@ export function FroniusLocalForm({
   });
   const [searchResults, setSearchResults] = useState<FroniusDevice[]>([]);
 
-  const searchMutation = trpc.energy.fronius_local.discover.useMutation({
+  const searchMutation = trpc.plugin.energy.fronius_local.discover.useMutation({
     onSuccess: (result: { found: FroniusDevice[] }) =>
       setSearchResults(result.found),
     onError: () => setSearchResults([]),
   });
 
-  const testMutation = trpc.energy.fronius_local.testConnection.useMutation({
-    onSuccess: (
-      data: { success: boolean },
-      variables: { host: string; meterDeviceId?: number },
-    ) => {
-      if (data.success) {
-        onTestSuccess(variables.host, String(variables.meterDeviceId ?? 0));
-      }
-    },
-  });
+  const testMutation = trpc.plugin.energy.fronius_local.testConnection
+    .useMutation({
+      onSuccess: (
+        data: { success: boolean },
+        variables: { host: string; meterDeviceId?: number },
+      ) => {
+        if (data.success) {
+          onTestSuccess(variables.host, String(variables.meterDeviceId ?? 0));
+        }
+      },
+    });
 
   const testResult = useTestStatus(testMutation);
 

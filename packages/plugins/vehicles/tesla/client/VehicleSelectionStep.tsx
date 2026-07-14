@@ -153,22 +153,13 @@ async function saveSelectedVehicles(
     utils: ReturnType<typeof trpc.useUtils>;
   },
 ) {
-  await selectedVehicles.reduce(
-    (chain, vehicle) =>
-      chain.then(async () => {
-        await utils.client.tesla.selectVehicle.mutate({
-          vin: vehicle.vin,
-          name: vehicle.name,
-        });
-        if (selectedVehicles.length > 1) {
-          await utils.client.vehicle.setPriority.mutate({
-            vehicleId: vehicle.vin,
-            priority: priorities[vehicle.vin] ?? 1,
-          });
-        }
-      }),
-    Promise.resolve(),
-  );
+  await utils.client.plugin.vehicle.tesla.selectVehicles.mutate({
+    vehicles: selectedVehicles.map((vehicle) => ({
+      vin: vehicle.vin,
+      name: vehicle.name,
+      priority: priorities[vehicle.vin] ?? 1,
+    })),
+  });
 }
 
 export function VehicleSelectionStep(_props: StepProps): JSX.Element {
@@ -179,6 +170,7 @@ export function VehicleSelectionStep(_props: StepProps): JSX.Element {
   const utils = trpc.useUtils();
 
   // Check if vehicles are already configured in the DB
+  // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): plugins need a scoped vehicle-list API
   const existingVehiclesQuery = trpc.vehicle.list.useQuery();
   const existingVehicles = existingVehiclesQuery.data?.vehicles ?? [];
 
@@ -186,7 +178,7 @@ export function VehicleSelectionStep(_props: StepProps): JSX.Element {
     data: vehiclesData,
     isLoading: loading,
     error: queryError,
-  } = trpc.tesla.teslaVehicles.useQuery();
+  } = trpc.plugin.vehicle.tesla.teslaVehicles.useQuery();
 
   const vehicles: Array<{ vin: string; name: string; state: string }> =
     vehiclesData?.vehicles ?? [];
@@ -215,6 +207,7 @@ export function VehicleSelectionStep(_props: StepProps): JSX.Element {
         utils,
       });
       // The pairing step reads vehicle.list — drop the pre-save cache.
+      // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): plugins need a scoped vehicle-list API
       await utils.vehicle.list.invalidate();
       return true;
     } catch (err) {

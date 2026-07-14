@@ -295,6 +295,22 @@ Open `https://tesla.com/_ak/<your-domain>` on your phone while near the vehicle.
 The Tesla app will prompt for approval; tap approve on the vehicle's center
 screen.
 
+Tesla fetches the public key from your domain only at pairing time — the domain
+doesn't need to stay reachable afterwards. Re-pairing (a new vehicle, or a key
+removed from the car) needs the domain serving the key again.
+
+When using the Cloudflare tunnel, it must stay up for the whole flow: partner
+registration through pairing. The tunnel URL changes on every start, so if it
+stops mid-flow, partner registration must be re-run with the new URL.
+
+### OAuth redirect constraints
+
+Tesla's portal only accepts `localhost` or `https` origins as redirect bases. A
+plain-http address (e.g. `http://192.168.1.10:8000`) can't be registered, so
+those setups must use the tunnel for the sign-in redirect regardless of how the
+public key is hosted — the wizard disables the static hosting options in that
+case, since the tunnel is required anyway and covers key hosting too.
+
 ### Test the Connection
 
 ```bash

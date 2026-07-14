@@ -6,6 +6,7 @@ import { trpc } from "./trpc.ts";
 import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
 import { useWizardNextControl } from "../../../../client/src/components/Wizard/wizardNextControl.ts";
 import { callbackUrl, resolveOAuthOrigin } from "./oauthOrigin.ts";
+import { resolvePublicKeyDomain } from "../shared/publicKeyDomain.ts";
 import { UnstableOriginCallout } from "./UnstableOriginCallout.tsx";
 import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
 
@@ -223,6 +224,27 @@ function OriginCallouts(
   return null;
 }
 
+function AlreadyWorkingCallout() {
+  return (
+    <Callout.Root color="amber">
+      <Callout.Text>
+        Tesla is already connected and working. Continuing will require a new
+        tunnel session and updating your Tesla developer portal (Allowed Origin,
+        Redirect URIs, Returned URLs). Use Skip to keep the current setup — only
+        continue if you're re-pairing or changing credentials.
+      </Callout.Text>
+    </Callout.Root>
+  );
+}
+
+/** A working setup means re-running these steps invalidates live portal
+ *  config — surface a warning so the user opts into that consciously. */
+function useTeslaWorking(): boolean {
+  const teslaStatus = trpc.plugin.vehicle.tesla.teslaStatus.useQuery();
+  return teslaStatus.data?.authenticated === true &&
+    teslaStatus.data?.keyPaired === true;
+}
+
 function credentialsHint(valid: boolean, hasOrigin: boolean): string {
   if (!hasOrigin) {
     return "Start the Cloudflare Tunnel on the Public Key Hosting step to continue";
@@ -249,6 +271,7 @@ export function TeslaCredentialsStep(_props: StepProps): JSX.Element {
     : "http://localhost:8000";
 
   // Check if tunnel is active (started on the Public Key Hosting step)
+  // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): tunnel endpoints move behind the plugin API
   const tunnelStatus = trpc.wizard.tunnelStatus.useQuery();
   const tunnelUrl = tunnelStatus.data?.url;
 
@@ -256,8 +279,14 @@ export function TeslaCredentialsStep(_props: StepProps): JSX.Element {
   const redirectUri = oauth.origin ? callbackUrl(oauth.origin) : null;
 
   // Partner registration requires the public key domain in Allowed Origins
-  // (Tesla: "Root domain must match registered allowed origin").
-  const allowedOrigin = teslaConfig?.teslaPublicKeyDomain ?? "";
+  // (Tesla: "Root domain must match registered allowed origin"). Resolved
+  // live so the instructions can never show a stale tunnel domain.
+  const hosting = teslaConfig?.teslaPublicKeyHosting ?? "";
+  const savedDomain = teslaConfig?.teslaPublicKeyDomain ?? null;
+  const allowedOrigin =
+    resolvePublicKeyDomain(hosting, savedDomain, tunnelUrl ?? null) ?? "";
+
+  const teslaWorking = useTeslaWorking();
 
   const saveMutation = useTeslaConfigMutation();
 
@@ -288,6 +317,8 @@ export function TeslaCredentialsStep(_props: StepProps): JSX.Element {
         Enter your Tesla Fleet API credentials. You'll need to create an
         application on the Tesla Developer Portal first.
       </Text>
+
+      {teslaWorking && <AlreadyWorkingCallout />}
 
       <OriginCallouts
         viaTunnel={oauth.viaTunnel}

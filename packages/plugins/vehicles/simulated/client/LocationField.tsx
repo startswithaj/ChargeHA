@@ -119,6 +119,7 @@ export function LocationField({
 
   const geocodeMutation = useMutation({
     mutationFn: (query: string) =>
+      // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): expose geocoding via host plugin API
       utils.client.config.geocode.query({ q: query }),
     onSuccess: (
       result: { latitude: number; longitude: number; displayName: string },

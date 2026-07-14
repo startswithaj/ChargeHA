@@ -340,33 +340,6 @@ describe("WizardService", () => {
       expect(result).toEqual({ url: "https://abc.trycloudflare.com" });
     });
 
-    it("notifies plugins of the fresh tunnel url", async () => {
-      const started: string[] = [];
-      const service = makeService({
-        vehiclePlugins: {
-          getAll: () => [
-            {
-              getTunnelRoutes: () => [],
-              onTunnelStarted: (url: string) => {
-                started.push(url);
-                return Promise.resolve();
-              },
-            },
-            // Plugins without the hook are skipped.
-            { getTunnelRoutes: () => [] },
-          ],
-        },
-        tunnelManager: {
-          isRunning: false,
-          tunnelUrl: null,
-          start: () => Promise.resolve("https://abc.trycloudflare.com"),
-          stop: () => Promise.resolve(),
-        },
-      });
-      await service.startTunnel();
-      expect(started).toEqual(["https://abc.trycloudflare.com"]);
-    });
-
     it("wraps Error in ServiceError on failure", async () => {
       const service = makeService({
         tunnelManager: {
@@ -419,31 +392,6 @@ describe("WizardService", () => {
       const result = await service.stopTunnel();
       expect(result).toEqual({ stopped: true });
       expect(stopped).toBe(true);
-    });
-
-    it("notifies plugins of the stopped tunnel url", async () => {
-      const stoppedUrls: string[] = [];
-      const service = makeService({
-        vehiclePlugins: {
-          getAll: () => [
-            {
-              getTunnelRoutes: () => [],
-              onTunnelStopped: (url: string) => {
-                stoppedUrls.push(url);
-                return Promise.resolve();
-              },
-            },
-          ],
-        },
-        tunnelManager: {
-          isRunning: true,
-          tunnelUrl: "https://abc.trycloudflare.com",
-          start: () => Promise.resolve(""),
-          stop: () => Promise.resolve(),
-        },
-      });
-      await service.stopTunnel();
-      expect(stoppedUrls).toEqual(["https://abc.trycloudflare.com"]);
     });
   });
 

@@ -65,6 +65,7 @@ function ErrorView(
 
 export function TeslaAuthStep(_props: StepProps): JSX.Element {
   const [status, setStatus] = useState<Status>("idle");
+  // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): tunnel endpoints move behind the plugin API
   const tunnelStatus = trpc.wizard.tunnelStatus.useQuery();
   const oauth = resolveOAuthOrigin(
     globalThis.location?.origin ?? "",
@@ -77,9 +78,12 @@ export function TeslaAuthStep(_props: StepProps): JSX.Element {
   };
 
   // Query auth status on mount (always enabled), poll during "polling" state
-  const authStatusQuery = trpc.tesla.teslaStatus.useQuery(undefined, {
-    refetchInterval: status === "polling" ? 3000 : false,
-  });
+  const authStatusQuery = trpc.plugin.vehicle.tesla.teslaStatus.useQuery(
+    undefined,
+    {
+      refetchInterval: status === "polling" ? 3000 : false,
+    },
+  );
 
   // If already authenticated on mount, skip straight to success
   useEffect(() => {
@@ -88,7 +92,7 @@ export function TeslaAuthStep(_props: StepProps): JSX.Element {
     }
   }, [authStatusQuery.data?.authenticated]);
 
-  const authUrlMutation = trpc.tesla.getAuthUrl.useMutation({
+  const authUrlMutation = trpc.plugin.vehicle.tesla.getAuthUrl.useMutation({
     onSuccess: ({ url }: { url: string }) => {
       globalThis.open(url, "_blank");
       setStatus("polling");

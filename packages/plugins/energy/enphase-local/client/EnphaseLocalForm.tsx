@@ -58,7 +58,7 @@ function SearchSection(
     subnet: string;
     setSubnet: (v: string) => void;
     searchMutation: ReturnType<
-      typeof trpc.energy.enphase_local.discover.useMutation
+      typeof trpc.plugin.energy.enphase_local.discover.useMutation
     >;
     searchResults: EnphaseDevice[];
     onSelectDevice: (device: EnphaseDevice) => void;
@@ -130,7 +130,7 @@ function SearchSection(
 
 function useTestStatus(
   testMutation: ReturnType<
-    typeof trpc.energy.enphase_local.testConnection.useMutation
+    typeof trpc.plugin.energy.enphase_local.testConnection.useMutation
   >,
 ): TestStatus {
   return useMemo(() => {
@@ -274,7 +274,7 @@ export function EnphaseLocalForm(
   // shown for confirmation, never typed or stored.
   const [detectedSerial, setDetectedSerial] = useState("");
 
-  const searchMutation = trpc.energy.enphase_local.discover.useMutation({
+  const searchMutation = trpc.plugin.energy.enphase_local.discover.useMutation({
     onSuccess: (result: { found: EnphaseDevice[] }) =>
       setSearchResults(result.found),
     onError: () => setSearchResults([]),
@@ -286,26 +286,27 @@ export function EnphaseLocalForm(
     ? { email, password, token: "" }
     : { email: "", password: "", token };
 
-  const testMutation = trpc.energy.enphase_local.testConnection.useMutation({
-    onSuccess: (
-      data: {
-        success: boolean;
-        serial?: string;
-        fetchedToken?: string | null;
+  const testMutation = trpc.plugin.energy.enphase_local.testConnection
+    .useMutation({
+      onSuccess: (
+        data: {
+          success: boolean;
+          serial?: string;
+          fetchedToken?: string | null;
+        },
+      ) => {
+        if (!data.success) return;
+        if (data.serial) setDetectedSerial(data.serial);
+        onTestSuccess({
+          host,
+          email: active.email,
+          password: active.password,
+          // Persist the owner token fetched during the test so the first poll
+          // doesn't need another cloud round-trip.
+          token: active.token || data.fetchedToken || "",
+        });
       },
-    ) => {
-      if (!data.success) return;
-      if (data.serial) setDetectedSerial(data.serial);
-      onTestSuccess({
-        host,
-        email: active.email,
-        password: active.password,
-        // Persist the owner token fetched during the test so the first poll
-        // doesn't need another cloud round-trip.
-        token: active.token || data.fetchedToken || "",
-      });
-    },
-  });
+    });
 
   const testResult = useTestStatus(testMutation);
   const canTest = host &&

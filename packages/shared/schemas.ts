@@ -445,6 +445,17 @@ export const authSelectVehicleInput: z.ZodType<{
 });
 export type AuthSelectVehicleInput = z.infer<typeof authSelectVehicleInput>;
 
+export const authSelectVehiclesInput: z.ZodType<{
+  vehicles: { vin: string; name?: string | undefined; priority: number }[];
+}> = z.object({
+  vehicles: z.array(z.object({
+    vin: z.string(),
+    name: z.string().optional(),
+    priority: z.number().int().min(1),
+  })).min(1),
+});
+export type AuthSelectVehiclesInput = z.infer<typeof authSelectVehiclesInput>;
+
 // ---- Logs inputs ----
 
 export const logsPaginationInput: z.ZodObject<{

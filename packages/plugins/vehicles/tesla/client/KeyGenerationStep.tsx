@@ -115,12 +115,12 @@ function ErrorCallout(
  *  cache so later steps (hosting instructions, AI prompt) see the new key. */
 function useKeyMutations() {
   const utils = trpc.useUtils();
-  const onKeysChanged = () => utils.tesla.getConfig.invalidate();
+  const onKeysChanged = () => utils.plugin.vehicle.tesla.getConfig.invalidate();
   return {
-    generateMutation: trpc.tesla.generateKeys.useMutation({
+    generateMutation: trpc.plugin.vehicle.tesla.generateKeys.useMutation({
       onSuccess: onKeysChanged,
     }),
-    importMutation: trpc.tesla.importKeys.useMutation({
+    importMutation: trpc.plugin.vehicle.tesla.importKeys.useMutation({
       onSuccess: onKeysChanged,
     }),
   };
@@ -130,6 +130,7 @@ export function KeyGenerationStep(_props: StepProps): JSX.Element {
   const [mode, setMode] = useState<Mode>("choose");
   const { data: teslaConfig } = useTeslaConfig();
   const hasExistingKeys = !!teslaConfig?.ecPublicKeyPem;
+  // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): expose encryption status via host plugin API
   const encryptionQuery = trpc.health.encryption.useQuery();
   const hasEncryptionKey = encryptionQuery.data?.configured ?? true;
 

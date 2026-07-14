@@ -44,10 +44,11 @@ const FIELDS: PluginConfigField[] = [
 ];
 
 export function SimulatedEnergyConfig(): JSX.Element {
-  const { data } = trpc.energy.simulated_energy.getConfig.useQuery();
+  const { data } = trpc.plugin.energy.simulated_energy.getConfig.useQuery();
   const utils = trpc.useUtils();
-  const { mutate } = trpc.energy.simulated_energy.setConfig.useMutation({
-    onSuccess: () => utils.energy.simulated_energy.getConfig.invalidate(),
+  const { mutate } = trpc.plugin.energy.simulated_energy.setConfig.useMutation({
+    onSuccess: () =>
+      utils.plugin.energy.simulated_energy.getConfig.invalidate(),
   });
   return <PluginConfigForm data={data} fields={FIELDS} onSave={mutate} />;
 }

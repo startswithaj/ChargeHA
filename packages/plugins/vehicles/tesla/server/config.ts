@@ -29,6 +29,11 @@ export const teslaConfigDef = defineSection({
     schema: z.string(),
     default: "",
   },
+  teslaPublicKeyHosting: {
+    key: "tesla.public_key_hosting",
+    schema: z.enum(["", "custom", "tunnel"]),
+    default: "" as const,
+  },
   teslaProxyUrl: {
     key: "tesla.proxy_url",
     schema: z.string(),
@@ -56,11 +61,6 @@ export const teslaConfigDef = defineSection({
   },
   teslaTokenExpiresAt: {
     key: "tesla.token_expires_at",
-    schema: z.string(),
-    default: "",
-  },
-  teslaOauthOrigin: {
-    key: "tesla.oauth_origin",
     schema: z.string(),
     default: "",
   },

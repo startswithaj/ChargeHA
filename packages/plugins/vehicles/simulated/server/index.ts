@@ -68,7 +68,9 @@ export class SimulatedVehiclePlugin implements VehiclePlugin {
   }
 
   async shutdown(): Promise<void> {
-    await this.startupPromise.catch(() => {});
+    await this.startupPromise.catch((err) => {
+      this.deps.log.error("Startup had failed before shutdown:", err);
+    });
     this.adapters.clear();
   }
 

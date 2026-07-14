@@ -17,29 +17,39 @@ const mocks = vi.hoisted(() => ({
 vi.mock("./trpc.ts", () => ({
   trpc: {
     useUtils: vi.fn(() => ({
-      tesla: { getConfig: { invalidate: vi.fn() } },
+      plugin: {
+        vehicle: { tesla: { getConfig: { invalidate: vi.fn() } } },
+      },
     })),
-    tesla: {
-      getConfig: {
-        useQuery: vi.fn(() => ({ data: {}, isLoading: false, error: null })),
-      },
-      generateKeys: {
-        useMutation: vi.fn(() => ({
-          mutate: mocks.generateMutate,
-          isSuccess: false,
-          isPending: false,
-          error: null,
-          reset: mocks.generateReset,
-        })),
-      },
-      importKeys: {
-        useMutation: vi.fn(() => ({
-          mutate: mocks.importMutate,
-          isSuccess: false,
-          isPending: false,
-          error: null,
-          reset: mocks.importReset,
-        })),
+    plugin: {
+      vehicle: {
+        tesla: {
+          getConfig: {
+            useQuery: vi.fn(() => ({
+              data: {},
+              isLoading: false,
+              error: null,
+            })),
+          },
+          generateKeys: {
+            useMutation: vi.fn(() => ({
+              mutate: mocks.generateMutate,
+              isSuccess: false,
+              isPending: false,
+              error: null,
+              reset: mocks.generateReset,
+            })),
+          },
+          importKeys: {
+            useMutation: vi.fn(() => ({
+              mutate: mocks.importMutate,
+              isSuccess: false,
+              isPending: false,
+              error: null,
+              reset: mocks.importReset,
+            })),
+          },
+        },
       },
     },
     health: {
@@ -93,17 +103,20 @@ describe("KeyGenerationStep", () => {
   };
 
   function setGenerateState(overrides: Partial<MutationResult>): void {
-    vi.mocked(trpc.tesla.generateKeys.useMutation).mockReturnValue({
-      ...defaultGenerate,
-      ...overrides,
-    } as never);
+    vi.mocked(trpc.plugin.vehicle.tesla.generateKeys.useMutation)
+      .mockReturnValue({
+        ...defaultGenerate,
+        ...overrides,
+      } as never);
   }
 
   function setImportState(overrides: Partial<MutationResult>): void {
-    vi.mocked(trpc.tesla.importKeys.useMutation).mockReturnValue({
-      ...defaultImport,
-      ...overrides,
-    } as never);
+    vi.mocked(trpc.plugin.vehicle.tesla.importKeys.useMutation).mockReturnValue(
+      {
+        ...defaultImport,
+        ...overrides,
+      } as never,
+    );
   }
 
   beforeEach(() => {

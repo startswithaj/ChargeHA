@@ -51,6 +51,6 @@ export const energyHandlers: Record<string, QueryHandler> = {
   "energy.history": (input, s) => ({
     readings: datedReadings(s, (input as { limit?: number }).limit ?? 60),
   }),
-  "energy.simulated_energy.getConfig": (_i, s) =>
+  "plugin.energy.simulated_energy.getConfig": (_i, s) =>
     deserializeSection(simulatedEnergyConfigDef, s.config),
 };

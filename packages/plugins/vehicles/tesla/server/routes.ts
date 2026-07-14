@@ -15,13 +15,16 @@ export function createTeslaHttpRoutes(
   // GET /callback — OAuth callback, exchanges code for tokens
   app.get("/callback", async (c) => {
     const code = c.req.query("code");
+    const state = c.req.query("state");
     if (!code) {
       return c.json({ error: "Missing authorization code" }, 400);
     }
 
     try {
-      // Use the same origin that was used to build the authorize URL
-      const origin = await deps.getConfig("oauth_origin") ||
+      // The token exchange must send the exact redirect_uri used at authorize
+      // time. Behind the tunnel the local server sees http, so the request
+      // URL is only a fallback (restart mid-handshake).
+      const origin = (state && tokenManager.takeAuthOrigin(state)) ||
         new URL(c.req.url).origin;
       await tokenManager.handleCallback(code, origin);
       // Return a page that closes itself — the original tab is polling for auth status

@@ -23,9 +23,13 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("./trpc.ts", () => ({
   trpc: {
-    tesla: {
-      registerPartner: {
-        useMutation: vi.fn(() => mocks.defaultResult),
+    plugin: {
+      vehicle: {
+        tesla: {
+          registerPartner: {
+            useMutation: vi.fn(() => mocks.defaultResult),
+          },
+        },
       },
     },
   },
@@ -37,11 +41,12 @@ describe("PartnerRegistrationStep", () => {
   function setRegisterPartnerState(
     overrides: Partial<typeof mocks.defaultResult>,
   ): void {
-    vi.mocked(trpc.tesla.registerPartner.useMutation).mockReturnValue({
-      ...mocks.defaultResult,
-      mutate: mocks.registerMutate,
-      ...overrides,
-    } as never);
+    vi.mocked(trpc.plugin.vehicle.tesla.registerPartner.useMutation)
+      .mockReturnValue({
+        ...mocks.defaultResult,
+        mutate: mocks.registerMutate,
+        ...overrides,
+      } as never);
   }
 
   beforeEach(() => {

@@ -7,17 +7,21 @@ import { StepNextHarness } from "../../../../client/src/components/Wizard/steps/
 import { makeStepProps } from "./test-helpers/stepProps.ts";
 
 const mocks = vi.hoisted(() => ({
-  selectVehicleMutate: vi.fn().mockResolvedValue({ success: true }),
-  setPriorityMutate: vi.fn().mockResolvedValue({ success: true }),
+  selectVehiclesMutate: vi.fn().mockResolvedValue({ success: true }),
   teslaVehiclesUseQuery: vi.fn(),
   vehicleListUseQuery: vi.fn(),
 }));
 
 vi.mock("./trpc.ts", () => ({
   trpc: {
-    tesla: {
-      teslaVehicles: {
-        useQuery: (...args: unknown[]) => mocks.teslaVehiclesUseQuery(...args),
+    plugin: {
+      vehicle: {
+        tesla: {
+          teslaVehicles: {
+            useQuery: (...args: unknown[]) =>
+              mocks.teslaVehiclesUseQuery(...args),
+          },
+        },
       },
     },
     vehicle: {
@@ -27,14 +31,13 @@ vi.mock("./trpc.ts", () => ({
     },
     useUtils: vi.fn(() => ({
       client: {
-        tesla: {
-          selectVehicle: {
-            mutate: mocks.selectVehicleMutate,
-          },
-        },
-        vehicle: {
-          setPriority: {
-            mutate: mocks.setPriorityMutate,
+        plugin: {
+          vehicle: {
+            tesla: {
+              selectVehicles: {
+                mutate: mocks.selectVehiclesMutate,
+              },
+            },
           },
         },
       },
@@ -160,15 +163,16 @@ describe("VehicleSelectionStep", () => {
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
-      expect(mocks.selectVehicleMutate).toHaveBeenCalledWith({
-        vin: "5YJ3E1EA1LF000001",
-        name: "My Model 3",
+      expect(mocks.selectVehiclesMutate).toHaveBeenCalledWith({
+        vehicles: [
+          { vin: "5YJ3E1EA1LF000001", name: "My Model 3", priority: 1 },
+        ],
       });
       expect(onNext).toHaveBeenCalled();
     });
   });
 
-  it("sets priority for each vehicle when multiple are selected", async () => {
+  it("saves all selected vehicles with priorities in one call", async () => {
     const onNext = vi.fn();
 
     renderWithProviders(
@@ -184,8 +188,13 @@ describe("VehicleSelectionStep", () => {
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
-      expect(mocks.selectVehicleMutate).toHaveBeenCalledTimes(2);
-      expect(mocks.setPriorityMutate).toHaveBeenCalledTimes(2);
+      expect(mocks.selectVehiclesMutate).toHaveBeenCalledTimes(1);
+      expect(mocks.selectVehiclesMutate).toHaveBeenCalledWith({
+        vehicles: [
+          { vin: "5YJ3E1EA1LF000001", name: "My Model 3", priority: 1 },
+          { vin: "7SAYGDEE5PA000002", name: "Family Model Y", priority: 2 },
+        ],
+      });
       expect(onNext).toHaveBeenCalled();
     });
   });

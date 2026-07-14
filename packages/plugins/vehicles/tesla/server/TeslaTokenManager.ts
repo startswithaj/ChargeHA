@@ -44,6 +44,11 @@ export class TeslaTokenManager {
   private readonly logger: Logger;
   private readonly fetch: FetchFn;
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Per-attempt OAuth handshake state: the redirect origin sent at authorize
+   *  time, keyed by the state param, so the callback's token exchange can send
+   *  the byte-identical redirect_uri. In-memory on purpose — a restart
+   *  mid-handshake just means clicking Authorize again. */
+  private readonly authOrigins = new Map<string, string>();
 
   constructor(
     deps: PluginDependencies,
@@ -80,8 +85,7 @@ export class TeslaTokenManager {
     state: string,
     requestOrigin: string,
   ): Promise<string> {
-    // Persist the origin so the OAuth callback can reconstruct the same redirect_uri
-    await this.deps.setConfig("oauth_origin", requestOrigin);
+    this.authOrigins.set(state, requestOrigin);
     const config = await this.getConfig();
     const params = new URLSearchParams({
       response_type: "code",
@@ -91,6 +95,14 @@ export class TeslaTokenManager {
       state,
     });
     return `${AUTH_BASE_URL}/oauth2/v3/authorize?${params.toString()}`;
+  }
+
+  /** The origin recorded for this auth attempt's state param, consumed on
+   *  read. Null when unknown (e.g. server restarted mid-handshake). */
+  takeAuthOrigin(state: string): string | null {
+    const origin = this.authOrigins.get(state) ?? null;
+    this.authOrigins.delete(state);
+    return origin;
   }
 
   async handleCallback(code: string, requestOrigin: string): Promise<void> {

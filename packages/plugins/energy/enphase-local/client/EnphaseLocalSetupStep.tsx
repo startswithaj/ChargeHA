@@ -10,8 +10,9 @@ import {
 } from "./EnphaseLocalForm.tsx";
 
 export function EnphaseLocalSetupStep(_props: StepProps) {
-  const { data: config } = trpc.energy.enphase_local.getConfig.useQuery();
-  const saveMutation = trpc.energy.enphase_local.setConfig.useMutation();
+  const { data: config } = trpc.plugin.energy.enphase_local.getConfig
+    .useQuery();
+  const saveMutation = trpc.plugin.energy.enphase_local.setConfig.useMutation();
 
   const [validated, setValidated] = useState<EnphaseLocalFormValues | null>(
     null,

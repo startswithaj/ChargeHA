@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import {
   authAuthorizeInput,
   authSelectVehicleInput,
+  authSelectVehiclesInput,
   wizardImportKeysInput,
 } from "@chargeha/shared/schemas";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
@@ -78,6 +79,12 @@ export const teslaRouter = router({
     .input(authSelectVehicleInput)
     .mutation(({ ctx, input }) => {
       return getTeslaPlugin(ctx).teslaService.selectVehicle(input);
+    }),
+
+  selectVehicles: publicProcedure
+    .input(authSelectVehiclesInput)
+    .mutation(({ ctx, input }) => {
+      return getTeslaPlugin(ctx).teslaService.selectVehicles(input);
     }),
 
   checkKeyPairing: publicProcedure.mutation(async ({ ctx }) => {
