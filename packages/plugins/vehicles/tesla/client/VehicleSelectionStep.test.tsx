@@ -38,6 +38,9 @@ vi.mock("./trpc.ts", () => ({
           },
         },
       },
+      vehicle: {
+        list: { invalidate: vi.fn(() => Promise.resolve()) },
+      },
     })),
   },
 }));

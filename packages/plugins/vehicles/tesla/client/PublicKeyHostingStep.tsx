@@ -8,6 +8,7 @@ import {
   hintUnlessLoading,
   useWizardNextControl,
 } from "../../../../client/src/components/Wizard/wizardNextControl.ts";
+import { canTeslaFetchKeyFrom } from "./oauthOrigin.ts";
 import {
   AiPromptInstructions,
   GitHubPagesInstructions,
@@ -207,21 +208,41 @@ function HostingMethodSection(
   );
 }
 
+/** Tunnel start/stop persists/clears tesla.public_key_domain server-side —
+ *  invalidate the config cache so the wizard reflects the new domain. */
+function useTunnelMutations() {
+  const tunnelStatus = trpc.wizard.tunnelStatus.useQuery();
+  const utils = trpc.useUtils();
+  const onTunnelChanged = () => {
+    tunnelStatus.refetch();
+    utils.tesla.getConfig.invalidate();
+  };
+  return {
+    tunnelStatus,
+    startTunnelMutation: trpc.wizard.startTunnel.useMutation({
+      onSuccess: onTunnelChanged,
+    }),
+    stopTunnelMutation: trpc.wizard.stopTunnel.useMutation({
+      onSuccess: onTunnelChanged,
+    }),
+  };
+}
+
+function hostingHint(configured: boolean, tunnelChosen: boolean): string {
+  if (configured) return "Public key hosting is configured — Next continues";
+  if (tunnelChosen) return "Start the tunnel to continue";
+  return "Configure public key hosting to continue";
+}
+
 export function PublicKeyHostingStep(_props: StepProps): JSX.Element {
   const { data: teslaConfig } = useTeslaConfig();
   const browserOrigin = globalThis.location?.origin || "";
   const publicKey = teslaConfig?.ecPublicKeyPem || "";
 
-  const tunnelStatus = trpc.wizard.tunnelStatus.useQuery();
+  const { tunnelStatus, startTunnelMutation, stopTunnelMutation } =
+    useTunnelMutations();
   const tunnelActive = tunnelStatus.data?.active ?? false;
   const tunnelUrl = tunnelStatus.data?.url;
-
-  const startTunnelMutation = trpc.wizard.startTunnel.useMutation({
-    onSuccess: () => tunnelStatus.refetch(),
-  });
-  const stopTunnelMutation = trpc.wizard.stopTunnel.useMutation({
-    onSuccess: () => tunnelStatus.refetch(),
-  });
 
   const [choice, setChoice] = useState<HostingChoice>(null);
   const [hostingMethod, setHostingMethod] = useState<HostingMethod>(null);
@@ -231,15 +252,18 @@ export function PublicKeyHostingStep(_props: StepProps): JSX.Element {
 
   const saveDomainMutation = useTeslaConfigMutation();
 
-  const domainConfigured = (tunnelActive && !!tunnelUrl) ||
-    !!teslaConfig?.teslaPublicKeyDomain;
+  const tunnelRunning = tunnelActive && !!tunnelUrl;
+  // Choosing the tunnel method means the tunnel itself must be running — a
+  // domain left over from another method doesn't count.
+  const tunnelChosen = choice === "no" && hostingMethod === "tunnel";
+  const domainConfigured = tunnelChosen
+    ? tunnelRunning
+    : tunnelRunning || !!teslaConfig?.teslaPublicKeyDomain;
   useWizardNextControl({
     canProceed: domainConfigured,
     hint: hintUnlessLoading(
       teslaConfig === undefined || tunnelStatus.isLoading,
-      domainConfigured
-        ? "Public key hosting is configured — Next continues"
-        : "Configure public key hosting to continue",
+      hostingHint(domainConfigured, tunnelChosen),
     ),
   });
 
@@ -268,6 +292,17 @@ export function PublicKeyHostingStep(_props: StepProps): JSX.Element {
           <Callout.Text>
             Public key domain is already configured as{" "}
             <strong>{teslaConfig.teslaPublicKeyDomain}</strong>.
+          </Callout.Text>
+        </Callout.Root>
+      )}
+
+      {!canTeslaFetchKeyFrom(browserOrigin) && (
+        <Callout.Root color="amber">
+          <Callout.Text>
+            You're accessing ChargeHA at <strong>{browserOrigin}</strong>{" "}
+            — Tesla's servers likely can't fetch the key from this address, so
+            "No" with a hosting method (the Cloudflare Tunnel is the quickest)
+            is the usual choice here.
           </Callout.Text>
         </Callout.Root>
       )}

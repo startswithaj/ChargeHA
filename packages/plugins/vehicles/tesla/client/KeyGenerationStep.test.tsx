@@ -16,6 +16,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("./trpc.ts", () => ({
   trpc: {
+    useUtils: vi.fn(() => ({
+      tesla: { getConfig: { invalidate: vi.fn() } },
+    })),
     tesla: {
       getConfig: {
         useQuery: vi.fn(() => ({ data: {}, isLoading: false, error: null })),

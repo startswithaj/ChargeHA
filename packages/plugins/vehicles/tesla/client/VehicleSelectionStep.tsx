@@ -214,6 +214,8 @@ export function VehicleSelectionStep(_props: StepProps): JSX.Element {
         priorities,
         utils,
       });
+      // The pairing step reads vehicle.list — drop the pre-save cache.
+      await utils.vehicle.list.invalidate();
       return true;
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Failed to save");

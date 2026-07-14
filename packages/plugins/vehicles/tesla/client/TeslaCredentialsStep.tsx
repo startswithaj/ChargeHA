@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Button, Callout, Select, Text, TextField } from "@radix-ui/themes";
 import { Check, CheckCircle, Copy, ExternalLink } from "lucide-react";
 import { useTeslaConfig, useTeslaConfigMutation } from "./useTeslaConfig.ts";
 import { trpc } from "./trpc.ts";
 import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
+import { useWizardNextControl } from "../../../../client/src/components/Wizard/wizardNextControl.ts";
+import { callbackUrl, resolveOAuthOrigin } from "./oauthOrigin.ts";
+import { UnstableOriginCallout } from "./UnstableOriginCallout.tsx";
 import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
 
 const REGIONS = [
@@ -56,7 +59,7 @@ function CredentialInputs(
       <div className={styles.fieldGroup}>
         <Text as="label" size="2" weight="medium">Client ID</Text>
         <TextField.Root
-          placeholder="e.g., f689df54-d25a-487b-9217-ba25fd4f0d3f"
+          placeholder="e.g., 12ab34cd-56ef-78ab-90cd-12ef34ab56cd"
           value={clientId}
           onChange={(e: { target: { value: string } }) =>
             setClientId(e.target.value)}
@@ -94,9 +97,10 @@ function CredentialInputs(
 }
 
 function DeveloperPortalInstructions(
-  { currentOrigin, redirectUri }: {
-    currentOrigin: string;
+  { allowedOrigin, redirectUri, viaTunnel }: {
+    allowedOrigin: string;
     redirectUri: string;
+    viaTunnel: boolean;
   },
 ) {
   return (
@@ -146,20 +150,44 @@ function DeveloperPortalInstructions(
           </Text>
         </li>
       </ol>
-      <Text as="p" size="2" weight="medium" style={{ marginTop: "0.75rem" }}>
-        Allowed Origin URLs:
-      </Text>
-      <div className={styles.copyRow}>
-        <code className={styles.codeSnippet}>{currentOrigin}</code>
-        <CopyButton text={currentOrigin} />
-      </div>
+      {allowedOrigin && (
+        <>
+          <Text
+            as="p"
+            size="2"
+            weight="medium"
+            style={{ marginTop: "0.75rem" }}
+          >
+            Allowed Origin URL(s):
+          </Text>
+          <div className={styles.copyRow}>
+            <code className={styles.codeSnippet}>{allowedOrigin}</code>
+            <CopyButton text={allowedOrigin} />
+          </div>
+        </>
+      )}
       <Text as="p" size="2" weight="medium" style={{ marginTop: "0.5rem" }}>
-        Allowed Redirect URIs:
+        Allowed Redirect URI(s):
       </Text>
       <div className={styles.copyRow}>
         <code className={styles.codeSnippet}>{redirectUri}</code>
         <CopyButton text={redirectUri} />
       </div>
+      {viaTunnel && (
+        <>
+          <Text as="p" size="2" weight="medium" style={{ marginTop: "0.5rem" }}>
+            Allowed Returned URL(s):
+          </Text>
+          <div className={styles.copyRow}>
+            <code className={styles.codeSnippet}>{redirectUri}</code>
+            <CopyButton text={redirectUri} />
+          </div>
+          <Text as="p" size="1" color="gray" style={{ marginTop: "0.25rem" }}>
+            Tesla requires the callback in both Redirect URIs and Returned URLs
+            when using a tunnel domain.
+          </Text>
+        </>
+      )}
       <Text as="p" size="1" color="gray" style={{ marginTop: "0.5rem" }}>
         After updating these values on the Tesla Developer Portal, wait 2-3
         minutes for changes to propagate before continuing.
@@ -168,7 +196,42 @@ function DeveloperPortalInstructions(
   );
 }
 
-export function TeslaCredentialsStep({ onNext }: StepProps): JSX.Element {
+function OriginCallouts(
+  { viaTunnel, origin, browserOrigin }: {
+    viaTunnel: boolean;
+    origin: string | null;
+    browserOrigin: string;
+  },
+) {
+  if (viaTunnel && origin) {
+    return (
+      <Callout.Root color="green">
+        <Callout.Icon>
+          <CheckCircle size={16} />
+        </Callout.Icon>
+        <Callout.Text>
+          Cloudflare Tunnel is active. Your address isn't registrable with Tesla
+          (plain http), so the OAuth URLs below use the tunnel — they must be
+          re-registered whenever the tunnel restarts.
+        </Callout.Text>
+      </Callout.Root>
+    );
+  }
+  if (!origin) {
+    return <UnstableOriginCallout browserOrigin={browserOrigin} />;
+  }
+  return null;
+}
+
+function credentialsHint(valid: boolean, hasOrigin: boolean): string {
+  if (!hasOrigin) {
+    return "Start the Cloudflare Tunnel on the Public Key Hosting step to continue";
+  }
+  if (!valid) return "Enter your Client ID and Client Secret to continue";
+  return "Next saves your Tesla credentials";
+}
+
+export function TeslaCredentialsStep(_props: StepProps): JSX.Element {
   const { data: teslaConfig } = useTeslaConfig();
   const [clientId, setClientId] = useState(
     teslaConfig?.teslaClientId || "",
@@ -189,11 +252,35 @@ export function TeslaCredentialsStep({ onNext }: StepProps): JSX.Element {
   const tunnelStatus = trpc.wizard.tunnelStatus.useQuery();
   const tunnelUrl = tunnelStatus.data?.url;
 
-  // Use tunnel URL when active, otherwise use browser origin
-  const currentOrigin = tunnelUrl ?? browserOrigin;
-  const redirectUri = `${currentOrigin}/api/vehicle/tesla/callback`;
+  const oauth = resolveOAuthOrigin(browserOrigin, tunnelUrl);
+  const redirectUri = oauth.origin ? callbackUrl(oauth.origin) : null;
+
+  // Partner registration requires the public key domain in Allowed Origins
+  // (Tesla: "Root domain must match registered allowed origin").
+  const allowedOrigin = teslaConfig?.teslaPublicKeyDomain ?? "";
 
   const saveMutation = useTeslaConfigMutation();
+
+  const save = useCallback(async () => {
+    try {
+      await saveMutation.mutateAsync({
+        teslaClientId: clientId.trim(),
+        teslaClientSecret: clientSecret.trim(),
+        teslaRegion: region as "na" | "eu" | "cn",
+      });
+      return true;
+    } catch {
+      // Stay on the step — the mutation error is rendered below.
+      return false;
+    }
+  }, [saveMutation, clientId, clientSecret, region]);
+
+  useWizardNextControl({
+    canProceed: isValid && !!oauth.origin,
+    hint: credentialsHint(isValid, !!oauth.origin),
+    pendingLabel: "Saving...",
+    onBeforeNext: save,
+  });
 
   return (
     <div className={styles.stepContainer}>
@@ -202,21 +289,19 @@ export function TeslaCredentialsStep({ onNext }: StepProps): JSX.Element {
         application on the Tesla Developer Portal first.
       </Text>
 
-      {tunnelUrl && (
-        <Callout.Root color="green">
-          <Callout.Icon>
-            <CheckCircle size={16} />
-          </Callout.Icon>
-          <Callout.Text>
-            Cloudflare Tunnel is active. The URLs below use your tunnel address.
-          </Callout.Text>
-        </Callout.Root>
-      )}
-
-      <DeveloperPortalInstructions
-        currentOrigin={currentOrigin}
-        redirectUri={redirectUri}
+      <OriginCallouts
+        viaTunnel={oauth.viaTunnel}
+        origin={oauth.origin}
+        browserOrigin={browserOrigin}
       />
+
+      {redirectUri && (
+        <DeveloperPortalInstructions
+          allowedOrigin={allowedOrigin}
+          redirectUri={redirectUri}
+          viaTunnel={oauth.viaTunnel}
+        />
+      )}
 
       <CredentialInputs
         clientId={clientId}
@@ -226,23 +311,6 @@ export function TeslaCredentialsStep({ onNext }: StepProps): JSX.Element {
         region={region}
         setRegion={setRegion}
       />
-
-      <div className={styles.stepActions}>
-        <Button
-          onClick={() =>
-            saveMutation.mutate(
-              {
-                teslaClientId: clientId.trim(),
-                teslaClientSecret: clientSecret.trim(),
-                teslaRegion: region as "na" | "eu" | "cn",
-              },
-              { onSuccess: () => onNext() },
-            )}
-          disabled={!isValid || saveMutation.isPending}
-        >
-          {saveMutation.isPending ? "Saving..." : "Save & Continue"}
-        </Button>
-      </div>
 
       {saveMutation.error && (
         <Text as="p" size="2" color="red">

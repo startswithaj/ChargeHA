@@ -202,6 +202,20 @@ describe("WizardShell", () => {
     expect(mockSetStepId).toHaveBeenCalledWith("timezone");
   });
 
+  it("clicking Skip inside a plugin group skips the whole group", () => {
+    const steps = makeSteps().map((s) =>
+      s.id.startsWith("tesla-") ? { ...s, group: "tesla" } : s
+    );
+    setMockStepId("tesla-credentials");
+
+    renderWithProviders(<WizardShell steps={steps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+
+    // Skips the remaining tesla steps straight to inverter-type.
+    expect(mockSetStepId).toHaveBeenCalledWith("inverter-type");
+  });
+
   it("resumes at saved step from DB", () => {
     setMockStepId("tesla-credentials");
 

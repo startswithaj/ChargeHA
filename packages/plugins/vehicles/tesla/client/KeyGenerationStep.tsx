@@ -111,6 +111,21 @@ function ErrorCallout(
   );
 }
 
+/** Key generation writes the key pair server-side — invalidate the config
+ *  cache so later steps (hosting instructions, AI prompt) see the new key. */
+function useKeyMutations() {
+  const utils = trpc.useUtils();
+  const onKeysChanged = () => utils.tesla.getConfig.invalidate();
+  return {
+    generateMutation: trpc.tesla.generateKeys.useMutation({
+      onSuccess: onKeysChanged,
+    }),
+    importMutation: trpc.tesla.importKeys.useMutation({
+      onSuccess: onKeysChanged,
+    }),
+  };
+}
+
 export function KeyGenerationStep(_props: StepProps): JSX.Element {
   const [mode, setMode] = useState<Mode>("choose");
   const { data: teslaConfig } = useTeslaConfig();
@@ -124,9 +139,7 @@ export function KeyGenerationStep(_props: StepProps): JSX.Element {
     importMutation.reset();
   };
 
-  const generateMutation = trpc.tesla.generateKeys.useMutation();
-
-  const importMutation = trpc.tesla.importKeys.useMutation();
+  const { generateMutation, importMutation } = useKeyMutations();
 
   const handleGenerate = () => {
     setMode("generate");

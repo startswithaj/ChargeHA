@@ -85,6 +85,18 @@ export class TeslaVehiclePlugin implements VehiclePlugin {
   }
 
   private async startup(): Promise<void> {
+    // A quick-tunnel public key domain cannot survive a restart (the tunnel
+    // runs in-process), so a persisted trycloudflare domain is dead by
+    // definition here — clear it so the wizard doesn't present it as
+    // configured. Starting a new tunnel re-persists via onTunnelStarted.
+    const domain = await this.deps.getConfig("public_key_domain");
+    if (domain?.endsWith(".trycloudflare.com")) {
+      await this.deps.setConfig("public_key_domain", "");
+      this.deps.log.info(
+        `Cleared expired tunnel public key domain ${domain}`,
+      );
+    }
+
     await this.teslaProxyManager.start();
 
     const hasCredentials = await this.deps.getConfig("client_id");

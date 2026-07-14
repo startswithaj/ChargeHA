@@ -3,6 +3,12 @@ import { Button, Callout, Text } from "@radix-ui/themes";
 import { CheckCircle, ExternalLink, Loader2 } from "lucide-react";
 import { trpc } from "./trpc.ts";
 import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
+import {
+  hintUnlessLoading,
+  useWizardNextControl,
+} from "../../../../client/src/components/Wizard/wizardNextControl.ts";
+import { callbackUrl, resolveOAuthOrigin } from "./oauthOrigin.ts";
+import { UnstableOriginCallout } from "./UnstableOriginCallout.tsx";
 import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
 
 type Status = "idle" | "polling" | "success" | "error";
@@ -28,19 +34,14 @@ function PollingView({ onCancel }: { onCancel: () => void }) {
   );
 }
 
-function SuccessView({ onNext }: { onNext: () => void }) {
+function SuccessView() {
   return (
-    <>
-      <Callout.Root color="green">
-        <Callout.Icon>
-          <CheckCircle size={16} />
-        </Callout.Icon>
-        <Callout.Text>Tesla account authorized successfully!</Callout.Text>
-      </Callout.Root>
-      <div className={styles.stepActions}>
-        <Button onClick={onNext}>Continue</Button>
-      </div>
-    </>
+    <Callout.Root color="green">
+      <Callout.Icon>
+        <CheckCircle size={16} />
+      </Callout.Icon>
+      <Callout.Text>Tesla account authorized successfully!</Callout.Text>
+    </Callout.Root>
   );
 }
 
@@ -62,9 +63,18 @@ function ErrorView(
   );
 }
 
-export function TeslaAuthStep({ onNext }: StepProps): JSX.Element {
+export function TeslaAuthStep(_props: StepProps): JSX.Element {
   const [status, setStatus] = useState<Status>("idle");
   const tunnelStatus = trpc.wizard.tunnelStatus.useQuery();
+  const oauth = resolveOAuthOrigin(
+    globalThis.location?.origin ?? "",
+    tunnelStatus.data?.url,
+  );
+  const redirectUri = oauth.origin ? callbackUrl(oauth.origin) : null;
+
+  const authorize = () => {
+    if (oauth.origin) authUrlMutation.mutate({ origin: oauth.origin });
+  };
 
   // Query auth status on mount (always enabled), poll during "polling" state
   const authStatusQuery = trpc.tesla.teslaStatus.useQuery(undefined, {
@@ -86,6 +96,16 @@ export function TeslaAuthStep({ onNext }: StepProps): JSX.Element {
     onError: () => setStatus("error"),
   });
 
+  useWizardNextControl({
+    canProceed: status === "success",
+    hint: hintUnlessLoading(
+      authStatusQuery.isLoading,
+      status === "success"
+        ? "Tesla account authorized — Next continues"
+        : "Authorize with Tesla to continue",
+    ),
+  });
+
   return (
     <div className={styles.stepContainer}>
       <Text as="p" size="3" color="gray">
@@ -93,19 +113,29 @@ export function TeslaAuthStep({ onNext }: StepProps): JSX.Element {
         window where you can log in to Tesla and grant access.
       </Text>
 
-      {status === "idle" && (
-        <div className={styles.stepActions}>
-          <Button
-            size="3"
-            onClick={() =>
-              authUrlMutation.mutate({
-                origin: tunnelStatus.data?.url ?? globalThis.location.origin,
-              })}
-          >
-            <ExternalLink size={16} />
-            Authorize with Tesla
-          </Button>
-        </div>
+      {status === "idle" && redirectUri && oauth.origin && (
+        <>
+          <Text as="p" size="2" color="gray">
+            Redirect URI that will be sent — it must be listed in your Tesla
+            app's Allowed Redirect URI(s)
+            {oauth.viaTunnel ? " and Allowed Returned URL(s)" : ""}:
+          </Text>
+          <div className={styles.copyRow}>
+            <code className={styles.codeSnippet}>{redirectUri}</code>
+          </div>
+          <div className={styles.stepActions}>
+            <Button size="3" onClick={authorize}>
+              <ExternalLink size={16} />
+              Authorize with Tesla
+            </Button>
+          </div>
+        </>
+      )}
+
+      {status === "idle" && !oauth.origin && (
+        <UnstableOriginCallout
+          browserOrigin={globalThis.location?.origin ?? ""}
+        />
       )}
 
       {status === "polling" && (
@@ -117,7 +147,7 @@ export function TeslaAuthStep({ onNext }: StepProps): JSX.Element {
         />
       )}
 
-      {status === "success" && <SuccessView onNext={onNext} />}
+      {status === "success" && <SuccessView />}
 
       {status === "error" && (
         <ErrorView
@@ -125,10 +155,7 @@ export function TeslaAuthStep({ onNext }: StepProps): JSX.Element {
             "Failed to start authorization"}
           onRetry={() => {
             authUrlMutation.reset();
-            authUrlMutation.mutate({
-              origin: tunnelStatus.data?.url ??
-                globalThis.location?.origin ?? "",
-            });
+            authorize();
           }}
         />
       )}

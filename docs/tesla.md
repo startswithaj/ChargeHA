@@ -118,19 +118,24 @@ Select **Authorisation Code and Machine-to-Machine**.
   Machine-to-Machine (for the one-time partner registration call).
 - Do NOT select "Machine-to-Machine only" — that's for enterprise fleets.
 
-**Allowed Origin URLs and Redirect URIs**
+**Allowed Origin URLs, Redirect URIs, and Returned URLs**
 
 Tesla requires you to whitelist these. The wizard will tell you the exact values
 when you reach that step — you can come back and fill them in then.
 
-If ChargeHA runs on your local network:
+The OAuth redirect (login round-trip) uses your browser's address when it is
+`localhost` or `https` — stable, so you register it once. On a plain-http
+network address the wizard uses the Cloudflare Tunnel URL instead; tunnel URLs
+change on every tunnel start, so the portal entries must be updated whenever the
+tunnel restarts.
 
-- **Localhost** — whitelist `http://localhost:<PORT>` (e.g.
-  `http://localhost:5175` for Vite dev).
-- **Cloudflare Tunnel** — the wizard can generate a temporary HTTPS tunnel for
-  you. No account required.
-- **GitHub Pages** — if you host your public key on GitHub Pages, whitelist that
-  domain.
+- **Allowed Origin URL(s)** — the domain your public key is served from (partner
+  registration rejects domains not listed here).
+- **Allowed Redirect URI(s)** — the OAuth callback URL,
+  `<origin>/api/vehicle/tesla/callback`.
+- **Allowed Returned URL(s)** — when the callback uses a tunnel domain, the same
+  callback URL must **also** be listed here; Tesla rejects the login with
+  "redirect_uri not registered" otherwise.
 
 **OAuth Scopes**
 
@@ -155,7 +160,7 @@ approved.
 
 Once approved, note your:
 
-- **Client ID** (a UUID like `f689df54-d25a-487b-9217-ba25fd4f0d3f`).
+- **Client ID** (a UUID like `12ab34cd-56ef-78ab-90cd-12ef34ab56cd`).
 - **Client Secret** (starts with `ta-secret.`).
 
 ### Part 2: ChargeHA Setup Wizard
@@ -323,13 +328,16 @@ You should never need to re-authorize unless:
 
 ## Troubleshooting
 
-### "We don't recognize this redirect_uri"
+### "We don't recognize this redirect_uri" / "redirect_uri is not registered"
 
 - The `redirect_uri` in the OAuth URL must **exactly match** one of the Allowed
   Redirect URIs in your Tesla developer app.
+- When the callback uses a **tunnel domain**, the same URL must also be listed
+  in **Allowed Returned URL(s)** — being in Allowed Redirect URIs alone is not
+  sufficient; Tesla rejects the login until both are set.
 - Tesla's URI field requires a path — bare domains are rejected. ChargeHA's
   callback path is `/api/vehicle/tesla/callback`.
-- Changes to Allowed Redirect URIs may take a few minutes to propagate.
+- Changes to these fields may take a few minutes to propagate.
 
 ### "Root domain must match registered allowed origin"
 

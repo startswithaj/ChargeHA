@@ -3,16 +3,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../../client/src/test-utils.tsx";
 import { TeslaCredentialsStep } from "./TeslaCredentialsStep.tsx";
+import { StepNextHarness } from "../../../../client/src/components/Wizard/steps/test-helpers/StepNextHarness.tsx";
 import { trpc } from "./trpc.ts";
 import { makeStepProps } from "./test-helpers/stepProps.ts";
 
 const mocks = vi.hoisted(() => {
   const mutate = vi.fn();
+  const mutateAsync = vi.fn();
   return {
     mutate,
+    mutateAsync,
     defaultResult: {
       mutate,
-      mutateAsync: vi.fn(),
+      mutateAsync,
       isPending: false,
       isSuccess: false,
       isError: false,
@@ -110,7 +113,7 @@ describe("TeslaCredentialsStep", () => {
       .toBeInTheDocument();
   });
 
-  it("renders setup instructions, allowed origin, and redirect URI", () => {
+  it("renders setup instructions and the browser-origin redirect URI", () => {
     renderWithProviders(<TeslaCredentialsStep {...makeStepProps()} />);
 
     expect(screen.getByText(/developer\.tesla\.com/)).toBeInTheDocument();
@@ -120,8 +123,13 @@ describe("TeslaCredentialsStep", () => {
     expect(screen.getByText(/Vehicle Information/)).toBeInTheDocument();
     expect(screen.getByText(/Vehicle Location/)).toBeInTheDocument();
     expect(screen.getByText(/Vehicle Charging Management/)).toBeInTheDocument();
-    expect(screen.getByText(/Allowed Origin URLs/)).toBeInTheDocument();
-    expect(screen.getByText(/Allowed Redirect URIs/)).toBeInTheDocument();
+    expect(screen.getByText(/Allowed Redirect URI\(s\)/)).toBeInTheDocument();
+    // jsdom origin is localhost — a stable origin, used directly.
+    expect(
+      screen.getByText(
+        `${globalThis.location.origin}/api/vehicle/tesla/callback`,
+      ),
+    ).toBeInTheDocument();
   });
 
   // ---- User interactions ----
@@ -143,30 +151,41 @@ describe("TeslaCredentialsStep", () => {
 
   // ---- Validation ----
 
-  it("Save button is disabled when required fields are empty", () => {
-    renderWithProviders(<TeslaCredentialsStep {...makeStepProps()} />);
+  it("Next is disabled when required fields are empty", () => {
+    renderWithProviders(
+      <StepNextHarness onAdvance={vi.fn()}>
+        <TeslaCredentialsStep {...makeStepProps()} />
+      </StepNextHarness>,
+    );
 
-    const saveButton = screen.getByRole("button", { name: /Save & Continue/ });
-    expect(saveButton).toBeDisabled();
+    const nextButton = screen.getByRole("button", { name: "Next" });
+    expect(nextButton).toBeDisabled();
+    expect(
+      screen.getByText("Enter your Client ID and Client Secret to continue"),
+    ).toBeInTheDocument();
 
     // Fill only client ID — still disabled
     fireEvent.change(screen.getByLabelText("Client ID"), {
       target: { value: "test-client-id" },
     });
-    expect(saveButton).toBeDisabled();
+    expect(nextButton).toBeDisabled();
 
     // Fill client secret too — now enabled
     fireEvent.change(screen.getByLabelText("Client Secret"), {
       target: { value: "ta-secret.test" },
     });
-    expect(saveButton).not.toBeDisabled();
+    expect(nextButton).not.toBeDisabled();
   });
 
   // ---- API calls ----
 
-  it("clicking Save & Continue calls setConfig with credentials", async () => {
+  it("clicking Next calls setConfig with credentials", async () => {
+    const onNext = vi.fn();
+    mocks.mutateAsync.mockResolvedValue({});
     renderWithProviders(
-      <TeslaCredentialsStep {...makeStepProps()} />,
+      <StepNextHarness onAdvance={onNext}>
+        <TeslaCredentialsStep {...makeStepProps({ onNext })} />
+      </StepNextHarness>,
     );
 
     fireEvent.change(screen.getByLabelText("Client ID"), {
@@ -176,17 +195,17 @@ describe("TeslaCredentialsStep", () => {
       target: { value: "ta-secret.test" },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /Save & Continue/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
-      expect(mocks.mutate).toHaveBeenCalledWith(
-        {
-          teslaClientId: "test-client-id",
-          teslaClientSecret: "ta-secret.test",
-          teslaRegion: "na",
-        },
-        expect.objectContaining({ onSuccess: expect.any(Function) }),
-      );
+      expect(mocks.mutateAsync).toHaveBeenCalledWith({
+        teslaClientId: "test-client-id",
+        teslaClientSecret: "ta-secret.test",
+        teslaRegion: "na",
+      });
+    });
+    await waitFor(() => {
+      expect(onNext).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -203,35 +222,55 @@ describe("TeslaCredentialsStep", () => {
     });
   });
 
-  it("shows 'Saving...' while mutation is pending", async () => {
-    setSetConfigState({ isPending: true });
+  it("shows 'Saving...' on Next while the save is in flight", async () => {
+    let resolveSave = (_v: unknown) => {};
+    mocks.mutateAsync.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
 
-    renderWithProviders(<TeslaCredentialsStep {...makeStepProps()} />);
+    renderWithProviders(
+      <StepNextHarness onAdvance={vi.fn()}>
+        <TeslaCredentialsStep {...makeStepProps()} />
+      </StepNextHarness>,
+    );
+
+    fireEvent.change(screen.getByLabelText("Client ID"), {
+      target: { value: "test-client-id" },
+    });
+    fireEvent.change(screen.getByLabelText("Client Secret"), {
+      target: { value: "ta-secret.test" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
       expect(screen.getByText("Saving...")).toBeInTheDocument();
     });
+    resolveSave({});
   });
 
   // ---- Tunnel behavior ----
 
-  it("uses tunnel URL for callout, allowed origin, and redirect URI", async () => {
+  it("keeps the stable browser origin for OAuth even when a tunnel is active", async () => {
     setTunnelActive("https://test-tunnel.trycloudflare.com");
 
     renderWithProviders(<TeslaCredentialsStep {...makeStepProps()} />);
 
+    // jsdom origin is localhost (stable) — the tunnel must NOT hijack OAuth.
     await waitFor(() => {
       expect(
-        screen.getByText(/Cloudflare Tunnel is active/),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText("https://test-tunnel.trycloudflare.com"),
-      ).toBeInTheDocument();
-      expect(
         screen.getByText(
-          "https://test-tunnel.trycloudflare.com/api/vehicle/tesla/callback",
+          `${globalThis.location.origin}/api/vehicle/tesla/callback`,
         ),
       ).toBeInTheDocument();
     });
+    expect(
+      screen.queryByText(/Cloudflare Tunnel is active/),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Allowed Returned URL\(s\)/),
+    ).not.toBeInTheDocument();
   });
 });

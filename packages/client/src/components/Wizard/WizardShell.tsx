@@ -25,6 +25,9 @@ export interface WizardStepConfig {
   label: string;
   /** Hide the Next/Finish button (Back stays) — e.g. the Done step completes via its own CTA. */
   hideNext?: boolean;
+  /** Steps sharing a group (e.g. one plugin's setup sequence) are skipped as
+   *  a block — Skip jumps past the whole group, not just one step. */
+  group?: string;
   render: (props: StepProps) => ReactNode;
 }
 
@@ -64,8 +67,13 @@ function useWizardCallbacks(
   }, [currentStep, goToStep]);
 
   const handleSkip = useCallback(() => {
-    if (!steps) return;
-    if (currentStep < steps.length - 1) goToStep(currentStep + 1);
+    if (!steps || currentStep >= steps.length - 1) return;
+    // Skipping inside a plugin's step group abandons the whole group.
+    const group = steps[currentStep]?.group;
+    const nextIndex = group
+      ? steps.findIndex((s, i) => i > currentStep && s.group !== group)
+      : currentStep + 1;
+    goToStep(nextIndex === -1 ? steps.length - 1 : nextIndex);
   }, [currentStep, steps, goToStep]);
 
   const handleSkipToEnd = useCallback(() => {
@@ -85,7 +93,6 @@ function WizardNav(
     onSkip,
     onNext,
     nextDisabled,
-    nextBlocked,
     busyLabel,
     hint,
   }: {
@@ -96,48 +103,47 @@ function WizardNav(
     onSkip: () => void;
     onNext: () => void;
     nextDisabled: boolean;
-    nextBlocked: boolean;
     busyLabel: string | null;
     hint: string | null;
   },
 ) {
   return (
-    <div className={styles.navigation}>
-      <Button
-        variant="soft"
-        onClick={onBack}
-        disabled={isFirstStep}
-        aria-label="Back"
-      >
-        <ArrowLeft size={16} />
-        Back
-      </Button>
-      <div className={styles.navigationRight}>
-        {hint && (
-          <Text
-            size="2"
-            color={nextBlocked ? "orange" : "gray"}
-            weight="medium"
-          >
+    <div className={styles.navFooter}>
+      {hint && (
+        <div className={styles.navHintRow}>
+          <Text size="2" color="gray" weight="medium">
             {hint}
           </Text>
-        )}
-        {!isLastStep && (
-          <Button variant="ghost" onClick={onSkip} aria-label="Skip">
-            Skip
-            <SkipForward size={16} />
-          </Button>
-        )}
-        {!hideNext && (
-          <Button
-            onClick={onNext}
-            disabled={nextDisabled}
-            aria-label={isLastStep ? "Finish" : "Next"}
-          >
-            {busyLabel ?? (isLastStep ? "Finish" : "Next")}
-            {!busyLabel && !isLastStep && <ArrowRight size={16} />}
-          </Button>
-        )}
+        </div>
+      )}
+      <div className={styles.navigation}>
+        <Button
+          variant="soft"
+          onClick={onBack}
+          disabled={isFirstStep}
+          aria-label="Back"
+        >
+          <ArrowLeft size={16} />
+          Back
+        </Button>
+        <div className={styles.navigationRight}>
+          {!isLastStep && (
+            <Button variant="ghost" onClick={onSkip} aria-label="Skip">
+              Skip
+              <SkipForward size={16} />
+            </Button>
+          )}
+          {!hideNext && (
+            <Button
+              onClick={onNext}
+              disabled={nextDisabled}
+              aria-label={isLastStep ? "Finish" : "Next"}
+            >
+              {busyLabel ?? (isLastStep ? "Finish" : "Next")}
+              {!busyLabel && !isLastStep && <ArrowRight size={16} />}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -166,8 +172,6 @@ function useNextControlState(advance: () => void) {
     setControl,
     handleNextClick,
     disabled: pending || (control ? !control.canProceed : false),
-    // Blocked (missing input) is highlighted; merely busy is not.
-    blocked: control ? !control.canProceed : false,
     busyLabel: pending ? control?.pendingLabel ?? "Working..." : null,
     hint: control?.hint ?? null,
   };
@@ -309,7 +313,6 @@ export function WizardShell({ steps, onComplete, onExit }: WizardShellProps) {
         onSkip={handleSkip}
         onNext={nextControl.handleNextClick}
         nextDisabled={nextControl.disabled}
-        nextBlocked={nextControl.blocked}
         busyLabel={nextControl.busyLabel}
         hint={nextControl.hint}
       />

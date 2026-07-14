@@ -225,8 +225,10 @@ function useAuthEffects(
         onNext();
         return;
       }
-      // Pre-select whatever auth mode is already configured.
-      if (authMode === "none" || authMode === "local" || authMode === "oidc") {
+      // Pre-select only an explicitly configured mode. "none" is the server
+      // default on a fresh install — highlighting it reads as a preselection
+      // the user never made.
+      if (authMode === "local" || authMode === "oidc") {
         setSelectedMode(authMode);
       }
       setSessionChecked(true);

@@ -106,6 +106,7 @@ describe("PublicKeyHostingStep", () => {
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
+    vi.unstubAllGlobals();
     cleanup();
   });
 
@@ -126,7 +127,26 @@ describe("PublicKeyHostingStep", () => {
 
   // ---- User interactions ----
 
+  /** The Yes flow needs an origin Tesla could reach — jsdom's localhost
+   *  origin correctly disables it, so stub a public https origin. */
+  const stubPublicOrigin = () =>
+    vi.stubGlobal("location", {
+      origin: "https://chargeha.example.com",
+    } as Location);
+
+  it("hints that Tesla likely can't reach an unreachable browser origin", () => {
+    // jsdom origin is http://localhost:3000 — unreachable from Tesla.
+    renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
+
+    expect(screen.getByText(/likely can't fetch the key from this address/))
+      .toBeInTheDocument();
+    // Yes stays clickable — the hint advises, it doesn't block.
+    expect(screen.getByLabelText("Yes, internet accessible"))
+      .not.toHaveAttribute("aria-disabled", "true");
+  });
+
   it("selecting Yes shows public key URL using browser origin", async () => {
+    stubPublicOrigin();
     renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
 
     fireEvent.click(
@@ -185,6 +205,7 @@ describe("PublicKeyHostingStep", () => {
       text: () => Promise.resolve(TEST_PUBLIC_KEY),
     });
     globalThis.fetch = mockFetch;
+    stubPublicOrigin();
 
     renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
 
@@ -203,6 +224,7 @@ describe("PublicKeyHostingStep", () => {
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
         `${expectedOrigin}/.well-known/appspecific/com.tesla.3p.public-key.pem`,
+        { cache: "no-store" },
       );
     });
 
@@ -307,6 +329,7 @@ describe("PublicKeyHostingStep", () => {
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
         "https://myhost.example.com/.well-known/appspecific/com.tesla.3p.public-key.pem",
+        { cache: "no-store" },
       );
     });
   });

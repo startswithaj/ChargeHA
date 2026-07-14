@@ -15,7 +15,7 @@ export function DirectHostingSection(
 ) {
   const verifyMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(publicKeyUrl);
+      const res = await fetch(publicKeyUrl, { cache: "no-store" });
       if (!res.ok) {
         throw new Error(`Failed to fetch public key: HTTP ${res.status}`);
       }

@@ -96,6 +96,7 @@ export function composeWizardSteps(
   const vehicleSteps = (vehiclePluginSteps[vehicleType] ?? []).map((step) => ({
     id: step.id,
     label: step.label,
+    group: vehicleType,
     render: (props: StepProps) =>
       renderPluginStep(step.componentKey, pluginComponents, props),
   }));
@@ -103,6 +104,7 @@ export function composeWizardSteps(
   const energySteps = (energyPluginSteps[energyType] ?? []).map((step) => ({
     id: step.id,
     label: step.label,
+    group: energyType,
     render: (props: StepProps) =>
       renderPluginStep(step.componentKey, pluginComponents, props),
   }));

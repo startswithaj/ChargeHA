@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../../client/src/test-utils.tsx";
 import { TeslaAuthStep } from "./TeslaAuthStep.tsx";
+import { StepNextHarness } from "../../../../client/src/components/Wizard/steps/test-helpers/StepNextHarness.tsx";
 import { makeStepProps } from "./test-helpers/stepProps.ts";
 
 const mocks = vi.hoisted(() => ({
@@ -127,21 +128,24 @@ describe("TeslaAuthStep", () => {
     });
   });
 
-  it("Continue button calls onNext when already authenticated", async () => {
+  it("enables Next when already authenticated", async () => {
     setTeslaStatus({ authenticated: true });
 
     const onNext = vi.fn();
-    renderWithProviders(<TeslaAuthStep {...makeStepProps({ onNext })} />);
+    renderWithProviders(
+      <StepNextHarness onAdvance={onNext}>
+        <TeslaAuthStep {...makeStepProps({ onNext })} />
+      </StepNextHarness>,
+    );
 
     await waitFor(() => {
       expect(
         screen.getByText(/Tesla account authorized successfully/),
       ).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Continue" }))
-        .toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Next" })).toBeEnabled();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(onNext).toHaveBeenCalledTimes(1);
   });
 
@@ -168,7 +172,7 @@ describe("TeslaAuthStep", () => {
 
   // ---- Tunnel behavior ----
 
-  it("passes tunnel URL as origin when tunnel is active", async () => {
+  it("uses the stable browser origin even when a tunnel is active", async () => {
     const { trpc } = await import("./trpc.ts");
     vi.mocked(trpc.wizard.tunnelStatus.useQuery).mockReturnValue({
       data: { active: true, url: "https://test-tunnel.trycloudflare.com" },
@@ -181,9 +185,10 @@ describe("TeslaAuthStep", () => {
       screen.getByRole("button", { name: /Authorize with Tesla/ }),
     );
 
+    // jsdom origin is localhost (stable) — the tunnel must NOT hijack OAuth.
     await waitFor(() => {
       expect(mocks.getAuthUrlMutate).toHaveBeenCalledWith({
-        origin: "https://test-tunnel.trycloudflare.com",
+        origin: globalThis.location.origin,
       });
     });
   });
