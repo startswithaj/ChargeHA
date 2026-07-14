@@ -143,7 +143,7 @@ export class TeslaService {
     data: unknown;
   }> {
     const clientId = await this.deps.getConfig("client_id");
-    const clientSecret = await this.deps.getConfig("client_secret");
+    const clientSecret = await this.deps.getSecret("client_secret");
     const domain = await this.deps.getConfig("public_key_domain");
 
     if (!clientId || !clientSecret) {

@@ -58,7 +58,7 @@ export class TeslaTokenManager {
   /** Read credentials fresh from DB on every call. No stale cache. */
   private async getConfig(): Promise<TeslaTokenConfig> {
     const clientId = await this.deps.getConfig("client_id");
-    const clientSecret = await this.deps.getConfig("client_secret");
+    const clientSecret = await this.deps.getSecret("client_secret");
     const region = await this.deps.getConfig("region");
 
     return {
@@ -242,8 +242,8 @@ export class TeslaTokenManager {
   }
 
   private async getTokens(): Promise<TokenSet | null> {
-    const accessToken = await this.deps.getConfig("access_token");
-    const refreshToken = await this.deps.getConfig("refresh_token");
+    const accessToken = await this.deps.getSecret("access_token");
+    const refreshToken = await this.deps.getSecret("refresh_token");
     const expiresAt = await this.deps.getConfig("token_expires_at");
     if (!accessToken || !refreshToken || !expiresAt) return null;
     return { accessToken, refreshToken, expiresAt };
@@ -254,14 +254,14 @@ export class TeslaTokenManager {
     refreshToken: string,
     expiresAt: string,
   ): Promise<void> {
-    await this.deps.setConfig("access_token", accessToken);
-    await this.deps.setConfig("refresh_token", refreshToken);
+    await this.deps.setSecret("access_token", accessToken);
+    await this.deps.setSecret("refresh_token", refreshToken);
     await this.deps.setConfig("token_expires_at", expiresAt);
   }
 
   async deleteTokens(): Promise<void> {
-    await this.deps.setConfig("access_token", "");
-    await this.deps.setConfig("refresh_token", "");
+    await this.deps.setSecret("access_token", "");
+    await this.deps.setSecret("refresh_token", "");
     await this.deps.setConfig("token_expires_at", "");
   }
 

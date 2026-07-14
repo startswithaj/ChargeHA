@@ -108,12 +108,13 @@ describe("TeslaService", () => {
     getConfig: (key: string) => {
       const config: Record<string, string> = {
         client_id: "id",
-        client_secret: "secret",
         region: "na",
         public_key_domain: "https://example.com",
       };
       return Promise.resolve(config[key] ?? null);
     },
+    getSecret: (key: string) =>
+      Promise.resolve(key === "client_secret" ? "secret" : null),
   };
 
   // ── listFleetVehicles ───────────────────────────────────────────────────────
@@ -238,11 +239,10 @@ describe("TeslaService", () => {
     it("throws when domain is not configured", async () => {
       const service = makeService({
         deps: {
-          getConfig: (key: string) => {
-            if (key === "client_id") return Promise.resolve("id");
-            if (key === "client_secret") return Promise.resolve("secret");
-            return Promise.resolve(null);
-          },
+          getConfig: (key: string) =>
+            Promise.resolve(key === "client_id" ? "id" : null),
+          getSecret: (key: string) =>
+            Promise.resolve(key === "client_secret" ? "secret" : null),
         },
       });
       await expect(service.registerPartner()).rejects.toThrow(
