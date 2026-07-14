@@ -116,8 +116,10 @@ describe("VehicleTypeStep", () => {
     mockIsDemoMode.mockReturnValue(true);
     renderWithProviders(<VehicleTypeStep {...makeStepProps()} />);
 
-    expect(screen.getByRole("button", { name: /Tesla/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /Simulated/ })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Tesla/ }))
+      .toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("button", { name: /Simulated/ }))
+      .toHaveAttribute("aria-disabled", "false");
   });
 
   // ---- User interactions ----

@@ -11,6 +11,10 @@ import {
 } from "../../../hooks/useSectionConfig.ts";
 import { demoMode } from "../../../lib/featureFlags.ts";
 import type { StepProps } from "../WizardShell.tsx";
+import {
+  hintUnlessLoading,
+  useWizardNextControl,
+} from "../wizardNextControl.ts";
 import styles from "./steps.module.css";
 
 const icons = {
@@ -26,6 +30,23 @@ export function InverterTypeStep(_props: StepProps) {
   const inDemo = demoMode.isActive();
 
   const mutation = useEquipmentConfigMutation();
+
+  // "" (None / Skip) is a valid selection but indistinguishable from "not
+  // chosen yet" in config — track this session's explicit choice as well.
+  const sessionChoice = wizardState.energyType;
+  const hasSelection = !!currentAdapter || !!sessionChoice;
+  // No hint until the config query settles — a blocked-hint that flips to
+  // ready milliseconds after mount reads as an orange flash in the nav.
+  const loading = equipmentConfig === undefined;
+  useWizardNextControl({
+    canProceed: hasSelection,
+    hint: hintUnlessLoading(
+      loading,
+      hasSelection
+        ? "Next continues with the selected energy source"
+        : "Select an energy source (or None / Skip) to continue",
+    ),
+  });
 
   const selectAdapter = (adapterType: string) => {
     mutation.mutate(
@@ -95,29 +116,31 @@ export function InverterTypeStep(_props: StepProps) {
           );
         })}
 
-        <div
-          className={styles.optionCard}
-          role="button"
-          tabIndex={0}
-          onClick={() => selectAdapter("")}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              selectAdapter("");
-            }
-          }}
-        >
-          <div
-            style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
-          >
-            <SkipForward size={18} />
-            <Text weight="bold">None / Skip</Text>
-          </div>
-          <Text size="2" color="gray">
-            Skip energy source configuration for now. You can add one later in
-            Settings.
-          </Text>
-        </div>
+        <NoneCard onSelect={() => selectAdapter("")} />
       </div>
+    </div>
+  );
+}
+
+function NoneCard({ onSelect }: { onSelect: () => void }) {
+  return (
+    <div
+      className={styles.optionCard}
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") onSelect();
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        <SkipForward size={18} />
+        <Text weight="bold">None / Skip</Text>
+      </div>
+      <Text size="2" color="gray">
+        Skip energy source configuration for now. You can add one later in
+        Settings.
+      </Text>
     </div>
   );
 }
