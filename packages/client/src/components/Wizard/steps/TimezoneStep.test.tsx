@@ -11,9 +11,13 @@ import {
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../test-utils.tsx";
 import { TimezoneStep } from "./TimezoneStep.tsx";
+import { StepNextHarness } from "./test-helpers/StepNextHarness.tsx";
 import type { StepProps } from "../WizardShell.tsx";
 
-const { mockMutate } = vi.hoisted(() => ({ mockMutate: vi.fn() }));
+const { mockMutate, mockMutateAsync } = vi.hoisted(() => ({
+  mockMutate: vi.fn(),
+  mockMutateAsync: vi.fn(),
+}));
 
 vi.mock("../../../trpc.ts", () => ({
   widenTrpc: vi.fn(),
@@ -38,7 +42,7 @@ vi.mock("../../../trpc.ts", () => ({
             (_opts?: { onSuccess?: (...args: unknown[]) => void }) => {
               return {
                 mutate: mockMutate,
-                mutateAsync: vi.fn(),
+                mutateAsync: mockMutateAsync,
                 isPending: false,
                 isSuccess: false,
                 isError: false,
@@ -206,17 +210,23 @@ describe("TimezoneStep", () => {
 
   it("clicking Next saves timezone to API", async () => {
     const onNext = vi.fn();
-    renderWithProviders(<TimezoneStep {...makeStepProps({ onNext })} />);
+    mockMutateAsync.mockResolvedValue({});
+    renderWithProviders(
+      <StepNextHarness onAdvance={onNext}>
+        <TimezoneStep {...makeStepProps({ onNext })} />
+      </StepNextHarness>,
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: /Save & Continue/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
-      expect(mockMutate).toHaveBeenCalledWith(
-        { timezone: FAKE_DETECTED_TZ },
-        expect.objectContaining({ onSuccess: expect.any(Function) }),
-      );
+      expect(mockMutateAsync).toHaveBeenCalledWith({
+        timezone: FAKE_DETECTED_TZ,
+      });
     });
 
-    expect(onNext).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(onNext).toHaveBeenCalledTimes(1);
+    });
   });
 });

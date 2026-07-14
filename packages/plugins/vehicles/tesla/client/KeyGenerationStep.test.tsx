@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../../client/src/test-utils.tsx";
 import { KeyGenerationStep } from "./KeyGenerationStep.tsx";
+import { StepNextHarness } from "../../../../client/src/components/Wizard/steps/test-helpers/StepNextHarness.tsx";
 import { trpc } from "./trpc.ts";
 import { makeStepProps } from "./test-helpers/stepProps.ts";
 
@@ -236,18 +237,20 @@ describe("KeyGenerationStep", () => {
     expect(mocks.generateReset).toHaveBeenCalled();
   });
 
-  it("Continue button calls onNext after successful generation", () => {
+  it("enables Next after successful generation", () => {
     const onNext = vi.fn();
     setGenerateState({ isSuccess: true });
 
     renderWithProviders(
-      <KeyGenerationStep {...makeStepProps({ onNext })} />,
+      <StepNextHarness onAdvance={onNext}>
+        <KeyGenerationStep {...makeStepProps({ onNext })} />
+      </StepNextHarness>,
     );
 
-    expect(screen.getByRole("button", { name: "Continue" }))
-      .toBeInTheDocument();
+    const nextButton = screen.getByRole("button", { name: "Next" });
+    expect(nextButton).toBeEnabled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(nextButton);
     expect(onNext).toHaveBeenCalledTimes(1);
   });
 

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../test-utils.tsx";
 import { HomeLocationStep } from "./HomeLocationStep.tsx";
+import { StepNextHarness } from "./test-helpers/StepNextHarness.tsx";
 import { trpc } from "../../../trpc.ts";
 import type { StepProps } from "../WizardShell.tsx";
 
@@ -146,15 +147,18 @@ describe("HomeLocationStep", () => {
     } as never);
 
     const onNext = vi.fn();
-    renderWithProviders(<HomeLocationStep {...makeStepProps({ onNext })} />);
+    renderWithProviders(
+      <StepNextHarness onAdvance={onNext}>
+        <HomeLocationStep {...makeStepProps({ onNext })} />
+      </StepNextHarness>,
+    );
 
     // Wait for config to load and coordinates to be set
     await waitFor(() => {
       expect(screen.getByText(/Location set/)).toBeInTheDocument();
     });
 
-    // Click Save & Continue
-    fireEvent.click(screen.getByRole("button", { name: /Save & Continue/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
       expect(mockHomeSetMutateAsync).toHaveBeenCalledWith({

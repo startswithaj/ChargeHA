@@ -1,11 +1,12 @@
-import { useMemo, useState } from "react";
-import { Button, Callout, Select, Text } from "@radix-ui/themes";
+import { useCallback, useMemo, useState } from "react";
+import { Callout, Select, Text } from "@radix-ui/themes";
 import { CheckCircle } from "lucide-react";
 import {
   useSystemConfig,
   useSystemConfigMutation,
 } from "../../../hooks/useSectionConfig.ts";
 import type { StepProps } from "../WizardShell.tsx";
+import { useWizardNextControl } from "../wizardNextControl.ts";
 import styles from "./steps.module.css";
 import { buildTimezoneOptions } from "../../../lib/timezones.ts";
 
@@ -17,7 +18,7 @@ function detectTimezone(): string {
   }
 }
 
-export function TimezoneStep({ onNext }: StepProps) {
+export function TimezoneStep(_props: StepProps) {
   const { data: systemConfig } = useSystemConfig();
   const detectedTimezone = useMemo(detectTimezone, []);
   const timezoneOptions = useMemo(buildTimezoneOptions, []);
@@ -26,6 +27,23 @@ export function TimezoneStep({ onNext }: StepProps) {
   );
 
   const saveMutation = useSystemConfigMutation();
+
+  const save = useCallback(async () => {
+    try {
+      await saveMutation.mutateAsync({ timezone: selectedTimezone });
+      return true;
+    } catch {
+      // Stay on the step — the mutation error is rendered below.
+      return false;
+    }
+  }, [saveMutation, selectedTimezone]);
+
+  useWizardNextControl({
+    canProceed: true,
+    hint: "Next saves your timezone",
+    pendingLabel: "Saving...",
+    onBeforeNext: save,
+  });
 
   return (
     <div className={styles.stepContainer}>
@@ -68,20 +86,6 @@ export function TimezoneStep({ onNext }: StepProps) {
             Auto-detected from your browser
           </Text>
         )}
-      </div>
-
-      <div className={styles.stepActions}>
-        <Button
-          onClick={() => {
-            saveMutation.mutate(
-              { timezone: selectedTimezone },
-              { onSuccess: () => onNext() },
-            );
-          }}
-          disabled={saveMutation.isPending}
-        >
-          {saveMutation.isPending ? "Saving..." : "Save & Continue"}
-        </Button>
       </div>
 
       {saveMutation.error && (

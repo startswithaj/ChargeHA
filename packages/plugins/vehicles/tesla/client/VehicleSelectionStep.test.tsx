@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../../client/src/test-utils.tsx";
 import { VehicleSelectionStep } from "./VehicleSelectionStep.tsx";
+import { StepNextHarness } from "../../../../client/src/components/Wizard/steps/test-helpers/StepNextHarness.tsx";
 import { makeStepProps } from "./test-helpers/stepProps.ts";
 
 const mocks = vi.hoisted(() => ({
@@ -139,19 +140,21 @@ describe("VehicleSelectionStep", () => {
 
   // ---- API calls ----
 
-  it("clicking Save & Continue saves selected vehicles via tRPC", async () => {
+  it("clicking Next saves selected vehicles via tRPC", async () => {
     const onNext = vi.fn();
     setVehicles([mockVehicles[0]]);
 
     renderWithProviders(
-      <VehicleSelectionStep {...makeStepProps({ onNext })} />,
+      <StepNextHarness onAdvance={onNext}>
+        <VehicleSelectionStep {...makeStepProps({ onNext })} />
+      </StepNextHarness>,
     );
 
     await waitFor(() => {
       expect(screen.getByText("My Model 3")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText("Save & Continue"));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
       expect(mocks.selectVehicleMutate).toHaveBeenCalledWith({
@@ -166,14 +169,16 @@ describe("VehicleSelectionStep", () => {
     const onNext = vi.fn();
 
     renderWithProviders(
-      <VehicleSelectionStep {...makeStepProps({ onNext })} />,
+      <StepNextHarness onAdvance={onNext}>
+        <VehicleSelectionStep {...makeStepProps({ onNext })} />
+      </StepNextHarness>,
     );
 
     await waitFor(() => {
       expect(screen.getByText("My Model 3")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText("Save & Continue"));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
       expect(mocks.selectVehicleMutate).toHaveBeenCalledTimes(2);
@@ -182,10 +187,14 @@ describe("VehicleSelectionStep", () => {
     });
   });
 
-  it("Save button disabled when no vehicles selected", async () => {
+  it("Next disabled when no vehicles selected", async () => {
     setVehicles([mockVehicles[0]]);
 
-    renderWithProviders(<VehicleSelectionStep {...makeStepProps()} />);
+    renderWithProviders(
+      <StepNextHarness onAdvance={vi.fn()}>
+        <VehicleSelectionStep {...makeStepProps()} />
+      </StepNextHarness>,
+    );
 
     await waitFor(() => {
       expect(screen.getByText("My Model 3")).toBeInTheDocument();
@@ -196,8 +205,9 @@ describe("VehicleSelectionStep", () => {
       screen.getByRole("checkbox", { name: /Select My Model 3/ }),
     );
 
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
     expect(
-      screen.getByRole("button", { name: /Save & Continue/ }),
-    ).toBeDisabled();
+      screen.getByText("Select at least one vehicle to continue"),
+    ).toBeInTheDocument();
   });
 });

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../test-utils.tsx";
 import { AuthStep } from "./AuthStep.tsx";
+import { StepNextHarness } from "./test-helpers/StepNextHarness.tsx";
 import type { StepProps } from "../WizardShell.tsx";
 
 const {
@@ -72,6 +73,15 @@ describe("AuthStep", () => {
     ...overrides,
   });
 
+  /** Render the step inside the Next harness — the step's advance behaviour
+   *  lives on the shell's Next button since the wizardNextControl refactor. */
+  const renderAuthStep = (props: StepProps) =>
+    renderWithProviders(
+      <StepNextHarness onAdvance={props.onNext}>
+        <AuthStep {...props} />
+      </StepNextHarness>,
+    );
+
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
@@ -84,7 +94,7 @@ describe("AuthStep", () => {
 
   it("renders three auth mode cards", () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
-    renderWithProviders(<AuthStep {...makeStepProps()} />);
+    renderAuthStep(makeStepProps());
 
     expect(screen.getByText("No Authentication")).toBeInTheDocument();
     expect(screen.getByText("Username & Password")).toBeInTheDocument();
@@ -93,7 +103,7 @@ describe("AuthStep", () => {
 
   it("does not show any form initially", () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
-    renderWithProviders(<AuthStep {...makeStepProps()} />);
+    renderAuthStep(makeStepProps());
 
     expect(screen.queryByTestId("local-form")).not.toBeInTheDocument();
     expect(screen.queryByTestId("oidc-form")).not.toBeInTheDocument();
@@ -101,7 +111,7 @@ describe("AuthStep", () => {
 
   it("shows description text", () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
-    renderWithProviders(<AuthStep {...makeStepProps()} />);
+    renderAuthStep(makeStepProps());
 
     expect(
       screen.getByText(/Choose how you want to protect access/),
@@ -114,10 +124,10 @@ describe("AuthStep", () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
     const onNext = vi.fn();
     mockSetAuthModeMutateAsync.mockResolvedValue({ success: true });
-    renderWithProviders(<AuthStep {...makeStepProps({ onNext })} />);
+    renderAuthStep(makeStepProps({ onNext }));
 
     fireEvent.click(screen.getByText("No Authentication"));
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
       expect(mockSetAuthModeMutateAsync).toHaveBeenCalledWith({
@@ -135,7 +145,7 @@ describe("AuthStep", () => {
 
   it("shows local form when Username & Password is selected", () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
-    renderWithProviders(<AuthStep {...makeStepProps()} />);
+    renderAuthStep(makeStepProps());
 
     fireEvent.click(screen.getByText("Username & Password"));
 
@@ -147,10 +157,10 @@ describe("AuthStep", () => {
   it("shows validation error when username is empty for local mode", async () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
     const onNext = vi.fn();
-    renderWithProviders(<AuthStep {...makeStepProps({ onNext })} />);
+    renderAuthStep(makeStepProps({ onNext }));
 
     fireEvent.click(screen.getByText("Username & Password"));
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
       expect(screen.getByText("Username is required")).toBeInTheDocument();
@@ -162,7 +172,7 @@ describe("AuthStep", () => {
   it("shows validation error when password is too short for local mode", async () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
     const onNext = vi.fn();
-    renderWithProviders(<AuthStep {...makeStepProps({ onNext })} />);
+    renderAuthStep(makeStepProps({ onNext }));
 
     fireEvent.click(screen.getByText("Username & Password"));
     fireEvent.change(screen.getByLabelText("Username"), {
@@ -171,7 +181,7 @@ describe("AuthStep", () => {
     fireEvent.change(screen.getByLabelText("Password"), {
       target: { value: "" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
       expect(
@@ -186,7 +196,7 @@ describe("AuthStep", () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
     const onNext = vi.fn();
     mockSetAuthModeMutateAsync.mockResolvedValue({ success: true });
-    renderWithProviders(<AuthStep {...makeStepProps({ onNext })} />);
+    renderAuthStep(makeStepProps({ onNext }));
 
     fireEvent.click(screen.getByText("Username & Password"));
     fireEvent.change(screen.getByLabelText("Username"), {
@@ -195,7 +205,7 @@ describe("AuthStep", () => {
     fireEvent.change(screen.getByLabelText("Password"), {
       target: { value: "password123" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
       expect(mockSetAuthModeMutateAsync).toHaveBeenCalledWith({
@@ -214,7 +224,7 @@ describe("AuthStep", () => {
   it("disables the OIDC option in demo mode", () => {
     mockIsFeatureEnabled.mockReturnValue(false);
     mockSessionRefetch.mockResolvedValue({ data: null });
-    renderWithProviders(<AuthStep {...makeStepProps()} />);
+    renderAuthStep(makeStepProps());
 
     const oidcCard = screen
       .getByText("OpenID Connect (OIDC)")
@@ -228,7 +238,7 @@ describe("AuthStep", () => {
 
   it("shows OIDC form when OpenID Connect is selected", () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
-    renderWithProviders(<AuthStep {...makeStepProps()} />);
+    renderAuthStep(makeStepProps());
 
     fireEvent.click(screen.getByText("OpenID Connect (OIDC)"));
 
@@ -271,7 +281,7 @@ describe("AuthStep", () => {
     async (_label, stage, expectedError) => {
       mockSessionRefetch.mockResolvedValue({ data: null });
       const onNext = vi.fn();
-      renderWithProviders(<AuthStep {...makeStepProps({ onNext })} />);
+      renderAuthStep(makeStepProps({ onNext }));
 
       fireEvent.click(screen.getByText("OpenID Connect (OIDC)"));
       const fields: Array<[string, string | undefined]> = [
@@ -287,7 +297,7 @@ describe("AuthStep", () => {
             target: { value },
           })
         );
-      fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+      fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
       await waitFor(() => {
         expect(screen.getByText(expectedError)).toBeInTheDocument();
@@ -315,7 +325,7 @@ describe("AuthStep", () => {
       configurable: true,
     });
 
-    renderWithProviders(<AuthStep {...makeStepProps({ onNext })} />);
+    renderAuthStep(makeStepProps({ onNext }));
 
     fireEvent.click(screen.getByText("OpenID Connect (OIDC)"));
     fireEvent.change(screen.getByLabelText("Issuer URL"), {
@@ -330,7 +340,7 @@ describe("AuthStep", () => {
     fireEvent.change(screen.getByLabelText("Base URL"), {
       target: { value: "https://chargeha.example.com" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
       expect(mockSaveOidcConfigMutateAsync).toHaveBeenCalledWith({
@@ -366,7 +376,7 @@ describe("AuthStep", () => {
     mockSaveOidcConfigMutateAsync.mockRejectedValue(
       new Error("OIDC discovery failed"),
     );
-    renderWithProviders(<AuthStep {...makeStepProps({ onNext })} />);
+    renderAuthStep(makeStepProps({ onNext }));
 
     fireEvent.click(screen.getByText("OpenID Connect (OIDC)"));
     fireEvent.change(screen.getByLabelText("Issuer URL"), {
@@ -381,7 +391,7 @@ describe("AuthStep", () => {
     fireEvent.change(screen.getByLabelText("Base URL"), {
       target: { value: "https://chargeha.example.com" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
       expect(
@@ -397,10 +407,10 @@ describe("AuthStep", () => {
     mockSetAuthModeMutateAsync.mockRejectedValue(
       new Error("Failed to save auth settings"),
     );
-    renderWithProviders(<AuthStep {...makeStepProps({ onNext })} />);
+    renderAuthStep(makeStepProps({ onNext }));
 
     fireEvent.click(screen.getByText("No Authentication"));
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
       expect(
@@ -415,7 +425,7 @@ describe("AuthStep", () => {
   it("displays OIDC error from URL query param on mount", async () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
     globalThis.history.replaceState({}, "", "/wizard?error=provider_denied");
-    renderWithProviders(<AuthStep {...makeStepProps()} />);
+    renderAuthStep(makeStepProps());
 
     await waitFor(() => {
       expect(
@@ -431,7 +441,7 @@ describe("AuthStep", () => {
       "",
       "/wizard?error=token_exchange_failed",
     );
-    renderWithProviders(<AuthStep {...makeStepProps()} />);
+    renderAuthStep(makeStepProps());
 
     await waitFor(() => {
       expect(screen.getByTestId("oidc-form")).toBeInTheDocument();
@@ -445,7 +455,7 @@ describe("AuthStep", () => {
     mockSessionRefetch.mockResolvedValue({
       data: { authenticated: true, authMode: "oidc" },
     });
-    renderWithProviders(<AuthStep {...makeStepProps({ onNext })} />);
+    renderAuthStep(makeStepProps({ onNext }));
 
     await waitFor(() => {
       expect(onNext).toHaveBeenCalledTimes(1);
@@ -457,7 +467,7 @@ describe("AuthStep", () => {
     mockSessionRefetch.mockResolvedValue({
       data: { authenticated: false, authMode: "none" },
     });
-    renderWithProviders(<AuthStep {...makeStepProps({ onNext })} />);
+    renderAuthStep(makeStepProps({ onNext }));
 
     // Flush microtasks deterministically (no fixed sleep).
     await Promise.resolve();
@@ -469,7 +479,7 @@ describe("AuthStep", () => {
     mockSessionRefetch.mockResolvedValue({
       data: { authenticated: false, authMode: "local" },
     });
-    renderWithProviders(<AuthStep {...makeStepProps()} />);
+    renderAuthStep(makeStepProps());
 
     // The local form renders only when "local" is the selected mode, so its
     // presence proves the configured mode was pre-selected on mount.
@@ -482,7 +492,7 @@ describe("AuthStep", () => {
 
   it("shows computed redirect URI when base URL is entered", () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
-    renderWithProviders(<AuthStep {...makeStepProps()} />);
+    renderAuthStep(makeStepProps());
 
     fireEvent.click(screen.getByText("OpenID Connect (OIDC)"));
     fireEvent.change(screen.getByLabelText("Base URL"), {
@@ -498,7 +508,7 @@ describe("AuthStep", () => {
 
   it("redirect URI is read-only", () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
-    renderWithProviders(<AuthStep {...makeStepProps()} />);
+    renderAuthStep(makeStepProps());
 
     fireEvent.click(screen.getByText("OpenID Connect (OIDC)"));
     fireEvent.change(screen.getByLabelText("Base URL"), {
@@ -511,7 +521,7 @@ describe("AuthStep", () => {
 
   it("strips trailing slashes from base URL for redirect URI", () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
-    renderWithProviders(<AuthStep {...makeStepProps()} />);
+    renderAuthStep(makeStepProps());
 
     fireEvent.click(screen.getByText("OpenID Connect (OIDC)"));
     fireEvent.change(screen.getByLabelText("Base URL"), {
@@ -526,18 +536,17 @@ describe("AuthStep", () => {
 
   // ---- No mode selected ----
 
-  it("shows validation error when no mode is selected", async () => {
+  it("disables Next with a hint when no mode is selected", async () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
     const onNext = vi.fn();
-    renderWithProviders(<AuthStep {...makeStepProps({ onNext })} />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    renderAuthStep(makeStepProps({ onNext }));
 
     await waitFor(() => {
-      expect(
-        screen.getByText("Please select an authentication mode"),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
     });
+    expect(
+      screen.getByText("Select an authentication mode to continue"),
+    ).toBeInTheDocument();
     expect(onNext).not.toHaveBeenCalled();
   });
 
@@ -562,7 +571,7 @@ describe("AuthStep", () => {
     "switching modes (%s) hides previous form and shows new",
     (_label, firstLabel, firstFormId, secondLabel, secondFormId) => {
       mockSessionRefetch.mockResolvedValue({ data: null });
-      renderWithProviders(<AuthStep {...makeStepProps()} />);
+      renderAuthStep(makeStepProps());
 
       fireEvent.click(screen.getByText(firstLabel));
       expect(screen.getByTestId(firstFormId)).toBeInTheDocument();
@@ -575,11 +584,11 @@ describe("AuthStep", () => {
 
   it("clears validation error when switching modes", async () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
-    renderWithProviders(<AuthStep {...makeStepProps()} />);
+    renderAuthStep(makeStepProps());
 
     // Trigger a validation error
     fireEvent.click(screen.getByText("Username & Password"));
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
     await waitFor(() => {
       expect(screen.getByText("Username is required")).toBeInTheDocument();
     });
@@ -595,14 +604,14 @@ describe("AuthStep", () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
     const onNext = vi.fn();
     mockSetAuthModeMutateAsync.mockResolvedValue({ success: true });
-    renderWithProviders(<AuthStep {...makeStepProps({ onNext })} />);
+    renderAuthStep(makeStepProps({ onNext }));
 
     const card = screen.getByText("No Authentication").closest(
       "[role=button]",
     );
     assertExists(card);
     fireEvent.keyDown(card, { key: "Enter" });
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
       expect(onNext).toHaveBeenCalledTimes(1);
@@ -611,7 +620,7 @@ describe("AuthStep", () => {
 
   it("selects mode via Space key on card", () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
-    renderWithProviders(<AuthStep {...makeStepProps()} />);
+    renderAuthStep(makeStepProps());
 
     const card = screen.getByText("Username & Password").closest(
       "[role=button]",

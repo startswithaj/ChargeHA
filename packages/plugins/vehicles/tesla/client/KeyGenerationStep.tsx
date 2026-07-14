@@ -11,13 +11,17 @@ import {
 import { useTeslaConfig } from "./useTeslaConfig.ts";
 import { trpc } from "./trpc.ts";
 import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
+import {
+  hintUnlessLoading,
+  useWizardNextControl,
+} from "../../../../client/src/components/Wizard/wizardNextControl.ts";
 import { KeyImportForm } from "./KeyImportForm.tsx";
 import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
 
 type Mode = "choose" | "generate" | "import";
 
 function SuccessView(
-  { mode, onNext }: { mode: Mode; onNext: () => void },
+  { mode }: { mode: Mode },
 ) {
   return (
     <div className={styles.stepContainer}>
@@ -34,11 +38,14 @@ function SuccessView(
           and stored successfully.
         </Callout.Text>
       </Callout.Root>
-      <div className={styles.stepActions}>
-        <Button onClick={onNext}>Continue</Button>
-      </div>
     </div>
   );
+}
+
+function keyGenHint(isSuccess: boolean, hasExistingKeys: boolean): string {
+  if (isSuccess) return "Key pair stored — Next continues";
+  if (hasExistingKeys) return "Next continues with the existing key pair";
+  return "Generate or import a key pair to continue";
 }
 
 function ChooseModeCards(
@@ -104,7 +111,7 @@ function ErrorCallout(
   );
 }
 
-export function KeyGenerationStep({ onNext }: StepProps): JSX.Element {
+export function KeyGenerationStep(_props: StepProps): JSX.Element {
   const [mode, setMode] = useState<Mode>("choose");
   const { data: teslaConfig } = useTeslaConfig();
   const hasExistingKeys = !!teslaConfig?.ecPublicKeyPem;
@@ -130,8 +137,16 @@ export function KeyGenerationStep({ onNext }: StepProps): JSX.Element {
   const isPending = generateMutation.isPending || importMutation.isPending;
   const error = generateMutation.error ?? importMutation.error;
 
+  useWizardNextControl({
+    canProceed: isSuccess || hasExistingKeys,
+    hint: hintUnlessLoading(
+      teslaConfig === undefined,
+      keyGenHint(isSuccess, hasExistingKeys),
+    ),
+  });
+
   if (isSuccess) {
-    return <SuccessView mode={mode} onNext={onNext} />;
+    return <SuccessView mode={mode} />;
   }
 
   return (
@@ -165,12 +180,6 @@ export function KeyGenerationStep({ onNext }: StepProps): JSX.Element {
             file to encrypt it at rest.
           </Callout.Text>
         </Callout.Root>
-      )}
-
-      {hasExistingKeys && mode === "choose" && (
-        <div className={styles.stepActions}>
-          <Button onClick={onNext}>Continue with existing keys</Button>
-        </div>
       )}
 
       {mode === "choose" && (

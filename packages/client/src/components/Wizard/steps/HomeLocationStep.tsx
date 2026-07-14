@@ -11,6 +11,7 @@ import { useLocationFetcher } from "../../../hooks/useLocationFetcher.ts";
 import { trpc } from "../../../trpc.ts";
 import { AddressSearch } from "./HomeLocationParts.tsx";
 import type { StepProps } from "../WizardShell.tsx";
+import { useWizardNextControl } from "../wizardNextControl.ts";
 import styles from "./steps.module.css";
 
 function QuickActions(
@@ -88,7 +89,7 @@ function StatusMessages(
   );
 }
 
-export function HomeLocationStep({ onNext }: StepProps) {
+export function HomeLocationStep(_props: StepProps) {
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
   const initializedRef = useRef(false);
@@ -130,8 +131,8 @@ export function HomeLocationStep({ onNext }: StepProps) {
   const saveMutation = useHomeConfigMutation();
   const utils = trpc.useUtils();
 
-  const handleSave = useCallback(async () => {
-    if (!lat || !lng) return;
+  const handleBeforeNext = useCallback(async (): Promise<boolean> => {
+    if (!lat || !lng) return false;
     try {
       await saveMutation.mutateAsync({
         homeLatitude: parseFloat(lat),
@@ -139,12 +140,22 @@ export function HomeLocationStep({ onNext }: StepProps) {
       });
       // Wait for cache to update before navigating so DoneStep sees fresh data
       await utils.config.home.get.invalidate();
-      onNext();
+      return true;
     } catch {
       geo.setGeoError("Failed to save location");
       geo.setGeoStatus("error");
+      return false;
     }
-  }, [lat, lng, saveMutation, utils, onNext, geo]);
+  }, [lat, lng, saveMutation, utils, geo]);
+
+  useWizardNextControl({
+    canProceed: hasCoords,
+    hint: hasCoords
+      ? "Next saves your home location"
+      : "Set your home location to continue",
+    pendingLabel: "Saving...",
+    onBeforeNext: handleBeforeNext,
+  });
 
   return (
     <div className={styles.stepContainer}>
@@ -184,17 +195,6 @@ export function HomeLocationStep({ onNext }: StepProps) {
         latNum={latNum}
         lngNum={lngNum}
       />
-
-      {/* Actions */}
-      <div className={styles.stepActions}>
-        <Button
-          size="2"
-          disabled={!hasCoords || saveMutation.isPending}
-          onClick={handleSave}
-        >
-          Save &amp; Continue
-        </Button>
-      </div>
     </div>
   );
 }

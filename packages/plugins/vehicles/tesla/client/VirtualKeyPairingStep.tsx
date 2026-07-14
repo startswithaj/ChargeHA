@@ -6,6 +6,7 @@ import type { VehicleWithState } from "@chargeha/shared";
 import { trpc } from "./trpc.ts";
 import { useTeslaConfig } from "./useTeslaConfig.ts";
 import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
+import { useWizardNextControl } from "../../../../client/src/components/Wizard/wizardNextControl.ts";
 import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
 
 function parseHostname(domain: string): string {
@@ -72,7 +73,7 @@ function PairingInstructions() {
   );
 }
 
-export function VirtualKeyPairingStep({ onNext }: StepProps): JSX.Element {
+export function VirtualKeyPairingStep(_props: StepProps): JSX.Element {
   const [verified, setVerified] = useState(false);
 
   const {
@@ -101,6 +102,13 @@ export function VirtualKeyPairingStep({ onNext }: StepProps): JSX.Element {
 
   const loading = vehiclesLoading || configLoading;
   const queryError = vehiclesError ?? configError;
+
+  useWizardNextControl({
+    canProceed: verified,
+    hint: verified
+      ? "Virtual key paired — Next continues"
+      : "Pair and verify the virtual key to continue",
+  });
 
   const domain = teslaConfig?.teslaPublicKeyDomain ||
     (typeof globalThis !== "undefined" ? globalThis.location.origin : "");
@@ -168,12 +176,6 @@ export function VirtualKeyPairingStep({ onNext }: StepProps): JSX.Element {
           </Callout.Icon>
           <Callout.Text>{error}</Callout.Text>
         </Callout.Root>
-      )}
-
-      {verified && (
-        <div className={styles.stepActions}>
-          <Button onClick={onNext}>Continue</Button>
-        </div>
       )}
     </div>
   );

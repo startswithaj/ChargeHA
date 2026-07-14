@@ -3,9 +3,10 @@ import { Button, Callout, Text } from "@radix-ui/themes";
 import { AlertCircle, CheckCircle, Loader2, RefreshCw } from "lucide-react";
 import { trpc } from "./trpc.ts";
 import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
+import { useWizardNextControl } from "../../../../client/src/components/Wizard/wizardNextControl.ts";
 import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
 
-export function PartnerRegistrationStep({ onNext }: StepProps): JSX.Element {
+export function PartnerRegistrationStep(_props: StepProps): JSX.Element {
   const calledRef = useRef(false);
 
   const registerMutation = trpc.tesla.registerPartner.useMutation();
@@ -24,6 +25,13 @@ export function PartnerRegistrationStep({ onNext }: StepProps): JSX.Element {
   const isError = registerMutation.isError;
 
   const errorMessage = registerMutation.error?.message;
+
+  useWizardNextControl({
+    canProceed: isSuccess,
+    hint: isSuccess
+      ? "Partner registered — Next continues"
+      : "Partner registration must succeed to continue",
+  });
 
   return (
     <div className={styles.stepContainer}>
@@ -69,12 +77,6 @@ export function PartnerRegistrationStep({ onNext }: StepProps): JSX.Element {
             </Button>
           </div>
         </>
-      )}
-
-      {isSuccess && (
-        <div className={styles.stepActions}>
-          <Button onClick={onNext}>Continue</Button>
-        </div>
       )}
     </div>
   );

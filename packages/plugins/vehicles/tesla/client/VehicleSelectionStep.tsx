@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button, Callout, Checkbox, Text, TextField } from "@radix-ui/themes";
+import { Callout, Checkbox, Text, TextField } from "@radix-ui/themes";
 import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import { trpc } from "./trpc.ts";
 import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
+import {
+  hintUnlessLoading,
+  useWizardNextControl,
+} from "../../../../client/src/components/Wizard/wizardNextControl.ts";
 import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
 
 type DiscoveredVehicle = { vin: string; name: string; state: string };
@@ -98,28 +102,22 @@ function useSelectionCallbacks(
 }
 
 function StatusCallouts(
-  { existingVehiclesPresent, loading, error, emptyResult, onNext }: {
+  { existingVehiclesPresent, loading, error, emptyResult }: {
     existingVehiclesPresent: boolean;
     loading: boolean;
     error: string | null;
     emptyResult: boolean;
-    onNext: () => void;
   },
 ) {
   return (
     <>
       {existingVehiclesPresent && (
-        <>
-          <Callout.Root color="green">
-            <Callout.Icon>
-              <CheckCircle size={16} />
-            </Callout.Icon>
-            <Callout.Text>Vehicles are already configured.</Callout.Text>
-          </Callout.Root>
-          <div className={styles.stepActions}>
-            <Button onClick={onNext}>Continue</Button>
-          </div>
-        </>
+        <Callout.Root color="green">
+          <Callout.Icon>
+            <CheckCircle size={16} />
+          </Callout.Icon>
+          <Callout.Text>Vehicles are already configured.</Callout.Text>
+        </Callout.Root>
       )}
       {loading && (
         <Callout.Root color="blue">
@@ -173,10 +171,9 @@ async function saveSelectedVehicles(
   );
 }
 
-export function VehicleSelectionStep({ onNext }: StepProps): JSX.Element {
+export function VehicleSelectionStep(_props: StepProps): JSX.Element {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [priorities, setPriorities] = useState<Record<string, number>>({});
-  const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const initialized = useRef(false);
   const utils = trpc.useUtils();
@@ -205,8 +202,11 @@ export function VehicleSelectionStep({ onNext }: StepProps): JSX.Element {
     setPriorities,
   );
 
-  const handleSave = async () => {
-    setSaving(true);
+  const handleBeforeNext = async (): Promise<boolean> => {
+    if (selected.size === 0) {
+      // Nothing newly selected — advance only if vehicles already exist.
+      return existingVehicles.length > 0;
+    }
     setSaveError(null);
     try {
       await saveSelectedVehicles({
@@ -214,13 +214,22 @@ export function VehicleSelectionStep({ onNext }: StepProps): JSX.Element {
         priorities,
         utils,
       });
-      onNext();
+      return true;
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Failed to save");
-    } finally {
-      setSaving(false);
+      return false;
     }
   };
+
+  useWizardNextControl({
+    canProceed: selected.size > 0 || existingVehicles.length > 0,
+    hint: hintUnlessLoading(
+      loading || existingVehiclesQuery.isLoading,
+      selectionHint(selected.size, existingVehicles.length),
+    ),
+    pendingLabel: "Saving...",
+    onBeforeNext: handleBeforeNext,
+  });
 
   const error = queryError?.message ?? saveError ?? null;
   const multiVehicle = selected.size > 1;
@@ -237,7 +246,6 @@ export function VehicleSelectionStep({ onNext }: StepProps): JSX.Element {
         loading={loading}
         error={error}
         emptyResult={!loading && !error && vehicles.length === 0}
-        onNext={onNext}
       />
 
       {!loading && vehicles.length > 0 && (
@@ -255,17 +263,12 @@ export function VehicleSelectionStep({ onNext }: StepProps): JSX.Element {
           ))}
         </div>
       )}
-
-      {!loading && vehicles.length > 0 && (
-        <div className={styles.stepActions}>
-          <Button
-            onClick={handleSave}
-            disabled={selected.size === 0 || saving}
-          >
-            {saving ? "Saving..." : "Save & Continue"}
-          </Button>
-        </div>
-      )}
     </div>
   );
+}
+
+function selectionHint(selectedCount: number, existingCount: number): string {
+  if (selectedCount > 0) return "Next saves the selected vehicles";
+  if (existingCount > 0) return "Vehicles already configured — Next continues";
+  return "Select at least one vehicle to continue";
 }
