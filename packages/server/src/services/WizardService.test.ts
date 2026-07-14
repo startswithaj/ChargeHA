@@ -767,7 +767,9 @@ describe("WizardService", () => {
         config: JSON.stringify({ batteryCapacityKwh: 60 }),
         mode: "auto",
       });
-      expect(configSet["energy_adapter_type"]).toBe("simulated_energy");
+      // demoSetup must not pick the energy source — that's the user's choice
+      // on the inverter-type step.
+      expect(configSet["energy_adapter_type"]).toBeUndefined();
       expect(configSet["home_latitude"]).toBe("-33.8688");
       expect(configSet["home_longitude"]).toBe("151.2093");
       expect(configSet["timezone"]).toBe("Australia/Sydney");

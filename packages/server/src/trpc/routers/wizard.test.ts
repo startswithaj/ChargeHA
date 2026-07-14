@@ -177,7 +177,7 @@ describe("Wizard tRPC Router", () => {
   });
 
   describe("wizard.demoSetup", () => {
-    it("creates a simulated vehicle and configures the simulated energy adapter", async () => {
+    it("creates a simulated vehicle without touching the energy adapter selection", async () => {
       const result = await caller.wizard.demoSetup({
         adapterType: "simulated",
       });
@@ -188,8 +188,9 @@ describe("Wizard tRPC Router", () => {
       expect(vehicles[0].id).toBe("DEMO-001");
       expect(vehicles[0].adapterType).toBe("simulated");
 
+      // The energy source is the user's choice on the inverter-type step.
       const adapterType = await db.getConfig("energy_adapter_type");
-      expect(adapterType).toBe("simulated_energy");
+      expect(adapterType).toBeNull();
 
       const lat = await db.getConfig("home_latitude");
       const lng = await db.getConfig("home_longitude");

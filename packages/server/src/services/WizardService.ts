@@ -214,7 +214,6 @@ export class WizardService {
         mode: "auto",
       });
 
-      await this.db.setConfig("energy_adapter_type", "simulated_energy");
       await this.db.setConfig("home_latitude", "-33.8688");
       await this.db.setConfig("home_longitude", "151.2093");
 
