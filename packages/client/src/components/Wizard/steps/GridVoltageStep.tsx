@@ -7,10 +7,9 @@ import {
 } from "../../../hooks/useSectionConfig.ts";
 import { useEnergyData } from "../../../hooks/useEnergyData.ts";
 import type { VehicleWithState } from "@chargeha/shared";
-import type { StepProps } from "../WizardShell.tsx";
 import styles from "./steps.module.css";
 
-export function GridVoltageStep(_props: StepProps) {
+export function GridVoltageStep() {
   const { data: solarConfig } = useSolarConfig();
   const mutation = useSolarConfigMutation();
   const { data: energyData } = useEnergyData();

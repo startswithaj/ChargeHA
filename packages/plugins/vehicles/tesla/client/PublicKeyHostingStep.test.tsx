@@ -4,7 +4,6 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../../client/src/test-utils.tsx";
 import { PublicKeyHostingStep } from "./PublicKeyHostingStep.tsx";
 import { trpc } from "./trpc.ts";
-import { makeStepProps } from "./test-helpers/stepProps.ts";
 
 const mocks = vi.hoisted(() => ({
   teslaSetConfigMutateAsync: vi.fn(),
@@ -126,7 +125,7 @@ describe("PublicKeyHostingStep", () => {
   // ---- Initial render ----
 
   it("renders internet-accessible yes/no question", async () => {
-    renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
+    renderWithProviders(<PublicKeyHostingStep />);
 
     await waitFor(() => {
       expect(
@@ -149,7 +148,7 @@ describe("PublicKeyHostingStep", () => {
 
   it("hints that Tesla likely can't reach an unreachable browser origin", () => {
     // jsdom origin is http://localhost:3000 — unreachable from Tesla.
-    renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
+    renderWithProviders(<PublicKeyHostingStep />);
 
     expect(screen.getByText(/likely can't fetch the key from this address/))
       .toBeInTheDocument();
@@ -160,7 +159,7 @@ describe("PublicKeyHostingStep", () => {
 
   it("selecting Yes shows public key URL using browser origin", async () => {
     stubPublicOrigin();
-    renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
+    renderWithProviders(<PublicKeyHostingStep />);
 
     fireEvent.click(
       screen.getByLabelText("Yes, internet accessible"),
@@ -177,7 +176,7 @@ describe("PublicKeyHostingStep", () => {
   });
 
   it("selecting No shows 3 hosting method options", async () => {
-    renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
+    renderWithProviders(<PublicKeyHostingStep />);
 
     fireEvent.click(
       screen.getByLabelText("No, not internet accessible"),
@@ -195,7 +194,7 @@ describe("PublicKeyHostingStep", () => {
     ["Host on GitHub Pages", /Host your public key on GitHub Pages/],
     ["Set it up with AI", /Copy this prompt and paste it into/],
   ])("%s shows method-specific instructions", async (label, expected) => {
-    renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
+    renderWithProviders(<PublicKeyHostingStep />);
 
     fireEvent.click(screen.getByLabelText("No, not internet accessible"));
 
@@ -220,7 +219,7 @@ describe("PublicKeyHostingStep", () => {
     globalThis.fetch = mockFetch;
     stubPublicOrigin();
 
-    renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
+    renderWithProviders(<PublicKeyHostingStep />);
 
     fireEvent.click(
       screen.getByLabelText("Yes, internet accessible"),
@@ -253,7 +252,7 @@ describe("PublicKeyHostingStep", () => {
   it("shows tunnel auto-display when tunnel is active", async () => {
     setTunnel(true, "https://test-tunnel.trycloudflare.com");
 
-    renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
+    renderWithProviders(<PublicKeyHostingStep />);
 
     await waitFor(() => {
       expect(
@@ -273,7 +272,7 @@ describe("PublicKeyHostingStep", () => {
   });
 
   it("shows 'Use Cloudflare Tunnel' as a hosting option in No flow", async () => {
-    renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
+    renderWithProviders(<PublicKeyHostingStep />);
 
     fireEvent.click(screen.getByLabelText("No, not internet accessible"));
 
@@ -287,7 +286,7 @@ describe("PublicKeyHostingStep", () => {
   });
 
   it("selecting tunnel option shows Start Tunnel button", async () => {
-    renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
+    renderWithProviders(<PublicKeyHostingStep />);
 
     fireEvent.click(screen.getByLabelText("No, not internet accessible"));
 
@@ -314,7 +313,7 @@ describe("PublicKeyHostingStep", () => {
     });
     globalThis.fetch = mockFetch;
 
-    renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
+    renderWithProviders(<PublicKeyHostingStep />);
 
     // Select No → Host it myself
     fireEvent.click(screen.getByLabelText("No, not internet accessible"));

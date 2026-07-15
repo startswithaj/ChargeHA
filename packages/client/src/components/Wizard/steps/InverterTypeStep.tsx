@@ -10,7 +10,6 @@ import {
   useEquipmentConfigMutation,
 } from "../../../hooks/useSectionConfig.ts";
 import { demoMode } from "../../../lib/featureFlags.ts";
-import type { StepProps } from "../WizardShell.tsx";
 import {
   hintUnlessLoading,
   useWizardNextControl,
@@ -23,7 +22,7 @@ const icons = {
   monitor: Monitor,
 } as const;
 
-export function InverterTypeStep(_props: StepProps) {
+export function InverterTypeStep() {
   const { data: equipmentConfig } = useEquipmentConfig();
   const currentAdapter = equipmentConfig?.energyAdapterType ?? "";
   const wizardState = useWizardState();

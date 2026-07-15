@@ -4,7 +4,6 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../../client/src/test-utils.tsx";
 import { TeslaAuthStep } from "./TeslaAuthStep.tsx";
 import { StepNextHarness } from "../../../../client/src/components/Wizard/steps/test-helpers/StepNextHarness.tsx";
-import { makeStepProps } from "./test-helpers/stepProps.ts";
 
 const mocks = vi.hoisted(() => ({
   getAuthUrlMutate: vi.fn(),
@@ -102,7 +101,7 @@ describe("TeslaAuthStep", () => {
   // ---- Initial render ----
 
   it("renders authorization button in idle state", () => {
-    renderWithProviders(<TeslaAuthStep {...makeStepProps()} />);
+    renderWithProviders(<TeslaAuthStep />);
 
     expect(
       screen.getByRole("button", { name: /Authorize with Tesla/ }),
@@ -114,7 +113,7 @@ describe("TeslaAuthStep", () => {
   // ---- User interactions / API calls ----
 
   it("clicking Authorize calls mutation, opens new window, and shows polling", async () => {
-    renderWithProviders(<TeslaAuthStep {...makeStepProps()} />);
+    renderWithProviders(<TeslaAuthStep />);
 
     fireEvent.click(
       screen.getByRole("button", { name: /Authorize with Tesla/ }),
@@ -137,7 +136,7 @@ describe("TeslaAuthStep", () => {
     const onNext = vi.fn();
     renderWithProviders(
       <StepNextHarness onAdvance={onNext}>
-        <TeslaAuthStep {...makeStepProps({ onNext })} />
+        <TeslaAuthStep />
       </StepNextHarness>,
     );
 
@@ -158,7 +157,7 @@ describe("TeslaAuthStep", () => {
       mocks.capturedOnError.current?.();
     });
 
-    renderWithProviders(<TeslaAuthStep {...makeStepProps()} />);
+    renderWithProviders(<TeslaAuthStep />);
 
     fireEvent.click(
       screen.getByRole("button", { name: /Authorize with Tesla/ }),
@@ -182,7 +181,7 @@ describe("TeslaAuthStep", () => {
       isLoading: false,
     } as never);
 
-    renderWithProviders(<TeslaAuthStep {...makeStepProps()} />);
+    renderWithProviders(<TeslaAuthStep />);
 
     fireEvent.click(
       screen.getByRole("button", { name: /Authorize with Tesla/ }),
@@ -202,7 +201,7 @@ describe("TeslaAuthStep", () => {
       mocks.capturedOnError.current?.();
     });
 
-    renderWithProviders(<TeslaAuthStep {...makeStepProps()} />);
+    renderWithProviders(<TeslaAuthStep />);
 
     fireEvent.click(
       screen.getByRole("button", { name: /Authorize with Tesla/ }),

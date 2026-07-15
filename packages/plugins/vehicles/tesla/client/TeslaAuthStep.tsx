@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Button, Callout, Text } from "@radix-ui/themes";
 import { CheckCircle, ExternalLink, Loader2 } from "lucide-react";
 import { trpc } from "./trpc.ts";
-import type { StepProps } from "../../../hostUi.ts";
 import { hintUnlessLoading, useWizardNextControl } from "../../../hostUi.ts";
 import { callbackUrl, resolveOAuthOrigin } from "./oauthOrigin.ts";
 import { UnstableOriginCallout } from "./UnstableOriginCallout.tsx";
@@ -60,7 +59,7 @@ function ErrorView(
   );
 }
 
-export function TeslaAuthStep(_props: StepProps): JSX.Element {
+export function TeslaAuthStep(): JSX.Element {
   const [status, setStatus] = useState<Status>("idle");
   const tunnelStatus = trpc.plugin.vehicle.tesla.tunnelStatus.useQuery();
   const oauth = resolveOAuthOrigin(

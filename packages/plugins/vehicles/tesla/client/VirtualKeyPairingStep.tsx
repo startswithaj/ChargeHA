@@ -8,7 +8,6 @@ import {
   type PublicKeyHosting,
   resolvePublicKeyDomain,
 } from "../shared/publicKeyDomain.ts";
-import type { StepProps } from "../../../hostUi.ts";
 import { useWizardNextControl } from "../../../hostUi.ts";
 import { stepStyles as styles } from "../../../hostUi.ts";
 
@@ -117,7 +116,7 @@ function PairingInstructions() {
   );
 }
 
-export function VirtualKeyPairingStep(_props: StepProps): JSX.Element {
+export function VirtualKeyPairingStep(): JSX.Element {
   const [verified, setVerified] = useState(false);
 
   const {

@@ -5,7 +5,6 @@ import {
   useSystemConfig,
   useSystemConfigMutation,
 } from "../../../hooks/useSectionConfig.ts";
-import type { StepProps } from "../WizardShell.tsx";
 import { useWizardNextControl } from "../wizardNextControl.ts";
 import styles from "./steps.module.css";
 import { buildTimezoneOptions } from "../../../lib/timezones.ts";
@@ -18,7 +17,7 @@ function detectTimezone(): string {
   }
 }
 
-export function TimezoneStep(_props: StepProps) {
+export function TimezoneStep() {
   const { data: systemConfig } = useSystemConfig();
   const detectedTimezone = useMemo(detectTimezone, []);
   const timezoneOptions = useMemo(buildTimezoneOptions, []);

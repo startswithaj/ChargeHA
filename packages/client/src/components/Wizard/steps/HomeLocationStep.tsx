@@ -10,7 +10,6 @@ import {
 import { useLocationFetcher } from "../../../hooks/useLocationFetcher.ts";
 import { trpc } from "../../../trpc.ts";
 import { AddressSearch } from "./HomeLocationParts.tsx";
-import type { StepProps } from "../WizardShell.tsx";
 import { useWizardNextControl } from "../wizardNextControl.ts";
 import styles from "./steps.module.css";
 
@@ -89,7 +88,7 @@ function StatusMessages(
   );
 }
 
-export function HomeLocationStep(_props: StepProps) {
+export function HomeLocationStep() {
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
   const initializedRef = useRef(false);

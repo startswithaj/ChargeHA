@@ -35,12 +35,12 @@ const CORE_STEPS_BEFORE: WizardStepConfig[] = [
   {
     id: "timezone",
     label: "Timezone",
-    render: (props) => <TimezoneStep {...props} />,
+    render: () => <TimezoneStep />,
   },
   {
     id: "vehicle-type",
     label: "Vehicle Type",
-    render: (props) => <VehicleTypeStep {...props} />,
+    render: () => <VehicleTypeStep />,
   },
 ];
 
@@ -48,7 +48,7 @@ const CORE_STEPS_MIDDLE: WizardStepConfig[] = [
   {
     id: "inverter-type",
     label: "Inverter Type",
-    render: (props) => <InverterTypeStep {...props} />,
+    render: () => <InverterTypeStep />,
   },
 ];
 
@@ -56,12 +56,12 @@ const CORE_STEPS_AFTER: WizardStepConfig[] = [
   {
     id: "home-location",
     label: "Home Location",
-    render: (props) => <HomeLocationStep {...props} />,
+    render: () => <HomeLocationStep />,
   },
   {
     id: "grid-voltage",
     label: "Grid Voltage",
-    render: (props) => <GridVoltageStep {...props} />,
+    render: () => <GridVoltageStep />,
   },
   {
     id: "done",

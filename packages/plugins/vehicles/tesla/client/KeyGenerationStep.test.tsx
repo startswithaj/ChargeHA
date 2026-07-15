@@ -5,7 +5,6 @@ import { renderWithProviders } from "../../../../client/src/test-utils.tsx";
 import { KeyGenerationStep } from "./KeyGenerationStep.tsx";
 import { StepNextHarness } from "../../../../client/src/components/Wizard/steps/test-helpers/StepNextHarness.tsx";
 import { trpc } from "./trpc.ts";
-import { makeStepProps } from "./test-helpers/stepProps.ts";
 
 const mocks = vi.hoisted(() => ({
   generateMutate: vi.fn(),
@@ -135,7 +134,7 @@ describe("KeyGenerationStep", () => {
   // ---- Initial render ----
 
   it("shows two option cards on initial render", () => {
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<KeyGenerationStep />);
 
     expect(screen.getByText("Generate a key pair for me")).toBeInTheDocument();
     expect(screen.getByText("I have my own key pair")).toBeInTheDocument();
@@ -148,13 +147,13 @@ describe("KeyGenerationStep", () => {
         isLoading: false,
       } as never);
 
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<KeyGenerationStep />);
 
     expect(screen.getByText(/stored in plain text/)).toBeInTheDocument();
   });
 
   it("hides encryption warning when ENCRYPTION_KEY is set", () => {
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<KeyGenerationStep />);
 
     expect(screen.queryByText(/stored in plain text/)).not.toBeInTheDocument();
   });
@@ -162,7 +161,7 @@ describe("KeyGenerationStep", () => {
   // ---- Generate flow ----
 
   it("calls generateKeys mutation when Generate option is clicked", async () => {
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<KeyGenerationStep />);
 
     fireEvent.click(screen.getByText("Generate a key pair for me"));
 
@@ -174,7 +173,7 @@ describe("KeyGenerationStep", () => {
   it("shows spinner during generate API call", async () => {
     setGenerateState({ isPending: true });
 
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<KeyGenerationStep />);
 
     fireEvent.click(screen.getByText("Generate a key pair for me"));
 
@@ -192,7 +191,7 @@ describe("KeyGenerationStep", () => {
     // Render with default state so ChooseModeCards is visible, then click
     // Generate to set mode="generate"; switching the mock to isSuccess
     // mid-flow drives the re-render into SuccessView with the right mode.
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<KeyGenerationStep />);
 
     setGenerateState({ isSuccess: true });
 
@@ -208,7 +207,7 @@ describe("KeyGenerationStep", () => {
   it("shows success after successful import", () => {
     setImportState({ isSuccess: true });
 
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<KeyGenerationStep />);
 
     expect(
       screen.getByText(/imported and stored successfully/),
@@ -235,7 +234,7 @@ describe("KeyGenerationStep", () => {
     (_flow, setter, errorMsg, expected) => {
       setter({ error: { message: errorMsg } });
 
-      renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+      renderWithProviders(<KeyGenerationStep />);
 
       expect(screen.getByText(expected)).toBeInTheDocument();
     },
@@ -244,7 +243,7 @@ describe("KeyGenerationStep", () => {
   it("Try Again button from error resets mutations", () => {
     setGenerateState({ error: { message: "Key generation failed" } });
 
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<KeyGenerationStep />);
 
     expect(screen.getByText("Key generation failed")).toBeInTheDocument();
 
@@ -259,7 +258,7 @@ describe("KeyGenerationStep", () => {
 
     renderWithProviders(
       <StepNextHarness onAdvance={onNext}>
-        <KeyGenerationStep {...makeStepProps({ onNext })} />
+        <KeyGenerationStep />
       </StepNextHarness>,
     );
 
@@ -273,7 +272,7 @@ describe("KeyGenerationStep", () => {
   // ---- Import flow ----
 
   it("shows import form when 'I have my own key pair' is clicked", () => {
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<KeyGenerationStep />);
 
     fireEvent.click(screen.getByText("I have my own key pair"));
 
@@ -284,7 +283,7 @@ describe("KeyGenerationStep", () => {
   });
 
   it("disables Save Keys button when textareas are empty", () => {
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<KeyGenerationStep />);
 
     fireEvent.click(screen.getByText("I have my own key pair"));
 
@@ -292,7 +291,7 @@ describe("KeyGenerationStep", () => {
   });
 
   it("calls importKeys mutation with PEM values", async () => {
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<KeyGenerationStep />);
 
     fireEvent.click(screen.getByText("I have my own key pair"));
 
@@ -311,7 +310,7 @@ describe("KeyGenerationStep", () => {
   });
 
   it("Back button from import returns to choose mode", () => {
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<KeyGenerationStep />);
 
     fireEvent.click(screen.getByText("I have my own key pair"));
     expect(screen.getByText("Public Key (PEM)")).toBeInTheDocument();

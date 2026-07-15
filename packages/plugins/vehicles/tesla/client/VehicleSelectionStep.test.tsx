@@ -4,7 +4,6 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../../client/src/test-utils.tsx";
 import { VehicleSelectionStep } from "./VehicleSelectionStep.tsx";
 import { StepNextHarness } from "../../../../client/src/components/Wizard/steps/test-helpers/StepNextHarness.tsx";
-import { makeStepProps } from "./test-helpers/stepProps.ts";
 
 const mocks = vi.hoisted(() => ({
   selectVehiclesMutate: vi.fn().mockResolvedValue({ success: true }),
@@ -90,7 +89,7 @@ describe("VehicleSelectionStep", () => {
       error: null,
     });
 
-    renderWithProviders(<VehicleSelectionStep {...makeStepProps()} />);
+    renderWithProviders(<VehicleSelectionStep />);
 
     expect(screen.getByText("Discovering vehicles...")).toBeInTheDocument();
   });
@@ -98,7 +97,7 @@ describe("VehicleSelectionStep", () => {
   it("shows empty state when no vehicles found", async () => {
     setVehicles([]);
 
-    renderWithProviders(<VehicleSelectionStep {...makeStepProps()} />);
+    renderWithProviders(<VehicleSelectionStep />);
 
     await waitFor(() => {
       expect(screen.getByText(/No vehicles found/)).toBeInTheDocument();
@@ -106,7 +105,7 @@ describe("VehicleSelectionStep", () => {
   });
 
   it("displays vehicle list on mount", async () => {
-    renderWithProviders(<VehicleSelectionStep {...makeStepProps()} />);
+    renderWithProviders(<VehicleSelectionStep />);
 
     await waitFor(() => {
       expect(screen.getByText("My Model 3")).toBeInTheDocument();
@@ -117,7 +116,7 @@ describe("VehicleSelectionStep", () => {
   it("renders name, VIN, and battery label", async () => {
     setVehicles([mockVehicles[0]]);
 
-    renderWithProviders(<VehicleSelectionStep {...makeStepProps()} />);
+    renderWithProviders(<VehicleSelectionStep />);
 
     await waitFor(() => {
       expect(screen.getByText("My Model 3")).toBeInTheDocument();
@@ -136,7 +135,7 @@ describe("VehicleSelectionStep", () => {
     async (count, shouldShow) => {
       setVehicles(mockVehicles.slice(0, count));
 
-      renderWithProviders(<VehicleSelectionStep {...makeStepProps()} />);
+      renderWithProviders(<VehicleSelectionStep />);
 
       await waitFor(() => {
         expect(screen.getByText("My Model 3")).toBeInTheDocument();
@@ -155,7 +154,7 @@ describe("VehicleSelectionStep", () => {
 
     renderWithProviders(
       <StepNextHarness onAdvance={onNext}>
-        <VehicleSelectionStep {...makeStepProps({ onNext })} />
+        <VehicleSelectionStep />
       </StepNextHarness>,
     );
 
@@ -180,7 +179,7 @@ describe("VehicleSelectionStep", () => {
 
     renderWithProviders(
       <StepNextHarness onAdvance={onNext}>
-        <VehicleSelectionStep {...makeStepProps({ onNext })} />
+        <VehicleSelectionStep />
       </StepNextHarness>,
     );
 
@@ -207,7 +206,7 @@ describe("VehicleSelectionStep", () => {
 
     renderWithProviders(
       <StepNextHarness onAdvance={vi.fn()}>
-        <VehicleSelectionStep {...makeStepProps()} />
+        <VehicleSelectionStep />
       </StepNextHarness>,
     );
 

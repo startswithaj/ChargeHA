@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { renderWithProviders } from "../../../test-utils.tsx";
 import { VehicleTypeStep } from "./VehicleTypeStep.tsx";
-import type { StepProps } from "../WizardShell.tsx";
 
 const {
   mockSetStepId,
@@ -76,15 +75,6 @@ vi.mock("../../../lib/featureFlags.ts", async (orig) => {
 // ---- Tests ----
 
 describe("VehicleTypeStep", () => {
-  const makeStepProps = (overrides: Partial<StepProps> = {}): StepProps => ({
-    onNext: vi.fn(),
-    onBack: vi.fn(),
-    onSkip: vi.fn(),
-    onSkipTo: vi.fn(),
-    onSkipToEnd: vi.fn(),
-    ...overrides,
-  });
-
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsDemoMode.mockReturnValue(false);
@@ -102,7 +92,7 @@ describe("VehicleTypeStep", () => {
   // ---- Initial render ----
 
   it("renders the vehicle-type chooser with both options and descriptions", () => {
-    renderWithProviders(<VehicleTypeStep {...makeStepProps()} />);
+    renderWithProviders(<VehicleTypeStep />);
 
     expect(screen.getByRole("button", { name: /Tesla/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Simulated/ }))
@@ -114,7 +104,7 @@ describe("VehicleTypeStep", () => {
 
   it("disables Tesla but not Simulated in demo mode", () => {
     mockIsDemoMode.mockReturnValue(true);
-    renderWithProviders(<VehicleTypeStep {...makeStepProps()} />);
+    renderWithProviders(<VehicleTypeStep />);
 
     expect(screen.getByRole("button", { name: /Tesla/ }))
       .toHaveAttribute("aria-disabled", "true");
@@ -125,7 +115,7 @@ describe("VehicleTypeStep", () => {
   // ---- User interactions ----
 
   it("selecting Tesla navigates to tesla-key-generation step", () => {
-    renderWithProviders(<VehicleTypeStep {...makeStepProps()} />);
+    renderWithProviders(<VehicleTypeStep />);
 
     fireEvent.click(screen.getByRole("button", { name: /Tesla/ }));
 
@@ -134,7 +124,7 @@ describe("VehicleTypeStep", () => {
   });
 
   it("selecting Simulated calls demoSetup mutation and navigates to inverter-type", () => {
-    renderWithProviders(<VehicleTypeStep {...makeStepProps()} />);
+    renderWithProviders(<VehicleTypeStep />);
 
     fireEvent.click(screen.getByRole("button", { name: /Simulated/ }));
 
@@ -147,7 +137,7 @@ describe("VehicleTypeStep", () => {
     mockVehicleList.mockReturnValue({
       data: { vehicles: [{ adapterType: "simulated" }] },
     });
-    renderWithProviders(<VehicleTypeStep {...makeStepProps()} />);
+    renderWithProviders(<VehicleTypeStep />);
 
     fireEvent.click(screen.getByRole("button", { name: /Simulated/ }));
 

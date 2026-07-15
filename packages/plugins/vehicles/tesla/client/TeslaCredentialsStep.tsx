@@ -3,7 +3,6 @@ import { Button, Callout, Select, Text, TextField } from "@radix-ui/themes";
 import { Check, CheckCircle, Copy, ExternalLink } from "lucide-react";
 import { useTeslaConfig, useTeslaConfigMutation } from "./useTeslaConfig.ts";
 import { trpc } from "./trpc.ts";
-import type { StepProps } from "../../../hostUi.ts";
 import { useWizardNextControl } from "../../../hostUi.ts";
 import { callbackUrl, resolveOAuthOrigin } from "./oauthOrigin.ts";
 import { resolvePublicKeyDomain } from "../shared/publicKeyDomain.ts";
@@ -253,7 +252,7 @@ function credentialsHint(valid: boolean, hasOrigin: boolean): string {
   return "Next saves your Tesla credentials";
 }
 
-export function TeslaCredentialsStep(_props: StepProps): JSX.Element {
+export function TeslaCredentialsStep(): JSX.Element {
   const { data: teslaConfig } = useTeslaConfig();
   const [clientId, setClientId] = useState(
     teslaConfig?.teslaClientId || "",

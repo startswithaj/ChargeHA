@@ -12,7 +12,6 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../test-utils.tsx";
 import { TimezoneStep } from "./TimezoneStep.tsx";
 import { StepNextHarness } from "./test-helpers/StepNextHarness.tsx";
-import type { StepProps } from "../WizardShell.tsx";
 
 const { mockMutate, mockMutateAsync } = vi.hoisted(() => ({
   mockMutate: vi.fn(),
@@ -126,15 +125,6 @@ const { originalSupportedValuesOf, originalDateTimeFormat, FAKE_DETECTED_TZ } =
 // ---- Tests ----
 
 describe("TimezoneStep", () => {
-  const makeStepProps = (overrides: Partial<StepProps> = {}): StepProps => ({
-    onNext: vi.fn(),
-    onBack: vi.fn(),
-    onSkip: vi.fn(),
-    onSkipTo: vi.fn(),
-    onSkipToEnd: vi.fn(),
-    ...overrides,
-  });
-
   afterAll(() => {
     Intl.supportedValuesOf = originalSupportedValuesOf;
     Intl.DateTimeFormat = originalDateTimeFormat;
@@ -156,7 +146,7 @@ describe("TimezoneStep", () => {
   // ---- Initial render ----
 
   it("renders timezone dropdown with auto-detected value", () => {
-    renderWithProviders(<TimezoneStep {...makeStepProps()} />);
+    renderWithProviders(<TimezoneStep />);
 
     expect(screen.getByText(/Select your timezone/)).toBeInTheDocument();
     // The trigger should show the auto-detected timezone
@@ -170,7 +160,7 @@ describe("TimezoneStep", () => {
   // ---- User interactions ----
 
   it("dropdown contains IANA timezone options", async () => {
-    renderWithProviders(<TimezoneStep {...makeStepProps()} />);
+    renderWithProviders(<TimezoneStep />);
 
     // Open the select dropdown
     const trigger = screen.getByRole("combobox", { name: "Timezone" });
@@ -187,7 +177,7 @@ describe("TimezoneStep", () => {
   });
 
   it("selecting a timezone updates the selected value", async () => {
-    renderWithProviders(<TimezoneStep {...makeStepProps()} />);
+    renderWithProviders(<TimezoneStep />);
 
     const trigger = screen.getByRole("combobox", { name: "Timezone" });
     fireEvent.click(trigger);
@@ -213,7 +203,7 @@ describe("TimezoneStep", () => {
     mockMutateAsync.mockResolvedValue({});
     renderWithProviders(
       <StepNextHarness onAdvance={onNext}>
-        <TimezoneStep {...makeStepProps({ onNext })} />
+        <TimezoneStep />
       </StepNextHarness>,
     );
 

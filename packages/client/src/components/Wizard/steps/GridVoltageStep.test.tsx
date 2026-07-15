@@ -4,7 +4,6 @@ import { cleanup, screen } from "@testing-library/react";
 import { renderWithProviders } from "../../../test-utils.tsx";
 import { GridVoltageStep } from "./GridVoltageStep.tsx";
 import { trpc } from "../../../trpc.ts";
-import type { StepProps } from "../WizardShell.tsx";
 
 const { mockMutate } = vi.hoisted(() => ({ mockMutate: vi.fn() }));
 
@@ -84,15 +83,6 @@ Element.prototype.scrollIntoView = vi.fn();
 // ---- Tests ----
 
 describe("GridVoltageStep", () => {
-  const makeStepProps = (overrides: Partial<StepProps> = {}): StepProps => ({
-    onNext: vi.fn(),
-    onBack: vi.fn(),
-    onSkip: vi.fn(),
-    onSkipTo: vi.fn(),
-    onSkipToEnd: vi.fn(),
-    ...overrides,
-  });
-
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -123,7 +113,7 @@ describe("GridVoltageStep", () => {
   // ---- Rendering ----
 
   it("renders the description text", () => {
-    renderWithProviders(<GridVoltageStep {...makeStepProps()} />);
+    renderWithProviders(<GridVoltageStep />);
 
     expect(
       screen.getByText(/this setting is used as a fallback/),
@@ -144,7 +134,7 @@ describe("GridVoltageStep", () => {
       error: null,
     } as never);
 
-    renderWithProviders(<GridVoltageStep {...makeStepProps()} />);
+    renderWithProviders(<GridVoltageStep />);
 
     expect(screen.getByText(expectedText)).toBeInTheDocument();
   });
@@ -218,7 +208,7 @@ describe("GridVoltageStep", () => {
         error: null,
       } as never);
 
-      renderWithProviders(<GridVoltageStep {...makeStepProps()} />);
+      renderWithProviders(<GridVoltageStep />);
 
       present.forEach((text) =>
         expect(screen.getByText(text)).toBeInTheDocument()
@@ -232,7 +222,7 @@ describe("GridVoltageStep", () => {
   // ---- User interactions ----
 
   it("renders no step-owned continue button — the shell's Next advances", () => {
-    renderWithProviders(<GridVoltageStep {...makeStepProps()} />);
+    renderWithProviders(<GridVoltageStep />);
 
     expect(screen.queryByRole("button", { name: "Continue" }))
       .not.toBeInTheDocument();

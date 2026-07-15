@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../test-utils.tsx";
 import { InverterTypeStep } from "./InverterTypeStep.tsx";
-import type { StepProps } from "../WizardShell.tsx";
 
 const { mockMutate, mockSetStepId, mockSetEnergyType } = vi.hoisted(() => ({
   mockMutate: vi.fn(),
@@ -74,15 +73,6 @@ vi.mock("../../../lib/featureFlags.ts", async (orig) => {
 // ---- Tests ----
 
 describe("InverterTypeStep", () => {
-  const makeStepProps = (overrides: Partial<StepProps> = {}): StepProps => ({
-    onNext: vi.fn(),
-    onBack: vi.fn(),
-    onSkip: vi.fn(),
-    onSkipTo: vi.fn(),
-    onSkipToEnd: vi.fn(),
-    ...overrides,
-  });
-
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsDemoMode.mockReturnValue(false);
@@ -101,7 +91,7 @@ describe("InverterTypeStep", () => {
 
   it("disables Fronius options in demo mode", () => {
     mockIsDemoMode.mockReturnValue(true);
-    renderWithProviders(<InverterTypeStep {...makeStepProps()} />);
+    renderWithProviders(<InverterTypeStep />);
 
     const local = screen.getByText("Fronius (Local)").closest(
       '[role="button"]',
@@ -114,7 +104,7 @@ describe("InverterTypeStep", () => {
   });
 
   it("renders three options: Fronius Local, Fronius Cloud, None/Skip", () => {
-    renderWithProviders(<InverterTypeStep {...makeStepProps()} />);
+    renderWithProviders(<InverterTypeStep />);
 
     expect(screen.getByText("Fronius (Local)")).toBeInTheDocument();
     expect(
@@ -126,7 +116,7 @@ describe("InverterTypeStep", () => {
   // ---- User interactions / API calls ----
 
   it("selecting None calls the equipment config mutation with empty adapter type", async () => {
-    renderWithProviders(<InverterTypeStep {...makeStepProps()} />);
+    renderWithProviders(<InverterTypeStep />);
 
     fireEvent.click(screen.getByText("None / Skip"));
 
@@ -147,7 +137,7 @@ describe("InverterTypeStep", () => {
   ])(
     "selecting %s persists adapter %s and navigates to %s",
     async (label, adapterType, nextStepId) => {
-      renderWithProviders(<InverterTypeStep {...makeStepProps()} />);
+      renderWithProviders(<InverterTypeStep />);
 
       fireEvent.click(screen.getByText(label));
 

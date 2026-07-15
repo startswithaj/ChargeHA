@@ -5,7 +5,6 @@ import { renderWithProviders } from "../../../../client/src/test-utils.tsx";
 import { TeslaCredentialsStep } from "./TeslaCredentialsStep.tsx";
 import { StepNextHarness } from "../../../../client/src/components/Wizard/steps/test-helpers/StepNextHarness.tsx";
 import { trpc } from "./trpc.ts";
-import { makeStepProps } from "./test-helpers/stepProps.ts";
 
 const mocks = vi.hoisted(() => {
   const mutate = vi.fn();
@@ -117,7 +116,7 @@ describe("TeslaCredentialsStep", () => {
   // ---- Initial render ----
 
   it("renders Client ID, Client Secret, and Region inputs", () => {
-    renderWithProviders(<TeslaCredentialsStep {...makeStepProps()} />);
+    renderWithProviders(<TeslaCredentialsStep />);
 
     expect(screen.getByLabelText("Client ID")).toBeInTheDocument();
     expect(screen.getByLabelText("Client Secret")).toBeInTheDocument();
@@ -126,7 +125,7 @@ describe("TeslaCredentialsStep", () => {
   });
 
   it("renders setup instructions and the browser-origin redirect URI", () => {
-    renderWithProviders(<TeslaCredentialsStep {...makeStepProps()} />);
+    renderWithProviders(<TeslaCredentialsStep />);
 
     expect(screen.getByText(/developer\.tesla\.com/)).toBeInTheDocument();
     expect(screen.getByText(/Create Application/)).toBeInTheDocument();
@@ -151,7 +150,7 @@ describe("TeslaCredentialsStep", () => {
     ["EU", /EU \(Europe/],
     ["CN", /CN \(China\)/],
   ])("Region dropdown shows %s option", async (_label, expected) => {
-    renderWithProviders(<TeslaCredentialsStep {...makeStepProps()} />);
+    renderWithProviders(<TeslaCredentialsStep />);
 
     fireEvent.click(screen.getByRole("combobox", { name: "Region" }));
 
@@ -166,7 +165,7 @@ describe("TeslaCredentialsStep", () => {
   it("Next is disabled when required fields are empty", () => {
     renderWithProviders(
       <StepNextHarness onAdvance={vi.fn()}>
-        <TeslaCredentialsStep {...makeStepProps()} />
+        <TeslaCredentialsStep />
       </StepNextHarness>,
     );
 
@@ -196,7 +195,7 @@ describe("TeslaCredentialsStep", () => {
     mocks.mutateAsync.mockResolvedValue({});
     renderWithProviders(
       <StepNextHarness onAdvance={onNext}>
-        <TeslaCredentialsStep {...makeStepProps({ onNext })} />
+        <TeslaCredentialsStep />
       </StepNextHarness>,
     );
 
@@ -227,7 +226,7 @@ describe("TeslaCredentialsStep", () => {
       error: new Error("Failed to save config"),
     });
 
-    renderWithProviders(<TeslaCredentialsStep {...makeStepProps()} />);
+    renderWithProviders(<TeslaCredentialsStep />);
 
     await waitFor(() => {
       expect(screen.getByText("Failed to save config")).toBeInTheDocument();
@@ -245,7 +244,7 @@ describe("TeslaCredentialsStep", () => {
 
     renderWithProviders(
       <StepNextHarness onAdvance={vi.fn()}>
-        <TeslaCredentialsStep {...makeStepProps()} />
+        <TeslaCredentialsStep />
       </StepNextHarness>,
     );
 
@@ -268,7 +267,7 @@ describe("TeslaCredentialsStep", () => {
   it("keeps the stable browser origin for OAuth even when a tunnel is active", async () => {
     setTunnelActive("https://test-tunnel.trycloudflare.com");
 
-    renderWithProviders(<TeslaCredentialsStep {...makeStepProps()} />);
+    renderWithProviders(<TeslaCredentialsStep />);
 
     // jsdom origin is localhost (stable) — the tunnel must NOT hijack OAuth.
     await waitFor(() => {

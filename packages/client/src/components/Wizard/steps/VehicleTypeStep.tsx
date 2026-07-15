@@ -8,7 +8,6 @@ import {
 } from "@chargeha/plugins/componentRegistry";
 import { trpc } from "../../../trpc.ts";
 import { demoMode } from "../../../lib/featureFlags.ts";
-import type { StepProps } from "../WizardShell.tsx";
 import {
   hintUnlessLoading,
   useWizardNextControl,
@@ -51,7 +50,7 @@ function TypeCard(
   );
 }
 
-export function VehicleTypeStep(_props: StepProps) {
+export function VehicleTypeStep() {
   const wizardState = useWizardState();
   const inDemo = demoMode.isActive();
   const pendingIdRef = useRef<string | null>(null);

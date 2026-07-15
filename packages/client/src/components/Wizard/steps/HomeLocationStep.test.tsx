@@ -5,7 +5,6 @@ import { renderWithProviders } from "../../../test-utils.tsx";
 import { HomeLocationStep } from "./HomeLocationStep.tsx";
 import { StepNextHarness } from "./test-helpers/StepNextHarness.tsx";
 import { trpc } from "../../../trpc.ts";
-import type { StepProps } from "../WizardShell.tsx";
 
 const { mockHomeSetMutateAsync, mockHomeGetInvalidate } = vi.hoisted(() => ({
   mockHomeSetMutateAsync: vi.fn(),
@@ -96,15 +95,6 @@ vi.mock("../../StaticMap/StaticMap.tsx", () => ({
 // ---- Tests ----
 
 describe("HomeLocationStep", () => {
-  const makeStepProps = (overrides: Partial<StepProps> = {}): StepProps => ({
-    onNext: vi.fn(),
-    onBack: vi.fn(),
-    onSkip: vi.fn(),
-    onSkipTo: vi.fn(),
-    onSkipToEnd: vi.fn(),
-    ...overrides,
-  });
-
   beforeEach(() => {
     vi.clearAllMocks();
     mockHomeSetMutateAsync.mockResolvedValue({});
@@ -122,7 +112,7 @@ describe("HomeLocationStep", () => {
   // ---- Initial render ----
 
   it("renders address search component", async () => {
-    renderWithProviders(<HomeLocationStep {...makeStepProps()} />);
+    renderWithProviders(<HomeLocationStep />);
 
     await waitFor(() => {
       expect(screen.getByTestId("address-search")).toBeInTheDocument();
@@ -130,7 +120,7 @@ describe("HomeLocationStep", () => {
   });
 
   it("renders GPS button", () => {
-    renderWithProviders(<HomeLocationStep {...makeStepProps()} />);
+    renderWithProviders(<HomeLocationStep />);
 
     expect(
       screen.getByRole("button", { name: /Use my current location/ }),
@@ -149,7 +139,7 @@ describe("HomeLocationStep", () => {
     const onNext = vi.fn();
     renderWithProviders(
       <StepNextHarness onAdvance={onNext}>
-        <HomeLocationStep {...makeStepProps({ onNext })} />
+        <HomeLocationStep />
       </StepNextHarness>,
     );
 

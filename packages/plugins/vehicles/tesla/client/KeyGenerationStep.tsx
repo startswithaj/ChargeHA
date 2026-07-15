@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { useTeslaConfig } from "./useTeslaConfig.ts";
 import { trpc } from "./trpc.ts";
-import type { StepProps } from "../../../hostUi.ts";
 import { hintUnlessLoading, useWizardNextControl } from "../../../hostUi.ts";
 import { KeyImportForm } from "./KeyImportForm.tsx";
 import { stepStyles as styles } from "../../../hostUi.ts";
@@ -123,7 +122,7 @@ function useKeyMutations() {
   };
 }
 
-export function KeyGenerationStep(_props: StepProps): JSX.Element {
+export function KeyGenerationStep(): JSX.Element {
   const [mode, setMode] = useState<Mode>("choose");
   const { data: teslaConfig } = useTeslaConfig();
   const hasExistingKeys = !!teslaConfig?.ecPublicKeyPem;

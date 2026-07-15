@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react";
 import { Text } from "@radix-ui/themes";
-import type { StepProps } from "../../../hostUi.ts";
 import { useWizardNextControl } from "../../../hostUi.ts";
 import { trpc } from "./trpc.ts";
 import { stepStyles as styles } from "../../../hostUi.ts";
@@ -9,7 +8,7 @@ import {
   type EnphaseLocalFormValues,
 } from "./EnphaseLocalForm.tsx";
 
-export function EnphaseLocalSetupStep(_props: StepProps) {
+export function EnphaseLocalSetupStep() {
   const { data: config } = trpc.plugin.energy.enphase_local.getConfig
     .useQuery();
   const saveMutation = trpc.plugin.energy.enphase_local.setConfig.useMutation();

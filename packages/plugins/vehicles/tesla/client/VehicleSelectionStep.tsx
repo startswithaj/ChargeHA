@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Callout, Checkbox, Text, TextField } from "@radix-ui/themes";
 import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import { trpc } from "./trpc.ts";
-import type { StepProps } from "../../../hostUi.ts";
 import { hintUnlessLoading, useWizardNextControl } from "../../../hostUi.ts";
 import { stepStyles as styles } from "../../../hostUi.ts";
 
@@ -159,7 +158,7 @@ async function saveSelectedVehicles(
   });
 }
 
-export function VehicleSelectionStep(_props: StepProps): JSX.Element {
+export function VehicleSelectionStep(): JSX.Element {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [priorities, setPriorities] = useState<Record<string, number>>({});
   const [saveError, setSaveError] = useState<string | null>(null);

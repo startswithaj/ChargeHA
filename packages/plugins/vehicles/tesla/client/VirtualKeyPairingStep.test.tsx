@@ -4,7 +4,6 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../../client/src/test-utils.tsx";
 import { VirtualKeyPairingStep } from "./VirtualKeyPairingStep.tsx";
 import { trpc } from "./trpc.ts";
-import { makeStepProps } from "./test-helpers/stepProps.ts";
 
 const mocks = vi.hoisted(() => ({
   checkKeyPairingMutate: vi.fn(),
@@ -103,7 +102,7 @@ describe("VirtualKeyPairingStep", () => {
   // ---- Initial render ----
 
   it("renders pairing instructions for each selected vehicle", async () => {
-    renderWithProviders(<VirtualKeyPairingStep {...makeStepProps()} />);
+    renderWithProviders(<VirtualKeyPairingStep />);
 
     await waitFor(() => {
       expect(screen.getByText("My Model 3")).toBeInTheDocument();
@@ -112,7 +111,7 @@ describe("VirtualKeyPairingStep", () => {
   });
 
   it("shows pairing URL containing the domain", async () => {
-    renderWithProviders(<VirtualKeyPairingStep {...makeStepProps()} />);
+    renderWithProviders(<VirtualKeyPairingStep />);
 
     await waitFor(() => {
       expect(
@@ -124,7 +123,7 @@ describe("VirtualKeyPairingStep", () => {
   });
 
   it("renders QR code element", async () => {
-    renderWithProviders(<VirtualKeyPairingStep {...makeStepProps()} />);
+    renderWithProviders(<VirtualKeyPairingStep />);
 
     await waitFor(() => {
       expect(screen.getByTestId("qr-code")).toBeInTheDocument();
@@ -134,7 +133,7 @@ describe("VirtualKeyPairingStep", () => {
   // ---- API calls ----
 
   it("verify button calls checkKeyPairing mutation", async () => {
-    renderWithProviders(<VirtualKeyPairingStep {...makeStepProps()} />);
+    renderWithProviders(<VirtualKeyPairingStep />);
 
     await waitFor(() => {
       expect(screen.getByText("Verify Pairing")).toBeInTheDocument();
@@ -153,7 +152,7 @@ describe("VirtualKeyPairingStep", () => {
       mocks.capturedCheckOnSuccess.current?.({ paired: true });
     });
 
-    renderWithProviders(<VirtualKeyPairingStep {...makeStepProps()} />);
+    renderWithProviders(<VirtualKeyPairingStep />);
 
     await waitFor(() => {
       expect(screen.getByText("Verify Pairing")).toBeInTheDocument();

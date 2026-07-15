@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react";
 import { Text } from "@radix-ui/themes";
-import type { StepProps } from "../../../hostUi.ts";
 import { useWizardNextControl } from "../../../hostUi.ts";
 import { trpc } from "./trpc.ts";
 import { stepStyles as styles } from "../../../hostUi.ts";
@@ -9,7 +8,7 @@ import {
   type SigenergyLocalFormValues,
 } from "./SigenergyLocalForm.tsx";
 
-export function SigenergyLocalSetupStep(_props: StepProps) {
+export function SigenergyLocalSetupStep() {
   const { data: config } = trpc.plugin.energy.sigenergy_local.getConfig
     .useQuery();
   const saveMutation = trpc.plugin.energy.sigenergy_local.setConfig

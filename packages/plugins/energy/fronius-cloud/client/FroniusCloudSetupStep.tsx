@@ -1,12 +1,11 @@
 import { useCallback, useState } from "react";
 import { Text } from "@radix-ui/themes";
-import type { StepProps } from "../../../hostUi.ts";
 import { useWizardNextControl } from "../../../hostUi.ts";
 import { trpc } from "./trpc.ts";
 import { stepStyles as styles } from "../../../hostUi.ts";
 import { FroniusCloudForm } from "./FroniusCloudForm.tsx";
 
-export function FroniusCloudSetupStep(_props: StepProps) {
+export function FroniusCloudSetupStep() {
   const { data: config } = trpc.plugin.energy.fronius_cloud.getConfig
     .useQuery();
   const saveMutation = trpc.plugin.energy.fronius_cloud.setConfig.useMutation();

@@ -3,7 +3,6 @@ import { Button, Callout, Text } from "@radix-ui/themes";
 import { CheckCircle, Globe, Loader2 } from "lucide-react";
 import { useTeslaConfig, useTeslaConfigMutation } from "./useTeslaConfig.ts";
 import { trpc } from "./trpc.ts";
-import type { StepProps } from "../../../hostUi.ts";
 import { hintUnlessLoading, useWizardNextControl } from "../../../hostUi.ts";
 import { canTeslaFetchKeyFrom, isStableOrigin } from "./oauthOrigin.ts";
 import {
@@ -293,7 +292,7 @@ function UnreachableOriginCallout(
   );
 }
 
-export function PublicKeyHostingStep(_props: StepProps): JSX.Element {
+export function PublicKeyHostingStep(): JSX.Element {
   const { data: teslaConfig } = useTeslaConfig();
   const browserOrigin = globalThis.location?.origin || "";
   const publicKey = teslaConfig?.ecPublicKeyPem || "";
