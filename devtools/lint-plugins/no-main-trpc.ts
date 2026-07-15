@@ -1,14 +1,9 @@
 /**
- * Deno lint plugin that keeps plugin code behind the defined plugin APIs.
- *
- * Rule no-main-trpc: tRPC calls in plugin code must go through the `plugin`
+ * Deno lint plugin: tRPC calls in plugin code must go through the `plugin`
  * namespace (`trpc.plugin.…` / `utils.plugin.…` / `utils.client.plugin.…`).
  * Any other segment on the `trpc`/`utils` root is flagged — including core
  * routers that don't exist yet. The only other allowed segments are tRPC's
  * own client API words, which aren't endpoints.
- *
- * Rule no-main-imports: plugin code may not deep-import main's client
- * internals — the host UI surface is `packages/plugins/hostUi.ts`.
  *
  * Only files under packages/plugins/ are checked; test files are excluded.
  * To intentionally keep a known violation (tracked tech debt), prefix the
@@ -20,8 +15,7 @@ const ROOT_NAMES: readonly string[] = ["trpc", "utils"];
 
 // Allowed first segments after the root: the plugin namespace plus tRPC's
 // client API. `client` is useUtils' raw-client escape hatch — what follows
-// it is checked when that next segment becomes the property of a
-// `utils.client` chain (handled below by treating it as a root too).
+// it is checked separately because `utils.client` is treated as a root too.
 const ALLOWED_SEGMENTS: readonly string[] = [
   "plugin",
   "client",
@@ -50,25 +44,6 @@ function isTrpcRoot(node: Deno.lint.MemberExpression["object"]): boolean {
 export default {
   name: "custom-main-refs",
   rules: {
-    "no-main-imports": {
-      create(context) {
-        const normalised = context.filename.replace(/\\/g, "/");
-        if (!isPluginFile(normalised)) return {};
-        if (normalised.endsWith("/packages/plugins/hostUi.ts")) return {};
-        return {
-          ImportDeclaration(node: Deno.lint.ImportDeclaration) {
-            const source = String(node.source.value);
-            if (!source.includes("client/src/")) return;
-            context.report({
-              node: node.source,
-              message:
-                "Plugin code must not deep-import main's client internals — import the host UI surface " +
-                "from packages/plugins/hostUi.ts (add the export there if it's missing).",
-            });
-          },
-        };
-      },
-    },
     "no-main-trpc": {
       create(context) {
         if (!isPluginFile(context.filename)) return {};

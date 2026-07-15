@@ -59,6 +59,7 @@
       "./devtools/lint-plugins/no-foreach-mutation.ts",
       "./devtools/lint-plugins/no-plugin-refs.ts",
       "./devtools/lint-plugins/no-main-trpc.ts",
+      "./devtools/lint-plugins/no-main-imports.ts",
       "./devtools/lint-plugins/no-server-trpc-caller.ts",
       "./devtools/lint-plugins/no-test-globals.ts",
       "./devtools/lint-plugins/test-file-length.ts"

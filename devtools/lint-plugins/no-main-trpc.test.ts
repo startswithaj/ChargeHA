@@ -7,9 +7,7 @@ const MAIN_FILE = "/repo/packages/client/src/components/Dashboard.tsx";
 
 Deno.test("no-main-trpc", async (t) => {
   const lint = (source: string, file = PLUGIN_FILE) =>
-    runPlugin(plugin, source, file).filter((d) =>
-      d.id.endsWith("no-main-trpc")
-    );
+    runPlugin(plugin, source, file);
 
   // All expect exactly one diagnostic in a plugin file.
   const flagCases: Array<[string, string]> = [
@@ -68,40 +66,4 @@ Deno.test("no-main-trpc", async (t) => {
       expect(lint(source, file).length).toBe(0);
     });
   }
-});
-
-Deno.test("no-main-imports", async (t) => {
-  const lint = (source: string, file = PLUGIN_FILE) =>
-    runPlugin(plugin, source, file).filter((d) =>
-      d.id.endsWith("no-main-imports")
-    );
-
-  await t.step("flags deep imports into main's client", () => {
-    const diags = lint(
-      `import { Spinner } from "../../../../client/src/components/ui/Spinner.tsx";`,
-    );
-    expect(diags.length).toBe(1);
-  });
-
-  await t.step("allows importing through the hostUi barrel", () => {
-    expect(lint(`import { Spinner } from "../../../hostUi.ts";`).length)
-      .toBe(0);
-  });
-
-  await t.step("allows the barrel itself to import client/src", () => {
-    const diags = lint(
-      `export { Spinner } from "../client/src/components/ui/Spinner.tsx";
-       import { X } from "../client/src/trpc.ts";`,
-      "/repo/packages/plugins/hostUi.ts",
-    );
-    expect(diags.length).toBe(0);
-  });
-
-  await t.step("ignores main's own files", () => {
-    const diags = lint(
-      `import { Spinner } from "../../client/src/components/ui/Spinner.tsx";`,
-      MAIN_FILE,
-    );
-    expect(diags.length).toBe(0);
-  });
 });
