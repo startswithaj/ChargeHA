@@ -45,7 +45,7 @@ export const installEnphaseDiscoveryStubs = (): EnphaseDiscoveryStubs => {
     (() => state.networkInterfacesResult) as typeof Deno.networkInterfaces;
 
   const http: EnvoyHttp = {
-    get: (host, _path, _headers) => {
+    get: (host) => {
       const device = devices.get(host);
       return device
         ? Promise.resolve({ status: 200, body: infoXml(device) })
