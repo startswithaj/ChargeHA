@@ -17,6 +17,13 @@ const EXEMPT_PREFIXES = [
   "GET /health",
 ] as const;
 
+/** Exact paths that bypass auth: the SPA shell and the login page — without
+ *  these an unauthenticated browser can never reach the login form. */
+const EXEMPT_EXACT = [
+  "GET /",
+  "GET /login",
+] as const;
+
 /** tRPC procedure paths that bypass auth. */
 const EXEMPT_TRPC_PATHS = [
   "/trpc/auth.login",
@@ -53,6 +60,10 @@ export function isHttps(req: Request): boolean {
 
 /** Check whether a path is exempt from auth. */
 function isExemptPath(method: string, path: string): boolean {
+  if (EXEMPT_EXACT.some((exact) => exact === `${method} ${path}`)) {
+    return true;
+  }
+
   // Check method+path prefixes
   const matchesPrefix = EXEMPT_PREFIXES.some((prefix) => {
     const [exemptMethod, exemptPath] = prefix.split(" ", 2);
@@ -144,8 +155,13 @@ export function createAuthMiddleware(
       }
     }
 
-    // 5. No valid session — 401
+    // 5. No valid session. Browser navigations (document requests) are sent
+    //    to the login page; data requests get a JSON 401.
     logger.warn(`Auth rejected: ${method} ${path}`);
+    const acceptsHtml = c.req.header("Accept")?.includes("text/html") ?? false;
+    if (method === "GET" && acceptsHtml) {
+      return c.redirect("/login", 302);
+    }
     return c.json({ error: "Unauthorized" }, 401);
   };
 }

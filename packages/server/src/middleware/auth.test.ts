@@ -118,6 +118,40 @@ describe("createAuthMiddleware()", () => {
       expect(res.status).toBe(200);
     });
 
+    it("allows GET / (the SPA shell) without auth", async () => {
+      const { app } = setupAuthApp({ authMode: "local" });
+
+      const res = await app.request("/");
+      expect(res.status).toBe(200);
+    });
+
+    it("allows GET /login without auth", async () => {
+      const { app } = setupAuthApp({ authMode: "local" });
+
+      const res = await app.request("/login");
+      expect(res.status).toBe(200);
+    });
+
+    it("does not exempt other document paths — redirects them to /login", async () => {
+      const { app } = setupAuthApp({ authMode: "local" });
+
+      const res = await app.request("/settings", {
+        headers: { Accept: "text/html" },
+      });
+      expect(res.status).toBe(302);
+      expect(res.headers.get("Location")).toBe("/login");
+    });
+
+    it("keeps JSON 401 for unauthenticated data requests", async () => {
+      const { app } = setupAuthApp({ authMode: "local" });
+
+      const res = await app.request("/trpc/config.get", {
+        headers: { Accept: "application/json" },
+      });
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({ error: "Unauthorized" });
+    });
+
     it("allows GET /.well-known/* without auth", async () => {
       const { app } = setupAuthApp({ authMode: "local" });
 
