@@ -45,7 +45,7 @@ export class SimulatedVehiclePlugin implements VehiclePlugin {
   private readonly adapters = new Map<string, SimulatedVehicleAdapter>();
   private readonly startupPromise: Promise<void>;
 
-  constructor(readonly deps: PluginDependencies) {
+  constructor(private readonly deps: PluginDependencies) {
     this.startupPromise = this.startup();
   }
 
@@ -93,7 +93,7 @@ export class SimulatedVehiclePlugin implements VehiclePlugin {
   }
 
   getRouter(): AnyRouter {
-    return createSimulatedRouter(this);
+    return createSimulatedRouter(this, this.deps);
   }
 
   /** Simulated vehicles are always commandable. */

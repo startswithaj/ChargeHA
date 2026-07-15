@@ -71,7 +71,7 @@ export class TeslaVehiclePlugin implements VehiclePlugin {
   private readonly startupPromise: Promise<void>;
 
   constructor(
-    readonly deps: PluginDependencies,
+    private readonly deps: PluginDependencies,
     private readonly teslaProxyManager: TeslaProxyManager,
     serviceIo?: TeslaServiceIo,
   ) {
@@ -182,7 +182,7 @@ export class TeslaVehiclePlugin implements VehiclePlugin {
   // ── Plugin interface implementations ────────────────────────────────────
 
   getRouter() {
-    return createTeslaRouter(this);
+    return createTeslaRouter(this, this.deps);
   }
 
   /** Commands need the tesla-http-proxy up and the virtual key paired. */

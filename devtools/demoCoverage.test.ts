@@ -35,10 +35,12 @@ const realPaths = (type: "query" | "mutation"): string[] => {
   const merged = createAppRouter({
     vehicle: {
       tesla: createTeslaRouter(
-        { deps: stubDeps("tesla") } as unknown as TeslaVehiclePlugin,
+        {} as unknown as TeslaVehiclePlugin,
+        stubDeps("tesla"),
       ),
       simulated: createSimulatedRouter(
-        { deps: stubDeps("simulated") } as unknown as SimulatedVehiclePlugin,
+        {} as unknown as SimulatedVehiclePlugin,
+        stubDeps("simulated"),
       ),
     },
     energy: {

@@ -1,4 +1,5 @@
 import { ServiceError } from "../lib/ServiceError.ts";
+import { inSequence } from "@chargeha/shared/async";
 import type { DayOfWeek } from "@chargeha/shared";
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { CreateTariffPeriodInput, TariffPeriodRow } from "../db/types.ts";
@@ -415,10 +416,7 @@ export class TariffService {
 
     // Delete all existing periods and create new ones from the preset
     await this.db.deleteAllTariffPeriods();
-    await preset.reduce(async (prev, period) => {
-      await prev;
-      await this.db.createTariffPeriod(period);
-    }, Promise.resolve());
+    await inSequence(preset, (period) => this.db.createTariffPeriod(period));
 
     const periods = await this.db.getTariffPeriods();
     return { periods };

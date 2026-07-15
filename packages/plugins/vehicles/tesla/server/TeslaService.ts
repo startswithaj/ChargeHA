@@ -1,6 +1,6 @@
 /// <reference lib="deno.ns" />
 import { TRPCError } from "@trpc/server";
-import { sleep } from "@chargeha/shared/async";
+import { inSequence, sleep } from "@chargeha/shared/async";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import type { TeslaTokenManager } from "./TeslaTokenManager.ts";
 import {
@@ -86,10 +86,7 @@ export class TeslaService {
 
       // Remove all Tesla vehicles from the manager
       const vehicles = await this.deps.getVehicleRows();
-      await vehicles.reduce(async (prev, v) => {
-        await prev;
-        await this.deps.deleteVehicle(v.id);
-      }, Promise.resolve());
+      await inSequence(vehicles, (v) => this.deps.deleteVehicle(v.id));
 
       // Clear stored tokens
       await this.tokenManager.deleteTokens();
@@ -122,10 +119,7 @@ export class TeslaService {
   async selectVehicles(
     input: { vehicles: { vin: string; name?: string; priority: number }[] },
   ): Promise<{ success: true; vins: string[] }> {
-    await input.vehicles.reduce(async (prev, vehicle) => {
-      await prev;
-      await this.saveVehicle(vehicle);
-    }, Promise.resolve());
+    await inSequence(input.vehicles, (vehicle) => this.saveVehicle(vehicle));
 
     // Trigger pairing check in the background after adding vehicles
     this.checkKeyPairing().catch((err) => {

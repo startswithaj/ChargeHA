@@ -2,10 +2,13 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTraceId } from "@chargeha/shared";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
+import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import type { SimulatedVehiclePlugin } from "./index.ts";
 
-export function createSimulatedRouter(plugin: SimulatedVehiclePlugin) {
-  const deps = plugin.deps;
+export function createSimulatedRouter(
+  plugin: SimulatedVehiclePlugin,
+  deps: PluginDependencies,
+) {
   return router({
     listVehicles: publicProcedure.query(async () => {
       return { vehicles: await deps.getVehiclesWithState() };

@@ -99,7 +99,7 @@ describe("Tesla Plugin Router", () => {
     vehicleRegistry.register(plugin);
 
     const appRouter = createAppRouter({
-      vehicle: { tesla: createTeslaRouter(plugin) },
+      vehicle: { tesla: createTeslaRouter(plugin, deps) },
       energy: {},
     });
     const createCaller = createCallerFactory(appRouter);
