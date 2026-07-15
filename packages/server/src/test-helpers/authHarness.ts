@@ -64,6 +64,8 @@ export function setupAuthApp(
   app.all("/trpc/auth.login", (c) => c.json({ result: true }));
   app.all("/trpc/auth.session", (c) => c.json({ result: true }));
   app.all("/trpc/config.get", (c) => c.json({ result: true }));
+  app.get("/", (c) => c.html("<html>shell</html>"));
+  app.get("/login", (c) => c.html("<html>login</html>"));
   app.get("/assets/app.js", (c) => c.text("js"));
   app.get("/assets/style.css", (c) => c.text("css"));
   app.get("/logo.svg", (c) => c.text("svg"));
