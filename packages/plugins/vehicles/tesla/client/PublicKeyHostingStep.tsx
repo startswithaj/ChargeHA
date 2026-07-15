@@ -11,6 +11,7 @@ import {
 import { canTeslaFetchKeyFrom, isStableOrigin } from "./oauthOrigin.ts";
 import {
   AiPromptInstructions,
+  FleetKeyInstructions,
   GitHubPagesInstructions,
   SelfHostInstructions,
   WELL_KNOWN_PATH,
@@ -26,8 +27,9 @@ import { stepStyles as styles } from "../../../hostUi.ts";
 type HostingChoice = null | "yes" | "no";
 
 function TunnelActiveView(
-  { tunnelUrl, onStop, stopping }: {
+  { tunnelUrl, expiryMinutes, onStop, stopping }: {
     tunnelUrl: string;
+    expiryMinutes: number | null;
     onStop: () => void;
     stopping: boolean;
   },
@@ -43,11 +45,21 @@ function TunnelActiveView(
           <CheckCircle size={16} />
         </Callout.Icon>
         <Callout.Text>
-          Your public key is being served via the Cloudflare Tunnel at{" "}
-          <strong>{tunnelUrl}/{WELL_KNOWN_PATH}</strong>. The domain has already
-          been saved — no additional hosting setup needed.
+          Your public key is being served via the tunnel at{" "}
+          <strong>{tunnelUrl}/{WELL_KNOWN_PATH}</strong>. No additional hosting
+          setup needed.
         </Callout.Text>
       </Callout.Root>
+      {expiryMinutes !== null && (
+        <Callout.Root color="amber">
+          <Callout.Text>
+            Free tunnels expire after {expiryMinutes}{" "}
+            minutes — finish partner registration, Tesla login, and key pairing
+            before then. If it expires mid-setup you'll need to start a new
+            tunnel and re-run partner registration.
+          </Callout.Text>
+        </Callout.Root>
+      )}
       <div className={styles.stepActions}>
         <Button variant="soft" onClick={onStop} disabled={stopping}>
           {stopping
@@ -136,8 +148,10 @@ function TunnelHostingSection(
   return (
     <div className={styles.instructionBox}>
       <Text as="p" size="2" color="gray">
-        Start a temporary Cloudflare Tunnel to serve your public key. No account
-        required — the tunnel is torn down when the wizard completes.
+        Start a temporary tunnel (via Pinggy) to serve your public key. No
+        account required — the tunnel is torn down when the wizard completes.
+        Free tunnels last 60 minutes and the URL includes your public IP
+        address.
       </Text>
       <div style={{ marginTop: "0.75rem" }}>
         <Button
@@ -168,12 +182,14 @@ function HostingMethodSection(
     setHostingMethod,
     publicKey,
     staticDisabled,
+    browserOrigin,
     startTunnelMutation,
   }: {
     hostingMethod: HostingMethod;
     setHostingMethod: (m: HostingMethod) => void;
     publicKey: string;
     staticDisabled: boolean;
+    browserOrigin: string;
     startTunnelMutation: ReturnType<
       typeof trpc.plugin.vehicle.tesla.startTunnel.useMutation
     >;
@@ -188,6 +204,7 @@ function HostingMethodSection(
         hostingMethod={hostingMethod}
         onSelect={setHostingMethod}
         staticDisabled={staticDisabled}
+        browserOrigin={browserOrigin}
       />
       {hostingMethod === "self" && (
         <>
@@ -201,6 +218,15 @@ function HostingMethodSection(
       {hostingMethod === "github" && (
         <>
           <GitHubPagesInstructions publicKey={publicKey} />
+          <DomainVerifyForm
+            publicKey={publicKey}
+            wellKnownPath={WELL_KNOWN_PATH}
+          />
+        </>
+      )}
+      {hostingMethod === "fleetkey" && (
+        <>
+          <FleetKeyInstructions publicKey={publicKey} />
           <DomainVerifyForm
             publicKey={publicKey}
             wellKnownPath={WELL_KNOWN_PATH}
@@ -289,8 +315,8 @@ function UnreachableOriginCallout(
       <Callout.Text>
         You're accessing ChargeHA at <strong>{browserOrigin}</strong>{" "}
         — Tesla's servers likely can't fetch the key from this address, so "No"
-        with a hosting method (the Cloudflare Tunnel is the quickest) is the
-        usual choice here.
+        with a hosting method (the tunnel is the quickest) is the usual choice
+        here.
       </Callout.Text>
     </Callout.Root>
   );
@@ -404,6 +430,7 @@ function HostingChoiceView(
           setHostingMethod={selectMethod}
           publicKey={publicKey}
           staticDisabled={!isStableOrigin(browserOrigin)}
+          browserOrigin={browserOrigin}
           startTunnelMutation={startTunnelMutation}
         />
       )}
@@ -468,6 +495,7 @@ export const publicKeyHostingStep: PluginStepDef = {
         view: (
           <TunnelActiveView
             tunnelUrl={tunnelUrl}
+            expiryMinutes={tunnelStatus.data?.expiryMinutes ?? null}
             onStop={() => stopTunnelMutation.mutate()}
             stopping={stopTunnelMutation.isPending}
           />

@@ -61,6 +61,7 @@ describe("TeslaService", () => {
         getUrl: () => null,
         start: () => Promise.reject(new Error("tunnel start not mocked")),
         stop: () => Promise.resolve(),
+        getExpiryMinutes: () => null,
       },
       setSimulatedLoad: () => {},
       log: mockLogger(),
@@ -347,6 +348,7 @@ describe("TeslaService", () => {
             getUrl: () => null,
             start: () => Promise.reject(new Error("tunnel start not mocked")),
             stop: () => Promise.resolve(),
+            getExpiryMinutes: () => null,
           },
         },
       });
@@ -375,6 +377,7 @@ describe("TeslaService", () => {
             getUrl: () => "https://abc.trycloudflare.com",
             start: () => Promise.reject(new Error("tunnel start not mocked")),
             stop: () => Promise.resolve(),
+            getExpiryMinutes: () => null,
           },
         },
         io,

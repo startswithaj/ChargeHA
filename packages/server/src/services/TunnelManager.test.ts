@@ -152,6 +152,16 @@ describe("TunnelManager", () => {
   /** Routes returned by the injected provider — tests mutate between calls. */
   const routesHolder: { routes: PluginTunnelRoute[] } = { routes: [] };
 
+  /** Provider matching the mock process output used across these tests. */
+  const testProvider = {
+    name: "test-tunnel",
+    path: "test-tunnel-bin",
+    args: ["{port}"],
+    urlPattern: /https:\/\/[a-z0-9-]+\.trycloudflare\.com/,
+    urlStream: "stderr" as const,
+    expiryMinutes: null,
+  };
+
   /** Construct a TunnelManager with the fake serve + command injected. */
   const makeTunnelManager = (
     logger: unknown = mockLogger,
@@ -163,7 +173,7 @@ describe("TunnelManager", () => {
       3000,
       () => routesHolder.routes,
       middlewarePort,
-      "cloudflared",
+      testProvider,
       mockServe,
       lazyCommand,
     );
@@ -361,7 +371,7 @@ describe("TunnelManager", () => {
       await tm.stop();
     });
 
-    it("throws specific error when cloudflared binary not found", async () => {
+    it("throws specific error when the tunnel binary is not found", async () => {
       stubDenoServe();
       stubDenoCommand({
         mockProcess: null as unknown as Deno.ChildProcess,
@@ -371,7 +381,7 @@ describe("TunnelManager", () => {
       const tm = makeTunnelManager();
 
       await expect(tm.start()).rejects.toThrow(
-        "cloudflared binary not found",
+        "test-tunnel-bin binary not found",
       );
       expect(tm.isRunning).toBe(false);
       // Middleware should be stopped on error
@@ -405,7 +415,7 @@ describe("TunnelManager", () => {
         await fakeTime.tickAsync(16_000);
 
         await expect(startPromise).rejects.toThrow(
-          "Timed out waiting for cloudflared tunnel URL",
+          "Timed out waiting for test-tunnel tunnel URL",
         );
       } finally {
         fakeTime.restore();
@@ -428,7 +438,7 @@ describe("TunnelManager", () => {
         await fakeTime.tickAsync(16_000);
 
         await expect(startPromise).rejects.toThrow(
-          "Timed out waiting for cloudflared tunnel URL",
+          "Timed out waiting for test-tunnel tunnel URL",
         );
       } finally {
         fakeTime.restore();
@@ -780,10 +790,10 @@ describe("TunnelManager", () => {
       await new Promise((r) => setTimeout(r, 50));
 
       // pipeStderr should have logged the remaining chunks
-      const cloudflaredLogs = debugCalls.filter((m) =>
-        m.startsWith("[cloudflared]")
+      const tunnelLogs = debugCalls.filter((m) =>
+        m.startsWith("[test-tunnel]")
       );
-      expect(cloudflaredLogs.length).toBeGreaterThan(0);
+      expect(tunnelLogs.length).toBeGreaterThan(0);
 
       await tm.stop();
     });

@@ -2,11 +2,52 @@
 import type { Logger } from "../lib/Logger.ts";
 import type { PluginTunnelRoute } from "@chargeha/plugins/types";
 
+/** How a tunnel process is spawned and its public URL recognised. */
+export interface TunnelProvider {
+  name: string;
+  path: string;
+  /** `{port}` is replaced with the middleware port. */
+  args: string[];
+  /** Matches the public https URL in the process output. */
+  urlPattern: RegExp;
+  /** Which stream the provider prints the URL to. */
+  urlStream: "stdout" | "stderr";
+  /** Free-tier session limit surfaced to the user, if any. */
+  expiryMinutes: number | null;
+}
+
+/** Pinggy over plain ssh. As of 2026-07 it is the only tested tunnel whose
+ *  domain Tesla's developer portal accepts in BOTH the Allowed Origin and
+ *  Redirect URI fields — trycloudflare.com, serveousercontent.com,
+ *  tunnelmole.net, loca.lt, and Pinggy's own pinggy-free.link alias are all
+ *  rejected in at least one (see docs/tesla.md). Free tunnels expire after
+ *  60 minutes and embed the user's public IP in the URL. */
+export const PINGGY_PROVIDER: TunnelProvider = {
+  name: "pinggy",
+  path: "ssh",
+  args: [
+    "-p",
+    "443",
+    "-o",
+    "StrictHostKeyChecking=no",
+    "-o",
+    "ServerAliveInterval=30",
+    "-o",
+    "ExitOnForwardFailure=yes",
+    "-R",
+    "0:localhost:{port}",
+    "qr@a.pinggy.io",
+  ],
+  urlPattern: /https:\/\/[a-z0-9-]+\.free\.pinggy\.net/,
+  urlStream: "stdout",
+  expiryMinutes: 60,
+};
+
 /**
- * Manages a cloudflared tunnel + middleware server for LAN users.
+ * Manages a tunnel process + middleware server for LAN users.
  * Plugin-provided routes come from the injected `getRoutes` provider at
  * `start()` time — TunnelManager itself does not hold a plugin reference.
- * The tunnel provides a temporary https://xxx.trycloudflare.com URL.
+ * The tunnel provides a temporary public https URL.
  */
 export class TunnelManager {
   private process: Deno.ChildProcess | null = null;
@@ -19,11 +60,16 @@ export class TunnelManager {
     private mainServerPort: number,
     private getRoutes: () => PluginTunnelRoute[],
     private middlewarePort = 4040,
-    private cloudflaredPath = "cloudflared",
+    private provider: TunnelProvider = PINGGY_PROVIDER,
     // Injected so tests can supply fakes instead of patching Deno globals.
     private serve: typeof Deno.serve = Deno.serve,
     private command: typeof Deno.Command = Deno.Command,
   ) {}
+
+  /** Free-tier session limit of the active provider, if any. */
+  get expiryMinutes(): number | null {
+    return this.provider.expiryMinutes;
+  }
 
   /**
    * Merge new routes into the live route set, deduping by path.
@@ -51,7 +97,7 @@ export class TunnelManager {
   }
 
   /**
-   * Start the middleware server and cloudflared tunnel.
+   * Start the middleware server and tunnel process.
    * Returns the public tunnel URL. Plugin-provided routes come from the
    * injected provider (backed by the plugin registry).
    */
@@ -116,27 +162,33 @@ export class TunnelManager {
       `Middleware server started on port ${this.middlewarePort}`,
     );
 
-    // Spawn cloudflared tunnel
+    // Spawn the tunnel process
     try {
-      const cmd = new this.command(this.cloudflaredPath, {
-        args: ["tunnel", "--url", `http://localhost:${this.middlewarePort}`],
+      const cmd = new this.command(this.provider.path, {
+        args: this.provider.args.map((a) =>
+          a.replace("{port}", String(this.middlewarePort))
+        ),
+        stdin: "null",
         stdout: "piped",
         stderr: "piped",
       });
 
       this.process = cmd.spawn();
-      this.logger.info(`cloudflared started (PID ${this.process.pid})`);
+      this.logger.info(
+        `${this.provider.name} tunnel started (PID ${this.process.pid})`,
+      );
 
-      // Parse the tunnel URL from stderr
       this._tunnelUrl = await this.parseTunnelUrl(this.process);
       this.logger.info(`Tunnel URL: ${this._tunnelUrl}`);
 
-      // Continue piping stderr in background
-      this.pipeStderr(this.process);
+      // Continue piping the URL stream in background
+      this.pipeUrlStream(this.process);
 
       // Monitor for unexpected exit
       this.process.status.then((status: Deno.CommandStatus) => {
-        this.logger.warn(`cloudflared exited with code ${status.code}`);
+        this.logger.warn(
+          `${this.provider.name} tunnel exited with code ${status.code}`,
+        );
         this.process = null;
         this._tunnelUrl = null;
       });
@@ -147,10 +199,10 @@ export class TunnelManager {
 
       if (err instanceof Deno.errors.NotFound) {
         this.logger.warn(
-          `cloudflared binary not found at "${this.cloudflaredPath}"`,
+          `${this.provider.name} binary not found at "${this.provider.path}"`,
         );
         throw new Error(
-          "cloudflared binary not found. Install it or set CLOUDFLARED_PATH.",
+          `${this.provider.path} binary not found — the tunnel needs it installed.`,
         );
       }
       throw err;
@@ -168,7 +220,7 @@ export class TunnelManager {
         this.logger.debug(`Process already exited: ${error}`);
       }
       this.process = null;
-      this.logger.info("cloudflared tunnel stopped");
+      this.logger.info("tunnel stopped");
     }
 
     await this.stopMiddleware();
@@ -177,21 +229,24 @@ export class TunnelManager {
   }
 
   /**
-   * Parse stderr for the tunnel URL. cloudflared prints a line like:
-   *   https://some-words.trycloudflare.com
+   * Parse the provider's URL stream for the public tunnel URL.
    * Waits up to 15 seconds.
    */
   private parseTunnelUrl(process: Deno.ChildProcess): Promise<string> {
     return new Promise((resolve, reject) => {
       const decoder = new TextDecoder();
-      const reader = process.stderr.getReader();
+      const reader = process[this.provider.urlStream].getReader();
       // stream buffer accumulated across async reads
       // deno-lint-ignore custom-no-let/no-let
       let buffer = "";
 
       const timeout = setTimeout(() => {
         reader.releaseLock();
-        reject(new Error("Timed out waiting for cloudflared tunnel URL"));
+        reject(
+          new Error(
+            `Timed out waiting for ${this.provider.name} tunnel URL`,
+          ),
+        );
       }, 15_000);
 
       const read = async () => {
@@ -202,9 +257,7 @@ export class TunnelManager {
             if (done) break;
 
             buffer += decoder.decode(value);
-            const match = buffer.match(
-              /https:\/\/[a-z0-9-]+\.trycloudflare\.com/,
-            );
+            const match = buffer.match(this.provider.urlPattern);
             if (match) {
               clearTimeout(timeout);
               reader.releaseLock();
@@ -222,21 +275,21 @@ export class TunnelManager {
     });
   }
 
-  /** Pipe remaining stderr to logger after URL has been parsed. */
-  private async pipeStderr(process: Deno.ChildProcess): Promise<void> {
+  /** Pipe the rest of the URL stream to the logger after parsing. */
+  private async pipeUrlStream(process: Deno.ChildProcess): Promise<void> {
     const decoder = new TextDecoder();
-    const reader = process.stderr.getReader();
+    const reader = process[this.provider.urlStream].getReader();
     try {
       // deno-lint-ignore custom-no-imperative-loops/no-imperative-loops
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         const text = decoder.decode(value).trim();
-        if (text) this.logger.debug(`[cloudflared] ${text}`);
+        if (text) this.logger.debug(`[${this.provider.name}] ${text}`);
       }
     } catch (error) {
       // Process exited
-      this.logger.debug(`Cloudflared stderr pipe ended: ${error}`);
+      this.logger.debug(`Tunnel output pipe ended: ${error}`);
     }
   }
 

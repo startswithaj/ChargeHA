@@ -215,7 +215,7 @@ function PairingLinkStep({ pairingDomain }: { pairingDomain: string | null }) {
   if (!pairingDomain) {
     return (
       <>
-        Your key domain rode the Cloudflare tunnel, which is no longer running —
+        Your key domain rode the temporary tunnel, which is no longer running —
         restart the setup wizard to start a new tunnel and re-run partner
         registration before pairing.
       </>

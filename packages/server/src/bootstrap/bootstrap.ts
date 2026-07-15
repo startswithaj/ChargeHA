@@ -120,8 +120,6 @@ function buildAuxServices(
     new Logger("Tunnel", logLevel),
     port,
     () => vehicleRegistry.getAll().flatMap((p) => p.getTunnelRoutes()),
-    4040,
-    Deno.env.get("CLOUDFLARED_PATH") ?? "cloudflared",
   );
   const wizardService = new WizardService(
     db,
@@ -508,6 +506,7 @@ export async function bootstrap(): Promise<
         getUrl: () => services.tunnelManager.tunnelUrl,
         start: async () => ({ url: await services.tunnelManager.start() }),
         stop: () => services.tunnelManager.stop(),
+        getExpiryMinutes: () => services.tunnelManager.expiryMinutes,
       },
       geocode: (query) => services.geocodeService.geocodeAddress(query),
       encryptionConfigured: () => encryptionKey !== null,

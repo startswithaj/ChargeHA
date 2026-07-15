@@ -18,6 +18,8 @@ export interface PluginTunnelApi {
   getUrl(): string | null;
   start(): Promise<{ url: string }>;
   stop(): Promise<void>;
+  /** Free-tier session limit of the tunnel provider, if any. */
+  getExpiryMinutes(): number | null;
 }
 
 /** Everything a PluginDependencies instance is built from. */

@@ -4,7 +4,7 @@ set -e
 echo "[entrypoint] Starting ChargeHA server..."
 
 # --allow-ffi / --unstable-ffi: @db/sqlite uses FFI for native SQLite
-# --allow-run: Tesla HTTP proxy process, Cloudflare tunnel, Fronius LAN discovery
+# --allow-run: Tesla HTTP proxy process, setup tunnel (ssh), Fronius LAN discovery
 # --allow-sys=networkInterfaces: Fronius inverter LAN discovery
 # --unsafely-ignore-certificate-errors=localhost: Tesla HTTP proxy uses a self-signed
 #   TLS cert on localhost:4443. Without this flag, Deno rejects the cert and ALL
