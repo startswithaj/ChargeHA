@@ -2,13 +2,12 @@ import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { HealthService } from "./HealthService.ts";
 import type { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
+import { EnergyPluginRegistry } from "@chargeha/server/bootstrap/EnergyPluginRegistry";
 import type { PluginHealthCheck } from "@chargeha/plugins/types";
 import { throwingMock } from "../test-helpers/throwingMock.ts";
 
 describe("HealthService", () => {
-  const emptyEnergyRegistry = {
-    getHealthChecks: () => [],
-  } as unknown as import("../bootstrap/EnergyPluginRegistry.ts").EnergyPluginRegistry;
+  const emptyEnergyRegistry = new EnergyPluginRegistry();
 
   const createMockRegistry = (
     checks: PluginHealthCheck[] = [],

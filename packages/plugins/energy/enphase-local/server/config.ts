@@ -6,7 +6,7 @@ import {
 } from "@chargeha/shared/configSections";
 
 // ── Enphase Local plugin config section ─────────────────────────────────────
-// All keys use dot-namespaced format: enphase_local.{key}
+// Keys are relative — PluginDependencies prefixes them with the plugin id.
 //
 // The Envoy (IQ Gateway) serves its local API over HTTPS with a self-signed
 // certificate. Firmware 7+ requires a JWT owner token obtained from Enphase's
@@ -15,22 +15,22 @@ import {
 
 export const enphaseLocalConfigDef = defineSection({
   host: {
-    key: "enphase_local.host",
+    key: "host",
     schema: z.string(),
     default: "",
   },
   email: {
-    key: "enphase_local.email",
+    key: "email",
     schema: z.string(),
     default: "",
   },
   password: {
-    key: "enphase_local.password",
+    key: "password",
     schema: z.string(),
     default: "",
   },
   token: {
-    key: "enphase_local.token",
+    key: "token",
     schema: z.string(),
     default: "",
   },
@@ -41,6 +41,6 @@ export type EnphaseLocalConfig = SectionType<typeof enphaseLocalConfigDef>;
 export type EnphaseLocalConfigKey = SectionKeys<typeof enphaseLocalConfigDef>;
 
 export const ENPHASE_LOCAL_SECRET_KEYS: readonly EnphaseLocalConfigKey[] = [
-  "enphase_local.password",
-  "enphase_local.token",
+  "password",
+  "token",
 ] as const satisfies readonly EnphaseLocalConfigKey[];

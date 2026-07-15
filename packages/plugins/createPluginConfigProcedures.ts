@@ -15,7 +15,9 @@ import { publicProcedure } from "../server/src/trpc/trpc.ts";
  * Each plugin spreads these into its own router so config I/O lives on
  * the plugin's own tRPC path (e.g. trpc.plugin.vehicle.tesla.getConfig)
  * instead of a centralized pluginConfig router with hardcoded pluginId
- * strings. All storage goes through the plugin's own deps — no `ctx.db`.
+ * strings. All storage goes through the plugin's own deps — configDef keys
+ * are relative (e.g. "client_id") and deps prefixes them with the plugin id,
+ * the single place namespacing happens.
  *
  * No reconfigure callback: `AppDatabase.setConfig` / `storeSecret` emit
  * `config_changed` events, and subscribers (e.g. EnergyPoller) drive any
@@ -28,18 +30,6 @@ export function createPluginConfigProcedures(
   configDef: SectionDef,
   secretKeys: readonly string[],
 ) {
-  const prefix = `${deps.pluginId}.`;
-  // configDef db keys are fully prefixed (e.g. "tesla.client_id") while deps
-  // auto-prefixes with the plugin id — strip it so keys aren't doubled.
-  const stripPrefix = (key: string): string => {
-    if (!key.startsWith(prefix)) {
-      throw new Error(
-        `Config key "${key}" is not namespaced under "${prefix}"`,
-      );
-    }
-    return key.slice(prefix.length);
-  };
-
   const secretKeySet = new Set<string>(secretKeys);
   const dbKeys = sectionDbKeys(configDef);
   const inputSchema = buildSectionInputSchema(configDef);
@@ -49,8 +39,8 @@ export function createPluginConfigProcedures(
       const entries = await Promise.all(
         dbKeys.map(async (key) => {
           const value = secretKeySet.has(key)
-            ? await deps.getSecret(stripPrefix(key))
-            : await deps.getConfig(stripPrefix(key));
+            ? await deps.getSecret(key)
+            : await deps.getConfig(key);
           return [key, value] as const;
         }),
       );
@@ -66,8 +56,8 @@ export function createPluginConfigProcedures(
         await Promise.all(
           Object.entries(kvPairs).map(([key, value]) =>
             secretKeySet.has(key)
-              ? deps.setSecret(stripPrefix(key), value)
-              : deps.setConfig(stripPrefix(key), value)
+              ? deps.setSecret(key, value)
+              : deps.setConfig(key, value)
           ),
         );
 

@@ -6,7 +6,7 @@ import {
 } from "@chargeha/shared/configSections";
 
 // ── Sigenergy plugin config section ─────────────────────────────────────────
-// All keys use dot-namespaced format: sigenergy_local.{key}
+// Keys are relative — PluginDependencies prefixes them with the plugin id.
 //
 // Sigenergy inverters expose a Modbus TCP interface with no authentication.
 // `host` is required; the rest have sensible defaults matching Sigenergy's
@@ -15,22 +15,22 @@ import {
 
 export const sigenergyLocalConfigDef = defineSection({
   host: {
-    key: "sigenergy_local.host",
+    key: "host",
     schema: z.string(),
     default: "",
   },
   port: {
-    key: "sigenergy_local.port",
+    key: "port",
     schema: z.string(),
     default: "502",
   },
   plantUnitId: {
-    key: "sigenergy_local.plant_unit_id",
+    key: "plant_unit_id",
     schema: z.string(),
     default: "247",
   },
   deviceUnitId: {
-    key: "sigenergy_local.device_unit_id",
+    key: "device_unit_id",
     schema: z.string(),
     default: "1",
   },

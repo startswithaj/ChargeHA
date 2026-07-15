@@ -2,6 +2,7 @@ import { afterEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { AppDatabase } from "../../db/AppDatabase.ts";
 import { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
+import { EnergyPluginRegistry } from "@chargeha/server/bootstrap/EnergyPluginRegistry";
 import { HealthService } from "../../services/HealthService.ts";
 import { appRouter } from "../root.ts";
 import { createCallerFactory } from "../trpc.ts";
@@ -48,9 +49,7 @@ describe("Health tRPC Router", () => {
     if (plugin) vehiclePlugins.register(plugin);
     const healthService = new HealthService(
       vehiclePlugins,
-      {
-        getHealthChecks: () => [],
-      } as unknown as import("../../bootstrap/EnergyPluginRegistry.ts").EnergyPluginRegistry,
+      new EnergyPluginRegistry(),
       encryptionKey,
     );
     return createCaller(throwingMock<TrpcContext>("TrpcContext", {

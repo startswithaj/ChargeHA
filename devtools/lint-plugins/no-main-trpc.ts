@@ -1,50 +1,32 @@
 /**
- * Deno lint plugin that disallows plugin code calling core (main) tRPC
- * routers. Plugins must stay behind their defined API: their own router
- * (`trpc.plugin.vehicle.<id>` / `trpc.plugin.energy.<id>`) plus the host UI
- * surface — never core routers like `wizard`, `vehicle`, or `health`.
+ * Deno lint plugin that keeps plugin code behind the defined plugin APIs.
  *
- * Catches member chains rooted at `trpc` or `utils` (optionally through
- * `.client`) whose first router segment is a core router name, e.g.:
- *   trpc.wizard.tunnelStatus.useQuery()
- *   utils.vehicle.list.invalidate()
- *   utils.client.vehicle.setPriority.mutate()
+ * Rule no-main-trpc: tRPC calls in plugin code must go through the `plugin`
+ * namespace (`trpc.plugin.…` / `utils.plugin.…` / `utils.client.plugin.…`).
+ * Any other segment on the `trpc`/`utils` root is flagged — including core
+ * routers that don't exist yet. The only other allowed segments are tRPC's
+ * own client API words, which aren't endpoints.
  *
- * Within the `plugin` namespace, a plugin may only address ITSELF:
- * `trpc.plugin.<kind>.<own-id>.*`, where kind/id derive from the file path
- * (`packages/plugins/vehicles/tesla/…` → `plugin.vehicle.tesla`). Note the
- * plural directory → singular namespace mapping, the dash → underscore id
- * mapping (`fronius-cloud` → `fronius_cloud`), and the energy simulated
- * special case (`energy/simulated` → `simulated_energy`). Shared plugin
- * infrastructure directly under packages/plugins/ has no own id and is
- * exempt from the ownership check. Only files under packages/plugins/ are
- * checked; test files are excluded.
+ * Rule no-main-imports: plugin code may not deep-import main's client
+ * internals — the host UI surface is `packages/plugins/hostUi.ts`.
  *
+ * Only files under packages/plugins/ are checked; test files are excluded.
  * To intentionally keep a known violation (tracked tech debt), prefix the
  * line with:
  *   // deno-lint-ignore custom-main-refs/no-main-trpc
  */
 
-const CORE_ROUTERS: readonly string[] = [
-  "auth",
-  "energy",
-  "subscription",
-  "stats",
-  "vehicle",
-  "config",
-  "health",
-  "tariff",
-  "schedule",
-  "log",
-  "notification",
-  "wizard",
-];
-
 const ROOT_NAMES: readonly string[] = ["trpc", "utils"];
 
-// Properties that may sit between the root and the router segment without
-// changing what is being addressed (useUtils' escape hatch to the raw client).
-const PASSTHROUGH_PROPS: readonly string[] = ["client"];
+// Allowed first segments after the root: the plugin namespace plus tRPC's
+// client API. `client` is useUtils' raw-client escape hatch — what follows
+// it is checked when that next segment becomes the property of a
+// `utils.client` chain (handled below by treating it as a root too).
+const ALLOWED_SEGMENTS: readonly string[] = [
+  "plugin",
+  "client",
+  "useUtils",
+];
 
 function isPluginFile(filename: string): boolean {
   const normalised = filename.replace(/\\/g, "/");
@@ -54,43 +36,15 @@ function isPluginFile(filename: string): boolean {
   return normalised.includes("/packages/plugins/");
 }
 
-interface PluginIdentity {
-  kind: "vehicle" | "energy";
-  id: string;
-}
-
-/** Own namespace identity from the file path, or null for shared plugin
- *  infrastructure directly under packages/plugins/. */
-function ownIdentity(filename: string): PluginIdentity | null {
-  const match = filename.replace(/\\/g, "/").match(
-    /\/packages\/plugins\/(vehicles|energy)\/([^/]+)\//,
-  );
-  if (!match) return null;
-  const kind = match[1] === "vehicles" ? "vehicle" : "energy";
-  const dir = match[2].replaceAll("-", "_");
-  const id = kind === "energy" && dir === "simulated"
-    ? "simulated_energy"
-    : dir;
-  return { kind, id };
-}
-
-/** Root identifier of a member chain (`utils` for `utils.client.vehicle`),
- *  provided every intermediate property is a passthrough — else null. */
-function chainRoot(node: Deno.lint.MemberExpression): string | null {
-  const walk = (
-    object: Deno.lint.MemberExpression["object"],
-  ): string | null => {
-    if (object.type === "Identifier") return object.name;
-    if (
-      object.type === "MemberExpression" &&
-      object.property.type === "Identifier" &&
-      PASSTHROUGH_PROPS.includes(object.property.name)
-    ) {
-      return walk(object.object);
-    }
-    return null;
-  };
-  return walk(node.object);
+/** True for `trpc` / `utils` identifiers and for the `utils.client` /
+ *  `trpc.client` member expression — the nodes a router segment hangs off. */
+function isTrpcRoot(node: Deno.lint.MemberExpression["object"]): boolean {
+  if (node.type === "Identifier") return ROOT_NAMES.includes(node.name);
+  return node.type === "MemberExpression" &&
+    node.object.type === "Identifier" &&
+    ROOT_NAMES.includes(node.object.name) &&
+    node.property.type === "Identifier" &&
+    node.property.name === "client";
 }
 
 export default {
@@ -118,47 +72,16 @@ export default {
     "no-main-trpc": {
       create(context) {
         if (!isPluginFile(context.filename)) return {};
-        const own = ownIdentity(context.filename);
         return {
           MemberExpression(node: Deno.lint.MemberExpression) {
+            if (!isTrpcRoot(node.object)) return;
             if (node.property.type !== "Identifier") return;
-            const routerName = node.property.name;
-
-            if (routerName === "plugin" && own !== null) {
-              const root = chainRoot(node);
-              if (root === null || !ROOT_NAMES.includes(root)) return;
-              // Walk outward: (x.plugin).<kind>.<id>
-              const kindNode = node.parent;
-              if (
-                kindNode?.type !== "MemberExpression" ||
-                kindNode.property.type !== "Identifier"
-              ) return;
-              const kind = kindNode.property.name;
-              const idNode = kindNode.parent;
-              const id = idNode?.type === "MemberExpression" &&
-                  idNode.property.type === "Identifier"
-                ? idNode.property.name
-                : null;
-              if (kind !== own.kind || (id !== null && id !== own.id)) {
-                context.report({
-                  node,
-                  message:
-                    `Plugin '${own.id}' addresses foreign plugin namespace 'plugin.${kind}${
-                      id ? `.${id}` : ""
-                    }' — a plugin may only call its own trpc.plugin.${own.kind}.${own.id}.* endpoints.`,
-                });
-              }
-              return;
-            }
-
-            if (!CORE_ROUTERS.includes(routerName)) return;
-            const root = chainRoot(node);
-            if (root === null || !ROOT_NAMES.includes(root)) return;
+            if (ALLOWED_SEGMENTS.includes(node.property.name)) return;
             context.report({
               node,
               message:
-                `Plugin code calls core tRPC router '${routerName}' — plugins must use their own router ` +
-                `(trpc.plugin.vehicle.<id> / trpc.plugin.energy.<id>) or the host-provided plugin API.`,
+                `'${node.property.name}' is not under the plugin namespace — tRPC calls in plugin code ` +
+                `must go through trpc.plugin.* (or the host-provided plugin API).`,
             });
           },
         };
