@@ -2,16 +2,15 @@ import { useMemo, useState } from "react";
 import { Button, Callout, Text } from "@radix-ui/themes";
 import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import type { VehicleWithState } from "@chargeha/shared";
 import { trpc } from "./trpc.ts";
 import { useTeslaConfig } from "./useTeslaConfig.ts";
 import {
   type PublicKeyHosting,
   resolvePublicKeyDomain,
 } from "../shared/publicKeyDomain.ts";
-import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
-import { useWizardNextControl } from "../../../../client/src/components/Wizard/wizardNextControl.ts";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import type { StepProps } from "../../../hostUi.ts";
+import { useWizardNextControl } from "../../../hostUi.ts";
+import { stepStyles as styles } from "../../../hostUi.ts";
 
 function parseHostname(domain: string): string {
   try {
@@ -125,10 +124,9 @@ export function VirtualKeyPairingStep(_props: StepProps): JSX.Element {
     data: vehiclesData,
     isLoading: vehiclesLoading,
     error: vehiclesError,
-    // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): plugins need a scoped vehicle-list API
-  } = trpc.vehicle.list.useQuery();
+  } = trpc.plugin.vehicle.tesla.listVehicles.useQuery();
   const vehicles = useMemo(
-    () => (vehiclesData?.vehicles ?? []) as VehicleWithState[],
+    () => vehiclesData?.vehicles ?? [],
     [vehiclesData],
   );
 
@@ -138,8 +136,7 @@ export function VirtualKeyPairingStep(_props: StepProps): JSX.Element {
     error: configError,
   } = useTeslaConfig();
 
-  // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): tunnel endpoints move behind the plugin API
-  const tunnelStatus = trpc.wizard.tunnelStatus.useQuery();
+  const tunnelStatus = trpc.plugin.vehicle.tesla.tunnelStatus.useQuery();
 
   const verifyMutation = trpc.plugin.vehicle.tesla.checkKeyPairing.useMutation({
     onSuccess: (result: { paired: boolean | null; error?: string }) => {

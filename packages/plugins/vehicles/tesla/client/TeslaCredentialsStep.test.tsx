@@ -62,15 +62,13 @@ vi.mock("./trpc.ts", () => ({
               isLoading: false,
             })),
           },
+          tunnelStatus: {
+            useQuery: vi.fn(() => ({
+              data: { active: false, url: null },
+              isLoading: false,
+            })),
+          },
         },
-      },
-    },
-    wizard: {
-      tunnelStatus: {
-        useQuery: vi.fn(() => ({
-          data: { active: false, url: null },
-          isLoading: false,
-        })),
       },
     },
   },
@@ -102,7 +100,7 @@ describe("TeslaCredentialsStep", () => {
   }
 
   function setTunnelActive(url: string): void {
-    vi.mocked(trpc.wizard.tunnelStatus.useQuery).mockReturnValue({
+    vi.mocked(trpc.plugin.vehicle.tesla.tunnelStatus.useQuery).mockReturnValue({
       data: { active: true, url },
       isLoading: false,
     } as never);

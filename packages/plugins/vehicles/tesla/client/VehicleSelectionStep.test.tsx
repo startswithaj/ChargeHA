@@ -21,12 +21,11 @@ vi.mock("./trpc.ts", () => ({
             useQuery: (...args: unknown[]) =>
               mocks.teslaVehiclesUseQuery(...args),
           },
+          listVehicles: {
+            useQuery: (...args: unknown[]) =>
+              mocks.vehicleListUseQuery(...args),
+          },
         },
-      },
-    },
-    vehicle: {
-      list: {
-        useQuery: (...args: unknown[]) => mocks.vehicleListUseQuery(...args),
       },
     },
     useUtils: vi.fn(() => ({
@@ -41,8 +40,12 @@ vi.mock("./trpc.ts", () => ({
           },
         },
       },
-      vehicle: {
-        list: { invalidate: vi.fn(() => Promise.resolve()) },
+      plugin: {
+        vehicle: {
+          tesla: {
+            listVehicles: { invalidate: vi.fn(() => Promise.resolve()) },
+          },
+        },
       },
     })),
   },

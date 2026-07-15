@@ -32,6 +32,8 @@ describe("Health tRPC Router", () => {
     getRouter: () => null,
     getHttpRoutes: () => null,
     getHealthChecks: () => [],
+    getCommandStatus: () =>
+      Promise.resolve({ commandsDisabled: false, reason: null }),
     getTunnelRoutes: () => [],
     ...overrides,
   });
@@ -44,7 +46,13 @@ describe("Health tRPC Router", () => {
     await db.init();
     const vehiclePlugins = new VehiclePluginRegistry();
     if (plugin) vehiclePlugins.register(plugin);
-    const healthService = new HealthService(vehiclePlugins, encryptionKey);
+    const healthService = new HealthService(
+      vehiclePlugins,
+      {
+        getHealthChecks: () => [],
+      } as unknown as import("../../bootstrap/EnergyPluginRegistry.ts").EnergyPluginRegistry,
+      encryptionKey,
+    );
     return createCaller(throwingMock<TrpcContext>("TrpcContext", {
       healthService,
     }));

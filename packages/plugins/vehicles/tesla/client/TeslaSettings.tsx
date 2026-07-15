@@ -8,8 +8,8 @@ import {
   type PublicKeyHosting,
   resolvePublicKeyDomain,
 } from "../shared/publicKeyDomain.ts";
-import { Spinner } from "../../../../client/src/components/ui/Spinner.tsx";
-import { ErrorBanner } from "../../../../client/src/components/ui/ErrorBanner.tsx";
+import { Spinner } from "../../../hostUi.ts";
+import { ErrorBanner } from "../../../hostUi.ts";
 import { TeslaSetupInstructions } from "./TeslaSetupInstructions.tsx";
 
 function useTransitionToAdd(
@@ -25,7 +25,6 @@ function useTransitionToAdd(
       setPolling(false);
       autoAddVehiclesMutation.mutate();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [polling, teslaAuthQuery.data?.authenticated]);
 }
 
@@ -179,24 +178,48 @@ function TeslaVehiclesList(
   );
 }
 
+function PairingLinkStep({ pairingDomain }: { pairingDomain: string | null }) {
+  if (!pairingDomain) {
+    return (
+      <>
+        Your key domain rode the Cloudflare tunnel, which is no longer running —
+        restart the setup wizard to start a new tunnel and re-run partner
+        registration before pairing.
+      </>
+    );
+  }
+  return (
+    <>
+      Open this link on your phone while near the vehicle:{" "}
+      <a
+        href={`https://tesla.com/_ak/${pairingDomain}`}
+        target="_blank"
+        rel="noreferrer"
+        style={{ color: "var(--accent-11)", wordBreak: "break-all" }}
+      >
+        tesla.com/_ak/{pairingDomain}
+      </a>
+    </>
+  );
+}
+
 function KeyPairingBlock(
   {
     keyPaired,
     pairingChecking,
     proxyDown,
-    teslaDomain,
-    origin,
+    pairingDomain,
     handleCheckPairing,
   }: {
     keyPaired: boolean | null;
     pairingChecking: boolean;
     proxyDown: boolean;
-    teslaDomain: string | null | undefined;
-    origin: string;
+    /** Resolved key domain — null when it rode the tunnel and the tunnel is
+     *  gone, in which case there is no valid pairing link to show. */
+    pairingDomain: string | null;
     handleCheckPairing: () => void;
   },
 ) {
-  const pairingDomain = teslaDomain ?? origin.replace(/^https?:\/\//, "");
   return (
     <div
       style={{
@@ -233,15 +256,7 @@ function KeyPairingBlock(
             }}
           >
             <li style={{ marginBottom: 4 }}>
-              Open this link on your phone while near the vehicle:{" "}
-              <a
-                href={`https://tesla.com/_ak/${pairingDomain}`}
-                target="_blank"
-                rel="noreferrer"
-                style={{ color: "var(--accent-11)", wordBreak: "break-all" }}
-              >
-                tesla.com/_ak/{pairingDomain}
-              </a>
+              <PairingLinkStep pairingDomain={pairingDomain} />
             </li>
             <li style={{ marginBottom: 4 }}>
               The Tesla app will open and ask you to approve a third-party key
@@ -291,8 +306,7 @@ function KeyPairingBlock(
  *  and the tunnel is gone (re-pairing then needs a fresh tunnel session). */
 function usePairingDomain(): string | null {
   const { data: teslaConfig } = trpc.plugin.vehicle.tesla.getConfig.useQuery();
-  // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): tunnel endpoints move behind the plugin API
-  const tunnelStatus = trpc.wizard.tunnelStatus.useQuery();
+  const tunnelStatus = trpc.plugin.vehicle.tesla.tunnelStatus.useQuery();
   const resolved = resolvePublicKeyDomain(
     (teslaConfig?.teslaPublicKeyHosting ?? "") as PublicKeyHosting,
     teslaConfig?.teslaPublicKeyDomain ?? null,
@@ -322,12 +336,13 @@ function useTeslaSettingsState() {
         data.vehicles,
     },
   );
-  // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): plugins need a scoped vehicle-list API
-  const vehiclesQuery = trpc.vehicle.list.useQuery(undefined, {
-    select: (data: { vehicles: VehicleWithState[] }) => data.vehicles,
-  });
-  // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): expose plugin warnings via host plugin API
-  const pluginWarningsQuery = trpc.health.pluginWarnings.useQuery();
+  const vehiclesQuery = trpc.plugin.vehicle.tesla.listVehicles.useQuery(
+    undefined,
+    {
+      select: (data: { vehicles: VehicleWithState[] }) => data.vehicles,
+    },
+  );
+  const proxyHealthQuery = trpc.plugin.vehicle.tesla.proxyHealth.useQuery();
 
   useEffect(() => {
     if (!polling) return;
@@ -344,7 +359,7 @@ function useTeslaSettingsState() {
     teslaAuthQuery,
     teslaVehiclesQuery,
     vehiclesQuery,
-    pluginWarningsQuery,
+    proxyHealthQuery,
   };
 }
 
@@ -368,8 +383,7 @@ function useTeslaSettingsMutations(
       utils.plugin.vehicle.tesla.teslaVehicles.setData(undefined, {
         vehicles: teslaList,
       });
-      // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): plugins need a scoped vehicle-list API
-      const vehicleData = utils.vehicle.list.getData();
+      const vehicleData = utils.plugin.vehicle.tesla.listVehicles.getData();
       const currentVehicles = vehicleData?.vehicles ?? [];
       const existingVins = new Set(
         currentVehicles.map((v: VehicleWithState) => v.id),
@@ -386,22 +400,19 @@ function useTeslaSettingsMutations(
       }
     },
     onSuccess: () => {
-      // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): plugins need a scoped vehicle-list API
-      utils.vehicle.list.invalidate();
+      utils.plugin.vehicle.tesla.listVehicles.invalidate();
       utils.plugin.vehicle.tesla.teslaVehicles.invalidate();
     },
     onError: () => {
       console.error("[TeslaSettings] Auto-add vehicles failed");
-      // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): plugins need a scoped vehicle-list API
-      utils.vehicle.list.invalidate();
+      utils.plugin.vehicle.tesla.listVehicles.invalidate();
       utils.plugin.vehicle.tesla.teslaVehicles.invalidate();
     },
   });
   const addTeslaVehicleMutation = trpc.plugin.vehicle.tesla.selectVehicle
     .useMutation({
       onSuccess: () => {
-        // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): plugins need a scoped vehicle-list API
-        utils.vehicle.list.invalidate();
+        utils.plugin.vehicle.tesla.listVehicles.invalidate();
         utils.plugin.vehicle.tesla.teslaVehicles.invalidate();
       },
     });
@@ -413,13 +424,11 @@ function useTeslaSettingsMutations(
         vin: null,
         vehicleName: null,
         keyPaired: null,
-        domain: null,
       });
       utils.plugin.vehicle.tesla.teslaVehicles.setData(undefined, {
         vehicles: [],
       });
-      // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): plugins need a scoped vehicle-list API
-      utils.vehicle.list.invalidate();
+      utils.plugin.vehicle.tesla.listVehicles.invalidate();
     },
   });
   const checkPairingMutation = trpc.plugin.vehicle.tesla.checkKeyPairing
@@ -451,7 +460,7 @@ export function TeslaSettings(): JSX.Element {
     teslaAuthQuery,
     teslaVehiclesQuery,
     vehiclesQuery,
-    pluginWarningsQuery,
+    proxyHealthQuery,
   } = state;
 
   const teslaAuth = teslaAuthQuery.data ?? null;
@@ -482,7 +491,7 @@ export function TeslaSettings(): JSX.Element {
   const handleDisconnect = () => disconnectMutation.mutate();
   const handleCheckPairing = () => checkPairingMutation.mutate();
   const pairingChecking = checkPairingMutation.isPending;
-  const proxyDown = (pluginWarningsQuery.data ?? []).length > 0;
+  const proxyDown = (proxyHealthQuery.data?.warnings ?? []).length > 0;
   const pairingDomain = usePairingDomain();
 
   return (
@@ -537,8 +546,7 @@ export function TeslaSettings(): JSX.Element {
           keyPaired={keyPaired}
           pairingChecking={pairingChecking}
           proxyDown={proxyDown}
-          teslaDomain={pairingDomain}
-          origin={origin}
+          pairingDomain={pairingDomain}
           handleCheckPairing={handleCheckPairing}
         />
       )}

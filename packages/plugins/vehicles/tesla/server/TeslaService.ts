@@ -141,7 +141,6 @@ export class TeslaService {
     await this.deps.upsertVehicleRow({
       id: vehicle.vin,
       name: vehicle.name ?? "Tesla",
-      adapterType: "tesla" as const,
       priority: vehicle.priority,
       config: JSON.stringify({}),
       mode: "auto" as const,
@@ -173,7 +172,7 @@ export class TeslaService {
     const domain = resolvePublicKeyDomain(
       hosting as PublicKeyHosting,
       await this.deps.getConfig("public_key_domain"),
-      this.deps.getTunnelUrl(),
+      this.deps.tunnel.getUrl(),
     );
 
     if (!clientId || !clientSecret) {

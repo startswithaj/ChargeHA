@@ -2,9 +2,9 @@ import { useEffect, useRef } from "react";
 import { Button, Callout, Text } from "@radix-ui/themes";
 import { AlertCircle, CheckCircle, Loader2, RefreshCw } from "lucide-react";
 import { trpc } from "./trpc.ts";
-import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
-import { useWizardNextControl } from "../../../../client/src/components/Wizard/wizardNextControl.ts";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import type { StepProps } from "../../../hostUi.ts";
+import { useWizardNextControl } from "../../../hostUi.ts";
+import { stepStyles as styles } from "../../../hostUi.ts";
 
 export function PartnerRegistrationStep(_props: StepProps): JSX.Element {
   const calledRef = useRef(false);

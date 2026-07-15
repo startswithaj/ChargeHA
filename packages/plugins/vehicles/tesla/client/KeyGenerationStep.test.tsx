@@ -40,6 +40,12 @@ vi.mock("./trpc.ts", () => ({
               reset: mocks.generateReset,
             })),
           },
+          encryptionStatus: {
+            useQuery: vi.fn(() => ({
+              data: { configured: true },
+              isLoading: false,
+            })),
+          },
           importKeys: {
             useMutation: vi.fn(() => ({
               mutate: mocks.importMutate,
@@ -50,14 +56,6 @@ vi.mock("./trpc.ts", () => ({
             })),
           },
         },
-      },
-    },
-    health: {
-      encryption: {
-        useQuery: vi.fn(() => ({
-          data: { configured: true },
-          isLoading: false,
-        })),
       },
     },
   },
@@ -123,10 +121,11 @@ describe("KeyGenerationStep", () => {
     vi.clearAllMocks();
     setGenerateState({});
     setImportState({});
-    vi.mocked(trpc.health.encryption.useQuery).mockReturnValue({
-      data: { configured: true },
-      isLoading: false,
-    } as never);
+    vi.mocked(trpc.plugin.vehicle.tesla.encryptionStatus.useQuery)
+      .mockReturnValue({
+        data: { configured: true },
+        isLoading: false,
+      } as never);
   });
 
   afterEach(() => {
@@ -143,10 +142,11 @@ describe("KeyGenerationStep", () => {
   });
 
   it("shows encryption warning when ENCRYPTION_KEY is not set", () => {
-    vi.mocked(trpc.health.encryption.useQuery).mockReturnValue({
-      data: { configured: false },
-      isLoading: false,
-    } as never);
+    vi.mocked(trpc.plugin.vehicle.tesla.encryptionStatus.useQuery)
+      .mockReturnValue({
+        data: { configured: false },
+        isLoading: false,
+      } as never);
 
     renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
 

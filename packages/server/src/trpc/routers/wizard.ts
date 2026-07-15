@@ -27,18 +27,6 @@ export const wizardRouter = router({
       return await ctx.wizardService.demoSetup(input);
     }),
 
-  startTunnel: publicProcedure.mutation(async ({ ctx }) => {
-    return await ctx.wizardService.startTunnel();
-  }),
-
-  stopTunnel: publicProcedure.mutation(async ({ ctx }) => {
-    return await ctx.wizardService.stopTunnel();
-  }),
-
-  tunnelStatus: publicProcedure.query(({ ctx }) => {
-    return ctx.wizardService.getTunnelStatus();
-  }),
-
   setAuthMode: publicProcedure
     .input(wizardSetAuthModeInput)
     .mutation(async ({ ctx, input }) => {

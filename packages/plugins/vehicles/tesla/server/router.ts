@@ -6,109 +6,124 @@ import {
   wizardImportKeysInput,
 } from "@chargeha/shared/schemas";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
-import type { TrpcContext } from "../../../../server/src/trpc/trpc.ts";
 import type { TeslaVehiclePlugin } from "./index.ts";
 import { TESLA_SECRET_KEYS, teslaConfigDef } from "./config.ts";
 import { createPluginConfigProcedures } from "../../../createPluginConfigProcedures.ts";
 
-function getTeslaPlugin(ctx: TrpcContext): TeslaVehiclePlugin {
-  const plugin = ctx.vehiclePlugins.get("tesla");
-  if (!plugin) {
-    throw new TRPCError({
-      code: "PRECONDITION_FAILED",
-      message: "Tesla plugin not registered",
-    });
-  }
-  return plugin as TeslaVehiclePlugin;
+async function collectProxyWarnings(
+  plugin: TeslaVehiclePlugin,
+): Promise<string[]> {
+  const checks = plugin.getHealthChecks();
+  const results = await Promise.all(checks.map(async (c) => ({
+    check: c,
+    result: await c.run(),
+  })));
+  return results
+    .filter(({ result }) => result.status !== "ok")
+    .map(({ check, result }) =>
+      result.message ?? check.warningMessage ?? `${check.name} check failed`
+    );
 }
 
-export const teslaRouter = router({
-  ...createPluginConfigProcedures("tesla", teslaConfigDef, TESLA_SECRET_KEYS),
+export function createTeslaRouter(plugin: TeslaVehiclePlugin) {
+  const deps = plugin.deps;
+  return router({
+    ...createPluginConfigProcedures(deps, teslaConfigDef, TESLA_SECRET_KEYS),
 
-  commandStatus: publicProcedure.query(async ({ ctx }) => {
-    const plugin = getTeslaPlugin(ctx);
-
-    const checks = plugin.getHealthChecks();
-    const checkResults = checks.length > 0
-      ? await Promise.all(checks.map((c) => c.run()))
-      : [];
-    const proxyOk = checkResults.every((r) => r.status === "ok") &&
-      checks.length > 0;
-
-    if (!proxyOk) {
-      return {
-        commandsDisabled: true,
-        reason: "The Tesla command proxy is not running.",
-      };
-    }
-
-    const status = await plugin.teslaTokenManager.getStatus();
-    if (status.vehicleConfigured && status.keyPaired !== true) {
-      return {
-        commandsDisabled: true,
-        reason:
-          "Your vehicle's key pairing is incomplete — the key must be approved on the vehicle's touchscreen before commands can be sent.",
-      };
-    }
-
-    return { commandsDisabled: false, reason: null };
-  }),
-
-  teslaStatus: publicProcedure.query(({ ctx }) => {
-    return getTeslaPlugin(ctx).teslaTokenManager.getStatus();
-  }),
-
-  teslaVehicles: publicProcedure.query(({ ctx }) => {
-    return getTeslaPlugin(ctx).teslaService.listFleetVehicles();
-  }),
-
-  getAuthUrl: publicProcedure
-    .input(authAuthorizeInput)
-    .mutation(async ({ ctx, input }) => {
-      const state = crypto.randomUUID();
-      const url = await getTeslaPlugin(ctx).teslaTokenManager
-        .getAuthorizationUrl(state, input.origin);
-      return { url, state };
+    teslaStatus: publicProcedure.query(() => {
+      return plugin.teslaTokenManager.getStatus();
     }),
 
-  disconnect: publicProcedure.mutation(({ ctx }) => {
-    return getTeslaPlugin(ctx).teslaService.disconnect();
-  }),
-
-  selectVehicle: publicProcedure
-    .input(authSelectVehicleInput)
-    .mutation(({ ctx, input }) => {
-      return getTeslaPlugin(ctx).teslaService.selectVehicle(input);
+    teslaVehicles: publicProcedure.query(() => {
+      return plugin.teslaService.listFleetVehicles();
     }),
 
-  selectVehicles: publicProcedure
-    .input(authSelectVehiclesInput)
-    .mutation(({ ctx, input }) => {
-      return getTeslaPlugin(ctx).teslaService.selectVehicles(input);
+    listVehicles: publicProcedure.query(async () => {
+      return { vehicles: await deps.getVehiclesWithState() };
     }),
 
-  checkKeyPairing: publicProcedure.mutation(async ({ ctx }) => {
-    const result = await getTeslaPlugin(ctx).teslaService.checkKeyPairing();
-    if (result.paired === null && result.error?.includes("No Tesla")) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: result.error,
-      });
-    }
-    return result;
-  }),
-
-  generateKeys: publicProcedure.mutation(({ ctx }) => {
-    return getTeslaPlugin(ctx).generateKeys();
-  }),
-
-  importKeys: publicProcedure
-    .input(wizardImportKeysInput)
-    .mutation(({ ctx, input }) => {
-      return getTeslaPlugin(ctx).importKeys(input);
+    encryptionStatus: publicProcedure.query(() => {
+      return { configured: deps.encryptionConfigured() };
     }),
 
-  registerPartner: publicProcedure.mutation(({ ctx }) => {
-    return getTeslaPlugin(ctx).teslaService.registerPartner();
-  }),
-});
+    proxyHealth: publicProcedure.query(async () => {
+      return { warnings: await collectProxyWarnings(plugin) };
+    }),
+
+    getAuthUrl: publicProcedure
+      .input(authAuthorizeInput)
+      .mutation(async ({ input }) => {
+        const state = crypto.randomUUID();
+        const url = await plugin.teslaTokenManager
+          .getAuthorizationUrl(state, input.origin);
+        return { url, state };
+      }),
+
+    disconnect: publicProcedure.mutation(() => {
+      return plugin.teslaService.disconnect();
+    }),
+
+    selectVehicle: publicProcedure
+      .input(authSelectVehicleInput)
+      .mutation(({ input }) => {
+        return plugin.teslaService.selectVehicle(input);
+      }),
+
+    selectVehicles: publicProcedure
+      .input(authSelectVehiclesInput)
+      .mutation(({ input }) => {
+        return plugin.teslaService.selectVehicles(input);
+      }),
+
+    checkKeyPairing: publicProcedure.mutation(async () => {
+      const result = await plugin.teslaService.checkKeyPairing();
+      if (result.paired === null && result.error?.includes("No Tesla")) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: result.error,
+        });
+      }
+      return result;
+    }),
+
+    generateKeys: publicProcedure.mutation(() => {
+      return plugin.generateKeys();
+    }),
+
+    importKeys: publicProcedure
+      .input(wizardImportKeysInput)
+      .mutation(({ input }) => {
+        return plugin.importKeys(input);
+      }),
+
+    registerPartner: publicProcedure.mutation(() => {
+      return plugin.teslaService.registerPartner();
+    }),
+
+    // ── Tunnel (host infrastructure reached via the plugin API) ───────────
+
+    tunnelStatus: publicProcedure.query(() => {
+      const url = deps.tunnel.getUrl();
+      return { active: url !== null, url };
+    }),
+
+    startTunnel: publicProcedure.mutation(async () => {
+      try {
+        return await deps.tunnel.start();
+      } catch (err) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: err instanceof Error
+            ? err.message
+            : "Failed to start tunnel",
+          cause: err,
+        });
+      }
+    }),
+
+    stopTunnel: publicProcedure.mutation(async () => {
+      await deps.tunnel.stop();
+      return { stopped: true };
+    }),
+  });
+}

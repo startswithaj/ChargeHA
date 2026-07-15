@@ -10,13 +10,10 @@ import {
 } from "lucide-react";
 import { useTeslaConfig } from "./useTeslaConfig.ts";
 import { trpc } from "./trpc.ts";
-import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
-import {
-  hintUnlessLoading,
-  useWizardNextControl,
-} from "../../../../client/src/components/Wizard/wizardNextControl.ts";
+import type { StepProps } from "../../../hostUi.ts";
+import { hintUnlessLoading, useWizardNextControl } from "../../../hostUi.ts";
 import { KeyImportForm } from "./KeyImportForm.tsx";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import { stepStyles as styles } from "../../../hostUi.ts";
 
 type Mode = "choose" | "generate" | "import";
 
@@ -130,8 +127,8 @@ export function KeyGenerationStep(_props: StepProps): JSX.Element {
   const [mode, setMode] = useState<Mode>("choose");
   const { data: teslaConfig } = useTeslaConfig();
   const hasExistingKeys = !!teslaConfig?.ecPublicKeyPem;
-  // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): expose encryption status via host plugin API
-  const encryptionQuery = trpc.health.encryption.useQuery();
+  const encryptionQuery = trpc.plugin.vehicle.tesla.encryptionStatus
+    .useQuery();
   const hasEncryptionKey = encryptionQuery.data?.configured ?? true;
 
   const resetToChoose = () => {

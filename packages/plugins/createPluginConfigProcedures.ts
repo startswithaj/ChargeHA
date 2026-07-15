@@ -6,14 +6,16 @@ import {
   serializeSection,
 } from "@chargeha/shared/configSections";
 import type { SectionDef } from "@chargeha/shared/configSections";
+import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import { publicProcedure } from "../server/src/trpc/trpc.ts";
 
 /**
  * Creates reusable getConfig/setConfig tRPC procedures for a plugin.
  *
  * Each plugin spreads these into its own router so config I/O lives on
- * the plugin's own tRPC path (e.g. trpc.plugin.vehicle.tesla.getConfig) instead of a
- * centralized pluginConfig router with hardcoded pluginId strings.
+ * the plugin's own tRPC path (e.g. trpc.plugin.vehicle.tesla.getConfig)
+ * instead of a centralized pluginConfig router with hardcoded pluginId
+ * strings. All storage goes through the plugin's own deps — no `ctx.db`.
  *
  * No reconfigure callback: `AppDatabase.setConfig` / `storeSecret` emit
  * `config_changed` events, and subscribers (e.g. EnergyPoller) drive any
@@ -22,21 +24,33 @@ import { publicProcedure } from "../server/src/trpc/trpc.ts";
  * encryption key directly.
  */
 export function createPluginConfigProcedures(
-  pluginId: string,
+  deps: PluginDependencies,
   configDef: SectionDef,
   secretKeys: readonly string[],
 ) {
+  const prefix = `${deps.pluginId}.`;
+  // configDef db keys are fully prefixed (e.g. "tesla.client_id") while deps
+  // auto-prefixes with the plugin id — strip it so keys aren't doubled.
+  const stripPrefix = (key: string): string => {
+    if (!key.startsWith(prefix)) {
+      throw new Error(
+        `Config key "${key}" is not namespaced under "${prefix}"`,
+      );
+    }
+    return key.slice(prefix.length);
+  };
+
   const secretKeySet = new Set<string>(secretKeys);
   const dbKeys = sectionDbKeys(configDef);
   const inputSchema = buildSectionInputSchema(configDef);
 
   return {
-    getConfig: publicProcedure.query(async ({ ctx }) => {
+    getConfig: publicProcedure.query(async () => {
       const entries = await Promise.all(
         dbKeys.map(async (key) => {
           const value = secretKeySet.has(key)
-            ? await ctx.db.readSecret(key)
-            : await ctx.db.getPluginConfig(key);
+            ? await deps.getSecret(stripPrefix(key))
+            : await deps.getConfig(stripPrefix(key));
           return [key, value] as const;
         }),
       );
@@ -45,19 +59,19 @@ export function createPluginConfigProcedures(
 
     setConfig: publicProcedure
       .input(z.record(z.string(), z.unknown()))
-      .mutation(async ({ ctx, input }) => {
+      .mutation(async ({ input }) => {
         const validated = inputSchema.parse(input);
         const kvPairs = serializeSection(configDef, validated);
 
         await Promise.all(
           Object.entries(kvPairs).map(([key, value]) =>
             secretKeySet.has(key)
-              ? ctx.db.storeSecret(key, value)
-              : ctx.db.setPluginConfig(key, value)
+              ? deps.setSecret(stripPrefix(key), value)
+              : deps.setConfig(stripPrefix(key), value)
           ),
         );
 
-        ctx.logger.info(`Plugin "${pluginId}" config updated`);
+        deps.log.info("Plugin config updated");
       }),
   };
 }

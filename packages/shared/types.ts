@@ -331,6 +331,7 @@ export const NOTIFICATION_EVENTS: NotificationEventInfo[] = [
 export type SSEEvent =
   | { type: "energy_update"; data: EnergyData & CumulativeEnergyData }
   | { type: "vehicle_update"; data: VehicleChargeState }
+  | { type: "vehicles_changed"; data: Record<string, never> }
   | {
     type: "vehicle_error";
     data: { vehicleId: string; vehicleName: string; error: string | null };

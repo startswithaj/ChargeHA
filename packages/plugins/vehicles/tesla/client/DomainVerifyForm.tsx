@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Button, Callout, Text } from "@radix-ui/themes";
 import { AlertCircle, CheckCircle } from "lucide-react";
 import { useTeslaConfigMutation } from "./useTeslaConfig.ts";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import { stepStyles as styles } from "../../../hostUi.ts";
 
 interface DomainVerifyFormProps {
   publicKey: string;

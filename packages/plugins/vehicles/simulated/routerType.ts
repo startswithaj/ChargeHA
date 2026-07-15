@@ -1,9 +1,9 @@
-import { createAppRouter } from "../../../server/src/trpc/root.ts";
-import { simulatedRouter } from "./server/router.ts";
+import type { createAppRouter } from "../../../server/src/trpc/root.ts";
+import type { createSimulatedRouter } from "./server/router.ts";
 
-const _typed = createAppRouter({
-  vehicle: { simulated: simulatedRouter },
-  energy: {},
-});
-
-export type SimulatedAppRouter = typeof _typed;
+export type SimulatedAppRouter = ReturnType<
+  typeof createAppRouter<
+    { simulated: ReturnType<typeof createSimulatedRouter> },
+    Record<string, never>
+  >
+>;

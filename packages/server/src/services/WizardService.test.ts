@@ -15,7 +15,6 @@ describe("WizardService", () => {
   type MockVehicleMgr = Record<string, unknown>;
   type MockAuth = Record<string, unknown>;
   type MockOidc = Record<string, unknown>;
-  type MockPlugins = Record<string, unknown>;
 
   function defaultDb(): MockDb {
     return {
@@ -52,15 +51,10 @@ describe("WizardService", () => {
     };
   }
 
-  function defaultPlugins(): MockPlugins {
-    return { getAll: () => [] };
-  }
-
   function makeService(overrides: {
     db?: MockDb;
     encryptionKey?: string | null;
     logger?: Record<string, unknown>;
-    vehiclePlugins?: MockPlugins;
     tunnelManager?: MockTunnel;
     vehicleManager?: MockVehicleMgr;
     authService?: MockAuth;
@@ -71,12 +65,10 @@ describe("WizardService", () => {
     const vehicleManager = overrides.vehicleManager ?? defaultVehicleMgr();
     const authService = overrides.authService ?? defaultAuth();
     const oidcService = overrides.oidcService ?? defaultOidc();
-    const vehiclePlugins = overrides.vehiclePlugins ?? defaultPlugins();
     return new WizardService(
       db as never,
       overrides.encryptionKey ?? null,
       (overrides.logger ?? mockLogger) as never,
-      vehiclePlugins as never,
       tunnelManager as never,
       vehicleManager as never,
       authService as never,
@@ -321,109 +313,6 @@ describe("WizardService", () => {
       });
       await service.setEnergyType("fronius-cloud");
       expect(saved).toBe("fronius-cloud");
-    });
-  });
-
-  // ── Tunnel management ─────────────────────────────────────────────────
-
-  describe("startTunnel", () => {
-    it("starts tunnel and returns url", async () => {
-      const service = makeService({
-        tunnelManager: {
-          isRunning: false,
-          tunnelUrl: null,
-          start: () => Promise.resolve("https://abc.trycloudflare.com"),
-          stop: () => Promise.resolve(),
-        },
-      });
-      const result = await service.startTunnel();
-      expect(result).toEqual({ url: "https://abc.trycloudflare.com" });
-    });
-
-    it("wraps Error in ServiceError on failure", async () => {
-      const service = makeService({
-        tunnelManager: {
-          isRunning: false,
-          tunnelUrl: null,
-          start: () => Promise.reject(new Error("cloudflared not found")),
-          stop: () => Promise.resolve(),
-        },
-      });
-      try {
-        await service.startTunnel();
-        expect(true).toBe(false);
-      } catch (err) {
-        expect((err as Error).message).toBe("cloudflared not found");
-      }
-    });
-
-    it("uses fallback message for non-Error throws", async () => {
-      const service = makeService({
-        tunnelManager: {
-          isRunning: false,
-          tunnelUrl: null,
-          start: () => Promise.reject("string-error"),
-          stop: () => Promise.resolve(),
-        },
-      });
-      try {
-        await service.startTunnel();
-        expect(true).toBe(false);
-      } catch (err) {
-        expect((err as Error).message).toBe("Failed to start tunnel");
-      }
-    });
-  });
-
-  describe("stopTunnel", () => {
-    it("stops tunnel and returns stopped:true", async () => {
-      let stopped = false;
-      const service = makeService({
-        tunnelManager: {
-          isRunning: true,
-          tunnelUrl: "https://abc.trycloudflare.com",
-          start: () => Promise.resolve(""),
-          stop: () => {
-            stopped = true;
-            return Promise.resolve();
-          },
-        },
-      });
-      const result = await service.stopTunnel();
-      expect(result).toEqual({ stopped: true });
-      expect(stopped).toBe(true);
-    });
-  });
-
-  describe("getTunnelStatus", () => {
-    it("returns active and url from tunnelManager", () => {
-      const service = makeService({
-        tunnelManager: {
-          isRunning: true,
-          tunnelUrl: "https://abc.trycloudflare.com",
-          start: () => Promise.resolve(""),
-          stop: () => Promise.resolve(),
-        },
-      });
-      expect(service.getTunnelStatus()).toEqual({
-        active: true,
-        url: "https://abc.trycloudflare.com",
-      });
-    });
-
-    it("returns inactive with null url when not running", () => {
-      const service = makeService({
-        tunnelManager: {
-          isRunning: false,
-          tunnelUrl: null,
-          start: () => Promise.resolve(""),
-          stop: () => Promise.resolve(),
-        },
-      });
-      expect(service.getTunnelStatus()).toEqual({
-        active: false,
-        url: null,
-      });
     });
   });
 

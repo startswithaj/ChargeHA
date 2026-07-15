@@ -3,6 +3,7 @@ import { defineSection } from "@chargeha/shared/configSections";
 import type { VehicleRow } from "@chargeha/server/db/types";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import type {
+  CommandStatus,
   PluginHealthCheck,
   PluginTunnelRoute,
   VehicleMiddleware,
@@ -12,8 +13,8 @@ import {
   SimulatedVehicleAdapter,
   type SimulatedVehicleConfig,
 } from "./SimulatedVehicleAdapter.ts";
-import { TeslaVehicleMiddleware } from "../../tesla/server/TeslaVehicleMiddleware.ts";
-import { simulatedRouter } from "./router.ts";
+import { SimulatedVehicleMiddleware } from "./SimulatedVehicleMiddleware.ts";
+import { createSimulatedRouter } from "./router.ts";
 
 /** Parse a JSON string into SimulatedVehicleConfig, returning {} on failure. */
 function parseVehicleConfig(
@@ -44,7 +45,7 @@ export class SimulatedVehiclePlugin implements VehiclePlugin {
   private readonly adapters = new Map<string, SimulatedVehicleAdapter>();
   private readonly startupPromise: Promise<void>;
 
-  constructor(private readonly deps: PluginDependencies) {
+  constructor(readonly deps: PluginDependencies) {
     this.startupPromise = this.startup();
   }
 
@@ -64,7 +65,7 @@ export class SimulatedVehiclePlugin implements VehiclePlugin {
     );
     sim.onPowerChange = () => this.recalculate();
     this.adapters.set(row.id, sim);
-    return new TeslaVehicleMiddleware(sim, this.deps.log);
+    return new SimulatedVehicleMiddleware(sim);
   }
 
   async shutdown(): Promise<void> {
@@ -92,7 +93,12 @@ export class SimulatedVehiclePlugin implements VehiclePlugin {
   }
 
   getRouter(): AnyRouter {
-    return simulatedRouter;
+    return createSimulatedRouter(this);
+  }
+
+  /** Simulated vehicles are always commandable. */
+  getCommandStatus(): Promise<CommandStatus> {
+    return Promise.resolve({ commandsDisabled: false, reason: null });
   }
 
   getHttpRoutes(): null {

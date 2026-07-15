@@ -3,12 +3,12 @@ import { Button, Callout, Select, Text, TextField } from "@radix-ui/themes";
 import { Check, CheckCircle, Copy, ExternalLink } from "lucide-react";
 import { useTeslaConfig, useTeslaConfigMutation } from "./useTeslaConfig.ts";
 import { trpc } from "./trpc.ts";
-import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
-import { useWizardNextControl } from "../../../../client/src/components/Wizard/wizardNextControl.ts";
+import type { StepProps } from "../../../hostUi.ts";
+import { useWizardNextControl } from "../../../hostUi.ts";
 import { callbackUrl, resolveOAuthOrigin } from "./oauthOrigin.ts";
 import { resolvePublicKeyDomain } from "../shared/publicKeyDomain.ts";
 import { UnstableOriginCallout } from "./UnstableOriginCallout.tsx";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import { stepStyles as styles } from "../../../hostUi.ts";
 
 const REGIONS = [
   { value: "na", label: "NA (North America / Asia-Pacific)" },
@@ -271,8 +271,7 @@ export function TeslaCredentialsStep(_props: StepProps): JSX.Element {
     : "http://localhost:8000";
 
   // Check if tunnel is active (started on the Public Key Hosting step)
-  // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): tunnel endpoints move behind the plugin API
-  const tunnelStatus = trpc.wizard.tunnelStatus.useQuery();
+  const tunnelStatus = trpc.plugin.vehicle.tesla.tunnelStatus.useQuery();
   const tunnelUrl = tunnelStatus.data?.url;
 
   const oauth = resolveOAuthOrigin(browserOrigin, tunnelUrl);

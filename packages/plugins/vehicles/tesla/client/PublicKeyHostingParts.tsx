@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button, Text } from "@radix-ui/themes";
 import { Check, Copy } from "lucide-react";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import { stepStyles as styles } from "../../../hostUi.ts";
 
 export const WELL_KNOWN_PATH =
   ".well-known/appspecific/com.tesla.3p.public-key.pem";

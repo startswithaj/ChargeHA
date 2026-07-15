@@ -57,7 +57,11 @@ describe("TeslaService", () => {
       upsertVehicleRow: () => Promise.resolve(),
       addVehicle: () => Promise.resolve(),
       deleteVehicle: () => Promise.resolve(),
-      getTunnelUrl: () => null,
+      tunnel: {
+        getUrl: () => null,
+        start: () => Promise.reject(new Error("tunnel start not mocked")),
+        stop: () => Promise.resolve(),
+      },
       setSimulatedLoad: () => {},
       log: mockLogger(),
       dbLog: mockLogger() as unknown as PluginDependencies["dbLog"],
@@ -299,7 +303,11 @@ describe("TeslaService", () => {
           getConfig: tunnelModeConfig,
           getSecret: (key: string) =>
             Promise.resolve(key === "client_secret" ? "secret" : null),
-          getTunnelUrl: () => null,
+          tunnel: {
+            getUrl: () => null,
+            start: () => Promise.reject(new Error("tunnel start not mocked")),
+            stop: () => Promise.resolve(),
+          },
         },
       });
       await expect(service.registerPartner()).rejects.toThrow(
@@ -323,7 +331,11 @@ describe("TeslaService", () => {
           getConfig: tunnelModeConfig,
           getSecret: (key: string) =>
             Promise.resolve(key === "client_secret" ? "secret" : null),
-          getTunnelUrl: () => "https://abc.trycloudflare.com",
+          tunnel: {
+            getUrl: () => "https://abc.trycloudflare.com",
+            start: () => Promise.reject(new Error("tunnel start not mocked")),
+            stop: () => Promise.resolve(),
+          },
         },
         io,
       });

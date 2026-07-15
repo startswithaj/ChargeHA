@@ -47,6 +47,11 @@ export function RealtimeSync() {
         };
       });
     },
+    // Vehicle membership changed (added/removed) — main owns its own cache;
+    // plugins never invalidate it directly.
+    onVehiclesChanged: () => {
+      utils.vehicle.list.invalidate();
+    },
     onVehicleError: (event) => {
       if (event.error === null) {
         vehicleErrorStore.clearError(event.vehicleId);

@@ -3,11 +3,8 @@ import { Button, Callout, Text } from "@radix-ui/themes";
 import { CheckCircle, Globe, Loader2 } from "lucide-react";
 import { useTeslaConfig, useTeslaConfigMutation } from "./useTeslaConfig.ts";
 import { trpc } from "./trpc.ts";
-import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
-import {
-  hintUnlessLoading,
-  useWizardNextControl,
-} from "../../../../client/src/components/Wizard/wizardNextControl.ts";
+import type { StepProps } from "../../../hostUi.ts";
+import { hintUnlessLoading, useWizardNextControl } from "../../../hostUi.ts";
 import { canTeslaFetchKeyFrom, isStableOrigin } from "./oauthOrigin.ts";
 import {
   AiPromptInstructions,
@@ -21,7 +18,7 @@ import {
   HostingMethodCards,
 } from "./HostingMethodCards.tsx";
 import { DirectHostingSection } from "./DirectHostingSection.tsx";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import { stepStyles as styles } from "../../../hostUi.ts";
 
 type HostingChoice = null | "yes" | "no";
 
@@ -128,7 +125,9 @@ function ChoiceCards(
 
 function TunnelHostingSection(
   { startTunnelMutation }: {
-    startTunnelMutation: ReturnType<typeof trpc.wizard.startTunnel.useMutation>;
+    startTunnelMutation: ReturnType<
+      typeof trpc.plugin.vehicle.tesla.startTunnel.useMutation
+    >;
   },
 ) {
   return (
@@ -172,7 +171,9 @@ function HostingMethodSection(
     setHostingMethod: (m: HostingMethod) => void;
     publicKey: string;
     staticDisabled: boolean;
-    startTunnelMutation: ReturnType<typeof trpc.wizard.startTunnel.useMutation>;
+    startTunnelMutation: ReturnType<
+      typeof trpc.plugin.vehicle.tesla.startTunnel.useMutation
+    >;
   },
 ) {
   return (
@@ -220,19 +221,16 @@ function HostingMethodSection(
 }
 
 function useTunnelMutations() {
-  // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): tunnel endpoints move behind the plugin API
-  const tunnelStatus = trpc.wizard.tunnelStatus.useQuery();
+  const tunnelStatus = trpc.plugin.vehicle.tesla.tunnelStatus.useQuery();
   const onTunnelChanged = () => {
     tunnelStatus.refetch();
   };
   return {
     tunnelStatus,
-    // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): tunnel endpoints move behind the plugin API
-    startTunnelMutation: trpc.wizard.startTunnel.useMutation({
+    startTunnelMutation: trpc.plugin.vehicle.tesla.startTunnel.useMutation({
       onSuccess: onTunnelChanged,
     }),
-    // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): tunnel endpoints move behind the plugin API
-    stopTunnelMutation: trpc.wizard.stopTunnel.useMutation({
+    stopTunnelMutation: trpc.plugin.vehicle.tesla.stopTunnel.useMutation({
       onSuccess: onTunnelChanged,
     }),
   };

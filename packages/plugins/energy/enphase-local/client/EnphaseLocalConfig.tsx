@@ -7,9 +7,9 @@ import {
   TextField,
 } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
-import { SettingsRow } from "../../../../client/src/components/pages/Settings/SettingsLayout.tsx";
-import { useSaveStatus } from "../../../../client/src/hooks/useSectionConfig.ts";
-import { usePluginSettingsHost } from "../../../../client/src/components/pages/Settings/pluginSettingsHost.ts";
+import { SettingsRow } from "../../../hostUi.ts";
+import { useSaveStatus } from "../../../hostUi.ts";
+import { usePluginSettingsHost } from "../../../hostUi.ts";
 
 type AuthMethod = "credentials" | "token";
 

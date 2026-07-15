@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button, Card, Switch, Text } from "@radix-ui/themes";
 import type { VehicleChargeState } from "@chargeha/shared";
 import { LocationField } from "./LocationField.tsx";
-import styles from "../../../../client/src/components/ScheduleDialog/ScheduleDialog.module.css";
+import { dialogStyles as styles } from "../../../hostUi.ts";
 
 export interface SimulatedVehicleDialogProps {
   vehicleState: VehicleChargeState | null;

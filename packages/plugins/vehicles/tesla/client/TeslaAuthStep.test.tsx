@@ -44,15 +44,13 @@ vi.mock("./trpc.ts", () => ({
               };
             }),
           },
+          tunnelStatus: {
+            useQuery: vi.fn(() => ({
+              data: { active: false, url: null },
+              isLoading: false,
+            })),
+          },
         },
-      },
-    },
-    wizard: {
-      tunnelStatus: {
-        useQuery: vi.fn(() => ({
-          data: { active: false, url: null },
-          isLoading: false,
-        })),
       },
     },
   },
@@ -179,7 +177,7 @@ describe("TeslaAuthStep", () => {
 
   it("uses the stable browser origin even when a tunnel is active", async () => {
     const { trpc } = await import("./trpc.ts");
-    vi.mocked(trpc.wizard.tunnelStatus.useQuery).mockReturnValue({
+    vi.mocked(trpc.plugin.vehicle.tesla.tunnelStatus.useQuery).mockReturnValue({
       data: { active: true, url: "https://test-tunnel.trycloudflare.com" },
       isLoading: false,
     } as never);

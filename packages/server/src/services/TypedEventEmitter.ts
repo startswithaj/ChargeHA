@@ -12,6 +12,9 @@ export interface EventMap {
   energy_poll_failure: { error: string };
   config_changed: { key: string };
   vehicle_update: VehicleChargeState;
+  /** Vehicle membership changed (added/removed) — an invalidation signal so
+   *  clients refetch their vehicle lists. */
+  vehicles_changed: Record<string, never>;
   vehicle_plug_changed: {
     vehicleId: string;
     vehicleName: string;

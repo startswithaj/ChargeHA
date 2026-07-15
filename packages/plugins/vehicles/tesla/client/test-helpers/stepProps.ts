@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { StepProps } from "../../../../../client/src/components/Wizard/WizardShell.tsx";
+import type { StepProps } from "../../../../hostUi.ts";
 
 export function makeStepProps(
   overrides: Partial<StepProps> = {},

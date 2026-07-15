@@ -1,6 +1,6 @@
 import { Badge, Button, Text, TextField } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
-import { SettingsRow } from "../../../../client/src/components/pages/Settings/SettingsLayout.tsx";
+import { SettingsRow } from "../../../hostUi.ts";
 
 export function FroniusCloudConfig(): JSX.Element | null {
   const { data: config } = trpc.plugin.energy.fronius_cloud.getConfig

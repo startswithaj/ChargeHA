@@ -47,6 +47,7 @@ describe("EnergyAdapterManager", () => {
       createAdapter,
       shutdown: () => Promise.resolve(),
       getRouter: () => null,
+      getHealthChecks: () => [],
     };
   }
 

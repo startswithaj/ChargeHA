@@ -7,7 +7,6 @@ export interface TeslaAuthStatus {
   vin: string | null;
   vehicleName: string | null;
   keyPaired: boolean | null; // null = unknown/not checked yet
-  domain: string | null; // TESLA_DOMAIN for key pairing link
 }
 
 export interface TeslaTokenConfig {
@@ -189,7 +188,6 @@ export class TeslaTokenManager {
       vin: teslaVehicle?.id ?? null,
       vehicleName: teslaVehicle?.name ?? null,
       keyPaired,
-      domain: null,
     };
   }
 

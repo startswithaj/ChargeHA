@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Button, Text, TextField } from "@radix-ui/themes";
 import { Loader2 } from "lucide-react";
 import { trpc } from "./trpc.ts";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import { stepStyles as styles } from "../../../hostUi.ts";
 import type { TestStatus } from "../../InverterSetupShared.tsx";
 import { TestResultBadge } from "../../InverterSetupShared.tsx";
 

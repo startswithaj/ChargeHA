@@ -46,24 +46,20 @@ vi.mock("./trpc.ts", () => ({
               },
             ),
           },
+          tunnelStatus: {
+            useQuery: vi.fn(() => ({
+              data: { active: false, url: null },
+              isLoading: false,
+            })),
+          },
+          listVehicles: {
+            useQuery: vi.fn(() => ({
+              data: { vehicles: [] },
+              isLoading: false,
+              error: null,
+            })),
+          },
         },
-      },
-    },
-    vehicle: {
-      list: {
-        useQuery: vi.fn(() => ({
-          data: { vehicles: [] },
-          isLoading: false,
-          error: null,
-        })),
-      },
-    },
-    wizard: {
-      tunnelStatus: {
-        useQuery: vi.fn(() => ({
-          data: { active: false, url: null },
-          isLoading: false,
-        })),
       },
     },
   },
@@ -81,7 +77,7 @@ describe("VirtualKeyPairingStep", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.capturedCheckOnSuccess.current = undefined;
-    vi.mocked(trpc.vehicle.list.useQuery).mockReturnValue({
+    vi.mocked(trpc.plugin.vehicle.tesla.listVehicles.useQuery).mockReturnValue({
       data: {
         vehicles: [
           {

@@ -1,10 +1,10 @@
 import type { AnyRouter } from "@trpc/server";
 import type { EnergySourceAdapter } from "@chargeha/shared";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
-import type { EnergyPlugin } from "@chargeha/plugins/types";
+import type { EnergyPlugin, PluginHealthCheck } from "@chargeha/plugins/types";
 import { FRONIUS_CLOUD_SECRET_KEYS, froniusCloudConfigDef } from "./config.ts";
 import { FroniusCloudAdapter } from "./FroniusCloudAdapter.ts";
-import { froniusCloudRouter } from "./router.ts";
+import { createFroniusCloudRouter } from "./router.ts";
 
 /**
  * Fronius Cloud energy plugin — manages Solar.web API communication behind
@@ -37,6 +37,10 @@ export class FroniusCloudPlugin implements EnergyPlugin {
   }
 
   getRouter(): AnyRouter {
-    return froniusCloudRouter;
+    return createFroniusCloudRouter(this.deps);
+  }
+
+  getHealthChecks(): PluginHealthCheck[] {
+    return [];
   }
 }

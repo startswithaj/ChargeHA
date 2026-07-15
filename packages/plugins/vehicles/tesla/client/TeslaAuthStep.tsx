@@ -2,14 +2,11 @@ import { useEffect, useState } from "react";
 import { Button, Callout, Text } from "@radix-ui/themes";
 import { CheckCircle, ExternalLink, Loader2 } from "lucide-react";
 import { trpc } from "./trpc.ts";
-import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
-import {
-  hintUnlessLoading,
-  useWizardNextControl,
-} from "../../../../client/src/components/Wizard/wizardNextControl.ts";
+import type { StepProps } from "../../../hostUi.ts";
+import { hintUnlessLoading, useWizardNextControl } from "../../../hostUi.ts";
 import { callbackUrl, resolveOAuthOrigin } from "./oauthOrigin.ts";
 import { UnstableOriginCallout } from "./UnstableOriginCallout.tsx";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import { stepStyles as styles } from "../../../hostUi.ts";
 
 type Status = "idle" | "polling" | "success" | "error";
 
@@ -65,8 +62,7 @@ function ErrorView(
 
 export function TeslaAuthStep(_props: StepProps): JSX.Element {
   const [status, setStatus] = useState<Status>("idle");
-  // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): tunnel endpoints move behind the plugin API
-  const tunnelStatus = trpc.wizard.tunnelStatus.useQuery();
+  const tunnelStatus = trpc.plugin.vehicle.tesla.tunnelStatus.useQuery();
   const oauth = resolveOAuthOrigin(
     globalThis.location?.origin ?? "",
     tunnelStatus.data?.url,

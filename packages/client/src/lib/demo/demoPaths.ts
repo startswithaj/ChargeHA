@@ -19,15 +19,17 @@ import type { MutationPath, QueryPath } from "./queryPaths.ts";
 /** Queries deliberately unreachable in demo (disabled plugins / features). */
 export const GATED_QUERIES: readonly string[] = [
   // Tesla — disabled in the wizard, no tesla vehicle ever exists.
-  "plugin.vehicle.tesla.commandStatus",
+  "plugin.vehicle.tesla.encryptionStatus",
   "plugin.vehicle.tesla.getConfig",
+  "plugin.vehicle.tesla.listVehicles",
+  "plugin.vehicle.tesla.proxyHealth",
   "plugin.vehicle.tesla.teslaStatus",
   "plugin.vehicle.tesla.teslaVehicles",
   // Fronius — disabled in the wizard, never the active adapter.
   "plugin.energy.fronius_local.getConfig",
   "plugin.energy.fronius_cloud.getConfig",
   // Cloudflare tunnel — Tesla-only setup step, never reached.
-  "wizard.tunnelStatus",
+  "plugin.vehicle.tesla.tunnelStatus",
 ] as const satisfies readonly QueryPath[];
 
 /** Queries known to exist but not yet implemented. Empty — all are handled. */
@@ -57,8 +59,8 @@ export const GATED_MUTATIONS = [
   "wizard.saveOidcConfig",
   "wizard.testOidcDiscovery",
   // Cloudflare tunnel — Tesla-only setup step, never reached.
-  "wizard.startTunnel",
-  "wizard.stopTunnel",
+  "plugin.vehicle.tesla.startTunnel",
+  "plugin.vehicle.tesla.stopTunnel",
 ] as const satisfies readonly MutationPath[];
 
 /** The gated mutation paths as a literal union. */

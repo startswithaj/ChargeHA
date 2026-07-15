@@ -4,8 +4,8 @@ import type { PluginTunnelRoute } from "@chargeha/plugins/types";
 
 /**
  * Manages a cloudflared tunnel + middleware server for LAN users.
- * Plugin-provided routes are passed into `start(routes)` by the caller —
- * TunnelManager itself does not hold a plugin reference.
+ * Plugin-provided routes come from the injected `getRoutes` provider at
+ * `start()` time — TunnelManager itself does not hold a plugin reference.
  * The tunnel provides a temporary https://xxx.trycloudflare.com URL.
  */
 export class TunnelManager {
@@ -17,6 +17,7 @@ export class TunnelManager {
   constructor(
     private logger: Logger,
     private mainServerPort: number,
+    private getRoutes: () => PluginTunnelRoute[],
     private middlewarePort = 4040,
     private cloudflaredPath = "cloudflared",
     // Injected so tests can supply fakes instead of patching Deno globals.
@@ -51,10 +52,11 @@ export class TunnelManager {
 
   /**
    * Start the middleware server and cloudflared tunnel.
-   * Returns the public tunnel URL. Plugin-provided routes are passed in by
-   * the caller (which already holds the plugin registry).
+   * Returns the public tunnel URL. Plugin-provided routes come from the
+   * injected provider (backed by the plugin registry).
    */
-  async start(routes: PluginTunnelRoute[]): Promise<string> {
+  async start(): Promise<string> {
+    const routes = this.getRoutes();
     if (this.isRunning && this._tunnelUrl) {
       this.mergeRoutes(routes);
       this.logger.info("Tunnel already running, returning existing URL");

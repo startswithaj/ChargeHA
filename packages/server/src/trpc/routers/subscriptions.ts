@@ -65,6 +65,10 @@ export const subscriptionsRouter = router({
         (data) => queue.push({ type: "vehicle_update", data }),
       ),
       ctx.eventEmitter.subscribe(
+        "vehicles_changed",
+        (data) => queue.push({ type: "vehicles_changed", data }),
+      ),
+      ctx.eventEmitter.subscribe(
         "vehicle_error",
         (data) => queue.push({ type: "vehicle_error", data }),
       ),

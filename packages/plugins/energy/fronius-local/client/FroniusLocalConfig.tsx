@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Badge, Button, Code, Text, TextField } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
-import { SettingsRow } from "../../../../client/src/components/pages/Settings/SettingsLayout.tsx";
+import { SettingsRow } from "../../../hostUi.ts";
 
 function SearchControls(
   { subnet, setSubnet, searchMutation }: {

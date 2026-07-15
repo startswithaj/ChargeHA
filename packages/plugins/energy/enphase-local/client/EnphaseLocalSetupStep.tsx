@@ -1,9 +1,9 @@
 import { useCallback, useState } from "react";
 import { Text } from "@radix-ui/themes";
-import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
-import { useWizardNextControl } from "../../../../client/src/components/Wizard/wizardNextControl.ts";
+import type { StepProps } from "../../../hostUi.ts";
+import { useWizardNextControl } from "../../../hostUi.ts";
 import { trpc } from "./trpc.ts";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import { stepStyles as styles } from "../../../hostUi.ts";
 import {
   EnphaseLocalForm,
   type EnphaseLocalFormValues,

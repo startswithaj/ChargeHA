@@ -123,6 +123,7 @@ export class VehicleManager {
       initialized: false,
     });
     this.logger.info(`Vehicle registered: ${row.name} (${row.id})`);
+    this.eventEmitter.emit("vehicles_changed", {});
 
     await this.seedFromRecentLog(row.id, row.name, middleware);
   }
@@ -195,6 +196,7 @@ export class VehicleManager {
     await this.removeVehicle(id);
     await this.db.deleteVehicle(id);
     await this.db.resequenceVehiclePriorities();
+    this.eventEmitter.emit("vehicles_changed", {});
   }
 
   // ── Data requests ─────────────────────────────────────────────────────

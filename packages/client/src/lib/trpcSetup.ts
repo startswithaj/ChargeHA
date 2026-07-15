@@ -64,6 +64,15 @@ export const queryClient = new QueryClient({
   }),
 });
 
+// vehicle.list is DB + cached state (no vendor API cost) and is read by both
+// main and plugin UIs — always-fresh so plugins never need to invalidate
+// main's cache. Live membership changes arrive via the vehicles_changed SSE
+// event; this covers mounts.
+queryClient.setQueryDefaults([["vehicle", "list"]], {
+  staleTime: 0,
+  refetchOnMount: "always",
+});
+
 const createLinks = (): TRPCLink<AppRouter>[] => {
   if (isDemoBuild) return [demoLink()];
   return [

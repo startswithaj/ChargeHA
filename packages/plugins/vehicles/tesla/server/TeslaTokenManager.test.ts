@@ -13,13 +13,19 @@ describe("TeslaTokenManager", () => {
   const testLogger = new Logger("Tesla", "error");
 
   const makeDeps = (appDb: AppDatabase): PluginDependencies =>
-    PluginDependencies.create(
-      appDb,
-      throwingMock<VehicleManager>("VehicleManager"),
-      throwingMock<EnergyAdapterManager>("EnergyAdapterManager"),
-      () => null,
-      "tesla",
-    );
+    PluginDependencies.create({
+      db: appDb,
+      vehicleManager: throwingMock<VehicleManager>("VehicleManager"),
+      energyManager: throwingMock<EnergyAdapterManager>("EnergyAdapterManager"),
+      tunnel: {
+        getUrl: () => null,
+        start: () => Promise.reject(new Error("tunnel not mocked")),
+        stop: () => Promise.resolve(),
+      },
+      geocode: () => Promise.reject(new Error("geocode not mocked")),
+      encryptionConfigured: () => false,
+      pluginId: "tesla",
+    });
 
   /** Seed tokens directly into the DB using namespaced config keys. */
   const seedTokens = async (
@@ -44,13 +50,19 @@ describe("TeslaTokenManager", () => {
     await db.setPluginConfig("tesla.client_id", "test-client-id");
     await db.setPluginConfig("tesla.client_secret", "test-client-secret");
     await db.setPluginConfig("tesla.region", "na");
-    deps = PluginDependencies.create(
+    deps = PluginDependencies.create({
       db,
-      throwingMock<VehicleManager>("VehicleManager"),
-      throwingMock<EnergyAdapterManager>("EnergyAdapterManager"),
-      () => null,
-      "tesla",
-    );
+      vehicleManager: throwingMock<VehicleManager>("VehicleManager"),
+      energyManager: throwingMock<EnergyAdapterManager>("EnergyAdapterManager"),
+      tunnel: {
+        getUrl: () => null,
+        start: () => Promise.reject(new Error("tunnel not mocked")),
+        stop: () => Promise.resolve(),
+      },
+      geocode: () => Promise.reject(new Error("geocode not mocked")),
+      encryptionConfigured: () => false,
+      pluginId: "tesla",
+    });
     manager = new TeslaTokenManager(deps, testLogger);
   });
 

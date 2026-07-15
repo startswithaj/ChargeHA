@@ -5,6 +5,7 @@ import type { VehicleRow } from "@chargeha/server/db/types";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import { generateEcKeyPair } from "@chargeha/server/lib/Encryption";
 import type {
+  CommandStatus,
   HealthCheckResult,
   PluginHealthCheck,
   PluginTunnelRoute,
@@ -18,7 +19,7 @@ import { TeslaService, type TeslaServiceIo } from "./TeslaService.ts";
 import { TeslaTokenManager } from "./TeslaTokenManager.ts";
 import { TESLA_SECRET_KEYS, teslaConfigDef } from "./config.ts";
 import { createTeslaHttpRoutes } from "./routes.ts";
-import { teslaRouter } from "./router.ts";
+import { createTeslaRouter } from "./router.ts";
 
 const DEFAULT_PROXY_URL = "https://localhost:4443";
 
@@ -70,7 +71,7 @@ export class TeslaVehiclePlugin implements VehiclePlugin {
   private readonly startupPromise: Promise<void>;
 
   constructor(
-    private readonly deps: PluginDependencies,
+    readonly deps: PluginDependencies,
     private readonly teslaProxyManager: TeslaProxyManager,
     serviceIo?: TeslaServiceIo,
   ) {
@@ -181,7 +182,35 @@ export class TeslaVehiclePlugin implements VehiclePlugin {
   // ── Plugin interface implementations ────────────────────────────────────
 
   getRouter() {
-    return teslaRouter;
+    return createTeslaRouter(this);
+  }
+
+  /** Commands need the tesla-http-proxy up and the virtual key paired. */
+  async getCommandStatus(): Promise<CommandStatus> {
+    const checks = this.getHealthChecks();
+    const checkResults = checks.length > 0
+      ? await Promise.all(checks.map((c) => c.run()))
+      : [];
+    const proxyOk = checkResults.every((r) => r.status === "ok") &&
+      checks.length > 0;
+
+    if (!proxyOk) {
+      return {
+        commandsDisabled: true,
+        reason: "The Tesla command proxy is not running.",
+      };
+    }
+
+    const status = await this.teslaTokenManager.getStatus();
+    if (status.vehicleConfigured && status.keyPaired !== true) {
+      return {
+        commandsDisabled: true,
+        reason:
+          "Your vehicle's key pairing is incomplete — the key must be approved on the vehicle's touchscreen before commands can be sent.",
+      };
+    }
+
+    return { commandsDisabled: false, reason: null };
   }
 
   getHttpRoutes(): Hono | null {

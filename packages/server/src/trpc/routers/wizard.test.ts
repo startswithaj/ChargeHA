@@ -45,7 +45,6 @@ describe("Wizard tRPC Router", () => {
       db,
       encryptionKey,
       mockLogger as never,
-      { getAll: () => [] } as never,
       {
         isRunning: false,
         tunnelUrl: null,
@@ -93,7 +92,6 @@ describe("Wizard tRPC Router", () => {
       db,
       encryptionKey,
       mockLogger as never,
-      { getAll: () => [] } as never,
       mockTunnelManager as never,
       {
         addVehicle: () => Promise.resolve(),
@@ -205,36 +203,6 @@ describe("Wizard tRPC Router", () => {
       });
       const timezone = await db.getConfig("timezone");
       expect(timezone).toBe("Australia/Sydney");
-    });
-  });
-
-  describe("wizard.tunnelStatus", () => {
-    it("returns active=false and url=null when tunnel is not running", async () => {
-      const result = await caller.wizard.tunnelStatus();
-      expect(result.active).toBe(false);
-      expect(result.url).toBeNull();
-    });
-
-    it("returns active=true and url when tunnel is running", async () => {
-      const { caller: tunnelCaller } = makeCallerWithActiveTunnel();
-      const result = await tunnelCaller.wizard.tunnelStatus();
-      expect(result.active).toBe(true);
-      expect(result.url).toBe("https://test-tunnel.trycloudflare.com");
-    });
-  });
-
-  describe("wizard.startTunnel", () => {
-    it("starts tunnel and returns URL", async () => {
-      const { caller: tunnelCaller } = makeCallerWithActiveTunnel();
-      const result = await tunnelCaller.wizard.startTunnel();
-      expect(result.url).toBe("https://test-tunnel.trycloudflare.com");
-    });
-  });
-
-  describe("wizard.stopTunnel", () => {
-    it("returns stopped=true", async () => {
-      const result = await caller.wizard.stopTunnel();
-      expect(result.stopped).toBe(true);
     });
   });
 
@@ -375,7 +343,6 @@ describe("Wizard tRPC Router", () => {
           db,
           null,
           mockLogger as never,
-          { getAll: () => [] } as never,
           {
             isRunning: false,
             tunnelUrl: null,

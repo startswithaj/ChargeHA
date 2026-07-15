@@ -2,8 +2,8 @@ import { useMemo, useState } from "react";
 import { Button, Code, Text, TextField } from "@radix-ui/themes";
 import { Search } from "lucide-react";
 import { trpc } from "./trpc.ts";
-import { Spinner } from "../../../../client/src/components/ui/Spinner.tsx";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import { Spinner } from "../../../hostUi.ts";
+import { stepStyles as styles } from "../../../hostUi.ts";
 import type { FroniusDevice, TestStatus } from "../../InverterSetupShared.tsx";
 import { TestResultBadge } from "../../InverterSetupShared.tsx";
 

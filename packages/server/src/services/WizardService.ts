@@ -1,7 +1,6 @@
 import { ServiceError } from "../lib/ServiceError.ts";
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { Logger } from "../lib/Logger.ts";
-import type { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
 import type { TunnelManager } from "./TunnelManager.ts";
 import type { VehicleManager } from "./VehicleManager.ts";
 import type { AuthService, ChangeModeInput } from "./AuthService.ts";
@@ -18,7 +17,6 @@ export class WizardService {
     private db: AppDatabase,
     private encryptionKey: string | null,
     private logger: Logger,
-    private vehiclePlugins: VehiclePluginRegistry,
     private tunnelManager: TunnelManager,
     private vehicleManager: VehicleManager,
     private authService: AuthService,
@@ -85,39 +83,6 @@ export class WizardService {
 
   async setEnergyType(type: string): Promise<void> {
     await this.db.setConfig("wizard_energy_type", type);
-  }
-
-  async startTunnel() {
-    try {
-      // Pull plugin-provided tunnel routes at call time — registry already
-      // holds every registered vehicle plugin.
-      const routes = this.vehiclePlugins.getAll().flatMap((p) =>
-        p.getTunnelRoutes()
-      );
-      const url = await this.tunnelManager.start(routes);
-      this.logger.info(`Tunnel started: ${url}`);
-      return { url };
-    } catch (err) {
-      this.logger.error("Failed to start tunnel", err);
-      throw new ServiceError(
-        err instanceof Error ? err.message : "Failed to start tunnel",
-        "INTERNAL_SERVER_ERROR",
-        { cause: err },
-      );
-    }
-  }
-
-  async stopTunnel() {
-    await this.tunnelManager.stop();
-    this.logger.info("Tunnel stopped");
-    return { stopped: true };
-  }
-
-  getTunnelStatus() {
-    return {
-      active: this.tunnelManager.isRunning,
-      url: this.tunnelManager.tunnelUrl,
-    };
   }
 
   async setAuthMode(

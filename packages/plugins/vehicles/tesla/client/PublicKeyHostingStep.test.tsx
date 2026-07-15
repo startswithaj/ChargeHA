@@ -40,30 +40,28 @@ vi.mock("./trpc.ts", () => ({
               reset: vi.fn(),
             })),
           },
+          tunnelStatus: {
+            useQuery: vi.fn(() => ({
+              data: { active: false, url: null },
+              isLoading: false,
+              refetch: vi.fn(),
+            })),
+          },
+          startTunnel: {
+            useMutation: vi.fn(() => ({
+              mutate: vi.fn(),
+              isPending: false,
+              error: null,
+            })),
+          },
+          stopTunnel: {
+            useMutation: vi.fn(() => ({
+              mutate: vi.fn(),
+              isPending: false,
+              error: null,
+            })),
+          },
         },
-      },
-    },
-    wizard: {
-      tunnelStatus: {
-        useQuery: vi.fn(() => ({
-          data: { active: false, url: null },
-          isLoading: false,
-          refetch: vi.fn(),
-        })),
-      },
-      startTunnel: {
-        useMutation: vi.fn(() => ({
-          mutate: vi.fn(),
-          isPending: false,
-          error: null,
-        })),
-      },
-      stopTunnel: {
-        useMutation: vi.fn(() => ({
-          mutate: vi.fn(),
-          isPending: false,
-          error: null,
-        })),
       },
     },
     useUtils: vi.fn(() => ({
@@ -93,7 +91,7 @@ describe("PublicKeyHostingStep", () => {
   let originalFetch: typeof globalThis.fetch;
 
   function setTunnel(active: boolean, url: string | null): void {
-    vi.mocked(trpc.wizard.tunnelStatus.useQuery).mockReturnValue({
+    vi.mocked(trpc.plugin.vehicle.tesla.tunnelStatus.useQuery).mockReturnValue({
       data: { active, url },
       isLoading: false,
       refetch: vi.fn(),

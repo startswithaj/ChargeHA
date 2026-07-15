@@ -119,6 +119,7 @@ function buildAuxServices(
   const tunnelManager = new TunnelManager(
     new Logger("Tunnel", logLevel),
     port,
+    () => vehicleRegistry.getAll().flatMap((p) => p.getTunnelRoutes()),
     4040,
     Deno.env.get("CLOUDFLARED_PATH") ?? "cloudflared",
   );
@@ -126,7 +127,6 @@ function buildAuxServices(
     db,
     encryptionKey,
     new Logger("WizardService", logLevel),
-    vehicleRegistry,
     tunnelManager,
     vehicleManager,
     authService,
@@ -258,7 +258,11 @@ function buildServices(
     logLevel,
   });
 
-  const healthService = new HealthService(vehicleRegistry, encryptionKey);
+  const healthService = new HealthService(
+    vehicleRegistry,
+    energyRegistry,
+    encryptionKey,
+  );
 
   new ChargeController(
     vehicleManager,
@@ -496,10 +500,18 @@ export async function bootstrap(): Promise<
 
   // Plugins self-initialize in their constructors.
   registerPlugins(
-    db,
-    services.vehicleManager,
-    services.energyManager,
-    () => services.tunnelManager.tunnelUrl,
+    {
+      db,
+      vehicleManager: services.vehicleManager,
+      energyManager: services.energyManager,
+      tunnel: {
+        getUrl: () => services.tunnelManager.tunnelUrl,
+        start: async () => ({ url: await services.tunnelManager.start() }),
+        stop: () => services.tunnelManager.stop(),
+      },
+      geocode: (query) => services.geocodeService.geocodeAddress(query),
+      encryptionConfigured: () => encryptionKey !== null,
+    },
     vehicleRegistry,
     energyRegistry,
   );

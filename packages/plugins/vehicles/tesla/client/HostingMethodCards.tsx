@@ -1,7 +1,7 @@
 import { Badge, Text } from "@radix-ui/themes";
 import { Cloud, Github, Globe, Sparkles } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import { stepStyles as styles } from "../../../hostUi.ts";
 
 export type HostingMethod = null | "self" | "github" | "ai" | "tunnel";
 

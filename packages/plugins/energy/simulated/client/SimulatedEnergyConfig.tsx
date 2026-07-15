@@ -1,8 +1,5 @@
 import { trpc } from "./trpc.ts";
-import {
-  type PluginConfigField,
-  PluginConfigForm,
-} from "../../../../client/src/components/pages/Settings/PluginConfigForm.tsx";
+import { type PluginConfigField, PluginConfigForm } from "../../../hostUi.ts";
 
 /** Editable solar knobs, mirroring the Simulator page. */
 const FIELDS: PluginConfigField[] = [

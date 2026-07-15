@@ -7,13 +7,12 @@ import { SimulatedVehicleDialog } from "./SimulatedVehicleDialog.tsx";
 
 /** Wrapper that renders one SimulatedVehicleDialog per simulated vehicle. */
 export function SimulatedVehicleSettings(): JSX.Element | null {
-  // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): plugins need a scoped vehicle-list API
-  const vehiclesQuery = trpc.vehicle.list.useQuery(undefined, {
-    select: (data: { vehicles: VehicleWithState[] }) =>
-      data.vehicles.filter(
-        (v) => v.adapterType === "simulated",
-      ),
-  });
+  const vehiclesQuery = trpc.plugin.vehicle.simulated.listVehicles.useQuery(
+    undefined,
+    {
+      select: (data: { vehicles: VehicleWithState[] }) => data.vehicles,
+    },
+  );
   const simulateMutation = trpc.plugin.vehicle.simulated.updateState
     .useMutation({
       onSuccess: () => vehiclesQuery.refetch(),

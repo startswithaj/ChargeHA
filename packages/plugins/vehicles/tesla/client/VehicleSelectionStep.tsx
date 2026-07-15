@@ -2,12 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Callout, Checkbox, Text, TextField } from "@radix-ui/themes";
 import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import { trpc } from "./trpc.ts";
-import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
-import {
-  hintUnlessLoading,
-  useWizardNextControl,
-} from "../../../../client/src/components/Wizard/wizardNextControl.ts";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import type { StepProps } from "../../../hostUi.ts";
+import { hintUnlessLoading, useWizardNextControl } from "../../../hostUi.ts";
+import { stepStyles as styles } from "../../../hostUi.ts";
 
 type DiscoveredVehicle = { vin: string; name: string; state: string };
 
@@ -170,8 +167,8 @@ export function VehicleSelectionStep(_props: StepProps): JSX.Element {
   const utils = trpc.useUtils();
 
   // Check if vehicles are already configured in the DB
-  // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): plugins need a scoped vehicle-list API
-  const existingVehiclesQuery = trpc.vehicle.list.useQuery();
+  const existingVehiclesQuery = trpc.plugin.vehicle.tesla.listVehicles
+    .useQuery();
   const existingVehicles = existingVehiclesQuery.data?.vehicles ?? [];
 
   const {
@@ -206,9 +203,8 @@ export function VehicleSelectionStep(_props: StepProps): JSX.Element {
         priorities,
         utils,
       });
-      // The pairing step reads vehicle.list — drop the pre-save cache.
-      // deno-lint-ignore custom-main-refs/no-main-trpc -- TODO(plugin-api): plugins need a scoped vehicle-list API
-      await utils.vehicle.list.invalidate();
+      // The pairing step reads the plugin vehicle list — drop the pre-save cache.
+      await utils.plugin.vehicle.tesla.listVehicles.invalidate();
       return true;
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Failed to save");

@@ -15,7 +15,7 @@ import { throwingMock } from "../../../../server/src/test-helpers/throwingMock.t
 import type { TeslaServiceIo } from "./TeslaService.ts";
 import { Logger } from "@chargeha/server/lib/Logger";
 import { decrypt } from "@chargeha/server/lib/Encryption";
-import { teslaRouter } from "./router.ts";
+import { createTeslaRouter } from "./router.ts";
 import { TeslaVehiclePlugin } from "./index.ts";
 import { StubTeslaProxyManager } from "./test-helpers/StubTeslaProxyManager.ts";
 
@@ -46,35 +46,18 @@ describe("Tesla Plugin Router", () => {
     ),
   );
 
-  const appRouter = createAppRouter({
-    vehicle: { tesla: teslaRouter },
-    energy: {},
-  });
-  const createCaller = createCallerFactory(appRouter);
-
-  // Tesla router is dynamically mounted at runtime, so the static root
-  // router type doesn't include it.
-  type CallerWithPlugins = ReturnType<typeof createCaller> & {
-    // deno-lint-ignore no-explicit-any
-    plugin: { vehicle: { tesla: any } };
-  };
-
   /**
    * Build a full test context: real DB, registries, VehicleManager, and a
-   * registered TeslaVehiclePlugin. Returns a tRPC caller and the pieces
-   * tests need to inspect. Tests that need to mock Fleet API calls pass in
-   * a `serviceIo`, which is forwarded to the plugin's TeslaService.
+   * registered TeslaVehiclePlugin. Returns a tRPC caller (fully typed — the
+   * router is built from the plugin instance) and the pieces tests need to
+   * inspect. Tests that need to mock Fleet API calls pass in a `serviceIo`,
+   * which is forwarded to the plugin's TeslaService.
    */
   async function setupCaller(opts: {
     encryptionKey?: string | null;
     serviceIo?: TeslaServiceIo;
     seedCredentials?: boolean;
-  } = {}): Promise<{
-    caller: CallerWithPlugins;
-    db: AppDatabase;
-    plugin: TeslaVehiclePlugin;
-    cleanup: () => Promise<void>;
-  }> {
+  } = {}) {
     const encryptionKey = opts.encryptionKey ?? null;
     const db = new AppDatabase(":memory:", encryptionKey, null);
     await db.init();
@@ -98,16 +81,28 @@ describe("Tesla Plugin Router", () => {
       "EnergyAdapterManager",
     );
 
-    const deps = PluginDependencies.create(
+    const deps = PluginDependencies.create({
       db,
       vehicleManager,
       energyManager,
-      () => null,
-      "tesla",
-    );
+      tunnel: {
+        getUrl: () => null,
+        start: () => Promise.reject(new Error("tunnel not mocked")),
+        stop: () => Promise.resolve(),
+      },
+      geocode: () => Promise.reject(new Error("geocode not mocked")),
+      encryptionConfigured: () => false,
+      pluginId: "tesla",
+    });
     const proxyManager = new StubTeslaProxyManager(deps, deps.log);
     const plugin = new TeslaVehiclePlugin(deps, proxyManager, opts.serviceIo);
     vehicleRegistry.register(plugin);
+
+    const appRouter = createAppRouter({
+      vehicle: { tesla: createTeslaRouter(plugin) },
+      energy: {},
+    });
+    const createCaller = createCallerFactory(appRouter);
 
     const ctx = throwingMock<TrpcContext>("TrpcContext", {
       db,
@@ -118,7 +113,7 @@ describe("Tesla Plugin Router", () => {
       logger: testLogger,
     });
 
-    const caller = createCaller(ctx) as CallerWithPlugins;
+    const caller = createCaller(ctx);
 
     return {
       caller,

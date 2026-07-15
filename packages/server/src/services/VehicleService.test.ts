@@ -9,8 +9,6 @@ import type { VehicleRow } from "../db/types.ts";
 import type { VehicleManager } from "./VehicleManager.ts";
 import type { CommandResult } from "./VehicleManager.ts";
 import type { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
-import type { TrpcContext } from "../trpc/trpc.ts";
-import { initTRPC } from "@trpc/server";
 import type { VehicleChargeState } from "@chargeha/shared";
 
 describe("VehicleService", () => {
@@ -102,6 +100,9 @@ describe("VehicleService", () => {
     displayName: string;
     settingsComponentKey: string | null;
     getRouter: () => unknown;
+    getCommandStatus?: () => Promise<
+      { commandsDisabled: boolean; reason: string | null }
+    >;
   }
 
   function makeMockPluginRegistry(
@@ -234,27 +235,23 @@ describe("VehicleService", () => {
         testLogger,
       );
 
-      const result = await service.getCommandStatus(
-        "UNKNOWN",
-        {} as TrpcContext,
-      );
+      const result = await service.getCommandStatus("UNKNOWN");
       expect(result).toEqual({ commandsDisabled: false, reason: null });
     });
 
     it("returns default when plugin not found in registry", async () => {
-      const result = await service.getCommandStatus(
-        "v1",
-        {} as TrpcContext,
-      );
+      const result = await service.getCommandStatus("v1");
       expect(result).toEqual({ commandsDisabled: false, reason: null });
     });
 
-    it("returns default when plugin has no router", async () => {
+    it("returns the plugin's command status", async () => {
       const plugins: MockPlugin[] = [{
         id: "tesla",
         displayName: "Tesla",
         settingsComponentKey: null,
         getRouter: () => null,
+        getCommandStatus: () =>
+          Promise.resolve({ commandsDisabled: true, reason: "tokens expired" }),
       }];
       registry = makeMockPluginRegistry(plugins);
       service = new VehicleService(
@@ -265,46 +262,11 @@ describe("VehicleService", () => {
         testLogger,
       );
 
-      const result = await service.getCommandStatus(
-        "v1",
-        {} as TrpcContext,
-      );
-      expect(result).toEqual({ commandsDisabled: false, reason: null });
-    });
-
-    // NOTE: The `"commandStatus" in caller` branch is unreachable.
-    // tRPC v11 callers are Proxy objects that don't implement a `has` trap,
-    // so the `in` operator always returns false regardless of whether the
-    // router has a `commandStatus` procedure. This is a dead-code branch.
-
-    it("returns default when router exists (commandStatus in caller is always false due to tRPC Proxy)", async () => {
-      const testT = initTRPC.create();
-      const testRouter = testT.router({
-        commandStatus: testT.procedure.query(() => ({
-          commandsDisabled: true,
-          reason: "tokens expired",
-        })),
+      const result = await service.getCommandStatus("v1");
+      expect(result).toEqual({
+        commandsDisabled: true,
+        reason: "tokens expired",
       });
-      const plugins: MockPlugin[] = [{
-        id: "tesla",
-        displayName: "Tesla",
-        settingsComponentKey: null,
-        getRouter: () => testRouter,
-      }];
-      registry = makeMockPluginRegistry(plugins);
-      service = new VehicleService(
-        db,
-        mgr,
-        registry,
-        new TypedEventEmitter(),
-        testLogger,
-      );
-
-      const result = await service.getCommandStatus(
-        "v1",
-        {} as TrpcContext,
-      );
-      expect(result).toEqual({ commandsDisabled: false, reason: null });
     });
   });
 

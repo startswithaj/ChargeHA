@@ -10,22 +10,25 @@ import type {
   inferProcedureOutput,
 } from "@trpc/server";
 import type { createAppRouter } from "../../../../server/src/trpc/root.ts";
-import type { teslaRouter } from "../../../../plugins/vehicles/tesla/server/router.ts";
-import type { simulatedRouter } from "../../../../plugins/vehicles/simulated/server/router.ts";
-import type { froniusLocalRouter } from "../../../../plugins/energy/fronius-local/server/router.ts";
-import type { froniusCloudRouter } from "../../../../plugins/energy/fronius-cloud/server/router.ts";
-import type { simulatedEnergyRouter } from "../../../../plugins/energy/simulated/server/router.ts";
+import type { createTeslaRouter } from "../../../../plugins/vehicles/tesla/server/router.ts";
+import type { createSimulatedRouter } from "../../../../plugins/vehicles/simulated/server/router.ts";
+import type { createFroniusLocalRouter } from "../../../../plugins/energy/fronius-local/server/router.ts";
+import type { createFroniusCloudRouter } from "../../../../plugins/energy/fronius-cloud/server/router.ts";
+import type { createSimulatedEnergyRouter } from "../../../../plugins/energy/simulated/server/router.ts";
 
 // The fully-merged router type (core + every plugin), built purely from types —
 // mirrors how each plugin's routerType.ts merges, but type-only so nothing
 // reaches the client bundle. New plugin? Add its router type to this merge.
 type FullAppRouter = ReturnType<
   typeof createAppRouter<
-    { tesla: typeof teslaRouter; simulated: typeof simulatedRouter },
     {
-      fronius_local: typeof froniusLocalRouter;
-      fronius_cloud: typeof froniusCloudRouter;
-      simulated_energy: typeof simulatedEnergyRouter;
+      tesla: ReturnType<typeof createTeslaRouter>;
+      simulated: ReturnType<typeof createSimulatedRouter>;
+    },
+    {
+      fronius_local: ReturnType<typeof createFroniusLocalRouter>;
+      fronius_cloud: ReturnType<typeof createFroniusCloudRouter>;
+      simulated_energy: ReturnType<typeof createSimulatedEnergyRouter>;
     }
   >
 >;
