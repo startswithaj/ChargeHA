@@ -253,6 +253,11 @@ function useAuthStepState(onNext: () => void) {
 
   const setAuthMode = trpc.wizard.setAuthMode.useMutation();
   const saveOidcConfig = trpc.wizard.saveOidcConfig.useMutation();
+  // Depend on the stable mutate fns, not the mutation objects: react-query
+  // returns a fresh object each render, which would give handleBeforeNext a new
+  // identity every render and drive useWizardNextControl's effect into a loop.
+  const { mutateAsync: setAuthModeMutate } = setAuthMode;
+  const { mutateAsync: saveOidcMutate } = saveOidcConfig;
   const sessionQuery = trpc.auth.session.useQuery(undefined, {
     enabled: false,
   });
@@ -296,11 +301,11 @@ function useAuthStepState(onNext: () => void) {
     }
     try {
       if (selectedMode === "oidc") {
-        await saveOidcConfig.mutateAsync(oidcForm);
+        await saveOidcMutate(oidcForm);
         globalThis.location.href = "/auth/oidc/login?return=wizard";
         return false;
       }
-      await setAuthMode.mutateAsync({
+      await setAuthModeMutate({
         mode: selectedMode,
         localConfig: selectedMode === "local" ? localForm : undefined,
         oidcConfig: undefined,
@@ -312,7 +317,7 @@ function useAuthStepState(onNext: () => void) {
       );
       return false;
     }
-  }, [selectedMode, localForm, oidcForm, setAuthMode, saveOidcConfig]);
+  }, [selectedMode, localForm, oidcForm, setAuthModeMutate, saveOidcMutate]);
 
   const selectMode = (mode: AuthMode) => {
     setSelectedMode(mode);

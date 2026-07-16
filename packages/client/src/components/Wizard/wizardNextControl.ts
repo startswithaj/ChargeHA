@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect } from "react";
+import { createContext, useContext, useEffect, useRef } from "react";
 
 /**
  * Gating + behaviour a step attaches to the wizard shell's Next button.
@@ -41,8 +41,29 @@ export const WizardNextProvider = WizardNextContext.Provider;
 export function useWizardNextControl(control: WizardNextControl): void {
   const report = useContext(WizardNextContext);
   const { canProceed, hint, pendingLabel, onBeforeNext } = control;
+
+  // Keep the latest onBeforeNext in a ref and report a stable wrapper. Steps
+  // routinely recreate onBeforeNext each render (it closes over form state and
+  // react-query mutation objects); depending on its identity in the effect
+  // below would re-report every render and spin the shell into an infinite
+  // update loop. The wrapper always calls the newest handler, so callers never
+  // have to memoize it. Only presence (defined vs not) affects the reported
+  // control, so re-report on that boolean, not the function identity.
+  const onBeforeNextRef = useRef(onBeforeNext);
   useEffect(() => {
-    report?.({ canProceed, hint, pendingLabel, onBeforeNext });
-  }, [report, canProceed, hint, pendingLabel, onBeforeNext]);
+    onBeforeNextRef.current = onBeforeNext;
+  });
+  const hasBeforeNext = !!onBeforeNext;
+
+  useEffect(() => {
+    report?.({
+      canProceed,
+      hint,
+      pendingLabel,
+      onBeforeNext: hasBeforeNext
+        ? () => onBeforeNextRef.current?.() ?? Promise.resolve(false)
+        : undefined,
+    });
+  }, [report, canProceed, hint, pendingLabel, hasBeforeNext]);
   useEffect(() => () => report?.(null), [report]);
 }
