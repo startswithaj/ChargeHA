@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle, ExternalLink, Key } from "lucide-react";
-import { Badge, Button, Card, Code, Text } from "@radix-ui/themes";
+import { AlertDialog, Badge, Button, Card, Code, Text } from "@radix-ui/themes";
 import type { VehicleWithState } from "@chargeha/shared";
 import { trpc } from "./trpc.ts";
 import {
@@ -10,6 +10,7 @@ import {
 } from "../shared/publicKeyDomain.ts";
 import { Spinner } from "../../../hostUi.ts";
 import { ErrorBanner } from "../../../hostUi.ts";
+import { useInvalidateVehiclePlugins } from "../../../hostUi.ts";
 import { TeslaSetupInstructions } from "./TeslaSetupInstructions.tsx";
 
 function useTransitionToAdd(
@@ -55,8 +56,11 @@ function TeslaHeader(
   );
 }
 
-function DisconnectBlock(
-  { handleDisconnect }: { handleDisconnect: () => void },
+function ResetBlock(
+  { handleReset, resetting }: {
+    handleReset: () => void;
+    resetting: boolean;
+  },
 ) {
   return (
     <div
@@ -66,12 +70,40 @@ function DisconnectBlock(
         borderTop: "1px solid var(--gray-a4)",
       }}
     >
-      <Button size="1" variant="soft" color="red" onClick={handleDisconnect}>
-        Disconnect Tesla
-      </Button>
+      <AlertDialog.Root>
+        <AlertDialog.Trigger>
+          <Button size="1" variant="soft" color="red" disabled={resetting}>
+            Reset Tesla Setup
+          </Button>
+        </AlertDialog.Trigger>
+        <AlertDialog.Content maxWidth="420px">
+          <AlertDialog.Title>Reset Tesla setup?</AlertDialog.Title>
+          <AlertDialog.Description size="2">
+            All current Tesla settings will be erased and onboarding will start
+            fresh.
+          </AlertDialog.Description>
+          <div
+            style={{
+              display: "flex",
+              gap: 12,
+              marginTop: 16,
+              justifyContent: "flex-end",
+            }}
+          >
+            <AlertDialog.Cancel>
+              <Button variant="soft" color="gray">Cancel</Button>
+            </AlertDialog.Cancel>
+            <AlertDialog.Action>
+              <Button color="red" onClick={handleReset}>
+                Erase and start fresh
+              </Button>
+            </AlertDialog.Action>
+          </div>
+        </AlertDialog.Content>
+      </AlertDialog.Root>
       <Text size="1" color="gray" style={{ marginLeft: 8 }}>
-        Clears tokens and removes Tesla vehicles. You can reconnect to
-        re-authorize with updated permissions.
+        Erases all Tesla credentials, keys, and vehicles so you can set up Tesla
+        again from scratch.
       </Text>
     </div>
   );
@@ -369,6 +401,7 @@ function useTeslaSettingsMutations(
     setPolling: (b: boolean) => void;
   },
 ) {
+  const invalidateVehiclePlugins = useInvalidateVehiclePlugins();
   const connectMutation = trpc.plugin.vehicle.tesla.getAuthUrl.useMutation({
     onSuccess: ({ url }: { url: string }) => {
       globalThis.open(url, "_blank");
@@ -416,18 +449,13 @@ function useTeslaSettingsMutations(
         utils.plugin.vehicle.tesla.teslaVehicles.invalidate();
       },
     });
-  const disconnectMutation = trpc.plugin.vehicle.tesla.disconnect.useMutation({
+  const resetMutation = trpc.plugin.vehicle.tesla.resetOnboarding.useMutation({
     onSuccess: () => {
-      utils.plugin.vehicle.tesla.teslaStatus.setData(undefined, {
-        authenticated: false,
-        vehicleConfigured: false,
-        vin: null,
-        vehicleName: null,
-        keyPaired: null,
-      });
-      utils.plugin.vehicle.tesla.teslaVehicles.setData(undefined, {
-        vehicles: [],
-      });
+      // Config + vehicles are gone: flip the plugin back to "not configured"
+      // so the "+ Set up Tesla" onboarding card reappears in Vehicle settings.
+      invalidateVehiclePlugins();
+      utils.plugin.vehicle.tesla.teslaStatus.invalidate();
+      utils.plugin.vehicle.tesla.teslaVehicles.invalidate();
       utils.plugin.vehicle.tesla.listVehicles.invalidate();
     },
   });
@@ -444,7 +472,7 @@ function useTeslaSettingsMutations(
     connectMutation,
     autoAddVehiclesMutation,
     addTeslaVehicleMutation,
-    disconnectMutation,
+    resetMutation,
     checkPairingMutation,
   };
 }
@@ -473,7 +501,7 @@ export function TeslaSettings(): JSX.Element {
     connectMutation,
     autoAddVehiclesMutation,
     addTeslaVehicleMutation,
-    disconnectMutation,
+    resetMutation,
     checkPairingMutation,
   } = useTeslaSettingsMutations({ utils, setPolling });
 
@@ -488,7 +516,6 @@ export function TeslaSettings(): JSX.Element {
     connectMutation.mutate({ origin: globalThis.location.origin });
   const handleAddTeslaVehicle = (vin: string, name: string) =>
     addTeslaVehicleMutation.mutate({ vin, name });
-  const handleDisconnect = () => disconnectMutation.mutate();
   const handleCheckPairing = () => checkPairingMutation.mutate();
   const pairingChecking = checkPairingMutation.isPending;
   const proxyDown = (proxyHealthQuery.data?.warnings ?? []).length > 0;
@@ -551,8 +578,11 @@ export function TeslaSettings(): JSX.Element {
         />
       )}
 
-      {teslaAvailable && teslaAuth?.authenticated && (
-        <DisconnectBlock handleDisconnect={handleDisconnect} />
+      {teslaAvailable && (
+        <ResetBlock
+          handleReset={() => resetMutation.mutate()}
+          resetting={resetMutation.isPending}
+        />
       )}
     </div>
   );

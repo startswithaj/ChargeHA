@@ -210,8 +210,8 @@ describe("Tesla Plugin Router", () => {
     });
   });
 
-  describe("tesla.disconnect", () => {
-    it("clears tokens and removes Tesla vehicles", async () => {
+  describe("tesla.resetOnboarding", () => {
+    it("clears config and removes Tesla vehicles", async () => {
       const expiresAt = new Date(Date.now() + 3600000).toISOString();
       await seedTokens(ctx.db, "access", "refresh", expiresAt);
       await ctx.db.upsertVehicle({
@@ -226,15 +226,15 @@ describe("Tesla Plugin Router", () => {
       expect(await ctx.db.getPluginConfig("tesla.access_token")).toBe("access");
       expect(await ctx.db.getVehicle("VIN123")).not.toBeNull();
 
-      const data = await ctx.caller.plugin.vehicle.tesla.disconnect();
+      const data = await ctx.caller.plugin.vehicle.tesla.resetOnboarding();
       expect(data.success).toBe(true);
 
       expect(await ctx.db.getPluginConfig("tesla.access_token")).toBeFalsy();
       expect(await ctx.db.getVehicle("VIN123")).toBeNull();
     });
 
-    it("succeeds even when no tokens exist", async () => {
-      const data = await ctx.caller.plugin.vehicle.tesla.disconnect();
+    it("succeeds even when nothing is configured", async () => {
+      const data = await ctx.caller.plugin.vehicle.tesla.resetOnboarding();
       expect(data.success).toBe(true);
     });
   });

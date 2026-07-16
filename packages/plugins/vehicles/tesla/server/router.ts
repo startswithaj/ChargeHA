@@ -62,8 +62,8 @@ export function createTeslaRouter(
         return { url, state };
       }),
 
-    disconnect: publicProcedure.mutation(() => {
-      return plugin.teslaService.disconnect();
+    resetOnboarding: publicProcedure.mutation(() => {
+      return plugin.teslaService.resetOnboarding();
     }),
 
     selectVehicle: publicProcedure

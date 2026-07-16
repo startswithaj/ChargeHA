@@ -162,13 +162,14 @@ describe("TeslaService", () => {
     });
   });
 
-  // ── disconnect ──────────────────────────────────────────────────────────────
+  // ── resetOnboarding ─────────────────────────────────────────────────────────
 
-  describe("TeslaService.disconnect", () => {
-    it("removes vehicles, clears tokens, and stops refresh", async () => {
+  describe("TeslaService.resetOnboarding", () => {
+    it("removes vehicles, resets config to defaults, and stops refresh", async () => {
       const deleted: string[] = [];
       const stopCalls: boolean[] = [];
-      const deleteTokenCalls: boolean[] = [];
+      const configSet: string[] = [];
+      const secretSet: string[] = [];
 
       const service = makeService({
         deps: {
@@ -177,23 +178,38 @@ describe("TeslaService", () => {
             deleted.push(id);
             return Promise.resolve();
           },
+          setConfig: (key: string) => {
+            configSet.push(key);
+            return Promise.resolve();
+          },
+          setSecret: (key: string) => {
+            secretSet.push(key);
+            return Promise.resolve();
+          },
         },
         tokenManager: {
           stopAutoRefresh: () => {
             stopCalls.push(true);
           },
-          deleteTokens: () => {
-            deleteTokenCalls.push(true);
-            return Promise.resolve();
-          },
         } as unknown as Partial<TeslaTokenManager>,
       });
 
-      const result = await service.disconnect();
+      const result = await service.resetOnboarding();
       expect(result.success).toBe(true);
       expect(stopCalls).toHaveLength(1);
       expect(deleted).toEqual(["VIN123"]);
-      expect(deleteTokenCalls).toHaveLength(1);
+      // Secret keys reset via setSecret, the rest via setConfig.
+      expect(secretSet).toEqual(
+        expect.arrayContaining([
+          "ec_private_key",
+          "client_secret",
+          "access_token",
+          "refresh_token",
+        ]),
+      );
+      expect(configSet).toEqual(
+        expect.arrayContaining(["client_id", "region"]),
+      );
     });
   });
 

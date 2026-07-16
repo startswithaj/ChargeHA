@@ -40,11 +40,11 @@ export const PENDING_QUERIES: readonly string[] =
 export const GATED_MUTATIONS = [
   // Tesla — disabled in the wizard, no tesla vehicle ever exists.
   "plugin.vehicle.tesla.checkKeyPairing",
-  "plugin.vehicle.tesla.disconnect",
   "plugin.vehicle.tesla.generateKeys",
   "plugin.vehicle.tesla.getAuthUrl",
   "plugin.vehicle.tesla.importKeys",
   "plugin.vehicle.tesla.registerPartner",
+  "plugin.vehicle.tesla.resetOnboarding",
   "plugin.vehicle.tesla.selectVehicle",
   "plugin.vehicle.tesla.selectVehicles",
   "plugin.vehicle.tesla.setConfig",

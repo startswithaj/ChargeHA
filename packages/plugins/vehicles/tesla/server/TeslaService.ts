@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { inSequence, sleep } from "@chargeha/shared/async";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import type { TeslaTokenManager } from "./TeslaTokenManager.ts";
+import { TESLA_SECRET_KEYS, teslaConfigDef } from "./config.ts";
 import {
   type PublicKeyHosting,
   resolvePublicKeyDomain,
@@ -78,29 +79,28 @@ export class TeslaService {
     }
   }
 
-  /** Disconnect Tesla: stop refresh, remove vehicles, clear tokens. */
-  async disconnect(): Promise<{ success: true }> {
-    try {
-      // Stop auto-refresh
-      this.tokenManager.stopAutoRefresh();
+  /** Erase all Tesla configuration and vehicles so onboarding can start fresh
+   *  from the first wizard step. Resets every config key to its default,
+   *  clearing credentials, keys, hosting, partner registration, and tokens. */
+  async resetOnboarding(): Promise<{ success: true }> {
+    this.tokenManager.stopAutoRefresh();
 
-      // Remove all Tesla vehicles from the manager
-      const vehicles = await this.deps.getVehicleRows();
-      await inSequence(vehicles, (v) => this.deps.deleteVehicle(v.id));
+    const vehicles = await this.deps.getVehicleRows();
+    await inSequence(vehicles, (v) => this.deps.deleteVehicle(v.id));
 
-      // Clear stored tokens
-      await this.tokenManager.deleteTokens();
+    const secretKeys = new Set<string>(TESLA_SECRET_KEYS);
+    await inSequence(
+      Object.values(teslaConfigDef),
+      (def) =>
+        secretKeys.has(def.key)
+          ? this.deps.setSecret(def.key, String(def.default))
+          : this.deps.setConfig(def.key, String(def.default)),
+    );
 
-      this.logger.info(
-        "Tesla disconnected — tokens cleared, vehicles removed",
-      );
-      return { success: true as const };
-    } catch (err) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: err instanceof Error ? err.message : "Disconnect failed",
-      });
-    }
+    this.logger.info(
+      "Tesla onboarding reset — all config and vehicles cleared",
+    );
+    return { success: true as const };
   }
 
   /** Select and register a vehicle from Tesla Fleet API. */
