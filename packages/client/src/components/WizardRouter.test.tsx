@@ -70,8 +70,7 @@ vi.mock("../hooks/useWizardState.ts", () => ({
     vehicleType: "tesla",
     energyType: "fronius_local",
     setStepId: vi.fn(),
-    setVehicleType: vi.fn(),
-    setEnergyType: vi.fn(),
+    commitSelection: vi.fn(),
     isLoading: false,
   })),
 }));

@@ -6,14 +6,14 @@ import { VehicleTypeStep } from "./VehicleTypeStep.tsx";
 
 const {
   mockSetStepId,
-  mockSetVehicleType,
+  mockCommitSelection,
   mockDemoMutate,
   captured,
   mockVehicleList,
 } = vi
   .hoisted(() => ({
     mockSetStepId: vi.fn(),
-    mockSetVehicleType: vi.fn(),
+    mockCommitSelection: vi.fn(),
     mockDemoMutate: vi.fn(),
     captured: { demoOnSuccess: undefined as (() => void) | undefined },
     mockVehicleList: vi.fn(() => ({
@@ -26,7 +26,7 @@ vi.mock("../../../hooks/useWizardState.ts", () => ({
     stepId: "vehicle-type",
     vehicleType: null,
     setStepId: mockSetStepId,
-    setVehicleType: mockSetVehicleType,
+    commitSelection: mockCommitSelection,
   })),
 }));
 
@@ -119,8 +119,10 @@ describe("VehicleTypeStep", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Tesla/ }));
 
-    expect(mockSetVehicleType).toHaveBeenCalledWith("tesla");
-    expect(mockSetStepId).toHaveBeenCalledWith("tesla-key-generation");
+    expect(mockCommitSelection).toHaveBeenCalledWith({
+      vehicleType: "tesla",
+      stepId: "tesla-key-generation",
+    });
   });
 
   it("selecting Simulated calls demoSetup mutation and navigates to inverter-type", () => {
@@ -129,8 +131,10 @@ describe("VehicleTypeStep", () => {
     fireEvent.click(screen.getByRole("button", { name: /Simulated/ }));
 
     expect(mockDemoMutate).toHaveBeenCalledWith({ adapterType: "simulated" });
-    expect(mockSetVehicleType).toHaveBeenCalledWith("simulated");
-    expect(mockSetStepId).toHaveBeenCalledWith("inverter-type");
+    expect(mockCommitSelection).toHaveBeenCalledWith({
+      vehicleType: "simulated",
+      stepId: "inverter-type",
+    });
   });
 
   it("reselecting the already-configured vehicle type proceeds without recreating it", () => {
@@ -142,7 +146,9 @@ describe("VehicleTypeStep", () => {
     fireEvent.click(screen.getByRole("button", { name: /Simulated/ }));
 
     expect(mockDemoMutate).not.toHaveBeenCalled();
-    expect(mockSetVehicleType).toHaveBeenCalledWith("simulated");
-    expect(mockSetStepId).toHaveBeenCalledWith("inverter-type");
+    expect(mockCommitSelection).toHaveBeenCalledWith({
+      vehicleType: "simulated",
+      stepId: "inverter-type",
+    });
   });
 });

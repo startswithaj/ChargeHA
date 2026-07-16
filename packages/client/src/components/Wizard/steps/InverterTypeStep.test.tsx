@@ -5,10 +5,10 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../test-utils.tsx";
 import { InverterTypeStep } from "./InverterTypeStep.tsx";
 
-const { mockMutate, mockSetStepId, mockSetEnergyType } = vi.hoisted(() => ({
+const { mockMutate, mockSetStepId, mockCommitSelection } = vi.hoisted(() => ({
   mockMutate: vi.fn(),
   mockSetStepId: vi.fn(),
-  mockSetEnergyType: vi.fn(),
+  mockCommitSelection: vi.fn(),
 }));
 
 vi.mock("../../../hooks/useWizardState.ts", () => ({
@@ -17,8 +17,7 @@ vi.mock("../../../hooks/useWizardState.ts", () => ({
     vehicleType: "",
     energyType: "",
     setStepId: mockSetStepId,
-    setVehicleType: vi.fn(),
-    setEnergyType: mockSetEnergyType,
+    commitSelection: mockCommitSelection,
     isLoading: false,
   })),
 }));
@@ -127,8 +126,10 @@ describe("InverterTypeStep", () => {
       );
     });
 
-    expect(mockSetEnergyType).toHaveBeenCalledWith("");
-    expect(mockSetStepId).toHaveBeenCalledWith("home-location");
+    expect(mockCommitSelection).toHaveBeenCalledWith({
+      energyType: "",
+      stepId: "home-location",
+    });
   });
 
   it.each<[string, string, string]>([
@@ -148,8 +149,10 @@ describe("InverterTypeStep", () => {
         );
       });
 
-      expect(mockSetEnergyType).toHaveBeenCalledWith(adapterType);
-      expect(mockSetStepId).toHaveBeenCalledWith(nextStepId);
+      expect(mockCommitSelection).toHaveBeenCalledWith({
+        energyType: adapterType,
+        stepId: nextStepId,
+      });
     },
   );
 });

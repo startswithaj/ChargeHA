@@ -1,11 +1,8 @@
-import { assertExists } from "@std/assert";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { createTestQueryClient } from "../test-utils.tsx";
-
-type OnMutate = ((vars: Record<string, unknown>) => void) | undefined;
 
 const hoisted = vi.hoisted(() => ({
   state: {
@@ -20,11 +17,6 @@ const hoisted = vi.hoisted(() => ({
     step: vi.fn(),
     vehicleType: vi.fn(),
     energyType: vi.fn(),
-  },
-  captured: {
-    stepOnMutate: undefined as OnMutate,
-    vehicleTypeOnMutate: undefined as OnMutate,
-    energyTypeOnMutate: undefined as OnMutate,
   },
   cancel: vi.fn(),
   setData: vi.fn(),
@@ -60,22 +52,13 @@ vi.mock("../trpc.ts", () => ({
         }),
       },
       setStep: {
-        useMutation: (opts: Record<string, unknown>) => {
-          hoisted.captured.stepOnMutate = opts.onMutate as OnMutate;
-          return { mutate: hoisted.mutates.step };
-        },
+        useMutation: () => ({ mutate: hoisted.mutates.step }),
       },
       setVehicleType: {
-        useMutation: (opts: Record<string, unknown>) => {
-          hoisted.captured.vehicleTypeOnMutate = opts.onMutate as OnMutate;
-          return { mutate: hoisted.mutates.vehicleType };
-        },
+        useMutation: () => ({ mutate: hoisted.mutates.vehicleType }),
       },
       setEnergyType: {
-        useMutation: (opts: Record<string, unknown>) => {
-          hoisted.captured.energyTypeOnMutate = opts.onMutate as OnMutate;
-          return { mutate: hoisted.mutates.energyType };
-        },
+        useMutation: () => ({ mutate: hoisted.mutates.energyType }),
       },
     },
   },
@@ -105,9 +88,6 @@ describe("useWizardState", () => {
     hoisted.mutates.energyType.mockClear();
     hoisted.cancel.mockClear();
     hoisted.setData.mockClear();
-    hoisted.captured.stepOnMutate = undefined;
-    hoisted.captured.vehicleTypeOnMutate = undefined;
-    hoisted.captured.energyTypeOnMutate = undefined;
   });
 
   it("returns default values when queries have no data", () => {
@@ -152,75 +132,61 @@ describe("useWizardState", () => {
     expect(result.current.isLoading).toBe(true);
   });
 
-  it.each<{
-    name: string;
-    call: (r: ReturnType<typeof useWizardState>) => void;
-    mock: () => ReturnType<typeof vi.fn>;
-    expectArg: Record<string, string>;
-  }>([
-    {
-      name: "setStepId",
-      call: (r) => r.setStepId("authentication"),
-      mock: () => hoisted.mutates.step,
-      expectArg: { stepId: "authentication" },
-    },
-    {
-      name: "setVehicleType",
-      call: (r) => r.setVehicleType("tesla"),
-      mock: () => hoisted.mutates.vehicleType,
-      expectArg: { type: "tesla" },
-    },
-    {
-      name: "setEnergyType",
-      call: (r) => r.setEnergyType("fronius_local"),
-      mock: () => hoisted.mutates.energyType,
-      expectArg: { type: "fronius_local" },
-    },
-  ])("$name calls mutation with correct args", ({ call, mock, expectArg }) => {
+  it("setStepId persists the step and writes the cache optimistically", () => {
     const { result } = setup();
 
     act(() => {
-      call(result.current);
+      result.current.setStepId("authentication");
     });
 
-    expect(mock()).toHaveBeenCalledWith(expectArg);
+    expect(hoisted.mutates.step).toHaveBeenCalledWith({
+      stepId: "authentication",
+    });
+    // Optimistic write is synchronous (not deferred behind an awaited cancel).
+    expect(hoisted.cancel).toHaveBeenCalled();
+    expect(hoisted.setData).toHaveBeenCalledWith(undefined, "authentication");
   });
 
-  it.each<{
-    name: string;
-    captured: () => OnMutate;
-    args: Record<string, string>;
-    expected: string;
-  }>([
-    {
-      name: "step",
-      captured: () => hoisted.captured.stepOnMutate,
-      args: { stepId: "timezone" },
-      expected: "timezone",
-    },
-    {
-      name: "vehicleType",
-      captured: () => hoisted.captured.vehicleTypeOnMutate,
-      args: { type: "simulated" },
-      expected: "simulated",
-    },
-    {
-      name: "energyType",
-      captured: () => hoisted.captured.energyTypeOnMutate,
-      args: { type: "fronius_cloud" },
-      expected: "fronius_cloud",
-    },
-  ])(
-    "$name onMutate cancels query and sets data optimistically",
-    async ({ captured, args, expected }) => {
-      setup();
+  it("commitSelection writes step + energy caches synchronously in one call", () => {
+    const { result } = setup();
 
-      const fn = captured();
-      assertExists(fn);
-      await fn(args);
+    act(() => {
+      result.current.commitSelection({
+        energyType: "fronius_local",
+        stepId: "fronius-local-setup",
+      });
+    });
 
-      expect(hoisted.cancel).toHaveBeenCalled();
-      expect(hoisted.setData).toHaveBeenCalledWith(undefined, expected);
-    },
-  );
+    expect(hoisted.mutates.step).toHaveBeenCalledWith({
+      stepId: "fronius-local-setup",
+    });
+    expect(hoisted.mutates.energyType).toHaveBeenCalledWith({
+      type: "fronius_local",
+    });
+    // Both caches are written synchronously so React commits them together.
+    expect(hoisted.setData).toHaveBeenCalledWith(
+      undefined,
+      "fronius-local-setup",
+    );
+    expect(hoisted.setData).toHaveBeenCalledWith(undefined, "fronius_local");
+    // vehicleType is untouched when not provided.
+    expect(hoisted.mutates.vehicleType).not.toHaveBeenCalled();
+  });
+
+  it("commitSelection persists the vehicle type when provided", () => {
+    const { result } = setup();
+
+    act(() => {
+      result.current.commitSelection({
+        vehicleType: "tesla",
+        stepId: "tesla-credentials",
+      });
+    });
+
+    expect(hoisted.mutates.vehicleType).toHaveBeenCalledWith({ type: "tesla" });
+    expect(hoisted.mutates.step).toHaveBeenCalledWith({
+      stepId: "tesla-credentials",
+    });
+    expect(hoisted.mutates.energyType).not.toHaveBeenCalled();
+  });
 });

@@ -55,14 +55,12 @@ export function VehicleTypeStep() {
   const inDemo = demoMode.isActive();
   const pendingIdRef = useRef<string | null>(null);
 
-  /** Navigate to the first plugin step, or skip to inverter-type if the plugin has none. */
-  const navigateAfterSelection = (type: string) => {
+  /** Set the vehicle type and move to the first plugin step (or inverter-type
+   *  if the plugin has none) in one atomic commit. */
+  const selectVehicleType = (type: string) => {
     const pluginSteps = vehiclePluginSteps[type] ?? [];
-    if (pluginSteps.length > 0) {
-      wizardState.setStepId(pluginSteps[0].id);
-    } else {
-      wizardState.setStepId("inverter-type");
-    }
+    const stepId = pluginSteps.length > 0 ? pluginSteps[0].id : "inverter-type";
+    wizardState.commitSelection({ vehicleType: type, stepId });
   };
 
   const utils = trpc.useUtils();
@@ -87,8 +85,7 @@ export function VehicleTypeStep() {
       utils.vehicle.list.invalidate();
       const id = pendingIdRef.current;
       if (!id) throw new Error("Expected pending vehicle type ID");
-      wizardState.setVehicleType(id);
-      navigateAfterSelection(id);
+      selectVehicleType(id);
     },
   });
 
@@ -96,16 +93,14 @@ export function VehicleTypeStep() {
     const option = vehiclePluginOptions.find((o) => o.id === id);
     if (id === selectedType) {
       // Already set up with this type — continue without recreating.
-      wizardState.setVehicleType(id);
-      navigateAfterSelection(id);
+      selectVehicleType(id);
       return;
     }
     if (option?.demoSetup) {
       pendingIdRef.current = id;
       demoSetupMutation.mutate({ adapterType: id });
     } else {
-      wizardState.setVehicleType(id);
-      navigateAfterSelection(id);
+      selectVehicleType(id);
     }
   };
 

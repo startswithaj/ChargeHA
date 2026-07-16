@@ -95,8 +95,7 @@ describe("WizardShell", () => {
       vehicleType: "",
       energyType: "",
       setStepId: mockSetStepId,
-      setVehicleType: vi.fn(),
-      setEnergyType: vi.fn(),
+      commitSelection: vi.fn(),
       isLoading: false,
       ...overrides,
     });

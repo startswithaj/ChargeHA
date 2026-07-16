@@ -52,14 +52,12 @@ export function InverterTypeStep() {
       { energyAdapterType: adapterType },
       {
         onSuccess: () => {
-          wizardState.setEnergyType(adapterType);
           // Navigate to the first energy plugin step, or skip to home-location if none
           const pluginSteps = energyPluginSteps[adapterType] ?? [];
-          if (pluginSteps.length > 0) {
-            wizardState.setStepId(pluginSteps[0].id);
-          } else {
-            wizardState.setStepId("home-location");
-          }
+          const stepId = pluginSteps.length > 0
+            ? pluginSteps[0].id
+            : "home-location";
+          wizardState.commitSelection({ energyType: adapterType, stepId });
         },
       },
     );

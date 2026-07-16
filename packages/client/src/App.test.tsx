@@ -99,8 +99,7 @@ vi.mock("./hooks/useWizardState.ts", () => ({
     vehicleType: "",
     energyType: "",
     setStepId: vi.fn(),
-    setVehicleType: vi.fn(),
-    setEnergyType: vi.fn(),
+    commitSelection: vi.fn(),
     isLoading: false,
   })),
 }));

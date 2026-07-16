@@ -8,12 +8,16 @@ export interface WizardState {
   vehicleType: string;
   /** Selected energy type (e.g. "fronius_local", "fronius_cloud", ""). */
   energyType: string;
-  /** Set the current step by string ID. */
+  /** Move to a step within the current (unchanged) step list. */
   setStepId: (id: string) => void;
-  /** Set the selected vehicle type. */
-  setVehicleType: (type: string) => void;
-  /** Set the selected energy type. */
-  setEnergyType: (type: string) => void;
+  /** Atomically change the vehicle/energy selection and the current step. The
+   *  step list is derived from the selected types, so the type change and the
+   *  step change must land in one render — writing them separately produces a
+   *  frame where stepId points at a step the list hasn't gained yet, which
+   *  WizardShell misreads as a corrupt id and "heals" by snapping back. */
+  commitSelection: (
+    next: { stepId: string; vehicleType?: string; energyType?: string },
+  ) => void;
   /** Whether the initial data has loaded from the server. */
   isLoading: boolean;
 }
@@ -30,40 +34,42 @@ export function useWizardState(): WizardState {
   const vehicleTypeQuery = trpc.wizard.getVehicleType.useQuery();
   const energyTypeQuery = trpc.wizard.getEnergyType.useQuery();
 
-  const stepMutation = trpc.wizard.setStep.useMutation({
-    onMutate: async ({ stepId }) => {
-      await utils.wizard.getStep.cancel();
-      utils.wizard.getStep.setData(undefined, stepId);
-    },
-  });
-
-  const vehicleTypeMutation = trpc.wizard.setVehicleType.useMutation({
-    onMutate: async ({ type }) => {
-      await utils.wizard.getVehicleType.cancel();
-      utils.wizard.getVehicleType.setData(undefined, type);
-    },
-  });
-
-  const energyTypeMutation = trpc.wizard.setEnergyType.useMutation({
-    onMutate: async ({ type }) => {
-      await utils.wizard.getEnergyType.cancel();
-      utils.wizard.getEnergyType.setData(undefined, type);
-    },
-  });
+  const stepMutation = trpc.wizard.setStep.useMutation();
+  const vehicleTypeMutation = trpc.wizard.setVehicleType.useMutation();
+  const energyTypeMutation = trpc.wizard.setEnergyType.useMutation();
 
   const setStepId = useCallback(
-    (id: string) => stepMutation.mutate({ stepId: id }),
-    [stepMutation],
+    (id: string) => {
+      // Optimistic write is synchronous (no awaited cancel beforehand) so it
+      // commits in the same render as any sibling write in the same call stack.
+      utils.wizard.getStep.cancel();
+      utils.wizard.getStep.setData(undefined, id);
+      stepMutation.mutate({ stepId: id });
+    },
+    [utils, stepMutation],
   );
 
-  const setVehicleType = useCallback(
-    (type: string) => vehicleTypeMutation.mutate({ type }),
-    [vehicleTypeMutation],
-  );
+  const commitSelection = useCallback(
+    (next: { stepId: string; vehicleType?: string; energyType?: string }) => {
+      // All optimistic cache writes run synchronously in one call so React
+      // batches them into a single commit — the step id and the type that puts
+      // that step in the list are never out of sync for a render.
+      utils.wizard.getStep.cancel();
+      utils.wizard.getStep.setData(undefined, next.stepId);
+      stepMutation.mutate({ stepId: next.stepId });
 
-  const setEnergyType = useCallback(
-    (type: string) => energyTypeMutation.mutate({ type }),
-    [energyTypeMutation],
+      if (next.vehicleType !== undefined) {
+        utils.wizard.getVehicleType.cancel();
+        utils.wizard.getVehicleType.setData(undefined, next.vehicleType);
+        vehicleTypeMutation.mutate({ type: next.vehicleType });
+      }
+      if (next.energyType !== undefined) {
+        utils.wizard.getEnergyType.cancel();
+        utils.wizard.getEnergyType.setData(undefined, next.energyType);
+        energyTypeMutation.mutate({ type: next.energyType });
+      }
+    },
+    [utils, stepMutation, vehicleTypeMutation, energyTypeMutation],
   );
 
   return {
@@ -71,8 +77,7 @@ export function useWizardState(): WizardState {
     vehicleType: vehicleTypeQuery.data || "",
     energyType: energyTypeQuery.data || "",
     setStepId,
-    setVehicleType,
-    setEnergyType,
+    commitSelection,
     isLoading: stepQuery.isLoading || vehicleTypeQuery.isLoading ||
       energyTypeQuery.isLoading,
   };
