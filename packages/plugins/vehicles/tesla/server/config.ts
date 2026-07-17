@@ -81,3 +81,13 @@ export const TESLA_SECRET_KEYS = [
   "access_token",
   "refresh_token",
 ] as const satisfies readonly TeslaConfigKey[];
+
+/** Config that resetOnboarding deliberately keeps: the EC keypair and the
+ *  domain it is published at. The user hosts the public key themselves, so
+ *  wiping either forces them to re-host or re-type a still-valid setup. The
+ *  wizard mints a new pair, or takes a new domain, when they want one. */
+export const TESLA_RESET_PRESERVED_KEYS = [
+  "ec_private_key",
+  "ec_public_key_pem",
+  "public_key_domain",
+] as const satisfies readonly TeslaConfigKey[];

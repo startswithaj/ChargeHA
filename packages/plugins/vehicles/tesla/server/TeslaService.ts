@@ -3,7 +3,11 @@ import { TRPCError } from "@trpc/server";
 import { inSequence, sleep } from "@chargeha/shared/async";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import type { TeslaTokenManager } from "./TeslaTokenManager.ts";
-import { TESLA_SECRET_KEYS, teslaConfigDef } from "./config.ts";
+import {
+  TESLA_RESET_PRESERVED_KEYS,
+  TESLA_SECRET_KEYS,
+  teslaConfigDef,
+} from "./config.ts";
 import {
   type PublicKeyHosting,
   resolvePublicKeyDomain,
@@ -79,9 +83,10 @@ export class TeslaService {
     }
   }
 
-  /** Erase all Tesla configuration and vehicles so onboarding can start fresh
-   *  from the first wizard step. Resets every config key to its default,
-   *  clearing credentials, keys, hosting, partner registration, and tokens. */
+  /** Erase Tesla configuration and vehicles so onboarding can start fresh from
+   *  the first wizard step, clearing credentials, hosting, partner
+   *  registration, and tokens. The EC keypair survives — see
+   *  TESLA_RESET_PRESERVED_KEYS. */
   async resetOnboarding(): Promise<{ success: true }> {
     this.tokenManager.stopAutoRefresh();
 
@@ -89,8 +94,9 @@ export class TeslaService {
     await inSequence(vehicles, (v) => this.deps.deleteVehicle(v.id));
 
     const secretKeys = new Set<string>(TESLA_SECRET_KEYS);
+    const preserved = new Set<string>(TESLA_RESET_PRESERVED_KEYS);
     await inSequence(
-      Object.values(teslaConfigDef),
+      Object.values(teslaConfigDef).filter((def) => !preserved.has(def.key)),
       (def) =>
         secretKeys.has(def.key)
           ? this.deps.setSecret(def.key, String(def.default))
@@ -98,7 +104,7 @@ export class TeslaService {
     );
 
     this.logger.info(
-      "Tesla onboarding reset — all config and vehicles cleared",
+      "Tesla onboarding reset — config and vehicles cleared, keypair kept",
     );
     return { success: true as const };
   }

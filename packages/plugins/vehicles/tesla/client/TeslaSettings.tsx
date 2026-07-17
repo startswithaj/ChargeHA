@@ -102,8 +102,9 @@ function ResetBlock(
         </AlertDialog.Content>
       </AlertDialog.Root>
       <Text size="1" color="gray" style={{ marginLeft: 8 }}>
-        Erases all Tesla credentials, keys, and vehicles so you can set up Tesla
-        again from scratch.
+        Erases your Tesla credentials and vehicles so you can set up Tesla again
+        from scratch. Your key pair is kept, so your hosted public key stays
+        valid — generate a new one in the wizard if you need to.
       </Text>
     </div>
   );

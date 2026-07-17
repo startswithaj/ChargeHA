@@ -201,7 +201,6 @@ describe("TeslaService", () => {
       // Secret keys reset via setSecret, the rest via setConfig.
       expect(secretSet).toEqual(
         expect.arrayContaining([
-          "ec_private_key",
           "client_secret",
           "access_token",
           "refresh_token",
@@ -210,6 +209,31 @@ describe("TeslaService", () => {
       expect(configSet).toEqual(
         expect.arrayContaining(["client_id", "region"]),
       );
+    });
+
+    it("keeps the EC keypair so the hosted public key stays valid", async () => {
+      const configSet: string[] = [];
+      const secretSet: string[] = [];
+
+      const service = makeService({
+        deps: {
+          getVehicleRows: () => Promise.resolve([VEHICLE_ROW]),
+          deleteVehicle: () => Promise.resolve(),
+          setConfig: (key: string) => {
+            configSet.push(key);
+            return Promise.resolve();
+          },
+          setSecret: (key: string) => {
+            secretSet.push(key);
+            return Promise.resolve();
+          },
+        },
+      });
+
+      await service.resetOnboarding();
+      expect(secretSet).not.toContain("ec_private_key");
+      expect(configSet).not.toContain("ec_public_key_pem");
+      expect(configSet).not.toContain("public_key_domain");
     });
   });
 
