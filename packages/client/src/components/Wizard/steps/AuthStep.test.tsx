@@ -3,9 +3,9 @@ import { assertExists } from "@std/assert";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../test-utils.tsx";
-import { AuthStep } from "./AuthStep.tsx";
+import { authStep } from "./AuthStep.tsx";
 import { StepNextHarness } from "./test-helpers/StepNextHarness.tsx";
-import type { StepProps } from "../WizardShell.tsx";
+import type { StepProps } from "../flow.ts";
 
 const {
   mockSetAuthModeMutateAsync,
@@ -67,19 +67,20 @@ describe("AuthStep", () => {
   const makeStepProps = (overrides: Partial<StepProps> = {}): StepProps => ({
     onNext: vi.fn(),
     onBack: vi.fn(),
-    onSkip: vi.fn(),
     onSkipTo: vi.fn(),
     onSkipToEnd: vi.fn(),
     ...overrides,
   });
 
-  /** Render the step inside the Next harness — the step's advance behaviour
-   *  lives on the shell's Next button since the wizardNextControl refactor. */
+  /** Render the step through the real StepHost — the step's gate and its save
+   *  both come back from useStep, so the harness drives them together. */
   const renderAuthStep = (props: StepProps) =>
     renderWithProviders(
-      <StepNextHarness onAdvance={props.onNext}>
-        <AuthStep {...props} />
-      </StepNextHarness>,
+      <StepNextHarness
+        def={authStep}
+        stepProps={props}
+        onAdvance={props.onNext}
+      />,
     );
 
   afterEach(() => {

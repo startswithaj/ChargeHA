@@ -11,6 +11,14 @@ import type {
   WizardSaveOidcConfigInput,
   WizardSetAuthModeInput,
 } from "@chargeha/shared/schemas";
+import type { WizardNavState } from "@chargeha/shared";
+import type { CoreConfigKey } from "@chargeha/shared/configSections";
+
+const NAV_CONFIG_KEYS: Record<keyof WizardNavState, CoreConfigKey> = {
+  stepId: "wizard_step",
+  vehicleType: "wizard_vehicle_type",
+  energyType: "wizard_energy_type",
+};
 
 export class WizardService {
   constructor(
@@ -47,9 +55,7 @@ export class WizardService {
     }
 
     // Clear wizard navigation state from DB
-    await this.db.setConfig("wizard_step", "");
-    await this.db.setConfig("wizard_vehicle_type", "");
-    await this.db.setConfig("wizard_energy_type", "");
+    await this.patchState({ stepId: "", vehicleType: "", energyType: "" });
 
     // Clear OIDC pending flag if set
     await this.db.setConfig("wizard_oidc_pending", "");
@@ -61,28 +67,35 @@ export class WizardService {
 
   // ── Wizard navigation state (persisted to DB config keys) ────────────────
 
-  async getStep(): Promise<string> {
-    return (await this.db.getConfig("wizard_step")) ?? "";
+  async getState(): Promise<WizardNavState> {
+    const [stepId, vehicleType, energyType] = await Promise.all([
+      this.db.getConfig(NAV_CONFIG_KEYS.stepId),
+      this.db.getConfig(NAV_CONFIG_KEYS.vehicleType),
+      this.db.getConfig(NAV_CONFIG_KEYS.energyType),
+    ]);
+    return {
+      stepId: stepId ?? "",
+      vehicleType: vehicleType ?? "",
+      energyType: energyType ?? "",
+    };
   }
 
-  async setStep(stepId: string): Promise<void> {
-    await this.db.setConfig("wizard_step", stepId);
-  }
-
-  async getVehicleType(): Promise<string> {
-    return (await this.db.getConfig("wizard_vehicle_type")) ?? "";
-  }
-
-  async setVehicleType(type: string): Promise<void> {
-    await this.db.setConfig("wizard_vehicle_type", type);
-  }
-
-  async getEnergyType(): Promise<string> {
-    return (await this.db.getConfig("wizard_energy_type")) ?? "";
-  }
-
-  async setEnergyType(type: string): Promise<void> {
-    await this.db.setConfig("wizard_energy_type", type);
+  async patchState(patch: Partial<WizardNavState>): Promise<void> {
+    // Object.entries widens keys to string; the entries of a Partial<T> are
+    // exactly T's fields, so narrow back before indexing the key map.
+    const entries = Object.entries(patch) as [
+      keyof WizardNavState,
+      string | undefined,
+    ][];
+    await Promise.all(
+      entries
+        .filter((entry): entry is [keyof WizardNavState, string] =>
+          entry[1] !== undefined
+        )
+        .map(([field, value]) =>
+          this.db.setConfig(NAV_CONFIG_KEYS[field], value)
+        ),
+    );
   }
 
   async setAuthMode(

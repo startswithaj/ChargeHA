@@ -8,8 +8,12 @@ import {
   type PublicKeyHosting,
   resolvePublicKeyDomain,
 } from "../shared/publicKeyDomain.ts";
-import { useWizardNextControl } from "../../../hostUi.ts";
-import { stepStyles as styles } from "../../../hostUi.ts";
+import {
+  advanceOnly,
+  type PluginStepDef,
+  stepStyles as styles,
+  type WizardNext,
+} from "../../../hostUi.ts";
 
 function parseHostname(domain: string): string {
   try {
@@ -116,7 +120,36 @@ function PairingInstructions() {
   );
 }
 
-export function VirtualKeyPairingStep(): JSX.Element {
+export const virtualKeyPairingStep: PluginStepDef = {
+  id: "tesla-virtual-key-pairing",
+  label: "Virtual Key Pairing",
+  useStep: () => {
+    const pairing = useVirtualKeyPairing();
+    return {
+      next: pairingNext(pairing.loading, pairing.verified),
+      view: pairing.loading
+        ? <LoadingView />
+        : <VirtualKeyPairingView {...pairing} />,
+    };
+  },
+};
+
+function pairingNext(loading: boolean, verified: boolean): WizardNext {
+  if (verified) {
+    return {
+      kind: "ready",
+      hint: "Virtual key paired — Next continues",
+      onNext: advanceOnly,
+    };
+  }
+  if (loading) return { kind: "loading" };
+  return {
+    kind: "blocked",
+    reason: "Pair and verify the virtual key to continue",
+  };
+}
+
+function useVirtualKeyPairing() {
   const [verified, setVerified] = useState(false);
 
   const {
@@ -145,15 +178,7 @@ export function VirtualKeyPairingStep(): JSX.Element {
     },
   });
 
-  const loading = vehiclesLoading || configLoading;
   const queryError = vehiclesError ?? configError;
-
-  useWizardNextControl({
-    canProceed: verified,
-    hint: verified
-      ? "Virtual key paired — Next continues"
-      : "Pair and verify the virtual key to continue",
-  });
 
   const { pairingUrl, tunnelDown } = computePairingUrl(
     teslaConfig?.teslaPublicKeyHosting ?? "",
@@ -161,10 +186,22 @@ export function VirtualKeyPairingStep(): JSX.Element {
     tunnelStatus.data?.url ?? null,
   );
 
-  const error = queryError?.message ?? deriveVerifyError(verifyMutation);
+  return {
+    verified,
+    loading: vehiclesLoading || configLoading,
+    vehicles,
+    pairingUrl,
+    tunnelDown,
+    verifying: verifyMutation.isPending,
+    verify: () => verifyMutation.mutate(),
+    error: queryError?.message ?? deriveVerifyError(verifyMutation),
+  };
+}
 
-  if (loading) return <LoadingView />;
-
+function VirtualKeyPairingView(
+  { verified, vehicles, pairingUrl, tunnelDown, verifying, verify, error }:
+    ReturnType<typeof useVirtualKeyPairing>,
+) {
   return (
     <div className={styles.stepContainer}>
       <Text as="p" size="3" color="gray">
@@ -186,15 +223,9 @@ export function VirtualKeyPairingStep(): JSX.Element {
       <PairingInstructions />
 
       <div className={styles.verifyRow}>
-        <Button
-          variant="soft"
-          onClick={() => verifyMutation.mutate()}
-          disabled={verifyMutation.isPending}
-        >
-          {verifyMutation.isPending && (
-            <Loader2 size={16} className={styles.spinner} />
-          )}
-          {verifyMutation.isPending ? "Verifying..." : "Verify Pairing"}
+        <Button variant="soft" onClick={verify} disabled={verifying}>
+          {verifying && <Loader2 size={16} className={styles.spinner} />}
+          {verifying ? "Verifying..." : "Verify Pairing"}
         </Button>
       </div>
 

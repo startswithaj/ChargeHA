@@ -1,8 +1,15 @@
+import type { PluginStepDef } from "../../../hostUi.ts";
 import type {
   PluginScheduleNote,
-  PluginWizardStep,
   VehiclePluginOption,
 } from "../../../componentRegistry.ts";
+import { keyGenerationStep } from "./KeyGenerationStep.tsx";
+import { publicKeyHostingStep } from "./PublicKeyHostingStep.tsx";
+import { teslaCredentialsStep } from "./TeslaCredentialsStep.tsx";
+import { partnerRegistrationStep } from "./PartnerRegistrationStep.tsx";
+import { teslaAuthStep } from "./TeslaAuthStep.tsx";
+import { vehicleSelectionStep } from "./VehicleSelectionStep.tsx";
+import { virtualKeyPairingStep } from "./VirtualKeyPairingStep.tsx";
 
 /** Tesla schedule note shown on the Schedules page. */
 export const teslaScheduleNote: PluginScheduleNote = {
@@ -20,41 +27,13 @@ export const teslaVehicleOption: VehiclePluginOption = {
   iconKey: "car",
 };
 
-/** Tesla wizard step definitions for the setup wizard. */
-export const teslaWizardSteps: PluginWizardStep[] = [
-  {
-    id: "tesla-key-generation",
-    label: "Key Generation",
-    componentKey: "tesla-key-generation",
-  },
-  {
-    id: "tesla-public-key-hosting",
-    label: "Public Key Hosting",
-    componentKey: "tesla-public-key-hosting",
-  },
-  {
-    id: "tesla-credentials",
-    label: "Tesla Credentials",
-    componentKey: "tesla-credentials",
-  },
-  {
-    id: "tesla-partner-registration",
-    label: "Partner Registration",
-    componentKey: "tesla-partner-registration",
-  },
-  {
-    id: "tesla-auth",
-    label: "Tesla Authorization",
-    componentKey: "tesla-auth",
-  },
-  {
-    id: "tesla-vehicle-selection",
-    label: "Vehicle Selection",
-    componentKey: "tesla-vehicle-selection",
-  },
-  {
-    id: "tesla-virtual-key-pairing",
-    label: "Virtual Key Pairing",
-    componentKey: "tesla-virtual-key-pairing",
-  },
+/** Tesla wizard steps, in the order they are walked. */
+export const teslaWizardSteps: PluginStepDef[] = [
+  keyGenerationStep,
+  publicKeyHostingStep,
+  teslaCredentialsStep,
+  partnerRegistrationStep,
+  teslaAuthStep,
+  vehicleSelectionStep,
+  virtualKeyPairingStep,
 ];

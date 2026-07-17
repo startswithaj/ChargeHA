@@ -2,8 +2,9 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, screen } from "@testing-library/react";
 import { renderWithProviders } from "../../../test-utils.tsx";
-import { GridVoltageStep } from "./GridVoltageStep.tsx";
+import { gridVoltageStep } from "./GridVoltageStep.tsx";
 import { trpc } from "../../../trpc.ts";
+import { StepNextHarness } from "./test-helpers/StepNextHarness.tsx";
 
 const { mockMutate } = vi.hoisted(() => ({ mockMutate: vi.fn() }));
 
@@ -113,7 +114,7 @@ describe("GridVoltageStep", () => {
   // ---- Rendering ----
 
   it("renders the description text", () => {
-    renderWithProviders(<GridVoltageStep />);
+    renderWithProviders(<StepNextHarness def={gridVoltageStep} />);
 
     expect(
       screen.getByText(/this setting is used as a fallback/),
@@ -134,7 +135,7 @@ describe("GridVoltageStep", () => {
       error: null,
     } as never);
 
-    renderWithProviders(<GridVoltageStep />);
+    renderWithProviders(<StepNextHarness def={gridVoltageStep} />);
 
     expect(screen.getByText(expectedText)).toBeInTheDocument();
   });
@@ -208,7 +209,7 @@ describe("GridVoltageStep", () => {
         error: null,
       } as never);
 
-      renderWithProviders(<GridVoltageStep />);
+      renderWithProviders(<StepNextHarness def={gridVoltageStep} />);
 
       present.forEach((text) =>
         expect(screen.getByText(text)).toBeInTheDocument()
@@ -222,7 +223,7 @@ describe("GridVoltageStep", () => {
   // ---- User interactions ----
 
   it("renders no step-owned continue button — the shell's Next advances", () => {
-    renderWithProviders(<GridVoltageStep />);
+    renderWithProviders(<StepNextHarness def={gridVoltageStep} />);
 
     expect(screen.queryByRole("button", { name: "Continue" }))
       .not.toBeInTheDocument();

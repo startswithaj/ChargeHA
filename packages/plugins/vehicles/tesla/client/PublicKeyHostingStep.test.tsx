@@ -2,8 +2,9 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../../client/src/test-utils.tsx";
-import { PublicKeyHostingStep } from "./PublicKeyHostingStep.tsx";
+import { publicKeyHostingStep } from "./PublicKeyHostingStep.tsx";
 import { trpc } from "./trpc.ts";
+import { StepNextHarness } from "../../../../client/src/components/Wizard/steps/test-helpers/StepNextHarness.tsx";
 
 const mocks = vi.hoisted(() => ({
   teslaSetConfigMutateAsync: vi.fn(),
@@ -125,7 +126,7 @@ describe("PublicKeyHostingStep", () => {
   // ---- Initial render ----
 
   it("renders internet-accessible yes/no question", async () => {
-    renderWithProviders(<PublicKeyHostingStep />);
+    renderWithProviders(<StepNextHarness def={publicKeyHostingStep} />);
 
     await waitFor(() => {
       expect(
@@ -148,7 +149,7 @@ describe("PublicKeyHostingStep", () => {
 
   it("hints that Tesla likely can't reach an unreachable browser origin", () => {
     // jsdom origin is http://localhost:3000 — unreachable from Tesla.
-    renderWithProviders(<PublicKeyHostingStep />);
+    renderWithProviders(<StepNextHarness def={publicKeyHostingStep} />);
 
     expect(screen.getByText(/likely can't fetch the key from this address/))
       .toBeInTheDocument();
@@ -159,7 +160,7 @@ describe("PublicKeyHostingStep", () => {
 
   it("selecting Yes shows public key URL using browser origin", async () => {
     stubPublicOrigin();
-    renderWithProviders(<PublicKeyHostingStep />);
+    renderWithProviders(<StepNextHarness def={publicKeyHostingStep} />);
 
     fireEvent.click(
       screen.getByLabelText("Yes, internet accessible"),
@@ -176,7 +177,7 @@ describe("PublicKeyHostingStep", () => {
   });
 
   it("selecting No shows 3 hosting method options", async () => {
-    renderWithProviders(<PublicKeyHostingStep />);
+    renderWithProviders(<StepNextHarness def={publicKeyHostingStep} />);
 
     fireEvent.click(
       screen.getByLabelText("No, not internet accessible"),
@@ -194,7 +195,7 @@ describe("PublicKeyHostingStep", () => {
     ["Host on GitHub Pages", /Host your public key on GitHub Pages/],
     ["Set it up with AI", /Copy this prompt and paste it into/],
   ])("%s shows method-specific instructions", async (label, expected) => {
-    renderWithProviders(<PublicKeyHostingStep />);
+    renderWithProviders(<StepNextHarness def={publicKeyHostingStep} />);
 
     fireEvent.click(screen.getByLabelText("No, not internet accessible"));
 
@@ -219,7 +220,7 @@ describe("PublicKeyHostingStep", () => {
     globalThis.fetch = mockFetch;
     stubPublicOrigin();
 
-    renderWithProviders(<PublicKeyHostingStep />);
+    renderWithProviders(<StepNextHarness def={publicKeyHostingStep} />);
 
     fireEvent.click(
       screen.getByLabelText("Yes, internet accessible"),
@@ -252,7 +253,7 @@ describe("PublicKeyHostingStep", () => {
   it("shows tunnel auto-display when tunnel is active", async () => {
     setTunnel(true, "https://test-tunnel.trycloudflare.com");
 
-    renderWithProviders(<PublicKeyHostingStep />);
+    renderWithProviders(<StepNextHarness def={publicKeyHostingStep} />);
 
     await waitFor(() => {
       expect(
@@ -272,7 +273,7 @@ describe("PublicKeyHostingStep", () => {
   });
 
   it("shows 'Use Cloudflare Tunnel' as a hosting option in No flow", async () => {
-    renderWithProviders(<PublicKeyHostingStep />);
+    renderWithProviders(<StepNextHarness def={publicKeyHostingStep} />);
 
     fireEvent.click(screen.getByLabelText("No, not internet accessible"));
 
@@ -286,7 +287,7 @@ describe("PublicKeyHostingStep", () => {
   });
 
   it("selecting tunnel option shows Start Tunnel button", async () => {
-    renderWithProviders(<PublicKeyHostingStep />);
+    renderWithProviders(<StepNextHarness def={publicKeyHostingStep} />);
 
     fireEvent.click(screen.getByLabelText("No, not internet accessible"));
 
@@ -313,7 +314,7 @@ describe("PublicKeyHostingStep", () => {
     });
     globalThis.fetch = mockFetch;
 
-    renderWithProviders(<PublicKeyHostingStep />);
+    renderWithProviders(<StepNextHarness def={publicKeyHostingStep} />);
 
     // Select No → Host it myself
     fireEvent.click(screen.getByLabelText("No, not internet accessible"));

@@ -1,11 +1,9 @@
 import { publicProcedure, router } from "../trpc.ts";
 import {
   wizardDemoSetupInput,
+  wizardPatchStateInput,
   wizardSaveOidcConfigInput,
   wizardSetAuthModeInput,
-  wizardSetEnergyTypeInput,
-  wizardSetStepInput,
-  wizardSetVehicleTypeInput,
   wizardTestOidcDiscoveryInput,
 } from "@chargeha/shared/schemas";
 
@@ -51,33 +49,13 @@ export const wizardRouter = router({
 
   // ── Wizard navigation state ────────────────────────────────────────────
 
-  getStep: publicProcedure.query(async ({ ctx }) => {
-    return await ctx.wizardService.getStep();
+  state: publicProcedure.query(async ({ ctx }) => {
+    return await ctx.wizardService.getState();
   }),
 
-  setStep: publicProcedure
-    .input(wizardSetStepInput)
+  patchState: publicProcedure
+    .input(wizardPatchStateInput)
     .mutation(async ({ ctx, input }) => {
-      await ctx.wizardService.setStep(input.stepId);
-    }),
-
-  getVehicleType: publicProcedure.query(async ({ ctx }) => {
-    return await ctx.wizardService.getVehicleType();
-  }),
-
-  setVehicleType: publicProcedure
-    .input(wizardSetVehicleTypeInput)
-    .mutation(async ({ ctx, input }) => {
-      await ctx.wizardService.setVehicleType(input.type);
-    }),
-
-  getEnergyType: publicProcedure.query(async ({ ctx }) => {
-    return await ctx.wizardService.getEnergyType();
-  }),
-
-  setEnergyType: publicProcedure
-    .input(wizardSetEnergyTypeInput)
-    .mutation(async ({ ctx, input }) => {
-      await ctx.wizardService.setEnergyType(input.type);
+      await ctx.wizardService.patchState(input);
     }),
 });

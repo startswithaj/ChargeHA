@@ -2,10 +2,14 @@ import { useEffect, useState } from "react";
 import { Button, Callout, Text } from "@radix-ui/themes";
 import { CheckCircle, ExternalLink, Loader2 } from "lucide-react";
 import { trpc } from "./trpc.ts";
-import { hintUnlessLoading, useWizardNextControl } from "../../../hostUi.ts";
 import { callbackUrl, resolveOAuthOrigin } from "./oauthOrigin.ts";
 import { UnstableOriginCallout } from "./UnstableOriginCallout.tsx";
-import { stepStyles as styles } from "../../../hostUi.ts";
+import {
+  advanceOnly,
+  type PluginStepDef,
+  stepStyles as styles,
+  type WizardNext,
+} from "../../../hostUi.ts";
 
 type Status = "idle" | "polling" | "success" | "error";
 
@@ -59,7 +63,31 @@ function ErrorView(
   );
 }
 
-export function TeslaAuthStep(): JSX.Element {
+export const teslaAuthStep: PluginStepDef = {
+  id: "tesla-auth",
+  label: "Tesla Authorization",
+  useStep: () => {
+    const auth = useTeslaAuth();
+    return {
+      next: teslaAuthNext(auth.statusLoading, auth.status),
+      view: <TeslaAuthView {...auth} />,
+    };
+  },
+};
+
+function teslaAuthNext(loading: boolean, status: Status): WizardNext {
+  if (status === "success") {
+    return {
+      kind: "ready",
+      hint: "Tesla account authorized — Next continues",
+      onNext: advanceOnly,
+    };
+  }
+  if (loading) return { kind: "loading" };
+  return { kind: "blocked", reason: "Authorize with Tesla to continue" };
+}
+
+function useTeslaAuth() {
   const [status, setStatus] = useState<Status>("idle");
   const tunnelStatus = trpc.plugin.vehicle.tesla.tunnelStatus.useQuery();
   const oauth = resolveOAuthOrigin(
@@ -95,16 +123,29 @@ export function TeslaAuthStep(): JSX.Element {
     onError: () => setStatus("error"),
   });
 
-  useWizardNextControl({
-    canProceed: status === "success",
-    hint: hintUnlessLoading(
-      authStatusQuery.isLoading,
-      status === "success"
-        ? "Tesla account authorized — Next continues"
-        : "Authorize with Tesla to continue",
-    ),
-  });
+  return {
+    status,
+    statusLoading: authStatusQuery.isLoading,
+    oauth,
+    redirectUri,
+    authorize,
+    errorMessage: authUrlMutation.error?.message ??
+      "Failed to start authorization",
+    cancelPolling: () => {
+      authUrlMutation.reset();
+      setStatus("idle");
+    },
+    retry: () => {
+      authUrlMutation.reset();
+      authorize();
+    },
+  };
+}
 
+function TeslaAuthView(
+  { status, oauth, redirectUri, authorize, errorMessage, cancelPolling, retry }:
+    ReturnType<typeof useTeslaAuth>,
+) {
   return (
     <div className={styles.stepContainer}>
       <Text as="p" size="3" color="gray">
@@ -137,26 +178,12 @@ export function TeslaAuthStep(): JSX.Element {
         />
       )}
 
-      {status === "polling" && (
-        <PollingView
-          onCancel={() => {
-            authUrlMutation.reset();
-            setStatus("idle");
-          }}
-        />
-      )}
+      {status === "polling" && <PollingView onCancel={cancelPolling} />}
 
       {status === "success" && <SuccessView />}
 
       {status === "error" && (
-        <ErrorView
-          errorMessage={authUrlMutation.error?.message ??
-            "Failed to start authorization"}
-          onRetry={() => {
-            authUrlMutation.reset();
-            authorize();
-          }}
-        />
+        <ErrorView errorMessage={errorMessage} onRetry={retry} />
       )}
     </div>
   );

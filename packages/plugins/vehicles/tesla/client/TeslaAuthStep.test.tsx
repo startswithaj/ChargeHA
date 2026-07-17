@@ -2,7 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../../client/src/test-utils.tsx";
-import { TeslaAuthStep } from "./TeslaAuthStep.tsx";
+import { teslaAuthStep } from "./TeslaAuthStep.tsx";
 import { StepNextHarness } from "../../../../client/src/components/Wizard/steps/test-helpers/StepNextHarness.tsx";
 
 const mocks = vi.hoisted(() => ({
@@ -101,7 +101,7 @@ describe("TeslaAuthStep", () => {
   // ---- Initial render ----
 
   it("renders authorization button in idle state", () => {
-    renderWithProviders(<TeslaAuthStep />);
+    renderWithProviders(<StepNextHarness def={teslaAuthStep} />);
 
     expect(
       screen.getByRole("button", { name: /Authorize with Tesla/ }),
@@ -113,7 +113,7 @@ describe("TeslaAuthStep", () => {
   // ---- User interactions / API calls ----
 
   it("clicking Authorize calls mutation, opens new window, and shows polling", async () => {
-    renderWithProviders(<TeslaAuthStep />);
+    renderWithProviders(<StepNextHarness def={teslaAuthStep} />);
 
     fireEvent.click(
       screen.getByRole("button", { name: /Authorize with Tesla/ }),
@@ -135,9 +135,7 @@ describe("TeslaAuthStep", () => {
 
     const onNext = vi.fn();
     renderWithProviders(
-      <StepNextHarness onAdvance={onNext}>
-        <TeslaAuthStep />
-      </StepNextHarness>,
+      <StepNextHarness def={teslaAuthStep} onAdvance={onNext} />,
     );
 
     await waitFor(() => {
@@ -148,7 +146,8 @@ describe("TeslaAuthStep", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
-    expect(onNext).toHaveBeenCalledTimes(1);
+    // Next runs the step's handler before advancing, so this lands a tick later.
+    await waitFor(() => expect(onNext).toHaveBeenCalledTimes(1));
   });
 
   it("shows error state when auth URL mutation fails", async () => {
@@ -157,7 +156,7 @@ describe("TeslaAuthStep", () => {
       mocks.capturedOnError.current?.();
     });
 
-    renderWithProviders(<TeslaAuthStep />);
+    renderWithProviders(<StepNextHarness def={teslaAuthStep} />);
 
     fireEvent.click(
       screen.getByRole("button", { name: /Authorize with Tesla/ }),
@@ -181,7 +180,7 @@ describe("TeslaAuthStep", () => {
       isLoading: false,
     } as never);
 
-    renderWithProviders(<TeslaAuthStep />);
+    renderWithProviders(<StepNextHarness def={teslaAuthStep} />);
 
     fireEvent.click(
       screen.getByRole("button", { name: /Authorize with Tesla/ }),
@@ -201,7 +200,7 @@ describe("TeslaAuthStep", () => {
       mocks.capturedOnError.current?.();
     });
 
-    renderWithProviders(<TeslaAuthStep />);
+    renderWithProviders(<StepNextHarness def={teslaAuthStep} />);
 
     fireEvent.click(
       screen.getByRole("button", { name: /Authorize with Tesla/ }),

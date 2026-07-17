@@ -2,13 +2,23 @@ import { Button, Text } from "@radix-ui/themes";
 import { Play, Zap } from "lucide-react";
 import { vehiclePluginOptions } from "@chargeha/plugins/componentRegistry";
 import { trpc } from "../../../trpc.ts";
-import type { StepProps } from "../WizardShell.tsx";
+import { advanceOnly, type StepDef, type StepProps } from "../flow.ts";
 import logoSrc from "../../../assets/chargeha_soft-plug_brand.svg";
 import styles from "./steps.module.css";
 
 const demoPlugin = vehiclePluginOptions.find((o) => o.demoSetup);
 
-export function WelcomeStep({ onNext, onSkipToEnd }: StepProps) {
+export const welcomeStep: StepDef = {
+  id: "welcome",
+  label: "Welcome",
+  // The step's own buttons drive it; Next is just "Full Setup" by another name.
+  useStep: (props) => ({
+    next: { kind: "ready", hint: null, onNext: advanceOnly },
+    view: <WelcomeContent {...props} />,
+  }),
+};
+
+function WelcomeContent({ onNext, onSkipToEnd }: StepProps) {
   const utils = trpc.useUtils();
 
   const demoSetupMutation = trpc.wizard.demoSetup.useMutation();

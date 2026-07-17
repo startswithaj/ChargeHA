@@ -1,12 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
+import type { StepDef } from "./Wizard/flow.ts";
+import type { WizardStore } from "./Wizard/flow.ts";
 
 const mocks = vi.hoisted(() => ({
   invalidateVehicleList: vi.fn(),
   invalidateVehiclePlugins: vi.fn(),
   invalidateEnergyPlugins: vi.fn(),
   navigate: vi.fn(),
+  patch: vi.fn(),
+  clear: vi.fn(),
+  stub: { next: { kind: "hidden" as const }, view: null },
 }));
 
 vi.mock("../trpc.ts", () => ({
@@ -25,29 +30,14 @@ vi.mock("../trpc.ts", () => ({
 }));
 
 vi.mock("@chargeha/plugins/componentRegistry", () => ({
-  vehiclePluginOptions: [
-    { id: "tesla", label: "Tesla", description: "Tesla", iconKey: "car" },
-    {
-      id: "simulated",
-      label: "Simulated",
-      description: "Sim",
-      iconKey: "monitor",
-    },
-  ],
-  energyPluginOptions: [
-    {
-      id: "fronius_local",
-      label: "Fronius Local",
-      description: "Fronius",
-      iconKey: "server",
-    },
-  ],
+  vehiclePluginOptions: [],
+  energyPluginOptions: [],
   vehiclePluginSteps: {
     tesla: [
       {
         id: "tesla-key-gen",
         label: "Key Generation",
-        componentKey: "tesla-key-generation",
+        useStep: () => mocks.stub,
       },
     ],
     simulated: [],
@@ -57,35 +47,55 @@ vi.mock("@chargeha/plugins/componentRegistry", () => ({
       {
         id: "fronius-setup",
         label: "Fronius Setup",
-        componentKey: "fronius-local-setup",
+        useStep: () => mocks.stub,
       },
     ],
   },
 }));
 
-// Mock PluginOnboardingWizard to capture props
-vi.mock(
-  "./PluginOnboardingWizard/PluginOnboardingWizard.tsx",
-  () => ({
-    PluginOnboardingWizard: (
-      { pluginId, pluginName, steps, onComplete, onCancel }: {
-        pluginId: string;
-        pluginName: string;
-        steps: Array<{ id: string }>;
-        onComplete: () => void;
-        onCancel: () => void;
-      },
-    ) => (
-      <div>
-        <span data-testid="plugin-id">{pluginId}</span>
-        <span data-testid="plugin-name">{pluginName}</span>
-        <span data-testid="step-count">{steps.length}</span>
-        <button type="button" onClick={onComplete}>Complete</button>
-        <button type="button" onClick={onCancel}>Cancel</button>
-      </div>
-    ),
-  }),
-);
+vi.mock("../hooks/usePluginOnboardingState.ts", () => ({
+  usePluginOnboardingState: vi.fn((
+    pluginId: string,
+    defaultStepId: string,
+    kind: "vehicle" | "energy",
+  ) => ({
+    state: {
+      stepId: defaultStepId,
+      vehicleType: kind === "vehicle" ? pluginId : "",
+      energyType: kind === "energy" ? pluginId : "",
+    },
+    patch: mocks.patch,
+    isLoading: false,
+    clear: mocks.clear,
+  })),
+}));
+
+vi.mock("./Wizard/WizardShell.tsx", () => ({
+  WizardShell: (
+    { flow, store, basePath, onComplete, onBackOut }: {
+      flow: StepDef[];
+      store: WizardStore;
+      basePath: string;
+      onComplete: () => void;
+      onBackOut?: () => void;
+    },
+  ) => (
+    <div>
+      <span data-testid="base-path">{basePath}</span>
+      <span data-testid="step-count">{flow.length}</span>
+      <span data-testid="step-id">{store.state.stepId}</span>
+      <span data-testid="vehicle-type">{store.state.vehicleType}</span>
+      <span data-testid="owners">
+        {[...new Set(flow.map((s) => s.owner ?? "none"))].join(",")}
+      </span>
+      <button type="button" onClick={() => store.patch({ stepId: "next-one" })}>
+        Patch
+      </button>
+      <button type="button" onClick={onComplete}>Complete</button>
+      {onBackOut && <button type="button" onClick={onBackOut}>Cancel</button>}
+    </div>
+  ),
+}));
 
 vi.mock("../hooks/useRouter.ts", () => ({
   useRouter: () => ({
@@ -98,10 +108,7 @@ import { PluginSetupRouter } from "./PluginSetupRouter.tsx";
 
 describe("PluginSetupRouter", () => {
   beforeEach(() => {
-    mocks.invalidateVehicleList.mockClear();
-    mocks.invalidateVehiclePlugins.mockClear();
-    mocks.invalidateEnergyPlugins.mockClear();
-    mocks.navigate.mockClear();
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -109,20 +116,21 @@ describe("PluginSetupRouter", () => {
   });
 
   describe("vehicle plugin", () => {
-    it("renders with correct plugin name and step count from registry", () => {
-      render(
-        <PluginSetupRouter pluginId="tesla" />,
-      );
+    it("renders the plugin's own steps, addressed under its setup path", () => {
+      render(<PluginSetupRouter pluginId="tesla" />);
 
-      expect(screen.getByTestId("plugin-name")).toHaveTextContent("Tesla");
-      expect(screen.getByTestId("plugin-id")).toHaveTextContent("tesla");
       expect(screen.getByTestId("step-count")).toHaveTextContent("1");
+      expect(screen.getByTestId("base-path")).toHaveTextContent("/setup/tesla");
+    });
+
+    it("starts on the plugin's first step", () => {
+      render(<PluginSetupRouter pluginId="tesla" />);
+
+      expect(screen.getByTestId("step-id")).toHaveTextContent("tesla-key-gen");
     });
 
     it("invalidates vehicle caches and navigates to settings on complete", async () => {
-      render(
-        <PluginSetupRouter pluginId="tesla" />,
-      );
+      render(<PluginSetupRouter pluginId="tesla" />);
 
       await userEvent.click(screen.getByText("Complete"));
 
@@ -134,27 +142,28 @@ describe("PluginSetupRouter", () => {
         page: "settings",
       });
     });
+
+    it("clears the stored onboarding step on complete so a re-run starts fresh", async () => {
+      render(<PluginSetupRouter pluginId="tesla" />);
+
+      await userEvent.click(screen.getByText("Complete"));
+
+      expect(mocks.clear).toHaveBeenCalled();
+    });
   });
 
   describe("energy plugin", () => {
-    it("renders with correct plugin name and step count from registry", () => {
-      render(
-        <PluginSetupRouter pluginId="fronius_local" />,
-      );
+    it("renders the plugin's own steps, addressed under its setup path", () => {
+      render(<PluginSetupRouter pluginId="fronius_local" />);
 
-      expect(screen.getByTestId("plugin-name")).toHaveTextContent(
-        "Fronius Local",
-      );
-      expect(screen.getByTestId("plugin-id")).toHaveTextContent(
-        "fronius_local",
-      );
       expect(screen.getByTestId("step-count")).toHaveTextContent("1");
+      expect(screen.getByTestId("base-path")).toHaveTextContent(
+        "/setup/fronius_local",
+      );
     });
 
     it("invalidates energy caches and navigates to settings on complete", async () => {
-      render(
-        <PluginSetupRouter pluginId="fronius_local" />,
-      );
+      render(<PluginSetupRouter pluginId="fronius_local" />);
 
       await userEvent.click(screen.getByText("Complete"));
 
@@ -168,11 +177,30 @@ describe("PluginSetupRouter", () => {
     });
   });
 
+  describe("skip", () => {
+    it("marks the plugin as the owner of its steps and as the selection", () => {
+      render(<PluginSetupRouter pluginId="tesla" />);
+
+      // Both halves are needed: the owner makes Skip treat the chain as a
+      // block, and the selection keeps those owned steps in the list.
+      expect(screen.getByTestId("owners")).toHaveTextContent("tesla");
+      expect(screen.getByTestId("vehicle-type")).toHaveTextContent("tesla");
+    });
+  });
+
+  describe("store", () => {
+    it("persists step changes to the plugin's own onboarding state", async () => {
+      render(<PluginSetupRouter pluginId="tesla" />);
+
+      await userEvent.click(screen.getByText("Patch"));
+
+      expect(mocks.patch).toHaveBeenCalledWith({ stepId: "next-one" });
+    });
+  });
+
   describe("cancel", () => {
-    it("navigates to settings on cancel", async () => {
-      render(
-        <PluginSetupRouter pluginId="tesla" />,
-      );
+    it("navigates to settings when backing out of the first step", async () => {
+      render(<PluginSetupRouter pluginId="tesla" />);
 
       await userEvent.click(screen.getByText("Cancel"));
 
@@ -183,58 +211,14 @@ describe("PluginSetupRouter", () => {
     });
   });
 
-  describe("unknown plugin", () => {
-    it("falls back to pluginId as name when not in registry", () => {
-      render(
-        <PluginSetupRouter pluginId="unknown_plugin" />,
-      );
+  describe("plugins with no setup steps", () => {
+    it.each(["unknown_plugin", "simulated"])(
+      "renders nothing for %s rather than an empty wizard",
+      (pluginId) => {
+        const { container } = render(<PluginSetupRouter pluginId={pluginId} />);
 
-      expect(screen.getByTestId("plugin-name")).toHaveTextContent(
-        "unknown_plugin",
-      );
-    });
-
-    it("renders empty steps for unknown plugin", () => {
-      render(
-        <PluginSetupRouter pluginId="unknown_plugin" />,
-      );
-
-      expect(screen.getByTestId("step-count")).toHaveTextContent("0");
-    });
-
-    it("treats unknown plugin as energy and invalidates energy caches", async () => {
-      render(
-        <PluginSetupRouter pluginId="unknown_plugin" />,
-      );
-
-      await userEvent.click(screen.getByText("Complete"));
-
-      // unknown_plugin is not in vehiclePluginSteps, so isVehiclePlugin is false
-      expect(mocks.invalidateEnergyPlugins).toHaveBeenCalled();
-      expect(mocks.invalidateVehicleList).not.toHaveBeenCalled();
-      expect(mocks.invalidateVehiclePlugins).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("simulated vehicle plugin", () => {
-    it("uses simulated vehicle steps (empty array)", () => {
-      render(
-        <PluginSetupRouter pluginId="simulated" />,
-      );
-
-      expect(screen.getByTestId("plugin-name")).toHaveTextContent("Simulated");
-      expect(screen.getByTestId("step-count")).toHaveTextContent("0");
-    });
-
-    it("invalidates vehicle caches on complete (simulated is a vehicle plugin)", async () => {
-      render(
-        <PluginSetupRouter pluginId="simulated" />,
-      );
-
-      await userEvent.click(screen.getByText("Complete"));
-
-      expect(mocks.invalidateVehicleList).toHaveBeenCalled();
-      expect(mocks.invalidateVehiclePlugins).toHaveBeenCalled();
-    });
+        expect(container).toBeEmptyDOMElement();
+      },
+    );
   });
 });

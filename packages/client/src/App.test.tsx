@@ -3,6 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 
+const stepMocks = vi.hoisted(() => ({
+  Stub: () => null,
+}));
+
 // Mock all page components so tests focus on routing, not page internals
 vi.mock("./components/pages/Dashboard/Dashboard.tsx", () => ({
   Dashboard: () => <div>Dashboard Page</div>,
@@ -72,13 +76,9 @@ vi.mock("@chargeha/plugins/componentRegistry", () => ({
       {
         id: "tesla-key-gen",
         label: "Key Generation",
-        componentKey: "tesla-key-generation",
+        Component: stepMocks.Stub,
       },
-      {
-        id: "tesla-auth",
-        label: "Authorization",
-        componentKey: "tesla-auth",
-      },
+      { id: "tesla-auth", label: "Authorization", Component: stepMocks.Stub },
     ],
     simulated: [],
   },
@@ -87,19 +87,15 @@ vi.mock("@chargeha/plugins/componentRegistry", () => ({
       {
         id: "fronius-setup",
         label: "Fronius Setup",
-        componentKey: "fronius-local-setup",
+        Component: stepMocks.Stub,
       },
     ],
   },
-  pluginComponents: {},
 }));
 vi.mock("./hooks/useWizardState.ts", () => ({
   useWizardState: vi.fn(() => ({
-    stepId: "welcome",
-    vehicleType: "",
-    energyType: "",
-    setStepId: vi.fn(),
-    commitSelection: vi.fn(),
+    state: { stepId: "welcome", vehicleType: "", energyType: "" },
+    patch: vi.fn(),
     isLoading: false,
   })),
 }));

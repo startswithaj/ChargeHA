@@ -3,7 +3,11 @@ import { Button, Callout, Text } from "@radix-ui/themes";
 import { CheckCircle, Globe, Loader2 } from "lucide-react";
 import { useTeslaConfig, useTeslaConfigMutation } from "./useTeslaConfig.ts";
 import { trpc } from "./trpc.ts";
-import { hintUnlessLoading, useWizardNextControl } from "../../../hostUi.ts";
+import {
+  advanceOnly,
+  type PluginStepDef,
+  type WizardNext,
+} from "../../../hostUi.ts";
 import { canTeslaFetchKeyFrom, isStableOrigin } from "./oauthOrigin.ts";
 import {
   AiPromptInstructions,
@@ -292,63 +296,77 @@ function UnreachableOriginCallout(
   );
 }
 
-export function PublicKeyHostingStep(): JSX.Element {
-  const { data: teslaConfig } = useTeslaConfig();
-  const browserOrigin = globalThis.location?.origin || "";
-  const publicKey = teslaConfig?.ecPublicKeyPem || "";
+function hostingNext(
+  loading: boolean,
+  domainConfigured: boolean,
+  tunnelChosen: boolean,
+): WizardNext {
+  if (domainConfigured) {
+    return {
+      kind: "ready",
+      hint: hostingHint(true, tunnelChosen),
+      onNext: advanceOnly,
+    };
+  }
+  if (loading) return { kind: "loading" };
+  return { kind: "blocked", reason: hostingHint(false, tunnelChosen) };
+}
 
-  const { tunnelStatus, startTunnelMutation, stopTunnelMutation } =
-    useTunnelMutations();
-  const tunnelActive = tunnelStatus.data?.active ?? false;
-  const tunnelUrl = tunnelStatus.data?.url;
-
-  const [choice, setChoice] = useState<HostingChoice>(null);
-  const [hostingMethod, setHostingMethod] = useState<HostingMethod>(null);
-
-  // "Yes" flow uses the browser origin (server is internet-accessible)
-  const publicKeyUrl = `${browserOrigin}/${WELL_KNOWN_PATH}`;
-
-  const saveDomainMutation = useTeslaConfigMutation();
-
-  // Persist the hosting choice — it's the only durable bit; the tunnel URL
-  // itself is live state and never stored.
-  const selectMethod = (method: HostingMethod) => {
-    setHostingMethod(method);
-    if (method === "tunnel") {
-      saveDomainMutation.mutate({ teslaPublicKeyHosting: "tunnel" });
-    }
-  };
-
-  const tunnelRunning = tunnelActive && !!tunnelUrl;
-  const hosting = teslaConfig?.teslaPublicKeyHosting ?? "";
-  // In tunnel mode only a live tunnel counts — but a completed Tesla setup
-  // no longer needs one (it was torn down on purpose after pairing).
-  const teslaWorking = useTeslaWorking();
-  const customConfigured = hosting === "custom" &&
-    !!teslaConfig?.teslaPublicKeyDomain;
+/** Whether the public key is reachable, and by which route. In tunnel mode
+ *  only a live tunnel counts; a custom domain counts once saved. */
+function resolveHosting(
+  { hosting, savedDomain, choice, hostingMethod, tunnelRunning, teslaWorking }:
+    {
+      hosting: string;
+      savedDomain: string | null;
+      choice: HostingChoice;
+      hostingMethod: HostingMethod;
+      tunnelRunning: boolean;
+      teslaWorking: boolean;
+    },
+) {
+  const customConfigured = hosting === "custom" && !!savedDomain;
   const tunnelChosen = (choice === "no" && hostingMethod === "tunnel") ||
     (choice === null && hosting === "tunnel");
   const domainConfigured = tunnelChosen
     ? tunnelRunning || teslaWorking
     : tunnelRunning || customConfigured;
-  useWizardNextControl({
-    canProceed: domainConfigured,
-    hint: hintUnlessLoading(
-      teslaConfig === undefined || tunnelStatus.isLoading,
-      hostingHint(domainConfigured, tunnelChosen),
-    ),
-  });
+  return { customConfigured, tunnelChosen, domainConfigured };
+}
 
-  if (tunnelActive && tunnelUrl) {
-    return (
-      <TunnelActiveView
-        tunnelUrl={tunnelUrl}
-        onStop={() => stopTunnelMutation.mutate()}
-        stopping={stopTunnelMutation.isPending}
-      />
-    );
-  }
-
+function HostingChoiceView(
+  {
+    browserOrigin,
+    publicKey,
+    publicKeyUrl,
+    customConfigured,
+    customDomain,
+    tunnelTornDown,
+    choice,
+    setChoice,
+    hostingMethod,
+    selectMethod,
+    setHostingMethod,
+    saveDomainMutation,
+    startTunnelMutation,
+  }: {
+    browserOrigin: string;
+    publicKey: string;
+    publicKeyUrl: string;
+    customConfigured: boolean;
+    customDomain: string;
+    tunnelTornDown: boolean;
+    choice: HostingChoice;
+    setChoice: (c: HostingChoice) => void;
+    hostingMethod: HostingMethod;
+    selectMethod: (m: HostingMethod) => void;
+    setHostingMethod: (m: HostingMethod) => void;
+    saveDomainMutation: ReturnType<typeof useTeslaConfigMutation>;
+    startTunnelMutation: ReturnType<
+      typeof trpc.plugin.vehicle.tesla.startTunnel.useMutation
+    >;
+  },
+) {
   return (
     <div className={styles.stepContainer}>
       <Text as="p" size="3" color="gray">
@@ -356,15 +374,9 @@ export function PublicKeyHostingStep(): JSX.Element {
         during the pairing process. It only needs to be reachable during setup.
       </Text>
 
-      {customConfigured && (
-        <CustomConfiguredCallout
-          domain={teslaConfig?.teslaPublicKeyDomain ?? ""}
-        />
-      )}
+      {customConfigured && <CustomConfiguredCallout domain={customDomain} />}
 
-      {hosting === "tunnel" && !tunnelRunning && teslaWorking && (
-        <TunnelTornDownCallout />
-      )}
+      {tunnelTornDown && <TunnelTornDownCallout />}
 
       {!canTeslaFetchKeyFrom(browserOrigin) && (
         <UnreachableOriginCallout browserOrigin={browserOrigin} />
@@ -398,3 +410,91 @@ export function PublicKeyHostingStep(): JSX.Element {
     </div>
   );
 }
+
+export const publicKeyHostingStep: PluginStepDef = {
+  id: "tesla-public-key-hosting",
+  label: "Public Key Hosting",
+  useStep: () => {
+    const { data: teslaConfig } = useTeslaConfig();
+    const browserOrigin = globalThis.location?.origin || "";
+    const publicKey = teslaConfig?.ecPublicKeyPem || "";
+
+    const { tunnelStatus, startTunnelMutation, stopTunnelMutation } =
+      useTunnelMutations();
+    const tunnelActive = tunnelStatus.data?.active ?? false;
+    const tunnelUrl = tunnelStatus.data?.url;
+
+    const [choice, setChoice] = useState<HostingChoice>(null);
+    const [hostingMethod, setHostingMethod] = useState<HostingMethod>(null);
+
+    // "Yes" flow uses the browser origin (server is internet-accessible)
+    const publicKeyUrl = `${browserOrigin}/${WELL_KNOWN_PATH}`;
+
+    const saveDomainMutation = useTeslaConfigMutation();
+
+    // Persist the hosting choice — it's the only durable bit; the tunnel URL
+    // itself is live state and never stored.
+    const selectMethod = (method: HostingMethod) => {
+      setHostingMethod(method);
+      if (method === "tunnel") {
+        saveDomainMutation.mutate({ teslaPublicKeyHosting: "tunnel" });
+      }
+    };
+
+    const tunnelRunning = tunnelActive && !!tunnelUrl;
+    const hosting = teslaConfig?.teslaPublicKeyHosting ?? "";
+    // In tunnel mode only a live tunnel counts — but a completed Tesla setup
+    // no longer needs one (it was torn down on purpose after pairing).
+    const teslaWorking = useTeslaWorking();
+    const { customConfigured, tunnelChosen, domainConfigured } = resolveHosting(
+      {
+        hosting,
+        savedDomain: teslaConfig?.teslaPublicKeyDomain ?? null,
+        choice,
+        hostingMethod,
+        tunnelRunning,
+        teslaWorking,
+      },
+    );
+    const next = hostingNext(
+      teslaConfig === undefined || tunnelStatus.isLoading,
+      domainConfigured,
+      tunnelChosen,
+    );
+
+    if (tunnelActive && tunnelUrl) {
+      return {
+        next,
+        view: (
+          <TunnelActiveView
+            tunnelUrl={tunnelUrl}
+            onStop={() => stopTunnelMutation.mutate()}
+            stopping={stopTunnelMutation.isPending}
+          />
+        ),
+      };
+    }
+
+    return {
+      next,
+      view: (
+        <HostingChoiceView
+          browserOrigin={browserOrigin}
+          publicKey={publicKey}
+          publicKeyUrl={publicKeyUrl}
+          customConfigured={customConfigured}
+          customDomain={teslaConfig?.teslaPublicKeyDomain ?? ""}
+          tunnelTornDown={hosting === "tunnel" && !tunnelRunning &&
+            teslaWorking}
+          choice={choice}
+          setChoice={setChoice}
+          hostingMethod={hostingMethod}
+          selectMethod={selectMethod}
+          setHostingMethod={setHostingMethod}
+          saveDomainMutation={saveDomainMutation}
+          startTunnelMutation={startTunnelMutation}
+        />
+      ),
+    };
+  },
+};

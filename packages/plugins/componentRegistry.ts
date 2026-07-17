@@ -1,28 +1,5 @@
 import type { ComponentType } from "react";
-
-/** Props passed to wizard step components by the wizard shell. */
-export interface StepProps {
-  onNext: () => void;
-  onBack: () => void;
-  onSkip: () => void;
-  onSkipTo: (step: number) => void;
-  onSkipToEnd: () => void;
-}
-
-// Tesla wizard step components
-import { KeyGenerationStep } from "./vehicles/tesla/client/KeyGenerationStep.tsx";
-import { PartnerRegistrationStep } from "./vehicles/tesla/client/PartnerRegistrationStep.tsx";
-import { PublicKeyHostingStep } from "./vehicles/tesla/client/PublicKeyHostingStep.tsx";
-import { TeslaAuthStep } from "./vehicles/tesla/client/TeslaAuthStep.tsx";
-import { TeslaCredentialsStep } from "./vehicles/tesla/client/TeslaCredentialsStep.tsx";
-import { VehicleSelectionStep } from "./vehicles/tesla/client/VehicleSelectionStep.tsx";
-import { VirtualKeyPairingStep } from "./vehicles/tesla/client/VirtualKeyPairingStep.tsx";
-
-// Energy wizard step components (one per plugin)
-import { FroniusLocalSetupStep } from "./energy/fronius-local/client/FroniusLocalSetupStep.tsx";
-import { FroniusCloudSetupStep } from "./energy/fronius-cloud/client/FroniusCloudSetupStep.tsx";
-import { SigenergyLocalSetupStep } from "./energy/sigenergy-local/client/SigenergyLocalSetupStep.tsx";
-import { EnphaseLocalSetupStep } from "./energy/enphase-local/client/EnphaseLocalSetupStep.tsx";
+import type { PluginStepDef } from "./hostUi.ts";
 
 // Simulated energy settings component
 import { SimulatedEnergyConfig } from "./energy/simulated/client/SimulatedEnergyConfig.tsx";
@@ -69,14 +46,6 @@ import {
   teslaVehicleOption,
   teslaWizardSteps,
 } from "./vehicles/tesla/client/wizardSteps.ts";
-
-// ── Plugin wizard step definitions ──────────────────────────────────────────
-
-export interface PluginWizardStep {
-  id: string;
-  label: string;
-  componentKey: string;
-}
 
 /** Metadata for an energy plugin option shown on the inverter type selection step. */
 export interface EnergyPluginOption {
@@ -142,36 +111,18 @@ export const vehicleScheduleNotes: PluginScheduleNote[] = [
 ];
 
 /** Vehicle plugin wizard steps, keyed by VehicleAdapterType. */
-export const vehiclePluginSteps: Record<string, PluginWizardStep[]> = {
+export const vehiclePluginSteps: Record<string, PluginStepDef[]> = {
   tesla: teslaWizardSteps,
   simulated: [],
 };
 
 /** Energy plugin wizard steps, keyed by energy adapter type. */
-export const energyPluginSteps: Record<string, PluginWizardStep[]> = {
+export const energyPluginSteps: Record<string, PluginStepDef[]> = {
   fronius_local: froniusLocalWizardSteps,
   fronius_cloud: froniusCloudWizardSteps,
   sigenergy_local: sigenergyLocalWizardSteps,
   enphase_local: enphaseLocalWizardSteps,
   simulated_energy: simulatedEnergyWizardSteps,
-};
-
-/**
- * Maps componentKey strings (from PluginWizardStep) to React components.
- * Used by the wizard shell to render plugin-provided steps dynamically.
- */
-export const pluginComponents: Record<string, ComponentType<StepProps>> = {
-  "tesla-key-generation": KeyGenerationStep,
-  "tesla-public-key-hosting": PublicKeyHostingStep,
-  "tesla-credentials": TeslaCredentialsStep,
-  "tesla-partner-registration": PartnerRegistrationStep,
-  "tesla-auth": TeslaAuthStep,
-  "tesla-vehicle-selection": VehicleSelectionStep,
-  "tesla-virtual-key-pairing": VirtualKeyPairingStep,
-  "fronius-local-setup": FroniusLocalSetupStep,
-  "fronius-cloud-setup": FroniusCloudSetupStep,
-  "sigenergy-local-setup": SigenergyLocalSetupStep,
-  "enphase-local-setup": EnphaseLocalSetupStep,
 };
 
 /**

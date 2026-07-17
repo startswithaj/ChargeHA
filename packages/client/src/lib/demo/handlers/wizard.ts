@@ -7,7 +7,9 @@ export const wizardHandlers: Record<string, QueryHandler> = {
       !s.config.energy_adapter_type;
     return { completed, firstRun };
   },
-  "wizard.getStep": (_i, s) => s.config.wizard_step ?? "",
-  "wizard.getVehicleType": (_i, s) => s.config.wizard_vehicle_type ?? "",
-  "wizard.getEnergyType": (_i, s) => s.config.wizard_energy_type ?? "",
+  "wizard.state": (_i, s) => ({
+    stepId: s.config.wizard_step ?? "",
+    vehicleType: s.config.wizard_vehicle_type ?? "",
+    energyType: s.config.wizard_energy_type ?? "",
+  }),
 };
