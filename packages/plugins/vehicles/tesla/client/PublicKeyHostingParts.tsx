@@ -35,6 +35,17 @@ export function CopyButton({ text, label }: { text: string; label?: string }) {
   );
 }
 
+function PublicKeyBlock({ publicKey }: { publicKey: string }) {
+  return (
+    <>
+      <pre className={styles.codeBlock}>{publicKey}</pre>
+      <div className={styles.copyRow}>
+        <CopyButton text={publicKey} label="Copy public key" />
+      </div>
+    </>
+  );
+}
+
 export function buildAiPrompt(publicKey: string): string {
   return `I need to host a Tesla Fleet API public key on GitHub Pages so Tesla can verify my app's identity.
 
@@ -79,9 +90,7 @@ export function SelfHostInstructions({ publicKey }: HostingInstructionsProps) {
           <Text as="span" size="2">
             Copy your public key into the PEM file:
           </Text>
-          <div className={styles.copyRow}>
-            <CopyButton text={publicKey} label="Copy public key" />
-          </div>
+          <PublicKeyBlock publicKey={publicKey} />
         </li>
         <li>
           <Text as="span" size="2">
@@ -120,9 +129,7 @@ export function GitHubPagesInstructions(
           <Text as="span" size="2">
             Copy your public key into the PEM file:
           </Text>
-          <div className={styles.copyRow}>
-            <CopyButton text={publicKey} label="Copy public key" />
-          </div>
+          <PublicKeyBlock publicKey={publicKey} />
         </li>
         <li>
           <Text as="span" size="2">
