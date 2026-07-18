@@ -286,7 +286,9 @@ function CustomConfiguredCallout({ domain }: { domain: string }) {
         <CheckCircle size={16} />
       </Callout.Icon>
       <Callout.Text>
-        Public key domain is already configured as <strong>{domain}</strong>.
+        Public key domain is already configured as{" "}
+        <strong>{domain}</strong>. Continue to keep it, or pick a hosting method
+        below to change it.
       </Callout.Text>
     </Callout.Root>
   );

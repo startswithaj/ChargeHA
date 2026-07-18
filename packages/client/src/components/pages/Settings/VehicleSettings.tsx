@@ -187,9 +187,18 @@ function ConfiguredPluginSettings(
             pluginSettingsComponents[p.settingsComponentKey];
           if (!SettingsComponent) return null;
           return (
-            <ErrorBoundary key={p.id} label="Plugin Settings">
-              <SettingsComponent />
-            </ErrorBoundary>
+            <div
+              key={p.id}
+              style={{
+                marginTop: 12,
+                paddingTop: 12,
+                borderTop: "1px solid var(--gray-a4)",
+              }}
+            >
+              <ErrorBoundary label="Plugin Settings">
+                <SettingsComponent />
+              </ErrorBoundary>
+            </div>
           );
         })}
     </>

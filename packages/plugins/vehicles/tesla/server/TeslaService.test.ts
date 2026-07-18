@@ -212,12 +212,14 @@ describe("TeslaService", () => {
       );
     });
 
-    it("keeps the EC keypair so the hosted public key stays valid", async () => {
+    it("keeps the EC keypair and a self-hosted domain + hosting mode", async () => {
       const configSet: string[] = [];
       const secretSet: string[] = [];
 
       const service = makeService({
         deps: {
+          getConfig: (key: string) =>
+            Promise.resolve(key === "public_key_hosting" ? "custom" : null),
           getVehicleRows: () => Promise.resolve([VEHICLE_ROW]),
           deleteVehicle: () => Promise.resolve(),
           setConfig: (key: string) => {
@@ -235,6 +237,32 @@ describe("TeslaService", () => {
       expect(secretSet).not.toContain("ec_private_key");
       expect(configSet).not.toContain("ec_public_key_pem");
       expect(configSet).not.toContain("public_key_domain");
+      expect(configSet).not.toContain("public_key_hosting");
+    });
+
+    it("clears the domain and hosting mode when hosting was a tunnel", async () => {
+      const configSet: string[] = [];
+
+      const service = makeService({
+        deps: {
+          getConfig: (key: string) =>
+            Promise.resolve(key === "public_key_hosting" ? "tunnel" : null),
+          getVehicleRows: () => Promise.resolve([VEHICLE_ROW]),
+          deleteVehicle: () => Promise.resolve(),
+          setConfig: (key: string) => {
+            configSet.push(key);
+            return Promise.resolve();
+          },
+          setSecret: () => Promise.resolve(),
+        },
+      });
+
+      await service.resetOnboarding();
+      // A tunnel URL is dead after a reset — cleared like everything else.
+      expect(configSet).toContain("public_key_domain");
+      expect(configSet).toContain("public_key_hosting");
+      // The keypair still survives regardless of hosting mode.
+      expect(configSet).not.toContain("ec_public_key_pem");
     });
   });
 

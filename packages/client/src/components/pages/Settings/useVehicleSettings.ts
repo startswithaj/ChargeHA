@@ -51,6 +51,9 @@ function useAddSimulatedVehicleMutation(
     },
     onSuccess: (id) => {
       utils.vehicle.list.invalidate();
+      // The simulated plugin flips to "configured" once it has a vehicle —
+      // refresh the plugin list so its settings pane appears without a reload.
+      utils.vehicle.getPlugins.invalidate();
       setRecentlyAddedVins(new Set([id]));
       setTimeout(() => setRecentlyAddedVins(new Set()), 4000);
     },
@@ -119,6 +122,9 @@ export function useVehicleSettings() {
   const deleteMutation = trpc.vehicle.delete.useMutation({
     onSuccess: () => {
       utils.vehicle.list.invalidate();
+      // Removing a plugin's last vehicle flips it back to "not configured" —
+      // refresh so its settings pane disappears without a reload.
+      utils.vehicle.getPlugins.invalidate();
     },
   });
 

@@ -82,12 +82,12 @@ export const TESLA_SECRET_KEYS = [
   "refresh_token",
 ] as const satisfies readonly TeslaConfigKey[];
 
-/** Config that resetOnboarding deliberately keeps: the EC keypair and the
- *  domain it is published at. The user hosts the public key themselves, so
- *  wiping either forces them to re-host or re-type a still-valid setup. The
- *  wizard mints a new pair, or takes a new domain, when they want one. */
+/** Config resetOnboarding always keeps: the EC keypair. The public key domain
+ *  and its hosting mode are kept too, but only when self-hosted — a tunnel URL
+ *  is ephemeral and dead after a reset, so it is cleared (see resetOnboarding).
+ *  The user hosts a self-hosted key themselves, so wiping it would force them to
+ *  re-host or re-type a still-valid setup. */
 export const TESLA_RESET_PRESERVED_KEYS = [
   "ec_private_key",
   "ec_public_key_pem",
-  "public_key_domain",
 ] as const satisfies readonly TeslaConfigKey[];

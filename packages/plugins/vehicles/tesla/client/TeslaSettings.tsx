@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle, ExternalLink, Key } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle,
+  ExternalLink,
+  Key,
+  RotateCcw,
+} from "lucide-react";
 import { AlertDialog, Badge, Button, Card, Code, Text } from "@radix-ui/themes";
 import type { VehicleWithState } from "@chargeha/shared";
 import { trpc } from "./trpc.ts";
@@ -70,9 +76,26 @@ function ResetBlock(
         borderTop: "1px solid var(--gray-a4)",
       }}
     >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 8,
+        }}
+      >
+        <RotateCcw size={14} />
+        <Text size="2" weight="medium">Reset Tesla Setup</Text>
+      </div>
       <AlertDialog.Root>
         <AlertDialog.Trigger>
-          <Button size="1" variant="soft" color="red" disabled={resetting}>
+          <Button
+            size="1"
+            variant="soft"
+            color="red"
+            disabled={resetting}
+            style={{ marginBottom: 8 }}
+          >
             Reset Tesla Setup
           </Button>
         </AlertDialog.Trigger>
@@ -101,7 +124,7 @@ function ResetBlock(
           </div>
         </AlertDialog.Content>
       </AlertDialog.Root>
-      <Text size="1" color="gray" style={{ marginLeft: 8 }}>
+      <Text size="1" color="gray" style={{ display: "block" }}>
         Erases your Tesla credentials and vehicles so you can set up Tesla again
         from scratch. Your key pair is kept, so your hosted public key stays
         valid — generate a new one in the wizard if you need to.
