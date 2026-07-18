@@ -107,7 +107,11 @@ export function createTeslaRouter(
 
     tunnelStatus: publicProcedure.query(() => {
       const url = deps.tunnel.getUrl();
-      return { active: url !== null, url };
+      return {
+        active: url !== null,
+        url,
+        expiryMinutes: deps.tunnel.getExpiryMinutes(),
+      };
     }),
 
     startTunnel: publicProcedure.mutation(async () => {

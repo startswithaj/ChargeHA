@@ -150,6 +150,46 @@ export function GitHubPagesInstructions(
   );
 }
 
+export function FleetKeyInstructions(
+  { publicKey }: HostingInstructionsProps,
+) {
+  return (
+    <div className={styles.instructionBox}>
+      <Text as="p" size="2" weight="medium">
+        Host your public key on FleetKey.net (free, by Teslemetry):
+      </Text>
+      <ol className={styles.instructionList}>
+        <li>
+          <Text as="span" size="2">
+            Copy your public key:
+          </Text>
+          <div className={styles.copyRow}>
+            <CopyButton text={publicKey} label="Copy public key" />
+          </div>
+        </li>
+        <li>
+          <Text as="span" size="2">
+            Go to{" "}
+            <a
+              href="https://fleetkey.net"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              fleetkey.net
+            </a>, paste the key, and click Create.
+          </Text>
+        </li>
+        <li>
+          <Text as="span" size="2">
+            You'll get a domain like <code>abc12.fleetkey.net</code>{" "}
+            — verify it below.
+          </Text>
+        </li>
+      </ol>
+    </div>
+  );
+}
+
 export function AiPromptInstructions({ publicKey }: HostingInstructionsProps) {
   const prompt = buildAiPrompt(publicKey);
 

@@ -210,8 +210,8 @@ function OriginCallouts(
           <CheckCircle size={16} />
         </Callout.Icon>
         <Callout.Text>
-          Cloudflare Tunnel is active. Your address isn't registrable with Tesla
-          (plain http), so the OAuth URLs below use the tunnel — they must be
+          The tunnel is active. Your address isn't registrable with Tesla (plain
+          http), so the OAuth URLs below use the tunnel — they must be
           re-registered whenever the tunnel restarts.
         </Callout.Text>
       </Callout.Root>
@@ -246,7 +246,7 @@ function useTeslaWorking(): boolean {
 
 function credentialsHint(valid: boolean, hasOrigin: boolean): string {
   if (!hasOrigin) {
-    return "Start the Cloudflare Tunnel on the Public Key Hosting step to continue";
+    return "Start the tunnel on the Public Key Hosting step to continue";
   }
   if (!valid) return "Enter your Client ID and Client Secret to continue";
   return "Next saves your Tesla credentials";

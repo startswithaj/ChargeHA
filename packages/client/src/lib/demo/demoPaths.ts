@@ -28,7 +28,7 @@ export const GATED_QUERIES: readonly string[] = [
   // Fronius — disabled in the wizard, never the active adapter.
   "plugin.energy.fronius_local.getConfig",
   "plugin.energy.fronius_cloud.getConfig",
-  // Cloudflare tunnel — Tesla-only setup step, never reached.
+  // Setup tunnel — Tesla-only setup step, never reached.
   "plugin.vehicle.tesla.tunnelStatus",
 ] as const satisfies readonly QueryPath[];
 
@@ -58,7 +58,7 @@ export const GATED_MUTATIONS = [
   "auth.updateOidcConfig",
   "wizard.saveOidcConfig",
   "wizard.testOidcDiscovery",
-  // Cloudflare tunnel — Tesla-only setup step, never reached.
+  // Setup tunnel — Tesla-only setup step, never reached.
   "plugin.vehicle.tesla.startTunnel",
   "plugin.vehicle.tesla.stopTunnel",
 ] as const satisfies readonly MutationPath[];

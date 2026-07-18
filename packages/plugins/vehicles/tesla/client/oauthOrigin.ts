@@ -4,7 +4,7 @@ export const TESLA_CALLBACK_PATH = "/api/vehicle/tesla/callback";
  * True when the browser origin can be registered in Tesla's developer portal
  * as a redirect base: localhost (any port, any protocol) or any https origin.
  * Plain http on a non-localhost host (e.g. a LAN IP) is rejected by the
- * portal, so OAuth must ride the Cloudflare tunnel instead.
+ * portal, so OAuth must ride the tunnel instead.
  */
 export function isStableOrigin(origin: string): boolean {
   try {

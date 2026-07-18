@@ -48,9 +48,13 @@ export function RealtimeSync() {
       });
     },
     // Vehicle membership changed (added/removed) — main owns its own cache;
-    // plugins never invalidate it directly.
+    // plugins never invalidate it directly. Refresh everything keyed on
+    // membership: the list, which plugins count as configured, and each
+    // plugin's own vehicle list (its settings pane reads that).
     onVehiclesChanged: () => {
       utils.vehicle.list.invalidate();
+      utils.vehicle.getPlugins.invalidate();
+      utils.plugin.vehicle.invalidate();
     },
     onVehicleError: (event) => {
       if (event.error === null) {

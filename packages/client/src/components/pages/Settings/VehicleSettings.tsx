@@ -120,6 +120,7 @@ function UnconfiguredPluginCard(
           marginBottom: 8,
         }}
       >
+        <Car size={14} />
         <Text size="2" weight="medium">{plugin.displayName}</Text>
         <Badge color="gray" size="1">Not configured</Badge>
       </div>
@@ -342,8 +343,6 @@ export function VehicleSettings() {
           handleDelete={handleDelete}
         />
 
-        <ConfiguredPluginSettings vehiclePlugins={vehiclePlugins} />
-
         {unconfiguredPlugins.map((plugin) => (
           <UnconfiguredPluginCard
             key={plugin.id}
@@ -355,6 +354,8 @@ export function VehicleSettings() {
         <SimulatedVehicleSection
           handleAddSimulatedVehicle={handleAddSimulatedVehicle}
         />
+
+        <ConfiguredPluginSettings vehiclePlugins={vehiclePlugins} />
       </SettingsSection>
     </>
   );

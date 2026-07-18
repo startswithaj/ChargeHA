@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { assertExists } from "@std/assert";
 import { FakeTime } from "@std/testing/time";
-import { TunnelManager } from "./TunnelManager.ts";
+import { PINGGY_PROVIDER, TunnelManager } from "./TunnelManager.ts";
 import type { PluginTunnelRoute } from "@chargeha/plugins/types";
 
 describe("TunnelManager", () => {
@@ -152,6 +152,16 @@ describe("TunnelManager", () => {
   /** Routes returned by the injected provider — tests mutate between calls. */
   const routesHolder: { routes: PluginTunnelRoute[] } = { routes: [] };
 
+  /** Provider matching the mock process output used across these tests. */
+  const testProvider = {
+    name: "test-tunnel",
+    path: "test-tunnel-bin",
+    args: ["{port}"],
+    urlPattern: /https:\/\/[a-z0-9-]+\.tunnel\.example\.com/,
+    urlStream: "stderr" as const,
+    expiryMinutes: null,
+  };
+
   /** Construct a TunnelManager with the fake serve + command injected. */
   const makeTunnelManager = (
     logger: unknown = mockLogger,
@@ -163,13 +173,33 @@ describe("TunnelManager", () => {
       3000,
       () => routesHolder.routes,
       middlewarePort,
-      "cloudflared",
+      testProvider,
       mockServe,
       lazyCommand,
     );
   };
 
   // ── Tests ───────────────────────────────────────────────────────────────────
+
+  describe("PINGGY_PROVIDER", () => {
+    it("matches free.pinggy.net URLs but not the tesla-rejected alias", () => {
+      const output = [
+        "Your tunnel will expire in 60 minutes.",
+        "http://nsctu-1-2-3-4.run.pinggy-free.link",
+        "https://nsctu-1-2-3-4.run.pinggy-free.link",
+        "https://yglnr-1-2-3-4.free.pinggy.net",
+      ].join("\n");
+      const match = output.match(PINGGY_PROVIDER.urlPattern);
+      expect(match?.[0]).toBe("https://yglnr-1-2-3-4.free.pinggy.net");
+    });
+
+    it("reads the URL from stdout and forwards the middleware port", () => {
+      expect(PINGGY_PROVIDER.urlStream).toBe("stdout");
+      expect(PINGGY_PROVIDER.path).toBe("ssh");
+      expect(PINGGY_PROVIDER.args).toContain("0:localhost:{port}");
+      expect(PINGGY_PROVIDER.expiryMinutes).toBe(60);
+    });
+  });
 
   describe("initial state", () => {
     it("isRunning returns false initially", () => {
@@ -187,7 +217,7 @@ describe("TunnelManager", () => {
     it("serves plugin-provided routes on the middleware server", async () => {
       const { process } = createMockProcess({
         stderrChunks: [
-          "https://test-tunnel.trycloudflare.com\n",
+          "https://test-tunnel.tunnel.example.com\n",
           "more output\n",
         ],
       });
@@ -220,7 +250,7 @@ describe("TunnelManager", () => {
     it("returns existing URL when tunnel is already running", async () => {
       const { process } = createMockProcess({
         stderrChunks: [
-          "https://existing-tunnel.trycloudflare.com\n",
+          "https://existing-tunnel.tunnel.example.com\n",
           "done\n",
         ],
       });
@@ -229,18 +259,18 @@ describe("TunnelManager", () => {
 
       const tm = makeTunnelManager();
       const url1 = await tm.start();
-      expect(url1).toBe("https://existing-tunnel.trycloudflare.com");
+      expect(url1).toBe("https://existing-tunnel.tunnel.example.com");
 
       // Second call should return same URL without re-spawning
       const url2 = await tm.start();
-      expect(url2).toBe("https://existing-tunnel.trycloudflare.com");
+      expect(url2).toBe("https://existing-tunnel.tunnel.example.com");
 
       await tm.stop();
     });
 
     it("merges routes from a second start() call into the live set", async () => {
       const { process } = createMockProcess({
-        stderrChunks: ["https://tunnel.trycloudflare.com\n"],
+        stderrChunks: ["https://tunnel.tunnel.example.com\n"],
       });
       stubDenoServe();
       stubDenoCommand({ mockProcess: process });
@@ -275,7 +305,7 @@ describe("TunnelManager", () => {
         warn: (msg: string) => warnCalls.push(msg),
       };
       const { process } = createMockProcess({
-        stderrChunks: ["https://tunnel.trycloudflare.com\n"],
+        stderrChunks: ["https://tunnel.tunnel.example.com\n"],
       });
       stubDenoServe();
       stubDenoCommand({ mockProcess: process });
@@ -304,7 +334,7 @@ describe("TunnelManager", () => {
 
     it("clears routes on stop so a fresh start registers cleanly", async () => {
       const { process: proc1 } = createMockProcess({
-        stderrChunks: ["https://tunnel-1.trycloudflare.com\n"],
+        stderrChunks: ["https://tunnel-1.tunnel.example.com\n"],
       });
       stubDenoServe();
       stubDenoCommand({ mockProcess: proc1 });
@@ -317,7 +347,7 @@ describe("TunnelManager", () => {
       await tm.stop();
 
       const { process: proc2 } = createMockProcess({
-        stderrChunks: ["https://tunnel-2.trycloudflare.com\n"],
+        stderrChunks: ["https://tunnel-2.tunnel.example.com\n"],
       });
       stubDenoCommand({ mockProcess: proc2 });
       stubDenoServe();
@@ -340,11 +370,11 @@ describe("TunnelManager", () => {
       await tm.stop();
     });
 
-    it("spawns cloudflared and parses tunnel URL from stderr", async () => {
+    it("spawns the provider process and parses the tunnel URL", async () => {
       const { process } = createMockProcess({
         stderrChunks: [
           "INFO Starting tunnel\n",
-          "https://my-tunnel.trycloudflare.com connected\n",
+          "https://my-tunnel.tunnel.example.com connected\n",
         ],
         pid: 5678,
       });
@@ -354,14 +384,14 @@ describe("TunnelManager", () => {
       const tm = makeTunnelManager();
       const url = await tm.start();
 
-      expect(url).toBe("https://my-tunnel.trycloudflare.com");
-      expect(tm.tunnelUrl).toBe("https://my-tunnel.trycloudflare.com");
+      expect(url).toBe("https://my-tunnel.tunnel.example.com");
+      expect(tm.tunnelUrl).toBe("https://my-tunnel.tunnel.example.com");
       expect(tm.isRunning).toBe(true);
 
       await tm.stop();
     });
 
-    it("throws specific error when cloudflared binary not found", async () => {
+    it("throws specific error when the tunnel binary is not found", async () => {
       stubDenoServe();
       stubDenoCommand({
         mockProcess: null as unknown as Deno.ChildProcess,
@@ -371,14 +401,14 @@ describe("TunnelManager", () => {
       const tm = makeTunnelManager();
 
       await expect(tm.start()).rejects.toThrow(
-        "cloudflared binary not found",
+        "test-tunnel-bin binary not found",
       );
       expect(tm.isRunning).toBe(false);
       // Middleware should be stopped on error
       expect(mockServerShutdownCalled).toBe(true);
     });
 
-    it("rethrows non-NotFound errors from cloudflared spawn", async () => {
+    it("rethrows non-NotFound errors from the tunnel spawn", async () => {
       stubDenoServe();
       stubDenoCommand({
         mockProcess: null as unknown as Deno.ChildProcess,
@@ -405,7 +435,7 @@ describe("TunnelManager", () => {
         await fakeTime.tickAsync(16_000);
 
         await expect(startPromise).rejects.toThrow(
-          "Timed out waiting for cloudflared tunnel URL",
+          "Timed out waiting for test-tunnel tunnel URL",
         );
       } finally {
         fakeTime.restore();
@@ -428,7 +458,7 @@ describe("TunnelManager", () => {
         await fakeTime.tickAsync(16_000);
 
         await expect(startPromise).rejects.toThrow(
-          "Timed out waiting for cloudflared tunnel URL",
+          "Timed out waiting for test-tunnel tunnel URL",
         );
       } finally {
         fakeTime.restore();
@@ -437,10 +467,10 @@ describe("TunnelManager", () => {
   });
 
   describe("process exit monitoring", () => {
-    it("clears state when cloudflared exits unexpectedly", async () => {
+    it("clears state when the tunnel process exits unexpectedly", async () => {
       const { process, resolveStatus } = createMockProcess({
         stderrChunks: [
-          "https://tunnel.trycloudflare.com\n",
+          "https://tunnel.tunnel.example.com\n",
           "output\n",
         ],
       });
@@ -451,7 +481,7 @@ describe("TunnelManager", () => {
       await tm.start();
       expect(tm.isRunning).toBe(true);
 
-      // Simulate cloudflared exiting
+      // Simulate the tunnel process exiting
       resolveStatus(
         { success: false, code: 1, signal: null } as Deno.CommandStatus,
       );
@@ -474,7 +504,7 @@ describe("TunnelManager", () => {
     it("kills the process and shuts down middleware when running", async () => {
       const { process } = createMockProcess({
         stderrChunks: [
-          "https://tunnel.trycloudflare.com\n",
+          "https://tunnel.tunnel.example.com\n",
           "done\n",
         ],
       });
@@ -494,7 +524,7 @@ describe("TunnelManager", () => {
     it("handles process that already exited (kill throws)", async () => {
       const { process } = createMockProcess({
         stderrChunks: [
-          "https://tunnel.trycloudflare.com\n",
+          "https://tunnel.tunnel.example.com\n",
           "done\n",
         ],
         killBehavior: "throws",
@@ -518,7 +548,7 @@ describe("TunnelManager", () => {
     beforeEach(() => {
       const { process } = createMockProcess({
         stderrChunks: [
-          "https://tunnel.trycloudflare.com\n",
+          "https://tunnel.tunnel.example.com\n",
           "extra output\n",
         ],
       });
@@ -703,7 +733,7 @@ describe("TunnelManager", () => {
     });
   });
 
-  describe("pipeStderr", () => {
+  describe("tunnel output logging", () => {
     it("handles stderr read error gracefully", async () => {
       let chunksSent = 0;
       const encoder = new TextEncoder();
@@ -713,7 +743,7 @@ describe("TunnelManager", () => {
             chunksSent++;
             controller.enqueue(
               encoder.encode(
-                "https://tunnel.trycloudflare.com\n",
+                "https://tunnel.tunnel.example.com\n",
               ),
             );
           } else {
@@ -765,7 +795,7 @@ describe("TunnelManager", () => {
 
       const { process } = createMockProcess({
         stderrChunks: [
-          "https://tunnel.trycloudflare.com\n",
+          "https://tunnel.tunnel.example.com\n",
           "debug info line 1\n",
           "debug info line 2\n",
         ],
@@ -780,10 +810,10 @@ describe("TunnelManager", () => {
       await new Promise((r) => setTimeout(r, 50));
 
       // pipeStderr should have logged the remaining chunks
-      const cloudflaredLogs = debugCalls.filter((m) =>
-        m.startsWith("[cloudflared]")
+      const tunnelLogs = debugCalls.filter((m) =>
+        m.startsWith("[test-tunnel]")
       );
-      expect(cloudflaredLogs.length).toBeGreaterThan(0);
+      expect(tunnelLogs.length).toBeGreaterThan(0);
 
       await tm.stop();
     });
@@ -792,7 +822,7 @@ describe("TunnelManager", () => {
   describe("stopMiddleware", () => {
     it("shuts down middleware server when present", async () => {
       const { process } = createMockProcess({
-        stderrChunks: ["https://tunnel.trycloudflare.com\n"],
+        stderrChunks: ["https://tunnel.tunnel.example.com\n"],
       });
       stubDenoServe();
       stubDenoCommand({ mockProcess: process });

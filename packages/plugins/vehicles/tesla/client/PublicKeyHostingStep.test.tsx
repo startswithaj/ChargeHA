@@ -258,7 +258,7 @@ describe("PublicKeyHostingStep", () => {
     await waitFor(() => {
       expect(
         screen.getByText(
-          /Your public key is being served via the Cloudflare Tunnel/,
+          /Your public key is being served via the tunnel/,
         ),
       ).toBeInTheDocument();
     });
@@ -272,14 +272,15 @@ describe("PublicKeyHostingStep", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("shows 'Use Cloudflare Tunnel' as a hosting option in No flow", async () => {
+  it("shows the tunnel as a hosting option in No flow", async () => {
     renderWithProviders(<StepNextHarness def={publicKeyHostingStep} />);
 
     fireEvent.click(screen.getByLabelText("No, not internet accessible"));
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Use Cloudflare Tunnel"))
+      expect(screen.getByLabelText("Use a temporary tunnel"))
         .toBeInTheDocument();
+      expect(screen.getByLabelText("Host on FleetKey.net")).toBeInTheDocument();
       expect(screen.getByLabelText("Host it myself")).toBeInTheDocument();
       expect(screen.getByLabelText("Host on GitHub Pages")).toBeInTheDocument();
       expect(screen.getByLabelText("Set it up with AI")).toBeInTheDocument();
@@ -292,11 +293,11 @@ describe("PublicKeyHostingStep", () => {
     fireEvent.click(screen.getByLabelText("No, not internet accessible"));
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Use Cloudflare Tunnel"))
+      expect(screen.getByLabelText("Use a temporary tunnel"))
         .toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByLabelText("Use Cloudflare Tunnel"));
+    fireEvent.click(screen.getByLabelText("Use a temporary tunnel"));
 
     await waitFor(() => {
       expect(

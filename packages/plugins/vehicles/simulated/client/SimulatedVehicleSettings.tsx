@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Badge, Button, Text } from "@radix-ui/themes";
-import { Pencil } from "lucide-react";
+import { FlaskConical, Pencil } from "lucide-react";
 import type { VehicleWithState } from "@chargeha/shared";
 import { trpc } from "./trpc.ts";
 import { SimulatedVehicleDialog } from "./SimulatedVehicleDialog.tsx";
@@ -39,13 +39,17 @@ export function SimulatedVehicleSettings(): JSX.Element | null {
         borderTop: "1px solid var(--gray-a4)",
       }}
     >
-      <Text
-        size="2"
-        weight="medium"
-        style={{ display: "block", marginBottom: 8 }}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 8,
+        }}
       >
-        Simulated Vehicle Settings
-      </Text>
+        <FlaskConical size={14} />
+        <Text size="2" weight="medium">Simulated Vehicle Settings</Text>
+      </div>
       {vehicles.map((v) => {
         const isExpanded = expanded.has(v.id);
         return (

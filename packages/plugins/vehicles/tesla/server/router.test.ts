@@ -89,6 +89,7 @@ describe("Tesla Plugin Router", () => {
         getUrl: () => null,
         start: () => Promise.reject(new Error("tunnel not mocked")),
         stop: () => Promise.resolve(),
+        getExpiryMinutes: () => null,
       },
       geocode: () => Promise.reject(new Error("geocode not mocked")),
       encryptionConfigured: () => false,

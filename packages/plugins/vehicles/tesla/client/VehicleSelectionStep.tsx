@@ -222,7 +222,13 @@ function useVehicleSelection() {
     data: vehiclesData,
     isLoading: loading,
     error: queryError,
-  } = trpc.plugin.vehicle.tesla.teslaVehicles.useQuery();
+  } = trpc.plugin.vehicle.tesla.teslaVehicles.useQuery(undefined, {
+    // The token is loaded just before this step; a first fetch can beat it and
+    // throw "No tokens available". Retry briefly so it waits instead of
+    // flashing that error before the list loads.
+    retry: 3,
+    retryDelay: 400,
+  });
 
   const vehicles: Array<{ vin: string; name: string; state: string }> =
     vehiclesData?.vehicles ?? [];
