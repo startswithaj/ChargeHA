@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  Car,
   CheckCircle,
   ExternalLink,
   Key,
@@ -50,6 +51,7 @@ function TeslaHeader(
         marginBottom: 8,
       }}
     >
+      <Car size={14} />
       <Text size="2" weight="medium">Tesla</Text>
       {teslaAvailable && authenticated && (
         <Badge color="green" size="1">Connected</Badge>
