@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, renderHook } from "@testing-library/react";
-import { usePluginOnboardingState } from "./usePluginOnboardingState.ts";
+import {
+  clearPluginOnboarding,
+  usePluginOnboardingState,
+} from "./usePluginOnboardingState.ts";
 
 describe("usePluginOnboardingState", () => {
   beforeEach(() => {
@@ -16,6 +19,44 @@ describe("usePluginOnboardingState", () => {
       usePluginOnboardingState("tesla", "credentials", "vehicle")
     );
     expect(result.current.state.stepId).toBe("credentials");
+  });
+
+  describe("clearPluginOnboarding", () => {
+    it("wipes a plugin's stored run so the next launch starts fresh", () => {
+      localStorage.setItem(
+        "chargeha-plugin-onboarding-tesla",
+        JSON.stringify("tesla-auth"),
+      );
+
+      clearPluginOnboarding("tesla");
+
+      expect(localStorage.getItem("chargeha-plugin-onboarding-tesla"))
+        .toBeNull();
+      // A fresh mount after clearing starts at the default step, not the
+      // half-finished one.
+      const { result } = renderHook(() =>
+        usePluginOnboardingState("tesla", "key-generation", "vehicle")
+      );
+      expect(result.current.state.stepId).toBe("key-generation");
+    });
+
+    it("only clears the named plugin", () => {
+      localStorage.setItem(
+        "chargeha-plugin-onboarding-tesla",
+        JSON.stringify("tesla-auth"),
+      );
+      localStorage.setItem(
+        "chargeha-plugin-onboarding-fronius_local",
+        JSON.stringify("fronius-setup"),
+      );
+
+      clearPluginOnboarding("tesla");
+
+      expect(localStorage.getItem("chargeha-plugin-onboarding-tesla"))
+        .toBeNull();
+      expect(localStorage.getItem("chargeha-plugin-onboarding-fronius_local"))
+        .toBe(JSON.stringify("fronius-setup"));
+    });
   });
 
   it("returns stored value from localStorage", () => {

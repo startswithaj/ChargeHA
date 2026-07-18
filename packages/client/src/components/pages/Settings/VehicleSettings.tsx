@@ -120,6 +120,7 @@ function UnconfiguredPluginCard(
           marginBottom: 8,
         }}
       >
+        <Car size={14} />
         <Text size="2" weight="medium">{plugin.displayName}</Text>
         <Badge color="gray" size="1">Not configured</Badge>
       </div>
@@ -187,18 +188,9 @@ function ConfiguredPluginSettings(
             pluginSettingsComponents[p.settingsComponentKey];
           if (!SettingsComponent) return null;
           return (
-            <div
-              key={p.id}
-              style={{
-                marginTop: 12,
-                paddingTop: 12,
-                borderTop: "1px solid var(--gray-a4)",
-              }}
-            >
-              <ErrorBoundary label="Plugin Settings">
-                <SettingsComponent />
-              </ErrorBoundary>
-            </div>
+            <ErrorBoundary key={p.id} label="Plugin Settings">
+              <SettingsComponent />
+            </ErrorBoundary>
           );
         })}
     </>
@@ -351,8 +343,6 @@ export function VehicleSettings() {
           handleDelete={handleDelete}
         />
 
-        <ConfiguredPluginSettings vehiclePlugins={vehiclePlugins} />
-
         {unconfiguredPlugins.map((plugin) => (
           <UnconfiguredPluginCard
             key={plugin.id}
@@ -364,6 +354,8 @@ export function VehicleSettings() {
         <SimulatedVehicleSection
           handleAddSimulatedVehicle={handleAddSimulatedVehicle}
         />
+
+        <ConfiguredPluginSettings vehiclePlugins={vehiclePlugins} />
       </SettingsSection>
     </>
   );

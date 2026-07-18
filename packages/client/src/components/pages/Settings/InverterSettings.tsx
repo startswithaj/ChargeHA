@@ -15,6 +15,7 @@ import {
 } from "./pluginSettingsHost.ts";
 import { trpc } from "../../../trpc.ts";
 import { useRouter } from "../../../hooks/useRouter.ts";
+import { clearPluginOnboarding } from "../../../hooks/usePluginOnboardingState.ts";
 import {
   energyPluginOptions,
   energyPluginSteps,
@@ -100,6 +101,16 @@ function groupPluginsByVendor(
   }, {});
 }
 
+/** A plugin needs the wizard when it isn't configured, has no inline settings
+ *  form, but does have wizard steps. */
+function needsOnboarding(
+  plugin: { id: string; configured: boolean },
+  hasInlineSettings: boolean,
+): boolean {
+  return !plugin.configured && !hasInlineSettings &&
+    (energyPluginSteps[plugin.id]?.length ?? 0) > 0;
+}
+
 export function InverterSettings() {
   const { navigate } = useRouter();
   const { data: config } = useEquipmentConfig();
@@ -111,6 +122,9 @@ export function InverterSettings() {
   const { data: plugins } = trpc.energy.getPlugins.useQuery();
 
   const handleStartOnboarding = useCallback((pluginId: string) => {
+    // Launching from settings is a fresh run — drop any half-finished state so
+    // it doesn't resume where a previous, abandoned attempt left off.
+    clearPluginOnboarding(pluginId);
     navigate({ type: "pluginSetup", pluginId });
   }, []);
 
@@ -141,18 +155,8 @@ export function InverterSettings() {
     ? pluginSettingsComponents[selectedPlugin.settingsComponentKey]
     : undefined;
 
-  // Check if the selected plugin needs onboarding (has wizard steps, isn't configured, and has no inline settings)
   const selectedNeedsSetup = selectedPlugin !== undefined &&
-    needsOnboarding(selectedPlugin, SettingsComponent);
-
-  function needsOnboarding(
-    plugin: NonNullable<typeof selectedPlugin>,
-    settings: typeof SettingsComponent,
-  ): boolean {
-    return !plugin.configured &&
-      !settings &&
-      (energyPluginSteps[plugin.id]?.length ?? 0) > 0;
-  }
+    needsOnboarding(selectedPlugin, !!SettingsComponent);
 
   return (
     <SettingsSection

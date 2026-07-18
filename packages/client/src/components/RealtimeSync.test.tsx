@@ -5,12 +5,16 @@ import { render } from "@testing-library/react";
 type RealtimeHandlers = {
   onEnergyUpdate: (data: unknown) => void;
   onVehicleUpdate: (data: unknown) => void;
+  onVehiclesChanged: () => void;
   onVehicleError: (data: unknown) => void;
 };
 
 const mocks = vi.hoisted(() => ({
   setData_energyRealtime: vi.fn(),
   setData_vehicleList: vi.fn(),
+  invalidate_vehicleList: vi.fn(),
+  invalidate_getPlugins: vi.fn(),
+  invalidate_pluginVehicle: vi.fn(),
   setError: vi.fn(),
   clearError: vi.fn(),
   captured: { handlers: null as RealtimeHandlers | null },
@@ -24,7 +28,14 @@ vi.mock("../trpc.ts", () => ({
         realtime: { setData: mocks.setData_energyRealtime },
       },
       vehicle: {
-        list: { setData: mocks.setData_vehicleList },
+        list: {
+          setData: mocks.setData_vehicleList,
+          invalidate: mocks.invalidate_vehicleList,
+        },
+        getPlugins: { invalidate: mocks.invalidate_getPlugins },
+      },
+      plugin: {
+        vehicle: { invalidate: mocks.invalidate_pluginVehicle },
       },
     })),
   },
@@ -49,6 +60,9 @@ describe("RealtimeSync", () => {
   beforeEach(() => {
     mocks.setData_energyRealtime.mockClear();
     mocks.setData_vehicleList.mockClear();
+    mocks.invalidate_vehicleList.mockClear();
+    mocks.invalidate_getPlugins.mockClear();
+    mocks.invalidate_pluginVehicle.mockClear();
     mocks.setError.mockClear();
     mocks.clearError.mockClear();
     mocks.captured.handlers = null;
@@ -61,6 +75,21 @@ describe("RealtimeSync", () => {
   it("renders null (renderless component)", () => {
     const { container } = render(<RealtimeSync />);
     expect(container.innerHTML).toBe("");
+  });
+
+  describe("onVehiclesChanged", () => {
+    it("invalidates the list, plugin configured-state, and plugin vehicle lists", () => {
+      render(<RealtimeSync />);
+
+      assertExists(mocks.captured.handlers);
+      mocks.captured.handlers.onVehiclesChanged();
+
+      // A plugin's settings pane reads its own vehicle list, so all three must
+      // refresh on a membership change — not just the top-level list.
+      expect(mocks.invalidate_vehicleList).toHaveBeenCalled();
+      expect(mocks.invalidate_getPlugins).toHaveBeenCalled();
+      expect(mocks.invalidate_pluginVehicle).toHaveBeenCalled();
+    });
   });
 
   describe("onEnergyUpdate", () => {

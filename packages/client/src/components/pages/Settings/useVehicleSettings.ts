@@ -5,6 +5,7 @@ import { vehiclePluginOptions } from "@chargeha/plugins/componentRegistry";
 import { useHomeConfig } from "../../../hooks/useSectionConfig.ts";
 import { trpc } from "../../../trpc.ts";
 import { useRouter } from "../../../hooks/useRouter.ts";
+import { clearPluginOnboarding } from "../../../hooks/usePluginOnboardingState.ts";
 
 const demoPlugin = vehiclePluginOptions.find((o) => o.demoSetup);
 
@@ -50,10 +51,9 @@ function useAddSimulatedVehicleMutation(
       return id;
     },
     onSuccess: (id) => {
-      utils.vehicle.list.invalidate();
-      // The simulated plugin flips to "configured" once it has a vehicle —
-      // refresh the plugin list so its settings pane appears without a reload.
-      utils.vehicle.getPlugins.invalidate();
+      // Cache refresh (list, plugin configured-state, plugin vehicle lists) is
+      // driven by the server's vehicles_changed event in RealtimeSync — the
+      // one place membership changes fan out, whatever created them.
       setRecentlyAddedVins(new Set([id]));
       setTimeout(() => setRecentlyAddedVins(new Set()), 4000);
     },
@@ -119,14 +119,10 @@ export function useVehicleSettings() {
 
   // --- Mutations ---
 
-  const deleteMutation = trpc.vehicle.delete.useMutation({
-    onSuccess: () => {
-      utils.vehicle.list.invalidate();
-      // Removing a plugin's last vehicle flips it back to "not configured" —
-      // refresh so its settings pane disappears without a reload.
-      utils.vehicle.getPlugins.invalidate();
-    },
-  });
+  // No onSuccess cache work: the server's vehicles_changed event (handled in
+  // RealtimeSync) invalidates the vehicle list, plugin configured-state, and
+  // plugin vehicle lists for every membership change.
+  const deleteMutation = trpc.vehicle.delete.useMutation();
 
   const priorityMutation = usePriorityMutation(utils);
   const addSimMutation = useAddSimulatedVehicleMutation({
@@ -155,6 +151,9 @@ export function useVehicleSettings() {
   const vehiclePlugins = vehiclePluginsQuery.data ?? [];
 
   const handleStartOnboarding = useCallback((pluginId: string) => {
+    // Launching from settings is a fresh run — drop any half-finished state so
+    // it doesn't resume where a previous, abandoned attempt left off.
+    clearPluginOnboarding(pluginId);
     navigate({ type: "pluginSetup", pluginId });
   }, []);
 

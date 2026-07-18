@@ -179,12 +179,6 @@ describe("useVehicleSettings", () => {
     expect(mockDeleteMutate).toHaveBeenCalledWith({ vehicleId: "VIN1" });
   });
 
-  it("delete mutation onSuccess invalidates vehicle list", () => {
-    renderHook(() => useVehicleSettings());
-    c.deleteOpts.onSuccess?.();
-    expect(mockInvalidateVehicleList).toHaveBeenCalled();
-  });
-
   it("handleMovePriority swaps vehicles up via priority mutationFn", () => {
     m.vehiclesData = {
       vehicles: [
