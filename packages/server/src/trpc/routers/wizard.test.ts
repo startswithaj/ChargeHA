@@ -410,69 +410,74 @@ describe("Wizard tRPC Router", () => {
     });
   });
 
-  describe("wizard.getStep / wizard.setStep", () => {
-    it("returns empty string on fresh DB", async () => {
-      const step = await caller.wizard.getStep();
-      expect(step).toBe("");
+  describe("wizard.state / wizard.patchState", () => {
+    it("returns empty fields on fresh DB", async () => {
+      const state = await caller.wizard.state();
+      expect(state).toEqual({ stepId: "", vehicleType: "", energyType: "" });
     });
 
     it("persists and retrieves a step ID", async () => {
-      await caller.wizard.setStep({ stepId: "tesla-credentials" });
-      const step = await caller.wizard.getStep();
-      expect(step).toBe("tesla-credentials");
+      await caller.wizard.patchState({ stepId: "tesla-credentials" });
+      const state = await caller.wizard.state();
+      expect(state.stepId).toBe("tesla-credentials");
     });
 
     it("overwrites previous step value", async () => {
-      await caller.wizard.setStep({ stepId: "welcome" });
-      await caller.wizard.setStep({ stepId: "done" });
-      const step = await caller.wizard.getStep();
-      expect(step).toBe("done");
-    });
-  });
-
-  describe("wizard.getVehicleType / wizard.setVehicleType", () => {
-    it("returns empty string on fresh DB", async () => {
-      const type = await caller.wizard.getVehicleType();
-      expect(type).toBe("");
+      await caller.wizard.patchState({ stepId: "welcome" });
+      await caller.wizard.patchState({ stepId: "done" });
+      const state = await caller.wizard.state();
+      expect(state.stepId).toBe("done");
     });
 
-    it("persists and retrieves vehicle type", async () => {
-      await caller.wizard.setVehicleType({ type: "tesla" });
-      const type = await caller.wizard.getVehicleType();
-      expect(type).toBe("tesla");
-    });
-  });
+    it("patches a single field without disturbing the others", async () => {
+      await caller.wizard.patchState({
+        stepId: "vehicle-type",
+        vehicleType: "tesla",
+        energyType: "fronius_local",
+      });
+      await caller.wizard.patchState({ stepId: "done" });
 
-  describe("wizard.getEnergyType / wizard.setEnergyType", () => {
-    it("returns empty string on fresh DB", async () => {
-      const type = await caller.wizard.getEnergyType();
-      expect(type).toBe("");
+      expect(await caller.wizard.state()).toEqual({
+        stepId: "done",
+        vehicleType: "tesla",
+        energyType: "fronius_local",
+      });
     });
 
-    it("persists and retrieves energy type", async () => {
-      await caller.wizard.setEnergyType({ type: "fronius_local" });
-      const type = await caller.wizard.getEnergyType();
-      expect(type).toBe("fronius_local");
+    it("round-trips a selection and its step in one write", async () => {
+      // The step id and the vehicle type that puts that step in the list are
+      // written together, so no read can observe one without the other.
+      await caller.wizard.patchState({
+        vehicleType: "tesla",
+        stepId: "tesla-key-generation",
+      });
+
+      expect(await caller.wizard.state()).toEqual({
+        stepId: "tesla-key-generation",
+        vehicleType: "tesla",
+        energyType: "",
+      });
     });
   });
 
   describe("wizard.complete - clears wizard state", () => {
     it("clears wizard_step, wizard_vehicle_type, wizard_energy_type on complete", async () => {
       // Set wizard state
-      await caller.wizard.setStep({ stepId: "home-location" });
-      await caller.wizard.setVehicleType({ type: "tesla" });
-      await caller.wizard.setEnergyType({ type: "fronius_local" });
+      await caller.wizard.patchState({
+        stepId: "home-location",
+        vehicleType: "tesla",
+        energyType: "fronius_local",
+      });
 
       // Complete wizard
       await caller.wizard.complete();
 
       // All wizard state should be cleared
-      const step = await caller.wizard.getStep();
-      const vehicleType = await caller.wizard.getVehicleType();
-      const energyType = await caller.wizard.getEnergyType();
-      expect(step).toBe("");
-      expect(vehicleType).toBe("");
-      expect(energyType).toBe("");
+      expect(await caller.wizard.state()).toEqual({
+        stepId: "",
+        vehicleType: "",
+        energyType: "",
+      });
     });
   });
 

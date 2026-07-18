@@ -2,7 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../../client/src/test-utils.tsx";
-import { KeyGenerationStep } from "./KeyGenerationStep.tsx";
+import { keyGenerationStep } from "./KeyGenerationStep.tsx";
 import { StepNextHarness } from "../../../../client/src/components/Wizard/steps/test-helpers/StepNextHarness.tsx";
 import { trpc } from "./trpc.ts";
 
@@ -134,7 +134,7 @@ describe("KeyGenerationStep", () => {
   // ---- Initial render ----
 
   it("shows two option cards on initial render", () => {
-    renderWithProviders(<KeyGenerationStep />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     expect(screen.getByText("Generate a key pair for me")).toBeInTheDocument();
     expect(screen.getByText("I have my own key pair")).toBeInTheDocument();
@@ -147,13 +147,13 @@ describe("KeyGenerationStep", () => {
         isLoading: false,
       } as never);
 
-    renderWithProviders(<KeyGenerationStep />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     expect(screen.getByText(/stored in plain text/)).toBeInTheDocument();
   });
 
   it("hides encryption warning when ENCRYPTION_KEY is set", () => {
-    renderWithProviders(<KeyGenerationStep />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     expect(screen.queryByText(/stored in plain text/)).not.toBeInTheDocument();
   });
@@ -161,7 +161,7 @@ describe("KeyGenerationStep", () => {
   // ---- Generate flow ----
 
   it("calls generateKeys mutation when Generate option is clicked", async () => {
-    renderWithProviders(<KeyGenerationStep />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     fireEvent.click(screen.getByText("Generate a key pair for me"));
 
@@ -173,7 +173,7 @@ describe("KeyGenerationStep", () => {
   it("shows spinner during generate API call", async () => {
     setGenerateState({ isPending: true });
 
-    renderWithProviders(<KeyGenerationStep />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     fireEvent.click(screen.getByText("Generate a key pair for me"));
 
@@ -191,7 +191,7 @@ describe("KeyGenerationStep", () => {
     // Render with default state so ChooseModeCards is visible, then click
     // Generate to set mode="generate"; switching the mock to isSuccess
     // mid-flow drives the re-render into SuccessView with the right mode.
-    renderWithProviders(<KeyGenerationStep />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     setGenerateState({ isSuccess: true });
 
@@ -207,7 +207,7 @@ describe("KeyGenerationStep", () => {
   it("shows success after successful import", () => {
     setImportState({ isSuccess: true });
 
-    renderWithProviders(<KeyGenerationStep />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     expect(
       screen.getByText(/imported and stored successfully/),
@@ -234,7 +234,7 @@ describe("KeyGenerationStep", () => {
     (_flow, setter, errorMsg, expected) => {
       setter({ error: { message: errorMsg } });
 
-      renderWithProviders(<KeyGenerationStep />);
+      renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
       expect(screen.getByText(expected)).toBeInTheDocument();
     },
@@ -243,7 +243,7 @@ describe("KeyGenerationStep", () => {
   it("Try Again button from error resets mutations", () => {
     setGenerateState({ error: { message: "Key generation failed" } });
 
-    renderWithProviders(<KeyGenerationStep />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     expect(screen.getByText("Key generation failed")).toBeInTheDocument();
 
@@ -252,27 +252,26 @@ describe("KeyGenerationStep", () => {
     expect(mocks.generateReset).toHaveBeenCalled();
   });
 
-  it("enables Next after successful generation", () => {
+  it("enables Next after successful generation", async () => {
     const onNext = vi.fn();
     setGenerateState({ isSuccess: true });
 
     renderWithProviders(
-      <StepNextHarness onAdvance={onNext}>
-        <KeyGenerationStep />
-      </StepNextHarness>,
+      <StepNextHarness def={keyGenerationStep} onAdvance={onNext} />,
     );
 
     const nextButton = screen.getByRole("button", { name: "Next" });
     expect(nextButton).toBeEnabled();
 
     fireEvent.click(nextButton);
-    expect(onNext).toHaveBeenCalledTimes(1);
+    // Next runs the step's handler before advancing, so this lands a tick later.
+    await waitFor(() => expect(onNext).toHaveBeenCalledTimes(1));
   });
 
   // ---- Import flow ----
 
   it("shows import form when 'I have my own key pair' is clicked", () => {
-    renderWithProviders(<KeyGenerationStep />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     fireEvent.click(screen.getByText("I have my own key pair"));
 
@@ -283,7 +282,7 @@ describe("KeyGenerationStep", () => {
   });
 
   it("disables Save Keys button when textareas are empty", () => {
-    renderWithProviders(<KeyGenerationStep />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     fireEvent.click(screen.getByText("I have my own key pair"));
 
@@ -291,7 +290,7 @@ describe("KeyGenerationStep", () => {
   });
 
   it("calls importKeys mutation with PEM values", async () => {
-    renderWithProviders(<KeyGenerationStep />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     fireEvent.click(screen.getByText("I have my own key pair"));
 
@@ -310,7 +309,7 @@ describe("KeyGenerationStep", () => {
   });
 
   it("Back button from import returns to choose mode", () => {
-    renderWithProviders(<KeyGenerationStep />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     fireEvent.click(screen.getByText("I have my own key pair"));
     expect(screen.getByText("Public Key (PEM)")).toBeInTheDocument();

@@ -1,47 +1,39 @@
-import { useState } from "react";
-import type { ReactNode } from "react";
-import {
-  type WizardNextControl,
-  WizardNextProvider,
-} from "../../wizardNextControl.ts";
+import { StepHost } from "../../StepHost.tsx";
+import type { StepDef, StepProps } from "../../flow.ts";
 
 /**
- * Minimal stand-in for WizardShell's nav in step tests: exposes the step's
- * registered Next control as a real "Next" button (plus its hint text) so
- * tests can drive save-then-advance behaviour without mounting the shell.
+ * Mounts one step the way the shell does — through the real StepHost, so the
+ * step's Next button, its gate and its save are exercised together rather than
+ * against a stand-in. Nav chrome is stubbed; everything else is production code.
  */
 export function StepNextHarness(
-  { children, onAdvance }: { children: ReactNode; onAdvance: () => void },
+  { def, onAdvance = () => {}, stepProps, isLastStep = false }: {
+    def: StepDef;
+    onAdvance?: () => void;
+    stepProps?: Partial<StepProps>;
+    isLastStep?: boolean;
+  },
 ) {
-  const [control, setControl] = useState<WizardNextControl | null>(null);
-  const [pending, setPending] = useState(false);
-
-  const handleClick = async () => {
-    if (!control?.onBeforeNext) {
-      onAdvance();
-      return;
-    }
-    setPending(true);
-    try {
-      if (await control.onBeforeNext()) onAdvance();
-    } finally {
-      setPending(false);
-    }
-  };
-
-  const busyLabel = pending ? control?.pendingLabel ?? "Working..." : null;
-
   return (
-    <WizardNextProvider value={setControl}>
-      {children}
-      <button
-        type="button"
-        disabled={pending || (control ? !control.canProceed : false)}
-        onClick={handleClick}
-      >
-        {busyLabel ?? "Next"}
-      </button>
-      {control?.hint && <span>{control.hint}</span>}
-    </WizardNextProvider>
+    <StepHost
+      def={def}
+      stepProps={{
+        onNext: () => {},
+        onBack: () => {},
+        onSkipTo: () => {},
+        onSkipToEnd: () => {},
+        ...stepProps,
+      }}
+      nav={{
+        // Labelled "Cancel" so a step that renders its own Back button (key
+        // import, for one) is not competing with the nav for the role.
+        isFirstStep: true,
+        isLastStep,
+        canBack: true,
+        onBack: () => {},
+        onSkip: () => {},
+      }}
+      advance={onAdvance}
+    />
   );
 }

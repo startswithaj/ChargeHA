@@ -10,7 +10,7 @@ import {
 } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../test-utils.tsx";
-import { TimezoneStep } from "./TimezoneStep.tsx";
+import { timezoneStep } from "./TimezoneStep.tsx";
 import { StepNextHarness } from "./test-helpers/StepNextHarness.tsx";
 
 const { mockMutate, mockMutateAsync } = vi.hoisted(() => ({
@@ -146,7 +146,7 @@ describe("TimezoneStep", () => {
   // ---- Initial render ----
 
   it("renders timezone dropdown with auto-detected value", () => {
-    renderWithProviders(<TimezoneStep />);
+    renderWithProviders(<StepNextHarness def={timezoneStep} />);
 
     expect(screen.getByText(/Select your timezone/)).toBeInTheDocument();
     // The trigger should show the auto-detected timezone
@@ -160,7 +160,7 @@ describe("TimezoneStep", () => {
   // ---- User interactions ----
 
   it("dropdown contains IANA timezone options", async () => {
-    renderWithProviders(<TimezoneStep />);
+    renderWithProviders(<StepNextHarness def={timezoneStep} />);
 
     // Open the select dropdown
     const trigger = screen.getByRole("combobox", { name: "Timezone" });
@@ -177,7 +177,7 @@ describe("TimezoneStep", () => {
   });
 
   it("selecting a timezone updates the selected value", async () => {
-    renderWithProviders(<TimezoneStep />);
+    renderWithProviders(<StepNextHarness def={timezoneStep} />);
 
     const trigger = screen.getByRole("combobox", { name: "Timezone" });
     fireEvent.click(trigger);
@@ -202,9 +202,7 @@ describe("TimezoneStep", () => {
     const onNext = vi.fn();
     mockMutateAsync.mockResolvedValue({});
     renderWithProviders(
-      <StepNextHarness onAdvance={onNext}>
-        <TimezoneStep />
-      </StepNextHarness>,
+      <StepNextHarness def={timezoneStep} onAdvance={onNext} />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));

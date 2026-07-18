@@ -2,7 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../test-utils.tsx";
-import { HomeLocationStep } from "./HomeLocationStep.tsx";
+import { homeLocationStep } from "./HomeLocationStep.tsx";
 import { StepNextHarness } from "./test-helpers/StepNextHarness.tsx";
 import { trpc } from "../../../trpc.ts";
 
@@ -112,7 +112,7 @@ describe("HomeLocationStep", () => {
   // ---- Initial render ----
 
   it("renders address search component", async () => {
-    renderWithProviders(<HomeLocationStep />);
+    renderWithProviders(<StepNextHarness def={homeLocationStep} />);
 
     await waitFor(() => {
       expect(screen.getByTestId("address-search")).toBeInTheDocument();
@@ -120,7 +120,7 @@ describe("HomeLocationStep", () => {
   });
 
   it("renders GPS button", () => {
-    renderWithProviders(<HomeLocationStep />);
+    renderWithProviders(<StepNextHarness def={homeLocationStep} />);
 
     expect(
       screen.getByRole("button", { name: /Use my current location/ }),
@@ -138,9 +138,7 @@ describe("HomeLocationStep", () => {
 
     const onNext = vi.fn();
     renderWithProviders(
-      <StepNextHarness onAdvance={onNext}>
-        <HomeLocationStep />
-      </StepNextHarness>,
+      <StepNextHarness def={homeLocationStep} onAdvance={onNext} />,
     );
 
     // Wait for config to load and coordinates to be set

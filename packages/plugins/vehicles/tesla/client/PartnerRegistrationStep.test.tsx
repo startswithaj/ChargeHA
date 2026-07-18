@@ -2,8 +2,9 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../../client/src/test-utils.tsx";
-import { PartnerRegistrationStep } from "./PartnerRegistrationStep.tsx";
+import { partnerRegistrationStep } from "./PartnerRegistrationStep.tsx";
 import { trpc } from "./trpc.ts";
+import { StepNextHarness } from "../../../../client/src/components/Wizard/steps/test-helpers/StepNextHarness.tsx";
 
 const mocks = vi.hoisted(() => {
   const registerMutate = vi.fn();
@@ -59,7 +60,7 @@ describe("PartnerRegistrationStep", () => {
   // ---- API calls ----
 
   it("calls registerPartner mutation on mount", async () => {
-    renderWithProviders(<PartnerRegistrationStep />);
+    renderWithProviders(<StepNextHarness def={partnerRegistrationStep} />);
 
     await waitFor(() => {
       expect(mocks.registerMutate).toHaveBeenCalledTimes(1);
@@ -95,7 +96,7 @@ describe("PartnerRegistrationStep", () => {
     async (_label, overrides, expected) => {
       setRegisterPartnerState(overrides);
 
-      renderWithProviders(<PartnerRegistrationStep />);
+      renderWithProviders(<StepNextHarness def={partnerRegistrationStep} />);
 
       await waitFor(() => {
         expect(screen.getByText(expected)).toBeInTheDocument();
@@ -111,7 +112,7 @@ describe("PartnerRegistrationStep", () => {
       error: { message: "Failed to obtain partner token" },
     });
 
-    renderWithProviders(<PartnerRegistrationStep />);
+    renderWithProviders(<StepNextHarness def={partnerRegistrationStep} />);
 
     // Wait for error state
     await waitFor(() => {

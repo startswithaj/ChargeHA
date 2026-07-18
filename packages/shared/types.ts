@@ -432,3 +432,17 @@ export interface VehicleSocSnapshot {
   vehicleName: string;
   batteryLevel: number; // 0-100 percentage
 }
+
+// ---- Wizard Navigation State ----
+
+/** Where the setup wizard is, and the selections that decide which steps exist.
+ *  Read and written as one record so the step id can never name a step the
+ *  current selections haven't put in the list. */
+export interface WizardNavState {
+  /** Current step ID (e.g. "welcome", "tesla-credentials"). */
+  stepId: string;
+  /** Selected vehicle type (e.g. "tesla", "simulated"). */
+  vehicleType: string;
+  /** Selected energy type (e.g. "fronius_local", "fronius_cloud", ""). */
+  energyType: string;
+}

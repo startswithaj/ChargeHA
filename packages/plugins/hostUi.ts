@@ -11,12 +11,16 @@
 // Typed tRPC client factory — plugins widen it with their own router type.
 export { widenTrpc } from "../client/src/trpc.ts";
 
-// Wizard shell integration.
-export type { StepProps } from "../client/src/components/Wizard/WizardShell.tsx";
-export {
-  hintUnlessLoading,
-  useWizardNextControl,
-} from "../client/src/components/Wizard/wizardNextControl.ts";
+// Wizard shell integration. A step declares what its Next button is (and what
+// it does) by returning it from useStep — there is no separate registration.
+export type {
+  PluginStepDef,
+  StepBehaviour,
+  StepProps,
+  WizardNext,
+  WizardNextHandler,
+} from "../client/src/components/Wizard/flow.ts";
+export { advanceOnly } from "../client/src/components/Wizard/flow.ts";
 export { default as stepStyles } from "../client/src/components/Wizard/steps/steps.module.css";
 
 // Settings page integration.

@@ -3,7 +3,7 @@ import { Button, Callout, Select, Text, TextField } from "@radix-ui/themes";
 import { Check, CheckCircle, Copy, ExternalLink } from "lucide-react";
 import { useTeslaConfig, useTeslaConfigMutation } from "./useTeslaConfig.ts";
 import { trpc } from "./trpc.ts";
-import { useWizardNextControl } from "../../../hostUi.ts";
+import { type PluginStepDef, type WizardNext } from "../../../hostUi.ts";
 import { callbackUrl, resolveOAuthOrigin } from "./oauthOrigin.ts";
 import { resolvePublicKeyDomain } from "../shared/publicKeyDomain.ts";
 import { UnstableOriginCallout } from "./UnstableOriginCallout.tsx";
@@ -252,100 +252,106 @@ function credentialsHint(valid: boolean, hasOrigin: boolean): string {
   return "Next saves your Tesla credentials";
 }
 
-export function TeslaCredentialsStep(): JSX.Element {
-  const { data: teslaConfig } = useTeslaConfig();
-  const [clientId, setClientId] = useState(
-    teslaConfig?.teslaClientId || "",
-  );
-  const [clientSecret, setClientSecret] = useState(
-    teslaConfig?.teslaClientSecret || "",
-  );
-  const [region, setRegion] = useState(teslaConfig?.teslaRegion || "na");
+function credentialsNext(
+  { isValid, hasOrigin, save }: {
+    isValid: boolean;
+    hasOrigin: boolean;
+    save: () => Promise<void>;
+  },
+): WizardNext {
+  if (!isValid || !hasOrigin) {
+    return { kind: "blocked", reason: credentialsHint(isValid, hasOrigin) };
+  }
+  return {
+    kind: "ready",
+    hint: credentialsHint(isValid, hasOrigin),
+    onNext: save,
+  };
+}
 
-  const isValid = clientId.trim().length > 0 && clientSecret.trim().length > 0;
+export const teslaCredentialsStep: PluginStepDef = {
+  id: "tesla-credentials",
+  label: "Tesla Credentials",
+  useStep: () => {
+    const { data: teslaConfig } = useTeslaConfig();
+    const [clientId, setClientId] = useState(
+      teslaConfig?.teslaClientId || "",
+    );
+    const [clientSecret, setClientSecret] = useState(
+      teslaConfig?.teslaClientSecret || "",
+    );
+    const [region, setRegion] = useState(teslaConfig?.teslaRegion || "na");
 
-  // Build the domain from the current window location for instructions
-  const browserOrigin = typeof globalThis !== "undefined"
-    ? globalThis.location.origin
-    : "http://localhost:8000";
+    const isValid = clientId.trim().length > 0 &&
+      clientSecret.trim().length > 0;
 
-  // Check if tunnel is active (started on the Public Key Hosting step)
-  const tunnelStatus = trpc.plugin.vehicle.tesla.tunnelStatus.useQuery();
-  const tunnelUrl = tunnelStatus.data?.url;
+    // Build the domain from the current window location for instructions
+    const browserOrigin = typeof globalThis !== "undefined"
+      ? globalThis.location.origin
+      : "http://localhost:8000";
 
-  const oauth = resolveOAuthOrigin(browserOrigin, tunnelUrl);
-  const redirectUri = oauth.origin ? callbackUrl(oauth.origin) : null;
+    // Check if tunnel is active (started on the Public Key Hosting step)
+    const tunnelStatus = trpc.plugin.vehicle.tesla.tunnelStatus.useQuery();
+    const tunnelUrl = tunnelStatus.data?.url;
 
-  // Partner registration requires the public key domain in Allowed Origins
-  // (Tesla: "Root domain must match registered allowed origin"). Resolved
-  // live so the instructions can never show a stale tunnel domain.
-  const hosting = teslaConfig?.teslaPublicKeyHosting ?? "";
-  const savedDomain = teslaConfig?.teslaPublicKeyDomain ?? null;
-  const allowedOrigin =
-    resolvePublicKeyDomain(hosting, savedDomain, tunnelUrl ?? null) ?? "";
+    const oauth = resolveOAuthOrigin(browserOrigin, tunnelUrl);
+    const redirectUri = oauth.origin ? callbackUrl(oauth.origin) : null;
 
-  const teslaWorking = useTeslaWorking();
+    // Partner registration requires the public key domain in Allowed Origins
+    // (Tesla: "Root domain must match registered allowed origin"). Resolved
+    // live so the instructions can never show a stale tunnel domain.
+    const hosting = teslaConfig?.teslaPublicKeyHosting ?? "";
+    const savedDomain = teslaConfig?.teslaPublicKeyDomain ?? null;
+    const allowedOrigin =
+      resolvePublicKeyDomain(hosting, savedDomain, tunnelUrl ?? null) ?? "";
 
-  const saveMutation = useTeslaConfigMutation();
+    const teslaWorking = useTeslaWorking();
 
-  const save = useCallback(async () => {
-    try {
+    const saveMutation = useTeslaConfigMutation();
+
+    const save = useCallback(async () => {
       await saveMutation.mutateAsync({
         teslaClientId: clientId.trim(),
         teslaClientSecret: clientSecret.trim(),
         teslaRegion: region as "na" | "eu" | "cn",
       });
-      return true;
-    } catch {
-      // Stay on the step — the mutation error is rendered below.
-      return false;
-    }
-  }, [saveMutation, clientId, clientSecret, region]);
+    }, [saveMutation, clientId, clientSecret, region]);
 
-  useWizardNextControl({
-    canProceed: isValid && !!oauth.origin,
-    hint: credentialsHint(isValid, !!oauth.origin),
-    pendingLabel: "Saving...",
-    onBeforeNext: save,
-  });
+    return {
+      next: credentialsNext({ isValid, hasOrigin: !!oauth.origin, save }),
+      view: (
+        <div className={styles.stepContainer}>
+          <Text as="p" size="3" color="gray">
+            Enter your Tesla Fleet API credentials. You'll need to create an
+            application on the Tesla Developer Portal first.
+          </Text>
 
-  return (
-    <div className={styles.stepContainer}>
-      <Text as="p" size="3" color="gray">
-        Enter your Tesla Fleet API credentials. You'll need to create an
-        application on the Tesla Developer Portal first.
-      </Text>
+          {teslaWorking && <AlreadyWorkingCallout />}
 
-      {teslaWorking && <AlreadyWorkingCallout />}
+          <OriginCallouts
+            viaTunnel={oauth.viaTunnel}
+            origin={oauth.origin}
+            browserOrigin={browserOrigin}
+          />
 
-      <OriginCallouts
-        viaTunnel={oauth.viaTunnel}
-        origin={oauth.origin}
-        browserOrigin={browserOrigin}
-      />
+          {redirectUri && (
+            <DeveloperPortalInstructions
+              allowedOrigin={allowedOrigin}
+              redirectUri={redirectUri}
+              viaTunnel={oauth.viaTunnel}
+            />
+          )}
 
-      {redirectUri && (
-        <DeveloperPortalInstructions
-          allowedOrigin={allowedOrigin}
-          redirectUri={redirectUri}
-          viaTunnel={oauth.viaTunnel}
-        />
-      )}
-
-      <CredentialInputs
-        clientId={clientId}
-        setClientId={setClientId}
-        clientSecret={clientSecret}
-        setClientSecret={setClientSecret}
-        region={region}
-        setRegion={setRegion}
-      />
-
-      {saveMutation.error && (
-        <Text as="p" size="2" color="red">
-          {saveMutation.error.message}
-        </Text>
-      )}
-    </div>
-  );
-}
+          <CredentialInputs
+            clientId={clientId}
+            setClientId={setClientId}
+            clientSecret={clientSecret}
+            setClientSecret={setClientSecret}
+            region={region}
+            setRegion={setRegion}
+          />
+        </div>
+      ),
+    };
+  },
+};

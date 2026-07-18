@@ -7,9 +7,20 @@ import {
 } from "../../../hooks/useSectionConfig.ts";
 import { useEnergyData } from "../../../hooks/useEnergyData.ts";
 import type { VehicleWithState } from "@chargeha/shared";
+import { advanceOnly, type StepDef } from "../flow.ts";
 import styles from "./steps.module.css";
 
-export function GridVoltageStep() {
+export const gridVoltageStep: StepDef = {
+  id: "grid-voltage",
+  label: "Grid Voltage",
+  // Nothing to save and nothing to wait for — Next just moves on.
+  useStep: () => ({
+    next: { kind: "ready", hint: null, onNext: advanceOnly },
+    view: <GridVoltageFields />,
+  }),
+};
+
+function GridVoltageFields() {
   const { data: solarConfig } = useSolarConfig();
   const mutation = useSolarConfigMutation();
   const { data: energyData } = useEnergyData();

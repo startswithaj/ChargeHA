@@ -3,23 +3,24 @@ import { assertExists } from "@std/assert";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../test-utils.tsx";
-import { InverterTypeStep } from "./InverterTypeStep.tsx";
+import { inverterTypeStep } from "./InverterTypeStep.tsx";
+import { StepNextHarness } from "./test-helpers/StepNextHarness.tsx";
 
-const { mockMutate, mockSetStepId, mockCommitSelection } = vi.hoisted(() => ({
+const { mockMutate, mockAdvance } = vi.hoisted(() => ({
   mockMutate: vi.fn(),
-  mockSetStepId: vi.fn(),
-  mockCommitSelection: vi.fn(),
+  mockAdvance: vi.fn(),
 }));
 
 vi.mock("../../../hooks/useWizardState.ts", () => ({
   useWizardState: vi.fn(() => ({
-    stepId: "inverter-type",
-    vehicleType: "",
-    energyType: "",
-    setStepId: mockSetStepId,
-    commitSelection: mockCommitSelection,
+    state: { stepId: "inverter-type", vehicleType: "", energyType: "" },
+    patch: vi.fn(),
     isLoading: false,
   })),
+}));
+
+vi.mock("../wizardAdvance.ts", () => ({
+  useWizardAdvance: vi.fn(() => mockAdvance),
 }));
 
 vi.mock("../../../trpc.ts", () => ({
@@ -90,7 +91,7 @@ describe("InverterTypeStep", () => {
 
   it("disables Fronius options in demo mode", () => {
     mockIsDemoMode.mockReturnValue(true);
-    renderWithProviders(<InverterTypeStep />);
+    renderWithProviders(<StepNextHarness def={inverterTypeStep} />);
 
     const local = screen.getByText("Fronius (Local)").closest(
       '[role="button"]',
@@ -103,7 +104,7 @@ describe("InverterTypeStep", () => {
   });
 
   it("renders three options: Fronius Local, Fronius Cloud, None/Skip", () => {
-    renderWithProviders(<InverterTypeStep />);
+    renderWithProviders(<StepNextHarness def={inverterTypeStep} />);
 
     expect(screen.getByText("Fronius (Local)")).toBeInTheDocument();
     expect(
@@ -114,8 +115,8 @@ describe("InverterTypeStep", () => {
 
   // ---- User interactions / API calls ----
 
-  it("selecting None calls the equipment config mutation with empty adapter type", async () => {
-    renderWithProviders(<InverterTypeStep />);
+  it("selecting None persists an empty adapter type and advances", async () => {
+    renderWithProviders(<StepNextHarness def={inverterTypeStep} />);
 
     fireEvent.click(screen.getByText("None / Skip"));
 
@@ -126,19 +127,17 @@ describe("InverterTypeStep", () => {
       );
     });
 
-    expect(mockCommitSelection).toHaveBeenCalledWith({
-      energyType: "",
-      stepId: "home-location",
-    });
+    // "" is a real selection, not an absent one — it advances like any other.
+    expect(mockAdvance).toHaveBeenCalledWith({ energyType: "" });
   });
 
-  it.each<[string, string, string]>([
-    ["Fronius (Local)", "fronius_local", "fronius-local-setup"],
-    ["Fronius (Cloud / Solar.web)", "fronius_cloud", "fronius-cloud-setup"],
+  it.each<[string, string]>([
+    ["Fronius (Local)", "fronius_local"],
+    ["Fronius (Cloud / Solar.web)", "fronius_cloud"],
   ])(
-    "selecting %s persists adapter %s and navigates to %s",
-    async (label, adapterType, nextStepId) => {
-      renderWithProviders(<InverterTypeStep />);
+    "selecting %s persists adapter %s and commits it without naming a next step",
+    async (label, adapterType) => {
+      renderWithProviders(<StepNextHarness def={inverterTypeStep} />);
 
       fireEvent.click(screen.getByText(label));
 
@@ -149,10 +148,18 @@ describe("InverterTypeStep", () => {
         );
       });
 
-      expect(mockCommitSelection).toHaveBeenCalledWith({
-        energyType: adapterType,
-        stepId: nextStepId,
-      });
+      // The step reports what was chosen; the flow decides where that leads.
+      expect(mockAdvance).toHaveBeenCalledWith({ energyType: adapterType });
     },
   );
+
+  it("does not advance when persisting the adapter fails", () => {
+    mockMutate.mockImplementation(() => {});
+    renderWithProviders(<StepNextHarness def={inverterTypeStep} />);
+
+    fireEvent.click(screen.getByText("Fronius (Local)"));
+
+    expect(mockMutate).toHaveBeenCalled();
+    expect(mockAdvance).not.toHaveBeenCalled();
+  });
 });

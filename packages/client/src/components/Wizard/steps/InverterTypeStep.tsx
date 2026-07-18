@@ -1,19 +1,15 @@
 import { Text } from "@radix-ui/themes";
 import { Cloud, Monitor, Server, SkipForward } from "lucide-react";
 import { useWizardState } from "../../../hooks/useWizardState.ts";
-import {
-  energyPluginOptions,
-  energyPluginSteps,
-} from "@chargeha/plugins/componentRegistry";
+import { energyPluginOptions } from "@chargeha/plugins/componentRegistry";
 import {
   useEquipmentConfig,
   useEquipmentConfigMutation,
 } from "../../../hooks/useSectionConfig.ts";
 import { demoMode } from "../../../lib/featureFlags.ts";
-import {
-  hintUnlessLoading,
-  useWizardNextControl,
-} from "../wizardNextControl.ts";
+import { advanceOnly, type StepDef, type WizardNext } from "../flow.ts";
+import { useWizardAdvance } from "../wizardAdvance.ts";
+import { OptionCard } from "./OptionCard.tsx";
 import styles from "./steps.module.css";
 
 const icons = {
@@ -22,46 +18,61 @@ const icons = {
   monitor: Monitor,
 } as const;
 
-export function InverterTypeStep() {
-  const { data: equipmentConfig } = useEquipmentConfig();
-  const currentAdapter = equipmentConfig?.energyAdapterType ?? "";
-  const wizardState = useWizardState();
-  const inDemo = demoMode.isActive();
+export const inverterTypeStep: StepDef = {
+  id: "inverter-type",
+  label: "Inverter Type",
+  useStep: () => {
+    const { data: equipmentConfig } = useEquipmentConfig();
+    const currentAdapter = equipmentConfig?.energyAdapterType ?? "";
+    const { state } = useWizardState();
+    const advance = useWizardAdvance();
+    const mutation = useEquipmentConfigMutation();
 
-  const mutation = useEquipmentConfigMutation();
+    // "" (None / Skip) is a valid selection but indistinguishable from "not
+    // chosen yet" in config — track this session's explicit choice as well.
+    const hasSelection = !!currentAdapter || !!state.energyType;
 
-  // "" (None / Skip) is a valid selection but indistinguishable from "not
-  // chosen yet" in config — track this session's explicit choice as well.
-  const sessionChoice = wizardState.energyType;
-  const hasSelection = !!currentAdapter || !!sessionChoice;
-  // No hint until the config query settles — a blocked-hint that flips to
-  // ready milliseconds after mount reads as an orange flash in the nav.
-  const loading = equipmentConfig === undefined;
-  useWizardNextControl({
-    canProceed: hasSelection,
-    hint: hintUnlessLoading(
-      loading,
-      hasSelection
-        ? "Next continues with the selected energy source"
-        : "Select an energy source (or None / Skip) to continue",
-    ),
-  });
+    const selectAdapter = (adapterType: string) => {
+      mutation.mutate(
+        { energyAdapterType: adapterType },
+        { onSuccess: () => advance({ energyType: adapterType }) },
+      );
+    };
 
-  const selectAdapter = (adapterType: string) => {
-    mutation.mutate(
-      { energyAdapterType: adapterType },
-      {
-        onSuccess: () => {
-          // Navigate to the first energy plugin step, or skip to home-location if none
-          const pluginSteps = energyPluginSteps[adapterType] ?? [];
-          const stepId = pluginSteps.length > 0
-            ? pluginSteps[0].id
-            : "home-location";
-          wizardState.commitSelection({ energyType: adapterType, stepId });
-        },
-      },
-    );
+    return {
+      next: inverterTypeNext(equipmentConfig === undefined, hasSelection),
+      view: (
+        <InverterTypeCards
+          currentAdapter={currentAdapter}
+          onSelect={selectAdapter}
+        />
+      ),
+    };
+  },
+};
+
+function inverterTypeNext(loading: boolean, hasSelection: boolean): WizardNext {
+  if (hasSelection) {
+    return {
+      kind: "ready",
+      hint: "Next continues with the selected energy source",
+      onNext: advanceOnly,
+    };
+  }
+  if (loading) return { kind: "loading" };
+  return {
+    kind: "blocked",
+    reason: "Select an energy source (or None / Skip) to continue",
   };
+}
+
+function InverterTypeCards(
+  { currentAdapter, onSelect }: {
+    currentAdapter: string;
+    onSelect: (adapterType: string) => void;
+  },
+) {
+  const inDemo = demoMode.isActive();
 
   return (
     <div className={styles.stepContainer}>
@@ -73,71 +84,26 @@ export function InverterTypeStep() {
       <div className={styles.optionCards}>
         {energyPluginOptions.map((option) => {
           const Icon = icons[option.iconKey];
-          const demoBlocked = inDemo && !option.demoAvailable;
           return (
-            <div
+            <OptionCard
               key={option.id}
-              className={`${styles.optionCard} ${
-                currentAdapter === option.id ? styles.optionCardSelected : ""
-              }`}
-              role="button"
-              aria-disabled={demoBlocked}
-              tabIndex={demoBlocked ? -1 : 0}
-              style={demoBlocked
-                ? { opacity: 0.5, cursor: "not-allowed" }
-                : undefined}
-              onClick={() => {
-                if (!demoBlocked) selectAdapter(option.id);
-              }}
-              onKeyDown={(e) => {
-                if (demoBlocked) return;
-                if (e.key === "Enter" || e.key === " ") {
-                  selectAdapter(option.id);
-                }
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                }}
-              >
-                <Icon size={18} />
-                <Text weight="bold">{option.label}</Text>
-              </div>
-              <Text size="2" color="gray">
-                {option.description}
-              </Text>
-            </div>
+              icon={<Icon size={18} />}
+              title={option.label}
+              description={option.description}
+              selected={currentAdapter === option.id}
+              disabled={inDemo && !option.demoAvailable}
+              onSelect={() => onSelect(option.id)}
+            />
           );
         })}
 
-        <NoneCard onSelect={() => selectAdapter("")} />
+        <OptionCard
+          icon={<SkipForward size={18} />}
+          title="None / Skip"
+          description="Skip energy source configuration for now. You can add one later in Settings."
+          onSelect={() => onSelect("")}
+        />
       </div>
-    </div>
-  );
-}
-
-function NoneCard({ onSelect }: { onSelect: () => void }) {
-  return (
-    <div
-      className={styles.optionCard}
-      role="button"
-      tabIndex={0}
-      onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") onSelect();
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-        <SkipForward size={18} />
-        <Text weight="bold">None / Skip</Text>
-      </div>
-      <Text size="2" color="gray">
-        Skip energy source configuration for now. You can add one later in
-        Settings.
-      </Text>
     </div>
   );
 }

@@ -2,8 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Callout, Checkbox, Text, TextField } from "@radix-ui/themes";
 import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import { trpc } from "./trpc.ts";
-import { hintUnlessLoading, useWizardNextControl } from "../../../hostUi.ts";
-import { stepStyles as styles } from "../../../hostUi.ts";
+import {
+  advanceOnly,
+  type PluginStepDef,
+  stepStyles as styles,
+  type WizardNext,
+} from "../../../hostUi.ts";
 
 type DiscoveredVehicle = { vin: string; name: string; state: string };
 
@@ -158,10 +162,54 @@ async function saveSelectedVehicles(
   });
 }
 
-export function VehicleSelectionStep(): JSX.Element {
+export const vehicleSelectionStep: PluginStepDef = {
+  id: "tesla-vehicle-selection",
+  label: "Vehicle Selection",
+  useStep: () => {
+    const selection = useVehicleSelection();
+    return {
+      next: selectionNext(selection),
+      view: <VehicleSelectionView {...selection} />,
+    };
+  },
+};
+
+/**
+ * Three ways forward, and each says what Next means: save what was picked,
+ * carry on with vehicles configured earlier, or pick something first.
+ */
+function selectionNext(
+  { loading, selectedCount, existingCount, save }: {
+    loading: boolean;
+    selectedCount: number;
+    existingCount: number;
+    save: () => Promise<void>;
+  },
+): WizardNext {
+  if (loading) return { kind: "loading" };
+  if (selectedCount > 0) {
+    return {
+      kind: "ready",
+      hint: "Next saves the selected vehicles",
+      onNext: save,
+    };
+  }
+  if (existingCount > 0) {
+    return {
+      kind: "ready",
+      hint: "Vehicles already configured — Next continues",
+      onNext: advanceOnly,
+    };
+  }
+  return {
+    kind: "blocked",
+    reason: "Select at least one vehicle to continue",
+  };
+}
+
+function useVehicleSelection() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [priorities, setPriorities] = useState<Record<string, number>>({});
-  const [saveError, setSaveError] = useState<string | null>(null);
   const initialized = useRef(false);
   const utils = trpc.useUtils();
 
@@ -190,38 +238,42 @@ export function VehicleSelectionStep(): JSX.Element {
     setPriorities,
   );
 
-  const handleBeforeNext = async (): Promise<boolean> => {
-    if (selected.size === 0) {
-      // Nothing newly selected — advance only if vehicles already exist.
-      return existingVehicles.length > 0;
-    }
-    setSaveError(null);
-    try {
-      await saveSelectedVehicles({
-        selectedVehicles: vehicles.filter((v) => selected.has(v.vin)),
-        priorities,
-        utils,
-      });
-      // The pairing step reads the plugin vehicle list — drop the pre-save cache.
-      await utils.plugin.vehicle.tesla.listVehicles.invalidate();
-      return true;
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Failed to save");
-      return false;
-    }
+  const save = async () => {
+    await saveSelectedVehicles({
+      selectedVehicles: vehicles.filter((v) => selected.has(v.vin)),
+      priorities,
+      utils,
+    });
+    // The pairing step reads the plugin vehicle list — drop the pre-save cache.
+    await utils.plugin.vehicle.tesla.listVehicles.invalidate();
   };
 
-  useWizardNextControl({
-    canProceed: selected.size > 0 || existingVehicles.length > 0,
-    hint: hintUnlessLoading(
-      loading || existingVehiclesQuery.isLoading,
-      selectionHint(selected.size, existingVehicles.length),
-    ),
-    pendingLabel: "Saving...",
-    onBeforeNext: handleBeforeNext,
-  });
+  return {
+    vehicles,
+    selected,
+    priorities,
+    toggleVehicle,
+    handlePriorityChange,
+    save,
+    selectedCount: selected.size,
+    existingCount: existingVehicles.length,
+    loading: loading || existingVehiclesQuery.isLoading,
+    error: queryError?.message ?? null,
+  };
+}
 
-  const error = queryError?.message ?? saveError ?? null;
+function VehicleSelectionView(
+  {
+    vehicles,
+    selected,
+    priorities,
+    toggleVehicle,
+    handlePriorityChange,
+    existingCount,
+    loading,
+    error,
+  }: ReturnType<typeof useVehicleSelection>,
+) {
   const multiVehicle = selected.size > 1;
 
   return (
@@ -232,7 +284,7 @@ export function VehicleSelectionStep(): JSX.Element {
       </Text>
 
       <StatusCallouts
-        existingVehiclesPresent={existingVehicles.length > 0}
+        existingVehiclesPresent={existingCount > 0}
         loading={loading}
         error={error}
         emptyResult={!loading && !error && vehicles.length === 0}
@@ -255,10 +307,4 @@ export function VehicleSelectionStep(): JSX.Element {
       )}
     </div>
   );
-}
-
-function selectionHint(selectedCount: number, existingCount: number): string {
-  if (selectedCount > 0) return "Next saves the selected vehicles";
-  if (existingCount > 0) return "Vehicles already configured — Next continues";
-  return "Select at least one vehicle to continue";
 }

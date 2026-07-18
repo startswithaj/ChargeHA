@@ -10,9 +10,13 @@ import {
 } from "lucide-react";
 import { useTeslaConfig } from "./useTeslaConfig.ts";
 import { trpc } from "./trpc.ts";
-import { hintUnlessLoading, useWizardNextControl } from "../../../hostUi.ts";
 import { KeyImportForm } from "./KeyImportForm.tsx";
-import { stepStyles as styles } from "../../../hostUi.ts";
+import {
+  advanceOnly,
+  type PluginStepDef,
+  stepStyles as styles,
+  type WizardNext,
+} from "../../../hostUi.ts";
 
 type Mode = "choose" | "generate" | "import";
 
@@ -122,7 +126,41 @@ function useKeyMutations() {
   };
 }
 
-export function KeyGenerationStep(): JSX.Element {
+export const keyGenerationStep: PluginStepDef = {
+  id: "tesla-key-generation",
+  label: "Key Generation",
+  useStep: () => {
+    const keys = useKeyGeneration();
+    return {
+      next: keyGenNext(
+        keys.configLoading,
+        keys.isSuccess,
+        keys.hasExistingKeys,
+      ),
+      view: keys.isSuccess
+        ? <SuccessView mode={keys.mode} />
+        : <KeyGenerationView {...keys} />,
+    };
+  },
+};
+
+function keyGenNext(
+  loading: boolean,
+  isSuccess: boolean,
+  hasExistingKeys: boolean,
+): WizardNext {
+  if (isSuccess || hasExistingKeys) {
+    return {
+      kind: "ready",
+      hint: keyGenHint(isSuccess, hasExistingKeys),
+      onNext: advanceOnly,
+    };
+  }
+  if (loading) return { kind: "loading" };
+  return { kind: "blocked", reason: keyGenHint(isSuccess, hasExistingKeys) };
+}
+
+function useKeyGeneration() {
   const [mode, setMode] = useState<Mode>("choose");
   const { data: teslaConfig } = useTeslaConfig();
   const hasExistingKeys = !!teslaConfig?.ecPublicKeyPem;
@@ -143,22 +181,35 @@ export function KeyGenerationStep(): JSX.Element {
     generateMutation.mutate();
   };
 
-  const isSuccess = generateMutation.isSuccess || importMutation.isSuccess;
-  const isPending = generateMutation.isPending || importMutation.isPending;
-  const error = generateMutation.error ?? importMutation.error;
+  return {
+    mode,
+    setImport: () => setMode("import"),
+    resetToChoose,
+    handleGenerate,
+    handleImport: (publicKeyPem: string, privateKeyPem: string) =>
+      importMutation.mutate({ publicKeyPem, privateKeyPem }),
+    hasExistingKeys,
+    hasEncryptionKey,
+    configLoading: teslaConfig === undefined,
+    isSuccess: generateMutation.isSuccess || importMutation.isSuccess,
+    isPending: generateMutation.isPending || importMutation.isPending,
+    error: generateMutation.error ?? importMutation.error,
+  };
+}
 
-  useWizardNextControl({
-    canProceed: isSuccess || hasExistingKeys,
-    hint: hintUnlessLoading(
-      teslaConfig === undefined,
-      keyGenHint(isSuccess, hasExistingKeys),
-    ),
-  });
-
-  if (isSuccess) {
-    return <SuccessView mode={mode} />;
-  }
-
+function KeyGenerationView(
+  {
+    mode,
+    setImport,
+    resetToChoose,
+    handleGenerate,
+    handleImport,
+    hasExistingKeys,
+    hasEncryptionKey,
+    isPending,
+    error,
+  }: ReturnType<typeof useKeyGeneration>,
+) {
   return (
     <div className={styles.stepContainer}>
       <Text as="p" size="3" color="gray">
@@ -195,7 +246,7 @@ export function KeyGenerationStep(): JSX.Element {
       {mode === "choose" && (
         <ChooseModeCards
           handleGenerate={handleGenerate}
-          setImport={() => setMode("import")}
+          setImport={setImport}
         />
       )}
 
@@ -211,11 +262,7 @@ export function KeyGenerationStep(): JSX.Element {
       {mode === "import" && (
         <KeyImportForm
           isPending={isPending}
-          onImport={(pub, priv) =>
-            importMutation.mutate({
-              publicKeyPem: pub,
-              privateKeyPem: priv,
-            })}
+          onImport={handleImport}
           onBack={resetToChoose}
         />
       )}

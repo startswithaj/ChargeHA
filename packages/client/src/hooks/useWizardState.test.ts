@@ -3,21 +3,16 @@ import { act, renderHook } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { createTestQueryClient } from "../test-utils.tsx";
+import type { WizardNavState } from "@chargeha/shared";
 
 const hoisted = vi.hoisted(() => ({
   state: {
-    stepData: undefined as string | undefined,
-    vehicleTypeData: undefined as string | undefined,
-    energyTypeData: undefined as string | undefined,
-    stepLoading: false,
-    vehicleTypeLoading: false,
-    energyTypeLoading: false,
+    data: undefined as
+      | { stepId: string; vehicleType: string; energyType: string }
+      | undefined,
+    isLoading: false,
   },
-  mutates: {
-    step: vi.fn(),
-    vehicleType: vi.fn(),
-    energyType: vi.fn(),
-  },
+  mutate: vi.fn(),
   cancel: vi.fn(),
   setData: vi.fn(),
 }));
@@ -27,38 +22,18 @@ vi.mock("../trpc.ts", () => ({
   trpc: {
     useUtils: () => ({
       wizard: {
-        getStep: { cancel: hoisted.cancel, setData: hoisted.setData },
-        getVehicleType: { cancel: hoisted.cancel, setData: hoisted.setData },
-        getEnergyType: { cancel: hoisted.cancel, setData: hoisted.setData },
+        state: { cancel: hoisted.cancel, setData: hoisted.setData },
       },
     }),
     wizard: {
-      getStep: {
+      state: {
         useQuery: () => ({
-          data: hoisted.state.stepData,
-          isLoading: hoisted.state.stepLoading,
+          data: hoisted.state.data,
+          isLoading: hoisted.state.isLoading,
         }),
       },
-      getVehicleType: {
-        useQuery: () => ({
-          data: hoisted.state.vehicleTypeData,
-          isLoading: hoisted.state.vehicleTypeLoading,
-        }),
-      },
-      getEnergyType: {
-        useQuery: () => ({
-          data: hoisted.state.energyTypeData,
-          isLoading: hoisted.state.energyTypeLoading,
-        }),
-      },
-      setStep: {
-        useMutation: () => ({ mutate: hoisted.mutates.step }),
-      },
-      setVehicleType: {
-        useMutation: () => ({ mutate: hoisted.mutates.vehicleType }),
-      },
-      setEnergyType: {
-        useMutation: () => ({ mutate: hoisted.mutates.energyType }),
+      patchState: {
+        useMutation: () => ({ mutate: hoisted.mutate }),
       },
     },
   },
@@ -76,117 +51,133 @@ describe("useWizardState", () => {
   const setup = () =>
     renderHook(() => useWizardState(), { wrapper: createWrapper() });
 
+  /** Run the updater the hook handed to setData against a starting state. */
+  const applyOptimisticWrite = (prev: WizardNavState | undefined) => {
+    const updater = hoisted.setData.mock.calls.at(-1)?.[1] as (
+      p: WizardNavState | undefined,
+    ) => WizardNavState;
+    return updater(prev);
+  };
+
   beforeEach(() => {
-    hoisted.state.stepData = undefined;
-    hoisted.state.vehicleTypeData = undefined;
-    hoisted.state.energyTypeData = undefined;
-    hoisted.state.stepLoading = false;
-    hoisted.state.vehicleTypeLoading = false;
-    hoisted.state.energyTypeLoading = false;
-    hoisted.mutates.step.mockClear();
-    hoisted.mutates.vehicleType.mockClear();
-    hoisted.mutates.energyType.mockClear();
+    hoisted.state.data = undefined;
+    hoisted.state.isLoading = false;
+    hoisted.mutate.mockClear();
     hoisted.cancel.mockClear();
     hoisted.setData.mockClear();
   });
 
-  it("returns default values when queries have no data", () => {
+  it("starts at welcome when the query has no data", () => {
     const { result } = setup();
 
-    expect(result.current.stepId).toBe("welcome");
-    expect(result.current.vehicleType).toBe("");
-    expect(result.current.energyType).toBe("");
+    expect(result.current.state).toEqual({
+      stepId: "welcome",
+      vehicleType: "",
+      energyType: "",
+    });
     expect(result.current.isLoading).toBe(false);
   });
 
-  it("returns query data when available", () => {
-    hoisted.state.stepData = "tesla-credentials";
-    hoisted.state.vehicleTypeData = "tesla";
-    hoisted.state.energyTypeData = "fronius_local";
+  it("exposes query data as the store's state", () => {
+    hoisted.state.data = {
+      stepId: "tesla-credentials",
+      vehicleType: "tesla",
+      energyType: "fronius_local",
+    };
 
     const { result } = setup();
 
-    expect(result.current.stepId).toBe("tesla-credentials");
-    expect(result.current.vehicleType).toBe("tesla");
-    expect(result.current.energyType).toBe("fronius_local");
+    expect(result.current.state).toEqual({
+      stepId: "tesla-credentials",
+      vehicleType: "tesla",
+      energyType: "fronius_local",
+    });
   });
 
-  it.each<{
-    name: string;
-    setLoading: () => void;
-  }>([
-    { name: "step", setLoading: () => (hoisted.state.stepLoading = true) },
-    {
-      name: "vehicleType",
-      setLoading: () => (hoisted.state.vehicleTypeLoading = true),
-    },
-    {
-      name: "energyType",
-      setLoading: () => (hoisted.state.energyTypeLoading = true),
-    },
-  ])("isLoading is true when $name query is loading", ({ setLoading }) => {
-    setLoading();
+  it("isLoading is true while the state query is loading", () => {
+    hoisted.state.isLoading = true;
 
     const { result } = setup();
 
     expect(result.current.isLoading).toBe(true);
   });
 
-  it("setStepId persists the step and writes the cache optimistically", () => {
+  it("patch persists the change and writes the cache optimistically", () => {
     const { result } = setup();
 
     act(() => {
-      result.current.setStepId("authentication");
+      result.current.patch({ stepId: "authentication" });
     });
 
-    expect(hoisted.mutates.step).toHaveBeenCalledWith({
-      stepId: "authentication",
-    });
-    // Optimistic write is synchronous (not deferred behind an awaited cancel).
+    expect(hoisted.mutate).toHaveBeenCalledWith({ stepId: "authentication" });
     expect(hoisted.cancel).toHaveBeenCalled();
-    expect(hoisted.setData).toHaveBeenCalledWith(undefined, "authentication");
+    expect(
+      applyOptimisticWrite({
+        stepId: "welcome",
+        vehicleType: "tesla",
+        energyType: "",
+      }),
+    ).toEqual({
+      stepId: "authentication",
+      vehicleType: "tesla",
+      energyType: "",
+    });
   });
 
-  it("commitSelection writes step + energy caches synchronously in one call", () => {
+  it("carries a selection and its step in a single mutation", () => {
     const { result } = setup();
 
     act(() => {
-      result.current.commitSelection({
+      result.current.patch({
         energyType: "fronius_local",
         stepId: "fronius-local-setup",
       });
     });
 
-    expect(hoisted.mutates.step).toHaveBeenCalledWith({
+    // One mutation carries both fields — they cannot land in separate renders.
+    expect(hoisted.mutate).toHaveBeenCalledTimes(1);
+    expect(hoisted.mutate).toHaveBeenCalledWith({
+      energyType: "fronius_local",
       stepId: "fronius-local-setup",
     });
-    expect(hoisted.mutates.energyType).toHaveBeenCalledWith({
-      type: "fronius_local",
-    });
-    // Both caches are written synchronously so React commits them together.
-    expect(hoisted.setData).toHaveBeenCalledWith(
-      undefined,
-      "fronius-local-setup",
-    );
-    expect(hoisted.setData).toHaveBeenCalledWith(undefined, "fronius_local");
-    // vehicleType is untouched when not provided.
-    expect(hoisted.mutates.vehicleType).not.toHaveBeenCalled();
   });
 
-  it("commitSelection persists the vehicle type when provided", () => {
+  it("merges over prior state, leaving omitted fields alone", () => {
     const { result } = setup();
 
     act(() => {
-      result.current.commitSelection({
+      result.current.patch({
         vehicleType: "tesla",
-        stepId: "tesla-credentials",
+        stepId: "tesla-key-generation",
       });
     });
 
-    expect(hoisted.mutates.vehicleType).toHaveBeenCalledWith({ type: "tesla" });
-    expect(hoisted.mutates.step).toHaveBeenCalledWith({
-      stepId: "tesla-credentials",
+    // The step and the type that puts it in the list are written together, and
+    // energyType — not part of this selection — survives untouched.
+    expect(
+      applyOptimisticWrite({
+        stepId: "vehicle-type",
+        vehicleType: "",
+        energyType: "fronius_local",
+      }),
+    ).toEqual({
+      stepId: "tesla-key-generation",
+      vehicleType: "tesla",
+      energyType: "fronius_local",
     });
-    expect(hoisted.mutates.energyType).not.toHaveBeenCalled();
+  });
+
+  it("optimistic write falls back to empty state before the query resolves", () => {
+    const { result } = setup();
+
+    act(() => {
+      result.current.patch({ stepId: "welcome" });
+    });
+
+    expect(applyOptimisticWrite(undefined)).toEqual({
+      stepId: "welcome",
+      vehicleType: "",
+      energyType: "",
+    });
   });
 });

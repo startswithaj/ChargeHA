@@ -206,113 +206,100 @@ describe("WizardService", () => {
     });
   });
 
-  // ── Navigation state (getStep/setStep, etc.) ─────────────────────────
+  // ── Navigation state (getState/patchState) ───────────────────────────
 
-  describe("getStep", () => {
-    it("returns stored step value", async () => {
+  describe("getState", () => {
+    it("reads every field from its config key", async () => {
+      const stored: Record<string, string> = {
+        wizard_step: "tesla-credentials",
+        wizard_vehicle_type: "tesla",
+        wizard_energy_type: "fronius_local",
+      };
       const service = makeService({
         db: {
-          getConfig: () => Promise.resolve("auth-setup"),
+          getConfig: (key: string) => Promise.resolve(stored[key] ?? null),
         },
       });
-      expect(await service.getStep()).toBe("auth-setup");
+
+      expect(await service.getState()).toEqual({
+        stepId: "tesla-credentials",
+        vehicleType: "tesla",
+        energyType: "fronius_local",
+      });
     });
 
-    it("returns empty string when db returns null", async () => {
+    it("defaults each field to empty string when db returns null", async () => {
       const service = makeService({
         db: {
           getConfig: () => Promise.resolve(null),
         },
       });
-      expect(await service.getStep()).toBe("");
+
+      expect(await service.getState()).toEqual({
+        stepId: "",
+        vehicleType: "",
+        energyType: "",
+      });
     });
   });
 
-  describe("setStep", () => {
-    it("persists step to db", async () => {
-      let saved: string | null = null;
+  describe("patchState", () => {
+    it("writes each provided field to its own config key", async () => {
+      const configSet: Record<string, string> = {};
       const service = makeService({
         db: {
-          setConfig: (_key: string, value: string) => {
-            saved = value;
+          setConfig: (key: string, value: string) => {
+            configSet[key] = value;
             return Promise.resolve();
           },
         },
       });
-      await service.setStep("vehicle-type");
-      expect(saved).toBe("vehicle-type");
-    });
-  });
 
-  describe("getVehicleType", () => {
-    it("returns stored vehicle type", async () => {
-      const service = makeService({
-        db: {
-          getConfig: () => Promise.resolve("tesla"),
-        },
+      await service.patchState({
+        stepId: "tesla-key-generation",
+        vehicleType: "tesla",
+        energyType: "fronius_local",
       });
-      expect(await service.getVehicleType()).toBe("tesla");
-    });
 
-    it("returns empty string when db returns null", async () => {
-      const service = makeService({
-        db: {
-          getConfig: () => Promise.resolve(null),
-        },
+      expect(configSet).toEqual({
+        wizard_step: "tesla-key-generation",
+        wizard_vehicle_type: "tesla",
+        wizard_energy_type: "fronius_local",
       });
-      expect(await service.getVehicleType()).toBe("");
     });
-  });
 
-  describe("setVehicleType", () => {
-    it("persists vehicle type to db", async () => {
-      let saved: string | null = null;
+    it("leaves omitted fields untouched", async () => {
+      const configSet: Record<string, string> = {};
       const service = makeService({
         db: {
-          setConfig: (_key: string, value: string) => {
-            saved = value;
+          setConfig: (key: string, value: string) => {
+            configSet[key] = value;
             return Promise.resolve();
           },
         },
       });
-      await service.setVehicleType("simulated");
-      expect(saved).toBe("simulated");
-    });
-  });
 
-  describe("getEnergyType", () => {
-    it("returns stored energy type", async () => {
-      const service = makeService({
-        db: {
-          getConfig: () => Promise.resolve("fronius-local"),
-        },
-      });
-      expect(await service.getEnergyType()).toBe("fronius-local");
+      await service.patchState({ stepId: "done" });
+
+      expect(configSet).toEqual({ wizard_step: "done" });
     });
 
-    it("returns empty string when db returns null", async () => {
+    it("writes an empty string rather than skipping the field", async () => {
+      const configSet: Record<string, string> = {};
       const service = makeService({
         db: {
-          getConfig: () => Promise.resolve(null),
-        },
-      });
-      expect(await service.getEnergyType()).toBe("");
-    });
-  });
-
-  describe("setEnergyType", () => {
-    it("persists energy type to db", async () => {
-      let saved: string | null = null;
-      const service = makeService({
-        db: {
-          setConfig: (_key: string, value: string) => {
-            saved = value;
+          setConfig: (key: string, value: string) => {
+            configSet[key] = value;
             return Promise.resolve();
           },
         },
       });
-      await service.setEnergyType("fronius-cloud");
-      expect(saved).toBe("fronius-cloud");
+
+      // "" is a real selection (None / Skip on the energy step), not an
+      // absent one — only undefined means "don't touch this field".
+      await service.patchState({ energyType: "" });
+
+      expect(configSet).toEqual({ wizard_energy_type: "" });
     });
   });
 

@@ -1,15 +1,10 @@
-import type {
-  EnergyPluginOption,
-  PluginWizardStep,
-} from "../../../componentRegistry.ts";
+import type { PluginStepDef } from "../../../hostUi.ts";
+import type { EnergyPluginOption } from "../../../componentRegistry.ts";
+import { sigenergyLocalSetupStep } from "./SigenergyLocalSetupStep.tsx";
 
-/** Sigenergy wizard step definitions for the setup wizard. */
-export const sigenergyLocalWizardSteps: PluginWizardStep[] = [
-  {
-    id: "sigenergy-local-setup",
-    label: "Sigenergy Setup",
-    componentKey: "sigenergy-local-setup",
-  },
+/** Sigenergy wizard steps, in order. */
+export const sigenergyLocalWizardSteps: PluginStepDef[] = [
+  sigenergyLocalSetupStep,
 ];
 
 /** Sigenergy option metadata for the inverter type selection step. */

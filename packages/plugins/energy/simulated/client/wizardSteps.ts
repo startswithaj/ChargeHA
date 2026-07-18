@@ -1,10 +1,8 @@
-import type {
-  EnergyPluginOption,
-  PluginWizardStep,
-} from "../../../componentRegistry.ts";
+import type { PluginStepDef } from "../../../hostUi.ts";
+import type { EnergyPluginOption } from "../../../componentRegistry.ts";
 
 /** Simulated energy has no setup step — it works with sensible defaults. */
-export const simulatedEnergyWizardSteps: PluginWizardStep[] = [];
+export const simulatedEnergyWizardSteps: PluginStepDef[] = [];
 
 /** Simulated energy option metadata for the inverter type selection step. */
 export const simulatedEnergyOption: EnergyPluginOption = {
