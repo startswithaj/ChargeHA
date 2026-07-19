@@ -154,8 +154,14 @@ export class PluginDependencies<K extends string = string> {
 
   // ── Vehicle lifecycle (notify VehicleManager) ────────────────────────
 
-  addVehicle(row: VehicleRow): Promise<void> {
-    return this.vehicleManager.addVehicle(row);
+  /** Register one of this plugin's vehicles with VehicleManager. The adapter
+   *  type is stamped with the plugin's own id — a plugin cannot register
+   *  another plugin's vehicles. */
+  addVehicle(row: Omit<VehicleRow, "adapterType">): Promise<void> {
+    return this.vehicleManager.addVehicle({
+      ...row,
+      adapterType: this.pluginId,
+    });
   }
 
   /** Permanently delete one of this plugin's vehicles: drops live state,
