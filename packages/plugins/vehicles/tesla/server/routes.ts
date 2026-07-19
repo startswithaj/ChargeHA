@@ -19,13 +19,20 @@ export function createTeslaHttpRoutes(
     if (!code) {
       return c.json({ error: "Missing authorization code" }, 400);
     }
+    if (!state) {
+      return c.json({ error: "Missing state parameter" }, 400);
+    }
 
     try {
       // The token exchange must send the exact redirect_uri used at authorize
-      // time. Behind the tunnel the local server sees http, so the request
-      // URL is only a fallback (restart mid-handshake).
-      const origin = (state && tokenManager.takeAuthOrigin(state)) ||
-        new URL(c.req.url).origin;
+      // time, so the origin is recorded against the state param. An unknown
+      // state means this callback belongs to a handshake this server never
+      // started, or one lost to a restart. Either way the stored origin is
+      // gone and the exchange can't send a matching redirect_uri.
+      const origin = tokenManager.takeAuthOrigin(state);
+      if (origin === null) {
+        return c.json({ error: "Unrecognised or expired state" }, 400);
+      }
       await tokenManager.handleCallback(code, origin);
       // Return a page that closes itself — the original tab is polling for auth status
       return c.html(`<!DOCTYPE html>
@@ -39,7 +46,7 @@ export function createTeslaHttpRoutes(
         `<!DOCTYPE html>
 <html><body>
 <p>Authorization failed: ${
-          error instanceof Error ? error.message : String(error)
+          escapeHtml(error instanceof Error ? error.message : String(error))
         }</p>
 <p>You can close this tab and try again.</p>
 </body></html>`,
@@ -63,4 +70,13 @@ export function createTeslaHttpRoutes(
   });
 
   return app;
+}
+
+/** Escape for HTML text content — the callback renders Tesla's error bodies. */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
