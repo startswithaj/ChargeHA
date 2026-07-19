@@ -56,6 +56,39 @@ describe("JsmodbusReader", () => {
     );
   });
 
+  it("reports not-connected on reads after a failed connect", async () => {
+    const socket = new FakeSocket();
+    socket.connect = function () {
+      queueMicrotask(() => this.emit("error", new Error("ECONNREFUSED")));
+      return this;
+    };
+    const reader = makeReader(socket);
+
+    await expect(reader.connect()).rejects.toThrow("Cannot reach Sigenergy");
+    // Leaving the socket assigned would hand back a client bound to a dead
+    // socket, failing with jsmodbus's opaque "no connection to modbus server".
+    await expect(reader.readInputRegisters(247, 30000, 2)).rejects.toThrow(
+      "Modbus socket is not connected",
+    );
+    expect(socket.destroyed).toBe(true);
+  });
+
+  it("keeps an error handler attached when connect fails", async () => {
+    const socket = new FakeSocket();
+    socket.connect = function () {
+      queueMicrotask(() => this.emit("error", new Error("ECONNREFUSED")));
+      return this;
+    };
+
+    await expect(makeReader(socket).connect()).rejects.toThrow(
+      "Cannot reach Sigenergy",
+    );
+    expect(socket.listenerCount("error")).toBeGreaterThan(0);
+    // Would throw ERR_UNHANDLED_ERROR if the failure path had left the socket
+    // bare between cleanup() and destroy().
+    socket.emit("error", new Error("late ECONNRESET"));
+  });
+
   it("destroys the socket on disconnect", async () => {
     const socket = new FakeSocket();
     const reader = makeReader(socket);
