@@ -306,6 +306,44 @@ describe("TeslaTokenManager", () => {
       }
     });
 
+    it("shares one refresh request across concurrent callers", async () => {
+      const d = makeDeps(db);
+      // Expired access token, so every entry point below triggers a refresh.
+      const expiredAt = new Date(Date.now() - 1000).toISOString();
+      await seedTokens(db, "old-access", "old-refresh", expiredAt);
+
+      let calls = 0;
+      let release = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const fakeFetch = async () => {
+        calls++;
+        // Hold the request open so the second caller arrives mid-flight — the
+        // race this guards is two POSTs consuming the same rotating token.
+        await gate;
+        return new Response(
+          JSON.stringify({
+            access_token: "new-access",
+            refresh_token: "new-refresh",
+            expires_in: 3600,
+          }),
+          { status: 200 },
+        );
+      };
+      const m = new TeslaTokenManager(d, testLogger, fakeFetch);
+
+      try {
+        const both = Promise.all([m.getAccessToken(), m.isAuthenticated()]);
+        release();
+        const [token] = await both;
+        expect(calls).toBe(1);
+        expect(token).toBe("new-access");
+      } finally {
+        m.stopAutoRefresh();
+      }
+    });
+
     it("returns empty strings when no credentials in DB", async () => {
       // Fresh DB with no tesla config
       const freshDb = new AppDatabase(":memory:");

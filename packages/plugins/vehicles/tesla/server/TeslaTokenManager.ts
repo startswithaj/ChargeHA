@@ -43,6 +43,7 @@ export class TeslaTokenManager {
   private readonly logger: Logger;
   private readonly fetch: FetchFn;
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  private refreshInFlight: Promise<void> | null = null;
   /** Per-attempt OAuth handshake state: the redirect origin sent at authorize
    *  time, keyed by the state param, so the callback's token exchange can send
    *  the byte-identical redirect_uri. In-memory on purpose — a restart
@@ -218,7 +219,20 @@ export class TeslaTokenManager {
     return FLEET_API_URLS[c.region] ?? FLEET_API_URLS.na;
   }
 
-  private async refreshTokens(): Promise<void> {
+  /**
+   * Tesla rotates refresh tokens — each refresh consumes the old one. Two
+   * concurrent refreshes would POST the same token, and last-writer-wins could
+   * persist the superseded value, breaking auth until the user re-authorizes.
+   * Concurrent callers share one in-flight request.
+   */
+  private refreshTokens(): Promise<void> {
+    this.refreshInFlight ??= this.performRefresh().finally(() => {
+      this.refreshInFlight = null;
+    });
+    return this.refreshInFlight;
+  }
+
+  private async performRefresh(): Promise<void> {
     const tokens = await this.getTokens();
     if (!tokens) throw new Error("No tokens to refresh");
 
