@@ -111,15 +111,15 @@ function DoneSummary({ onSkipTo }: StepProps) {
   // Always refetch on mount so the summary reflects the just-finished setup,
   // not a stale cache from an earlier step or the quick demo setup.
   const fresh = { refetchOnMount: "always" } as const;
-  const { data: systemConfig, isFetching: systemFetching } = trpc.config.system
+  const { data: systemConfig, isLoading: systemLoading } = trpc.config.system
     .get.useQuery(undefined, fresh);
-  const { data: equipmentConfig, isFetching: equipmentFetching } = trpc.config
+  const { data: equipmentConfig, isLoading: equipmentLoading } = trpc.config
     .equipment.get.useQuery(undefined, fresh);
-  const { data: homeConfig, isFetching: homeFetching } = trpc.config.home.get
+  const { data: homeConfig, isLoading: homeLoading } = trpc.config.home.get
     .useQuery(undefined, fresh);
-  const { data: authSession, isFetching: authFetching } = trpc.auth.session
+  const { data: authSession, isLoading: authLoading } = trpc.auth.session
     .useQuery(undefined, fresh);
-  const { data: vehiclesData, isFetching: vehiclesFetching } = trpc.vehicle.list
+  const { data: vehiclesData, isLoading: vehiclesLoading } = trpc.vehicle.list
     .useQuery(undefined, fresh);
   const vehicles = useMemo(
     () => (vehiclesData?.vehicles ?? []) as VehicleWithState[],
@@ -142,8 +142,10 @@ function DoneSummary({ onSkipTo }: StepProps) {
 
   const authMode = authSession?.authMode ?? "none";
 
-  const loading = systemFetching || equipmentFetching || homeFetching ||
-    vehiclesFetching || authFetching;
+  // isLoading, not isFetching — the summary must not blank out on the
+  // background refetches that invalidations elsewhere trigger.
+  const loading = systemLoading || equipmentLoading || homeLoading ||
+    vehiclesLoading || authLoading;
 
   const checklist = buildChecklist({
     authMode,
