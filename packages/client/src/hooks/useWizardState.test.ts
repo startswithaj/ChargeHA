@@ -15,6 +15,7 @@ const hoisted = vi.hoisted(() => ({
   mutate: vi.fn(),
   cancel: vi.fn(),
   setData: vi.fn(),
+  invalidate: vi.fn(),
 }));
 
 vi.mock("../trpc.ts", () => ({
@@ -22,7 +23,11 @@ vi.mock("../trpc.ts", () => ({
   trpc: {
     useUtils: () => ({
       wizard: {
-        state: { cancel: hoisted.cancel, setData: hoisted.setData },
+        state: {
+          cancel: hoisted.cancel,
+          setData: hoisted.setData,
+          invalidate: hoisted.invalidate,
+        },
       },
     }),
     wizard: {
@@ -109,7 +114,10 @@ describe("useWizardState", () => {
       result.current.patch({ stepId: "authentication" });
     });
 
-    expect(hoisted.mutate).toHaveBeenCalledWith({ stepId: "authentication" });
+    expect(hoisted.mutate).toHaveBeenCalledWith(
+      { stepId: "authentication" },
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
     expect(hoisted.cancel).toHaveBeenCalled();
     expect(
       applyOptimisticWrite({
@@ -124,6 +132,25 @@ describe("useWizardState", () => {
     });
   });
 
+  it("refetches server state when the patch fails", () => {
+    const { result } = setup();
+
+    act(() => {
+      result.current.patch({ stepId: "authentication" });
+    });
+
+    // The optimistic write left the client on a step the server never stored;
+    // without the refetch it survives until the next load, then jumps back.
+    const opts = hoisted.mutate.mock.calls.at(-1)?.[1] as {
+      onError: () => void;
+    };
+    expect(hoisted.invalidate).not.toHaveBeenCalled();
+    act(() => {
+      opts.onError();
+    });
+    expect(hoisted.invalidate).toHaveBeenCalled();
+  });
+
   it("carries a selection and its step in a single mutation", () => {
     const { result } = setup();
 
@@ -136,10 +163,10 @@ describe("useWizardState", () => {
 
     // One mutation carries both fields — they cannot land in separate renders.
     expect(hoisted.mutate).toHaveBeenCalledTimes(1);
-    expect(hoisted.mutate).toHaveBeenCalledWith({
-      energyType: "fronius_local",
-      stepId: "fronius-local-setup",
-    });
+    expect(hoisted.mutate).toHaveBeenCalledWith(
+      { energyType: "fronius_local", stepId: "fronius-local-setup" },
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
   });
 
   it("merges over prior state, leaving omitted fields alone", () => {

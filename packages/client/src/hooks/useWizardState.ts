@@ -29,7 +29,13 @@ export function useWizardState(): WizardStore {
         ...(prev ?? EMPTY_STATE),
         ...next,
       }));
-      patchMutation.mutate(next);
+      patchMutation.mutate(next, {
+        // Don't leave the client sitting on a step the server never stored —
+        // it survives until the next load, then silently jumps backwards.
+        onError: () => {
+          utils.wizard.state.invalidate();
+        },
+      });
     },
     [utils, patchMutation],
   );
