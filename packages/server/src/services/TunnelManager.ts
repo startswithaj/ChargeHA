@@ -173,25 +173,19 @@ export class TunnelManager {
         stderr: "piped",
       });
 
-      this.process = cmd.spawn();
+      const process = cmd.spawn();
+      this.process = process;
       this.logger.info(
-        `${this.provider.name} tunnel started (PID ${this.process.pid})`,
+        `${this.provider.name} tunnel started (PID ${process.pid})`,
       );
 
-      this._tunnelUrl = await this.parseTunnelUrl(this.process);
+      this._tunnelUrl = await this.parseTunnelUrl(process);
       this.logger.info(`Tunnel URL: ${this._tunnelUrl}`);
 
       // Continue piping the URL stream in background
-      this.pipeUrlStream(this.process);
+      this.pipeUrlStream(process);
 
-      // Monitor for unexpected exit
-      this.process.status.then((status: Deno.CommandStatus) => {
-        this.logger.warn(
-          `${this.provider.name} tunnel exited with code ${status.code}`,
-        );
-        this.process = null;
-        this._tunnelUrl = null;
-      });
+      this.monitorExit(process);
 
       return this._tunnelUrl;
     } catch (err) {
@@ -207,6 +201,20 @@ export class TunnelManager {
       }
       throw err;
     }
+  }
+
+  /** Clear tunnel state when the process exits, expectedly or otherwise. */
+  private monitorExit(process: Deno.ChildProcess): void {
+    process.status.then((status: Deno.CommandStatus) => {
+      this.logger.warn(
+        `${this.provider.name} tunnel exited with code ${status.code}`,
+      );
+      // A stop-then-start can land the old process's exit after the new one is
+      // assigned — clearing unconditionally would wipe the live tunnel's URL.
+      if (this.process !== process) return;
+      this.process = null;
+      this._tunnelUrl = null;
+    });
   }
 
   /** Stop the tunnel process and middleware server. */

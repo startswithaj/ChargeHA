@@ -391,6 +391,62 @@ describe("TunnelManager", () => {
       await tm.stop();
     });
 
+    it("keeps the new tunnel URL when the old process exits late", async () => {
+      const first = createMockProcess({
+        stderrChunks: ["https://tunnel-old.tunnel.example.com\n"],
+      });
+      stubDenoServe();
+      stubDenoCommand({ mockProcess: first.process });
+
+      const tm = makeTunnelManager();
+      await tm.start();
+      await tm.stop();
+
+      const second = createMockProcess({
+        stderrChunks: ["https://tunnel-new.tunnel.example.com\n"],
+      });
+      stubDenoServe();
+      stubDenoCommand({ mockProcess: second.process });
+      await tm.start();
+      expect(tm.tunnelUrl).toBe("https://tunnel-new.tunnel.example.com");
+
+      // The old process's exit resolves only now, after the new one is live.
+      // Clearing state unconditionally here would wipe the running tunnel.
+      first.resolveStatus(
+        { success: false, code: 0, signal: null } as Deno.CommandStatus,
+      );
+      // Let the status.then handler run before asserting.
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(tm.tunnelUrl).toBe("https://tunnel-new.tunnel.example.com");
+      expect(tm.isRunning).toBe(true);
+
+      await tm.stop();
+    });
+
+    it("clears state when the live tunnel process exits", async () => {
+      const { process, resolveStatus } = createMockProcess({
+        stderrChunks: ["https://tunnel-live.tunnel.example.com\n"],
+      });
+      stubDenoServe();
+      stubDenoCommand({ mockProcess: process });
+
+      const tm = makeTunnelManager();
+      await tm.start();
+      expect(tm.tunnelUrl).toBe("https://tunnel-live.tunnel.example.com");
+
+      resolveStatus(
+        { success: false, code: 1, signal: null } as Deno.CommandStatus,
+      );
+      // Let the status.then handler run before asserting.
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(tm.tunnelUrl).toBeNull();
+      expect(tm.isRunning).toBe(false);
+
+      await tm.stop();
+    });
+
     it("throws specific error when the tunnel binary is not found", async () => {
       stubDenoServe();
       stubDenoCommand({
