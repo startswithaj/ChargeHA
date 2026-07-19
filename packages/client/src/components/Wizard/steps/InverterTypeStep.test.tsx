@@ -6,9 +6,14 @@ import { renderWithProviders } from "../../../test-utils.tsx";
 import { inverterTypeStep } from "./InverterTypeStep.tsx";
 import { StepNextHarness } from "./test-helpers/StepNextHarness.tsx";
 
-const { mockMutate, mockAdvance } = vi.hoisted(() => ({
+const { mockMutate, mockAdvance, mockEquipmentGet } = vi.hoisted(() => ({
   mockMutate: vi.fn(),
   mockAdvance: vi.fn(),
+  mockEquipmentGet: vi.fn(() => ({
+    data: {} as { energyAdapterType?: string },
+    isLoading: false,
+    error: null,
+  })),
 }));
 
 vi.mock("../../../hooks/useWizardState.ts", () => ({
@@ -39,7 +44,7 @@ vi.mock("../../../trpc.ts", () => ({
     config: {
       equipment: {
         get: {
-          useQuery: vi.fn(() => ({ data: {}, isLoading: false, error: null })),
+          useQuery: mockEquipmentGet,
         },
         set: {
           useMutation: vi.fn(() => ({
@@ -76,6 +81,11 @@ describe("InverterTypeStep", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsDemoMode.mockReturnValue(false);
+    mockEquipmentGet.mockReturnValue({
+      data: {},
+      isLoading: false,
+      error: null,
+    });
     mockMutate.mockImplementation(
       (_input: unknown, opts?: { onSuccess?: () => void }) => {
         opts?.onSuccess?.();
@@ -152,6 +162,23 @@ describe("InverterTypeStep", () => {
       expect(mockAdvance).toHaveBeenCalledWith({ energyType: adapterType });
     },
   );
+
+  it("Next commits the saved adapter type when the wizard state has none", () => {
+    // energy_adapter_type survives wizard completion, so a re-opened wizard
+    // shows the saved source as selected while state.energyType is still "".
+    // Step membership keys off state.energyType, so Next must write it —
+    // otherwise the flow skips the plugin's own setup steps.
+    mockEquipmentGet.mockReturnValue({
+      data: { energyAdapterType: "fronius_local" },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(<StepNextHarness def={inverterTypeStep} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /^Next/ }));
+
+    expect(mockAdvance).toHaveBeenCalledWith({ energyType: "fronius_local" });
+  });
 
   it("does not advance when persisting the adapter fails", () => {
     mockMutate.mockImplementation(() => {});

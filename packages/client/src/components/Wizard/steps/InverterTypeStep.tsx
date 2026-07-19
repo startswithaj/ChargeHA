@@ -7,8 +7,8 @@ import {
   useEquipmentConfigMutation,
 } from "../../../hooks/useSectionConfig.ts";
 import { demoMode } from "../../../lib/featureFlags.ts";
-import { advanceOnly, type StepDef, type WizardNext } from "../flow.ts";
-import { useWizardAdvance } from "../wizardAdvance.ts";
+import type { StepDef, WizardNext } from "../flow.ts";
+import { useWizardAdvance, type WizardAdvance } from "../wizardAdvance.ts";
 import { OptionCard } from "./OptionCard.tsx";
 import styles from "./steps.module.css";
 
@@ -31,6 +31,7 @@ export const inverterTypeStep: StepDef = {
     // "" (None / Skip) is a valid selection but indistinguishable from "not
     // chosen yet" in config — track this session's explicit choice as well.
     const hasSelection = !!currentAdapter || !!state.energyType;
+    const selectedType = state.energyType || currentAdapter;
 
     const selectAdapter = (adapterType: string) => {
       mutation.mutate(
@@ -40,7 +41,12 @@ export const inverterTypeStep: StepDef = {
     };
 
     return {
-      next: inverterTypeNext(equipmentConfig === undefined, hasSelection),
+      next: inverterTypeNext(
+        equipmentConfig === undefined,
+        hasSelection,
+        selectedType,
+        advance,
+      ),
       view: (
         <InverterTypeCards
           currentAdapter={currentAdapter}
@@ -51,12 +57,23 @@ export const inverterTypeStep: StepDef = {
   },
 };
 
-function inverterTypeNext(loading: boolean, hasSelection: boolean): WizardNext {
+function inverterTypeNext(
+  loading: boolean,
+  hasSelection: boolean,
+  selectedType: string,
+  advance: WizardAdvance,
+): WizardNext {
   if (hasSelection) {
     return {
       kind: "ready",
       hint: "Next continues with the selected energy source",
-      onNext: advanceOnly,
+      // Not advanceOnly: the selection can come from saved config while
+      // state.energyType is still "". Step membership keys off state.energyType,
+      // so writing it here is what stops Next skipping the plugin's steps.
+      onNext: () => {
+        advance({ energyType: selectedType });
+        return Promise.resolve();
+      },
     };
   }
   if (loading) return { kind: "loading" };

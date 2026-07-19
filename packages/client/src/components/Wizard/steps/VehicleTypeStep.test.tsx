@@ -139,6 +139,21 @@ describe("VehicleTypeStep", () => {
     expect(mockAdvance).not.toHaveBeenCalled();
   });
 
+  it("Next commits the existing vehicle type when the wizard state has none", () => {
+    // A re-opened wizard clears wizard_vehicle_type but keeps the vehicle row,
+    // so the card renders selected off the existing vehicle. Step membership
+    // keys off state.vehicleType, so Next must write it — otherwise the flow
+    // computes the next step against "" and skips the plugin's steps entirely.
+    mockVehicleList.mockReturnValue({
+      data: { vehicles: [{ adapterType: "tesla" }] },
+    });
+    renderWithProviders(<StepNextHarness def={vehicleTypeStep} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /^Next/ }));
+
+    expect(mockAdvance).toHaveBeenCalledWith({ vehicleType: "tesla" });
+  });
+
   it("reselecting the already-configured vehicle type proceeds without recreating it", () => {
     mockVehicleList.mockReturnValue({
       data: { vehicles: [{ adapterType: "simulated" }] },

@@ -5,8 +5,8 @@ import { useWizardState } from "../../../hooks/useWizardState.ts";
 import { vehiclePluginOptions } from "@chargeha/plugins/componentRegistry";
 import { trpc } from "../../../trpc.ts";
 import { demoMode } from "../../../lib/featureFlags.ts";
-import { advanceOnly, type StepDef, type WizardNext } from "../flow.ts";
-import { useWizardAdvance } from "../wizardAdvance.ts";
+import type { StepDef, WizardNext } from "../flow.ts";
+import { useWizardAdvance, type WizardAdvance } from "../wizardAdvance.ts";
 import { OptionCard } from "./OptionCard.tsx";
 import styles from "./steps.module.css";
 
@@ -33,8 +33,10 @@ export const vehicleTypeStep: StepDef = {
       onSuccess: () => {
         utils.vehicle.list.invalidate();
         const id = pendingIdRef.current;
-        if (!id) throw new Error("Expected pending vehicle type ID");
-        advance({ vehicleType: id });
+        pendingIdRef.current = null;
+        // Throwing here would surface as an unhandled rejection rather than
+        // anything an error boundary catches — the selection just won't advance.
+        if (id) advance({ vehicleType: id });
       },
     });
 
@@ -53,6 +55,7 @@ export const vehicleTypeStep: StepDef = {
       next: vehicleTypeNext(
         vehiclesData === undefined || isLoading,
         selectedType,
+        advance,
       ),
       view: (
         <VehicleTypeCards
@@ -66,12 +69,23 @@ export const vehicleTypeStep: StepDef = {
   },
 };
 
-function vehicleTypeNext(loading: boolean, selectedType: string): WizardNext {
+function vehicleTypeNext(
+  loading: boolean,
+  selectedType: string,
+  advance: WizardAdvance,
+): WizardNext {
   if (selectedType) {
     return {
       kind: "ready",
       hint: "Next continues with the selected vehicle type",
-      onNext: advanceOnly,
+      // Not advanceOnly: selectedType can come from an existing vehicle while
+      // state.vehicleType is still "" (a re-opened wizard clears the type but
+      // keeps the vehicle). Step membership keys off state.vehicleType, so
+      // writing it here is what stops Next skipping the whole plugin block.
+      onNext: () => {
+        advance({ vehicleType: selectedType });
+        return Promise.resolve();
+      },
     };
   }
   if (loading) return { kind: "loading" };
