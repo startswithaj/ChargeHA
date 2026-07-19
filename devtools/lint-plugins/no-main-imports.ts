@@ -24,16 +24,30 @@ export default {
         const normalised = context.filename.replace(/\\/g, "/");
         if (!isPluginFile(normalised)) return {};
         if (normalised.endsWith("/packages/plugins/hostUi.ts")) return {};
+        const report = (node: Deno.lint.Node, source: string) => {
+          if (!source.includes("client/src/")) return;
+          context.report({
+            node,
+            message:
+              "Plugin code must not deep-import main's client internals — import the host UI surface " +
+              "from packages/plugins/hostUi.ts (add the export there if it's missing).",
+          });
+        };
         return {
           ImportDeclaration(node: Deno.lint.ImportDeclaration) {
-            const source = String(node.source.value);
-            if (!source.includes("client/src/")) return;
-            context.report({
-              node: node.source,
-              message:
-                "Plugin code must not deep-import main's client internals — import the host UI surface " +
-                "from packages/plugins/hostUi.ts (add the export there if it's missing).",
-            });
+            report(node.source, String(node.source.value));
+          },
+          // A re-export reaches main's internals just as directly as an import,
+          // and a local barrel would otherwise launder them past this rule.
+          ExportNamedDeclaration(node: Deno.lint.ExportNamedDeclaration) {
+            if (node.source) report(node.source, String(node.source.value));
+          },
+          ExportAllDeclaration(node: Deno.lint.ExportAllDeclaration) {
+            if (node.source) report(node.source, String(node.source.value));
+          },
+          ImportExpression(node: Deno.lint.ImportExpression) {
+            if (node.source.type !== "Literal") return;
+            report(node.source, String(node.source.value));
           },
         };
       },

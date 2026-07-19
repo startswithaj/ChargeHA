@@ -16,6 +16,31 @@ Deno.test("no-main-imports", async (t) => {
     expect(diags.length).toBe(1);
   });
 
+  // Re-exports and dynamic imports reach main's internals just as directly as
+  // a static import — a plugin could otherwise launder them via a local barrel.
+  await t.step("flags named re-exports of main's client", () => {
+    const diags = lint(
+      `export { Spinner } from "../../../../client/src/components/ui/Spinner.tsx";`,
+    );
+    expect(diags.length).toBe(1);
+  });
+
+  await t.step("flags star re-exports of main's client", () => {
+    const diags = lint(`export * from "../../../../client/src/trpc.ts";`);
+    expect(diags.length).toBe(1);
+  });
+
+  await t.step("flags dynamic imports of main's client", () => {
+    const diags = lint(
+      `const load = () => import("../../../../client/src/trpc.ts");`,
+    );
+    expect(diags.length).toBe(1);
+  });
+
+  await t.step("ignores re-exports that stay inside the plugin", () => {
+    expect(lint(`export { helper } from "./helper.ts";`).length).toBe(0);
+  });
+
   await t.step("allows importing through the hostUi barrel", () => {
     expect(lint(`import { Spinner } from "../../../hostUi.ts";`).length)
       .toBe(0);
