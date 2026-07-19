@@ -182,10 +182,24 @@ export class EnphaseClient {
     if (this.cachedToken && !this.isExpiring(this.cachedToken)) {
       return this.cachedToken;
     }
-    const fresh = await this.fetchOwnerToken();
-    this.cachedToken = fresh;
-    await this.persistToken(fresh);
-    return fresh;
+    // The cooldown is gated here rather than only on the 401 path: every route
+    // to the cloud login runs through this method, and a failed login leaves
+    // the cache empty, so the next poll would come straight back in and log in
+    // again — the account lockout this cooldown exists to prevent.
+    if (this.now() < this.refreshRejectedUntil) {
+      throw new EnphaseAuthError(
+        "Pausing Enphase cloud token refresh after a failed attempt, to avoid an account lockout",
+      );
+    }
+    try {
+      const fresh = await this.fetchOwnerToken();
+      this.cachedToken = fresh;
+      await this.persistToken(fresh);
+      return fresh;
+    } catch (err) {
+      this.refreshRejectedUntil = this.now() + AUTH_RETRY_COOLDOWN_MS;
+      throw err;
+    }
   }
 
   private isExpiring(token: string): boolean {
