@@ -6,6 +6,25 @@ Solar-aware EV charge controller for home automation. ChargeHA monitors your
 solar production and intelligently manages EV charging to maximise
 self-consumption — with advanced scheduling and notifications. Set and forget.
 
+## Contents
+
+- [Demo](#demo)
+- [ChargeHQ.net](#chargehqnet)
+- [Features](#features)
+- [Supported Integrations](#supported-integrations)
+- [Notes about Tesla](#notes-about-tesla)
+- [How It Works](#how-it-works)
+- [Quick Start](#quick-start)
+- [Mobile & Home Screen](#mobile--home-screen)
+- [Getting Started](#getting-started)
+- [Environment Variables](#environment-variables)
+- [Database Migrations](#database-migrations)
+- [Roadmap](#roadmap)
+- [Tech Stack](#tech-stack)
+- [App Tour Video](#app-tour-video)
+- [Contributing](#contributing)
+- [Contributors](#contributors)
+
 ## Demo
 
 ChargeHA has a demo mode that lets you review the features without installing.
@@ -16,9 +35,13 @@ It runs entirely in the browser.
 ## ChargeHQ.net
 
 ChargeHA is a self-hosted app that aims to have feature parity with
-[ChargeHQ](https://chargehq.net/). ChargeHQ is a very stable, reliable charge
+[ChargeHQ](https://chargehq.net/). ~~ChargeHQ is a very stable, reliable charge
 controller. It's only $7.99 AUD, so highly recommended if you don't care about
-self-hosting.
+self-hosting.~~
+
+**ChargeHQ is shutting down.** If you're a ChargeHQ user looking for a
+replacement, ChargeHA is built to fill that gap — self-hosted, no subscription,
+and your data stays on your own hardware.
 
 ChargeHA is not affiliated with, endorsed by, or associated with ChargeHQ.
 
@@ -374,6 +397,98 @@ enabling support for non-Tesla EVs through smart EVSE chargers.
 <p align="center">
   <img src="docs/chargeha-tour.webp" alt="Animated tour of ChargeHA: dashboard, stats, schedules, logs, simulator, and settings" width="800" />
 </p>
+
+## Contributing
+
+Contributions are very welcome — especially **new vehicles, inverters, and
+chargers**. If you own hardware ChargeHA doesn't support yet, adding it is
+usually a weekend's work.
+
+### Plugin architecture
+
+Every integration lives in `packages/plugins/` as a self-contained plugin. Core
+code never references a plugin by ID — plugins register themselves into
+`VehiclePluginRegistry` / `EnergyPluginRegistry` at boot and everything else
+talks to them through interfaces. That means a new integration is _additive_:
+you create a folder, register it in one place, and touch no existing logic.
+
+A plugin owns its own:
+
+- **Adapter** — the device protocol (HTTP, Modbus TCP, cloud API)
+- **Config schema** — declarative; the settings UI renders itself from it
+- **tRPC router** — optional, for plugin-specific actions like discovery
+- **Client components** — settings panel and setup-wizard steps
+- **Health checks** — surfaced as dashboard warnings when the device is unhappy
+
+### Adding an inverter
+
+An energy plugin only has to answer one question: _what is the power flow right
+now?_ The whole adapter contract is five methods:
+
+```ts
+export interface EnergySourceAdapter {
+  connect(): Promise<void>;
+  disconnect(): Promise<void>;
+  getRealtimeData(): Promise<EnergyData>;
+  getDeviceInfo(): Promise<DeviceInfo>;
+  pollIntervalSeconds(): number;
+}
+```
+
+`getRealtimeData()` returns solar production, grid power (positive = import,
+negative = export), home consumption, and optional battery power/SOC. Once those
+numbers are flowing, solar tracking, scheduling, blockouts, stats, and
+notifications all work for free.
+
+The plugin wrapper around it is thin:
+
+```ts
+export class MyInverterPlugin implements EnergyPlugin {
+  readonly id = "my_inverter";
+  readonly displayName = "My Inverter (Local)";
+  readonly vendor = "MyBrand";
+  readonly configDef = myInverterConfigDef;
+  readonly secretKeys: readonly string[] = [];
+
+  constructor(private readonly deps: PluginDependencies) {}
+
+  async createAdapter(): Promise<EnergySourceAdapter> {
+    const host = await this.deps.getConfig("host");
+    if (!host) throw new Error("Host not configured");
+    return new MyInverterAdapter(host, this.deps.log);
+  }
+  // ...getRouter(), getHealthChecks(), shutdown()
+}
+```
+
+Then one line in `packages/plugins/registerPlugins.ts`:
+
+```ts
+energyRegistry.register(new MyInverterPlugin(make("my_inverter")));
+```
+
+Copy `packages/plugins/energy/fronius-local/` (HTTP) or `sigenergy-local/`
+(Modbus TCP) as your starting point — both include auto-discovery, config UI,
+and adapter tests.
+
+### Vehicles and chargers
+
+Vehicle plugins implement `VehiclePlugin` + `VehicleMiddleware` — the middleware
+layer exists so plugins can apply their own caching and cost model (the Tesla
+plugin optimises hard against Fleet API pricing). Start from
+`packages/plugins/vehicles/simulated/` for the minimal shape.
+
+Charger support (OCPP 1.6J) is on the roadmap and will add a `ChargerAdapter`
+plugin type — see [Roadmap](#roadmap). If you want to help land it, open an
+issue first so we can agree the interface.
+
+### Before you open a PR
+
+- Read [docs/code.md](docs/code.md) for conventions and project layout
+- Add tests for your adapter (see the `test-helpers/` folders in existing
+  plugins)
+- Run `deno task check:all` — formatting, lint, types, plugin refs, and tests
+  must all pass
 
 ## Contributors
 
