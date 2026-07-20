@@ -17,7 +17,6 @@ import {
 } from "../shared/publicKeyDomain.ts";
 import { Spinner } from "../../../hostUi.ts";
 import { ErrorBanner } from "../../../hostUi.ts";
-import { useInvalidateVehiclePlugins } from "../../../hostUi.ts";
 import { TeslaSetupInstructions } from "./TeslaSetupInstructions.tsx";
 
 function useTransitionToAdd(
@@ -427,7 +426,6 @@ function useTeslaSettingsMutations(
     setPolling: (b: boolean) => void;
   },
 ) {
-  const invalidateVehiclePlugins = useInvalidateVehiclePlugins();
   const connectMutation = trpc.plugin.vehicle.tesla.getAuthUrl.useMutation({
     onSuccess: ({ url }: { url: string }) => {
       globalThis.open(url, "_blank");
@@ -477,8 +475,6 @@ function useTeslaSettingsMutations(
     });
   const resetMutation = trpc.plugin.vehicle.tesla.resetOnboarding.useMutation({
     onSuccess: () => {
-      // Flip the plugin back to not-configured so the setup card reappears.
-      invalidateVehiclePlugins();
       utils.plugin.vehicle.tesla.teslaStatus.invalidate();
       utils.plugin.vehicle.tesla.teslaVehicles.invalidate();
       utils.plugin.vehicle.tesla.listVehicles.invalidate();

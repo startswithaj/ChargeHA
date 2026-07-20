@@ -41,4 +41,3 @@ export {
   type PhotonResult,
   useAddressAutocomplete,
 } from "../client/src/hooks/useAddressAutocomplete.ts";
-export { useInvalidateVehiclePlugins } from "../client/src/hooks/useInvalidateVehiclePlugins.ts";
