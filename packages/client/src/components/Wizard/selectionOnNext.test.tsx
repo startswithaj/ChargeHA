@@ -84,4 +84,55 @@ describe("selection committed on Next", () => {
     });
     expect(state.stepId).toBe("tesla-step");
   });
+
+  it("saves the selection and finishes when the selecting step is last", async () => {
+    // The end of the flow used to write the current step onto itself, so a
+    // selection step in last position applied nothing and went nowhere — no
+    // completion, no error, no movement.
+    const onlyStep: StepDef[] = [
+      {
+        id: "vehicle-type",
+        label: "Vehicle Type",
+        useStep: () => ({
+          next: {
+            kind: "ready",
+            hint: null,
+            onNext: () => Promise.resolve({ vehicleType: "tesla" }),
+          },
+          view: <div>vehicle-type</div>,
+        }),
+      },
+    ];
+    let state: WizardNavState = {
+      stepId: "vehicle-type",
+      vehicleType: "",
+      energyType: "",
+    };
+    const patch = vi.fn((next: Partial<WizardNavState>) => {
+      state = { ...state, ...next };
+    });
+    const onComplete = vi.fn();
+    const store = {
+      get state() {
+        return state;
+      },
+      patch,
+      isLoading: false,
+    } as unknown as WizardStore;
+
+    render(
+      <WizardShell
+        flow={onlyStep}
+        store={store}
+        basePath="/x"
+        onComplete={onComplete}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Finish/ }));
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(patch).toHaveBeenCalledWith({ vehicleType: "tesla" });
+    expect(onComplete).toHaveBeenCalledTimes(1);
+  });
 });
