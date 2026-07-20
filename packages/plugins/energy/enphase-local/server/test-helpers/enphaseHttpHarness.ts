@@ -40,8 +40,7 @@ export class FakeEnvoyHttp implements EnvoyHttp {
  *  Encoded as base64url (no padding, `-`/`_` alphabet) like real JWTs. */
 export const makeJwt = (nowMs: number, msFromNow: number): string => {
   const payload = btoa(
-    // The `aud` filler pushes the encoding to produce `-`/`_` characters,
-    // so tests exercise the base64url → base64 conversion.
+    // The `aud` filler forces `-`/`_` in the encoding so base64url conversion is exercised.
     JSON.stringify({
       aud: "ÿþ?>",
       exp: Math.floor((nowMs + msFromNow) / 1000),

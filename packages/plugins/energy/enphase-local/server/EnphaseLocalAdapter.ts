@@ -9,21 +9,14 @@ import { EnphaseConnectionError } from "./EnphaseClient.ts";
 import type { EnphaseClient } from "./EnphaseClient.ts";
 import { INFO_PATH, tagValue } from "./envoyInfo.ts";
 
-// ── Envoy local API endpoints (firmware 7+) ─────────────────────────────────
-// Response shapes follow the community-documented local API as implemented by
-// the Home Assistant `pyenphase` library:
-// https://github.com/pyenphase/pyenphase
-//
-// `/ivp/meters` + `/ivp/meters/readings` need CT meters installed; systems
-// without them fall back to `/api/v1/production` (solar watts only, no grid).
+// Envoy local API (firmware 7+); response shapes per https://github.com/pyenphase/pyenphase
 
 const METERS_PATH = "/ivp/meters";
 const METER_READINGS_PATH = "/ivp/meters/readings";
 const PRODUCTION_FALLBACK_PATH = "/api/v1/production";
 const ENSEMBLE_POWER_PATH = "/ivp/ensemble/power";
 const ENSEMBLE_SECCTRL_PATH = "/ivp/ensemble/secctrl";
-// An identical poll error repeats every poll; persist one plugin-log entry
-// per this window instead of one per poll (poll interval is configurable).
+// One plugin-log entry per window instead of one per poll for a repeating error.
 const POLL_ERROR_RELOG_MS = 5 * 60 * 1000;
 
 type MeterConfig = { eid: number; state: string; measurementType: string };
@@ -33,8 +26,7 @@ type MeterReading = { eid: number; activePower: number };
 type MeterMap = { production: number; netConsumption: number } | null;
 
 function meterMapFrom(meters: MeterConfig[]): MeterMap {
-  // A metered Envoy without CTs actually wired still lists the meters, with
-  // state "disabled" — using those eids would read garbage as grid power.
+  // Meters listed with state "disabled" have no CTs wired and would read garbage.
   const enabled = meters.filter((m) => m.state === "enabled");
   const production = enabled.find((m) => m.measurementType === "production");
   const net = enabled.find((m) => m.measurementType === "net-consumption");
@@ -76,8 +68,7 @@ export class EnphaseLocalAdapter implements EnergySourceAdapter {
   }
 
   async connect(): Promise<void> {
-    // Probing the meter config both verifies auth/reachability and caches the
-    // eid map used by every subsequent poll.
+    // Probing the meter config verifies auth and caches the eid map.
     try {
       const map = await this.resolveMeterMap();
       const mode = map ? "CT meter readings" : "solar-only fallback";

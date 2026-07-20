@@ -5,13 +5,7 @@ import {
   type SectionType,
 } from "@chargeha/shared/configSections";
 
-// ── Enphase Local plugin config section ─────────────────────────────────────
-// Keys are relative — PluginDependencies prefixes them with the plugin id.
-//
-// The Envoy (IQ Gateway) serves its local API over HTTPS with a self-signed
-// certificate. Firmware 7+ requires a JWT owner token obtained from Enphase's
-// cloud: either fetched automatically with the account email/password, or
-// pasted manually by the user. `token` caches whichever token is in use.
+// Enphase Local config — keys are relative; firmware 7+ needs a JWT owner token from Enphase cloud.
 
 export const enphaseLocalConfigDef = defineSection({
   host: {

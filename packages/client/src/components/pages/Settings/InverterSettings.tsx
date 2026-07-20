@@ -122,8 +122,7 @@ export function InverterSettings() {
   const { data: plugins } = trpc.energy.getPlugins.useQuery();
 
   const handleStartOnboarding = useCallback((pluginId: string) => {
-    // Launching from settings is a fresh run — drop any half-finished state so
-    // it doesn't resume where a previous, abandoned attempt left off.
+    // Launching from settings is a fresh run, so drop any half-finished state.
     clearPluginOnboarding(pluginId);
     navigate({ type: "pluginSetup", pluginId });
   }, []);

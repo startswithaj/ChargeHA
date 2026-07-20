@@ -39,8 +39,7 @@ describe("JsmodbusReader", () => {
     await makeReader(socket).connect();
 
     expect(socket.listenerCount("error")).toBeGreaterThan(0);
-    // Would throw ERR_UNHANDLED_ERROR (crashing the process in production)
-    // if connect() had removed the last 'error' listener.
+    // Would throw ERR_UNHANDLED_ERROR if connect() had removed the last 'error' listener.
     socket.emit("error", new Error("read ECONNRESET"));
   });
 
@@ -65,8 +64,7 @@ describe("JsmodbusReader", () => {
     const reader = makeReader(socket);
 
     await expect(reader.connect()).rejects.toThrow("Cannot reach Sigenergy");
-    // Leaving the socket assigned would hand back a client bound to a dead
-    // socket, failing with jsmodbus's opaque "no connection to modbus server".
+    // A retained socket would hand back a client bound to a dead socket.
     await expect(reader.readInputRegisters(247, 30000, 2)).rejects.toThrow(
       "Modbus socket is not connected",
     );
@@ -84,8 +82,7 @@ describe("JsmodbusReader", () => {
       "Cannot reach Sigenergy",
     );
     expect(socket.listenerCount("error")).toBeGreaterThan(0);
-    // Would throw ERR_UNHANDLED_ERROR if the failure path had left the socket
-    // bare between cleanup() and destroy().
+    // Would throw ERR_UNHANDLED_ERROR if the failure path left the socket bare.
     socket.emit("error", new Error("late ECONNRESET"));
   });
 

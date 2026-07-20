@@ -168,10 +168,7 @@ describe("InverterTypeStep", () => {
   );
 
   it("Next commits the saved adapter type when the wizard state has none", async () => {
-    // energy_adapter_type survives wizard completion, so a re-opened wizard
-    // shows the saved source as selected while state.energyType is still "".
-    // Step membership keys off state.energyType, so Next must write it —
-    // otherwise the flow skips the plugin's own setup steps.
+    // Re-opened wizard: the saved source shows selected while state.energyType is still "", so Next must write it.
     mockEquipmentGet.mockReturnValue({
       data: { energyAdapterType: "fronius_local" },
       isLoading: false,
@@ -183,8 +180,7 @@ describe("InverterTypeStep", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^Next/ }));
 
-    // The step returns its selection from an async Next handler, so the move
-    // lands a microtask later.
+    // The selection comes back from an async Next handler, so the move lands a microtask later.
     await waitFor(() => {
       expect(mockAdvance).toHaveBeenCalledWith({ energyType: "fronius_local" });
     });

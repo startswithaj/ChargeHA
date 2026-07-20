@@ -22,9 +22,7 @@ export type ReaderFactory = (
   unitIds: number[],
 ) => ModbusReader;
 
-// ── Fingerprint registers (input registers, function code 0x04) ─────────────
-// Same addresses the adapter uses. Plant/EMS registers answer on the plant unit
-// id (default 247); per-device registers answer on the device unit id (1).
+// Fingerprint registers (0x04): plant registers answer on unit 247, per-device on unit 1.
 const PLANT_PV_POWER = 30035; // int32 — probed only for liveness on unit 247
 const DEVICE_MODEL_TYPE = 30500; // string, 15 registers
 const DEVICE_SERIAL = 30515; // string, 10 registers
@@ -33,9 +31,7 @@ const DEFAULT_PLANT_UNIT_ID = 247;
 const DEFAULT_DEVICE_UNIT_ID = 1;
 const DEFAULT_PORT = 502;
 
-// Short timeouts keep a full /24 sweep from stalling on silent hosts. A device
-// that isn't listening on 502 refuses the TCP connection near-instantly; only
-// firewalled/silent hosts wait out the connect timeout.
+// Short timeouts keep a /24 sweep from stalling; only silent hosts wait out the connect timeout.
 const DISCOVERY_TIMEOUTS: ModbusTimeouts = { connectMs: 1500, readMs: 1500 };
 
 /** Decode NUL-padded ASCII packed two chars per register. */

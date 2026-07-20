@@ -301,8 +301,7 @@ describe("DoneStep", () => {
     const editButtons = screen.getAllByRole("button", { name: /Edit/ });
     fireEvent.click(editButtons[0]);
 
-    // By id, not position: which index a step sits at depends on the plugins
-    // selected, so a number here lands somewhere different per configuration.
+    // By id, not position — indices shift with the selected plugins.
     expect(onSkipTo).toHaveBeenCalledWith("authentication");
   });
 

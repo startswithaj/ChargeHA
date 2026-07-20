@@ -25,8 +25,7 @@ export function StepNextHarness(
         ...stepProps,
       }}
       nav={{
-        // Labelled "Cancel" so a step that renders its own Back button (key
-        // import, for one) is not competing with the nav for the role.
+        // Labelled "Cancel" so steps with their own Back button don't clash with the nav.
         isFirstStep: true,
         isLastStep,
         canBack: true,

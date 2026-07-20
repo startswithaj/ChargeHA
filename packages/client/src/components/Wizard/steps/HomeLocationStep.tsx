@@ -143,8 +143,7 @@ export const homeLocationStep: StepDef = {
     const saveMutation = useHomeConfigMutation();
     const utils = trpc.useUtils();
 
-    // Only the has-coords branch carries this handler, so there is no
-    // "save without coordinates" state to guard against.
+    // Only the has-coords branch renders this handler.
     const save = useCallback(async () => {
       await saveMutation.mutateAsync({
         homeLatitude: parseFloat(lat),

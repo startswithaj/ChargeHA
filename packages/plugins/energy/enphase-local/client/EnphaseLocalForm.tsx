@@ -270,8 +270,7 @@ export function EnphaseLocalForm(
   );
   const [subnet, setSubnet] = useState("");
   const [searchResults, setSearchResults] = useState<EnphaseDevice[]>([]);
-  // Read from the device's /info by discovery or the connection test —
-  // shown for confirmation, never typed or stored.
+  // Read from the device's /info — shown for confirmation, never typed or stored.
   const [detectedSerial, setDetectedSerial] = useState("");
 
   const searchMutation = trpc.plugin.energy.enphase_local.discover.useMutation({
@@ -280,8 +279,7 @@ export function EnphaseLocalForm(
     onError: () => setSearchResults([]),
   });
 
-  // Only the selected method's values are sent and saved, so a stale value
-  // from the other method can't shadow the active one.
+  // Only the selected method's values are sent, so the other method can't shadow it.
   const active = method === "credentials"
     ? { email, password, token: "" }
     : { email: "", password: "", token };
@@ -301,8 +299,7 @@ export function EnphaseLocalForm(
           host,
           email: active.email,
           password: active.password,
-          // Persist the owner token fetched during the test so the first poll
-          // doesn't need another cloud round-trip.
+          // Persist the token fetched during the test so the first poll skips a cloud round-trip.
           token: active.token || data.fetchedToken || "",
         });
       },

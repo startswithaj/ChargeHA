@@ -181,8 +181,7 @@ describe("PluginSetupRouter", () => {
     it("marks the plugin as the owner of its steps and as the selection", () => {
       render(<PluginSetupRouter pluginId="tesla" />);
 
-      // Both halves are needed: the owner makes Skip treat the chain as a
-      // block, and the selection keeps those owned steps in the list.
+      // Owner makes Skip abandon the whole chain; the selection keeps those steps in the list.
       expect(screen.getByTestId("owners")).toHaveTextContent("tesla");
       expect(screen.getByTestId("vehicle-type")).toHaveTextContent("tesla");
     });

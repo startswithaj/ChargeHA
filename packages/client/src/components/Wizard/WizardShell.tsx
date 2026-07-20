@@ -45,9 +45,7 @@ function useWizardCallbacks(
     (id: string) => {
       const active = activeSteps(flow, state);
       if (!active.some((step) => step.id === id)) {
-        // Every jump targets a step the caller believes is on screen. A miss
-        // means the id is wrong, and landing "somewhere near it" is how the
-        // old positional jumps went unnoticed.
+        // A missed id means the caller is wrong; landing near it would hide that.
         throw new Error(
           `Cannot jump to unknown or excluded wizard step "${id}".`,
         );
@@ -65,8 +63,7 @@ function useWizardCallbacks(
 
   const handleSkip = useCallback(() => {
     const target = skipTargetId(flow, state);
-    // Nothing outside the block to land on — skipping part of a plugin's chain
-    // abandons the run rather than continuing into steps that needed it.
+    // Skipping part of a plugin's chain abandons the whole run.
     if (target) patch({ stepId: target });
     else onBackOut?.();
   }, [flow, state, patch, onBackOut]);
@@ -76,11 +73,7 @@ function useWizardCallbacks(
     if (last) patch({ stepId: last.id });
   }, [flow, state, patch]);
 
-  // The one way the wizard moves forward. The selection and the step it leads
-  // to are written together: the next step is read from the flow the new
-  // selection produces, so the id can never name a step that selection hasn't
-  // put in the list. At the end of the flow this completes rather than
-  // re-writing the current step onto itself, which would silently do nothing.
+  // The only way forward: the selection and the step it leads to are written together.
   const advance = useCallback<WizardAdvance>(
     (selection = {}) => {
       const nextState = { ...state, ...selection };
@@ -136,9 +129,7 @@ export function WizardShell(
     advance,
   } = useWizardCallbacks({ flow, store, onComplete, onBackOut });
 
-  // Keep the URL on the step actually being shown. The stored id can name a
-  // step the current selections exclude; resolveStepIndex lands on a real one
-  // and the URL follows what the user sees, not what the DB last recorded.
+  // Keep the URL on the step actually rendered, which may differ from the stored id.
   const shownStepId = stepConfig?.id;
   useEffect(() => {
     if (shownStepId) replacePath(`${basePath}/${shownStepId}`);

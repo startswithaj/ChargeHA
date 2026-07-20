@@ -32,8 +32,7 @@ export const vehicleTypeStep: StepDef = {
         utils.vehicle.list.invalidate();
         const id = pendingIdRef.current;
         pendingIdRef.current = null;
-        // Throwing here would surface as an unhandled rejection rather than
-        // anything an error boundary catches — the selection just won't advance.
+        // Throwing here would be an unhandled rejection; the selection just won't advance.
         if (id) onAdvance({ vehicleType: id });
       },
     });
@@ -74,12 +73,7 @@ function vehicleTypeNext(
     return {
       kind: "ready",
       hint: "Next continues with the selected vehicle type",
-      // Hand the chosen type back rather than just moving on. The card can
-      // already look selected because a vehicle exists from a previous setup,
-      // while the wizard itself has no type recorded. Returning it lets the
-      // shell save the choice and work out the next step in one go — if it
-      // works out the next step first, it doesn't know Tesla was chosen and
-      // jumps straight past Tesla's setup screens.
+      // Return the chosen type so the shell saves it and picks the next step in one go.
       onNext: () => Promise.resolve({ vehicleType: selectedType }),
     };
   }

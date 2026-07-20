@@ -11,8 +11,7 @@
 // Typed tRPC client factory — plugins widen it with their own router type.
 export { widenTrpc } from "../client/src/trpc.ts";
 
-// Wizard shell integration. A step declares what its Next button is (and what
-// it does) by returning it from useStep — there is no separate registration.
+// A step declares its Next button by returning it from useStep — no separate registration.
 export type {
   PluginStepDef,
   StepBehaviour,

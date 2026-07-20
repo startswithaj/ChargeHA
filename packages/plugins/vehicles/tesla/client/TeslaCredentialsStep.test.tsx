@@ -220,8 +220,7 @@ describe("TeslaCredentialsStep", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
-    // The step throws the reason and stays put; the host renders it next to the
-    // button that failed rather than each step rendering its own error block.
+    // The step throws the reason and stays put; the host renders it by the button.
     expect(await screen.findByText("Failed to save config"))
       .toBeInTheDocument();
   });

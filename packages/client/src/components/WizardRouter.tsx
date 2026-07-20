@@ -12,8 +12,7 @@ import { useWizardState } from "../hooks/useWizardState.ts";
 export function WizardRouter({ onComplete }: { onComplete: () => void }) {
   const store = useWizardState();
 
-  // A re-opened wizard (already completed once) can be exited early; on first
-  // run there is no configured app to fall back to, so no exit is offered.
+  // Only a re-opened wizard can be exited — on first run there is no configured app to return to.
   const { navigate } = useRouter();
   const { data: wizardStatus } = trpc.wizard.status.useQuery();
   const handleExit = useCallback(

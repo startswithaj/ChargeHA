@@ -11,8 +11,7 @@ export interface EnergyData {
   // Set by EnergyPoller — true when the adapter poll threw and zeros were
   // substituted. Adapters never set this. Defaults to false when omitted.
   pollFailed?: boolean;
-  // Set by EnergyPoller alongside pollFailed — the thrown error's message,
-  // surfaced to the frontend so failures are diagnosable from the dashboard.
+  // Set by EnergyPoller alongside pollFailed — the error message shown on the dashboard.
   pollError?: string;
 }
 

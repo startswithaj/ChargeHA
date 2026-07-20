@@ -410,8 +410,7 @@ describe("TunnelManager", () => {
       await tm.start();
       expect(tm.tunnelUrl).toBe("https://tunnel-new.tunnel.example.com");
 
-      // The old process's exit resolves only now, after the new one is live.
-      // Clearing state unconditionally here would wipe the running tunnel.
+      // The old process exits after the new one is live; clearing unconditionally would wipe it.
       first.resolveStatus(
         { success: false, code: 0, signal: null } as Deno.CommandStatus,
       );

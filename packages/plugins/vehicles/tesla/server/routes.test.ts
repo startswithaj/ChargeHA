@@ -78,8 +78,7 @@ describe("Tesla HTTP routes", () => {
       try {
         const res = await app.request("/callback?code=abc&state=not-ours");
         expect(res.status).toBe(400);
-        // The point of the check: no token exchange happens for a handshake
-        // this server never started.
+        // No token exchange for a handshake this server never started.
         expect(exchanged).toBe(false);
       } finally {
         manager.stopAutoRefresh();

@@ -16,8 +16,7 @@ Deno.test("no-main-imports", async (t) => {
     expect(diags.length).toBe(1);
   });
 
-  // Re-exports and dynamic imports reach main's internals just as directly as
-  // a static import — a plugin could otherwise launder them via a local barrel.
+  // Re-exports and dynamic imports reach main just as directly as a static import.
   await t.step("flags named re-exports of main's client", () => {
     const diags = lint(
       `export { Spinner } from "../../../../client/src/components/ui/Spinner.tsx";`,

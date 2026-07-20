@@ -84,8 +84,7 @@ describe("RealtimeSync", () => {
       assertExists(mocks.captured.handlers);
       mocks.captured.handlers.onVehiclesChanged();
 
-      // A plugin's settings pane reads its own vehicle list, so all three must
-      // refresh on a membership change — not just the top-level list.
+      // Plugin settings panes read their own vehicle list, so all three caches must refresh.
       expect(mocks.invalidate_vehicleList).toHaveBeenCalled();
       expect(mocks.invalidate_getPlugins).toHaveBeenCalled();
       expect(mocks.invalidate_pluginVehicle).toHaveBeenCalled();

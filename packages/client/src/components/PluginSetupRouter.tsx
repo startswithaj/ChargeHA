@@ -27,9 +27,7 @@ export function PluginSetupRouter(
 
   const isVehiclePlugin = !!(vehiclePluginSteps[pluginId]);
 
-  // Stamp the plugin as the owner of its own steps, exactly as wizardFlow does
-  // for the setup wizard — that is what makes Skip abandon the whole chain
-  // instead of dropping the user on a step that needed the one they skipped.
+  // Mark the plugin as owner of its steps so Skip abandons the whole chain.
   const flow: StepDef[] = useMemo(() => {
     const steps = vehiclePluginSteps[pluginId] ?? energyPluginSteps[pluginId] ??
       [];

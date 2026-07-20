@@ -64,10 +64,7 @@ export const queryClient = new QueryClient({
   }),
 });
 
-// vehicle.list is DB + cached state (no vendor API cost) and is read by both
-// main and plugin UIs — always-fresh so plugins never need to invalidate
-// main's cache. Live membership changes arrive via the vehicles_changed SSE
-// event; this covers mounts.
+// vehicle.list is cheap and read by both main and plugin UIs, so keep it always-fresh.
 queryClient.setQueryDefaults([["vehicle", "list"]], {
   staleTime: 0,
   refetchOnMount: "always",

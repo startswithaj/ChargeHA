@@ -223,9 +223,7 @@ function useVehicleSelection() {
     isLoading: loading,
     error: queryError,
   } = trpc.plugin.vehicle.tesla.teslaVehicles.useQuery(undefined, {
-    // The token is loaded just before this step; a first fetch can beat it and
-    // throw "No tokens available". Retry briefly so it waits instead of
-    // flashing that error before the list loads.
+    // Retry briefly — a first fetch can beat the token load and throw "No tokens available".
     retry: 3,
     retryDelay: 400,
   });

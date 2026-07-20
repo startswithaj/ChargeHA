@@ -61,8 +61,7 @@ function buildChecklist(
       | undefined;
   },
 ): ChecklistItem[] {
-  // Every target is a core step, so it is always in the list whatever the
-  // vehicle/energy selection.
+  // Every target is a core step, so it is always in the list.
   return [
     {
       label: authMode === "none"
@@ -142,8 +141,7 @@ function DoneSummary({ onSkipTo }: StepProps) {
 
   const authMode = authSession?.authMode ?? "none";
 
-  // isLoading, not isFetching — the summary must not blank out on the
-  // background refetches that invalidations elsewhere trigger.
+  // isLoading, not isFetching — the summary must not blank out on background refetches.
   const loading = systemLoading || equipmentLoading || homeLoading ||
     vehiclesLoading || authLoading;
 

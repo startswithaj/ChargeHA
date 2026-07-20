@@ -61,10 +61,7 @@ export function createSimulatedRouter(
           adapter.setSocPercent(clamped);
         }
 
-        // Refresh middleware cache so vehicle lists reflect the override.
-        // adapter.setX() updates the adapter, but the dashboard reads
-        // middleware.getCachedState() — without forceRefresh the cache
-        // keeps returning pre-override values.
+        // Force a middleware cache refresh — the dashboard reads getCachedState(), not the adapter.
         const state = await deps.requestVehicleState(input.vehicleId, {
           origin: "user:sim-update",
           traceId: createTraceId(),

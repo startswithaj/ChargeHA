@@ -32,8 +32,7 @@ export const timezoneStep: StepDef = {
       next: {
         kind: "ready",
         hint: "Next saves your timezone",
-        // mutateAsync throws on failure; the host shows the message and the
-        // wizard stays put.
+        // mutateAsync throws on failure; the host shows the message and the wizard stays put.
         onNext: async () => {
           await saveMutation.mutateAsync({ timezone: selectedTimezone });
         },

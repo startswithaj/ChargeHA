@@ -22,16 +22,14 @@ export function useWizardState(): WizardStore {
 
   const patch = useCallback(
     (next: Partial<WizardNavState>) => {
-      // One cache entry, so the step id and the types that decide which steps
-      // exist cannot disagree for a render.
+      // One cache entry, so the step id and the gating types can't disagree for a render.
       utils.wizard.state.cancel();
       utils.wizard.state.setData(undefined, (prev) => ({
         ...(prev ?? EMPTY_STATE),
         ...next,
       }));
       patchMutation.mutate(next, {
-        // Don't leave the client sitting on a step the server never stored —
-        // it survives until the next load, then silently jumps backwards.
+        // Refetch so the client doesn't sit on a step the server never stored.
         onError: () => {
           utils.wizard.state.invalidate();
         },

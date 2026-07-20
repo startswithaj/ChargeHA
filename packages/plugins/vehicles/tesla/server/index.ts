@@ -86,10 +86,7 @@ export class TeslaVehiclePlugin implements VehiclePlugin {
   }
 
   private async startup(): Promise<void> {
-    // Migrate pre-hosting-mode data: tunnel URLs used to be persisted as the
-    // public key domain, but a quick-tunnel URL cannot survive a restart (the
-    // tunnel runs in-process). Clear the dead URL and record the intent as
-    // tunnel hosting so the wizard resumes on the right method.
+    // Migrate old data: a persisted tunnel URL can't survive a restart, so clear it and record tunnel mode.
     const domain = await this.deps.getConfig("public_key_domain");
     if (domain?.endsWith(".trycloudflare.com")) {
       await this.deps.setConfig("public_key_domain", "");

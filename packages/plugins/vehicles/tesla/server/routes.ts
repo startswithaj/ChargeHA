@@ -24,11 +24,7 @@ export function createTeslaHttpRoutes(
     }
 
     try {
-      // The token exchange must send the exact redirect_uri used at authorize
-      // time, so the origin is recorded against the state param. An unknown
-      // state means this callback belongs to a handshake this server never
-      // started, or one lost to a restart. Either way the stored origin is
-      // gone and the exchange can't send a matching redirect_uri.
+      // The exchange needs the exact redirect_uri from authorize time, so an unknown state can't proceed.
       const origin = tokenManager.takeAuthOrigin(state);
       if (origin === null) {
         return c.json({ error: "Unrecognised or expired state" }, 400);

@@ -445,8 +445,7 @@ describe("Wizard tRPC Router", () => {
     });
 
     it("round-trips a selection and its step in one write", async () => {
-      // The step id and the vehicle type that puts that step in the list are
-      // written together, so no read can observe one without the other.
+      // The step id and the vehicle type that gates it are written together.
       await caller.wizard.patchState({
         vehicleType: "tesla",
         stepId: "tesla-key-generation",

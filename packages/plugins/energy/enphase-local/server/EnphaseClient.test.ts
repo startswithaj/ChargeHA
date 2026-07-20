@@ -138,9 +138,7 @@ describe("EnphaseClient", () => {
   });
 
   it("pauses cloud refreshes after the cloud login itself fails", async () => {
-    // The lockout path that isn't a 401 from the Envoy: the cached token is
-    // rejected, the refresh is attempted, and Enlighten refuses the login. The
-    // cache is now empty, so without a cooldown every subsequent poll logs in.
+    // Non-401 lockout path: cached token rejected, refresh attempted, Enlighten refuses the login.
     http.setRaw("/data", "denied", 401);
     const cloud = makeFakeCloud({ token: "unused", loginOk: false });
     const client = makeClient(

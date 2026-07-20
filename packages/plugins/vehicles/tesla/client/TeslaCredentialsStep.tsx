@@ -297,9 +297,7 @@ export const teslaCredentialsStep: PluginStepDef = {
     const oauth = resolveOAuthOrigin(browserOrigin, tunnelUrl);
     const redirectUri = oauth.origin ? callbackUrl(oauth.origin) : null;
 
-    // Partner registration requires the public key domain in Allowed Origins
-    // (Tesla: "Root domain must match registered allowed origin"). Resolved
-    // live so the instructions can never show a stale tunnel domain.
+    // Tesla requires the public key domain in Allowed Origins; resolve live to avoid a stale domain.
     const hosting = teslaConfig?.teslaPublicKeyHosting ?? "";
     const savedDomain = teslaConfig?.teslaPublicKeyDomain ?? null;
     const allowedOrigin =

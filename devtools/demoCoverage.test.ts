@@ -26,8 +26,7 @@ interface ProcedureDef {
   _def: { type: "query" | "mutation" | "subscription" };
 }
 
-// The router factories only need deps/plugin to close over — procedures are
-// never invoked here, only their _def shape is inspected.
+// Procedures are never invoked here — only their _def shape is inspected.
 const stubDeps = (pluginId: string): PluginDependencies =>
   ({ pluginId }) as unknown as PluginDependencies;
 

@@ -1,7 +1,4 @@
-// ── Shared local-network scanning helpers ───────────────────────────────────
-// Pure IP/subnet utilities used by the energy plugins' network auto-discovery
-// (Fronius over HTTP, Sigenergy over Modbus TCP). No side effects — the
-// discovery classes own the actual probing and dependency injection.
+// Shared IP/subnet helpers for the energy plugins' network discovery — no side effects.
 
 /** Generate all 254 host IPs for a /24 subnet. */
 export function generateSubnetIps(subnet: string): string[] {

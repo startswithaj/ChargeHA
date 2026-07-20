@@ -209,8 +209,7 @@ export class TunnelManager {
       this.logger.warn(
         `${this.provider.name} tunnel exited with code ${status.code}`,
       );
-      // A stop-then-start can land the old process's exit after the new one is
-      // assigned — clearing unconditionally would wipe the live tunnel's URL.
+      // The old process's exit can land after the new one is assigned — don't clear unconditionally.
       if (this.process !== process) return;
       this.process = null;
       this._tunnelUrl = null;

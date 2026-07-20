@@ -146,10 +146,7 @@ describe("VehicleTypeStep", () => {
   });
 
   it("Next commits the existing vehicle type when the wizard state has none", async () => {
-    // A re-opened wizard clears wizard_vehicle_type but keeps the vehicle row,
-    // so the card renders selected off the existing vehicle. Step membership
-    // keys off state.vehicleType, so Next must write it — otherwise the flow
-    // computes the next step against "" and skips the plugin's steps entirely.
+    // Re-opened wizard: the card shows selected off the existing vehicle while state.vehicleType is "", so Next must write it.
     mockVehicleList.mockReturnValue({
       data: { vehicles: [{ adapterType: "tesla" }] },
     });
@@ -159,8 +156,7 @@ describe("VehicleTypeStep", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^Next/ }));
 
-    // The step returns its selection from an async Next handler, so the move
-    // lands a microtask later.
+    // The selection comes back from an async Next handler, so the move lands a microtask later.
     await waitFor(() => {
       expect(mockAdvance).toHaveBeenCalledWith({ vehicleType: "tesla" });
     });

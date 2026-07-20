@@ -31,9 +31,7 @@ export const partnerRegistrationStep: PluginStepDef = {
     const registerMutation = trpc.plugin.vehicle.tesla.registerPartner
       .useMutation();
 
-    // Register partner on mount. The Tesla partner_accounts API is idempotent,
-    // so re-registering on every visit is safe and avoids the need to track
-    // registration state in config.
+    // Register on mount; Tesla's partner_accounts API is idempotent so there is no state to track.
     useEffect(() => {
       if (calledRef.current) return;
       calledRef.current = true;

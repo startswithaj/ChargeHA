@@ -51,9 +51,7 @@ function useAddSimulatedVehicleMutation(
       return id;
     },
     onSuccess: (id) => {
-      // Cache refresh (list, plugin configured-state, plugin vehicle lists) is
-      // driven by the server's vehicles_changed event in RealtimeSync — the
-      // one place membership changes fan out, whatever created them.
+      // Cache refresh is driven by the server's vehicles_changed event in RealtimeSync.
       setRecentlyAddedVins(new Set([id]));
       setTimeout(() => setRecentlyAddedVins(new Set()), 4000);
     },
@@ -119,9 +117,7 @@ export function useVehicleSettings() {
 
   // --- Mutations ---
 
-  // No onSuccess cache work: the server's vehicles_changed event (handled in
-  // RealtimeSync) invalidates the vehicle list, plugin configured-state, and
-  // plugin vehicle lists for every membership change.
+  // No onSuccess cache work: RealtimeSync handles vehicles_changed invalidation.
   const deleteMutation = trpc.vehicle.delete.useMutation();
 
   const priorityMutation = usePriorityMutation(utils);
@@ -151,8 +147,7 @@ export function useVehicleSettings() {
   const vehiclePlugins = vehiclePluginsQuery.data ?? [];
 
   const handleStartOnboarding = useCallback((pluginId: string) => {
-    // Launching from settings is a fresh run — drop any half-finished state so
-    // it doesn't resume where a previous, abandoned attempt left off.
+    // Launching from settings is a fresh run, so drop any half-finished state.
     clearPluginOnboarding(pluginId);
     navigate({ type: "pluginSetup", pluginId });
   }, []);

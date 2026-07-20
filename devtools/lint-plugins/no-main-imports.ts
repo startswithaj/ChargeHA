@@ -37,8 +37,7 @@ export default {
           ImportDeclaration(node: Deno.lint.ImportDeclaration) {
             report(node.source, String(node.source.value));
           },
-          // A re-export reaches main's internals just as directly as an import,
-          // and a local barrel would otherwise launder them past this rule.
+          // A re-export reaches main's internals just as directly as an import.
           ExportNamedDeclaration(node: Deno.lint.ExportNamedDeclaration) {
             if (node.source) report(node.source, String(node.source.value));
           },

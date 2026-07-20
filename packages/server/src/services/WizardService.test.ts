@@ -295,8 +295,7 @@ describe("WizardService", () => {
         },
       });
 
-      // "" is a real selection (None / Skip on the energy step), not an
-      // absent one — only undefined means "don't touch this field".
+      // "" is a real selection (None/Skip); only undefined means don't touch the field.
       await service.patchState({ energyType: "" });
 
       expect(configSet).toEqual({ wizard_energy_type: "" });
@@ -643,8 +642,7 @@ describe("WizardService", () => {
         config: JSON.stringify({ batteryCapacityKwh: 60 }),
         mode: "auto",
       });
-      // demoSetup must not pick the energy source — that's the user's choice
-      // on the inverter-type step.
+      // demoSetup must not pick the energy source — that's the user's choice.
       expect(configSet["energy_adapter_type"]).toBeUndefined();
       expect(configSet["home_latitude"]).toBe("-33.8688");
       expect(configSet["home_longitude"]).toBe("151.2093");

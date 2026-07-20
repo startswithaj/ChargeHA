@@ -319,8 +319,7 @@ describe("TeslaTokenManager", () => {
       });
       const fakeFetch = async () => {
         calls++;
-        // Hold the request open so the second caller arrives mid-flight — the
-        // race this guards is two POSTs consuming the same rotating token.
+        // Hold the request open so the second caller arrives mid-flight.
         await gate;
         return new Response(
           JSON.stringify({

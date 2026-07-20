@@ -94,9 +94,7 @@ export class TeslaService {
     await inSequence(vehicles, (v) => this.deps.deleteVehicle(v.id));
 
     const preserved = new Set<string>(TESLA_RESET_PRESERVED_KEYS);
-    // A self-hosted public key domain stays valid across a reset, so keep it
-    // and its hosting mode. A tunnel domain is a dead ephemeral URL — clear it
-    // so the wizard starts a fresh tunnel.
+    // Keep a self-hosted domain across a reset; clear a tunnel domain since the URL is dead.
     if ((await this.deps.getConfig("public_key_hosting")) !== "tunnel") {
       preserved.add("public_key_domain");
       preserved.add("public_key_hosting");

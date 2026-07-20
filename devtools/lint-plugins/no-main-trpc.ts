@@ -13,9 +13,7 @@
 
 const ROOT_NAMES: readonly string[] = ["trpc", "utils"];
 
-// Allowed first segments after the root: the plugin namespace plus tRPC's
-// client API. `client` is useUtils' raw-client escape hatch — what follows
-// it is checked separately because `utils.client` is treated as a root too.
+// Allowed first segments after the root: the plugin namespace plus tRPC's client API.
 const ALLOWED_SEGMENTS: readonly string[] = [
   "plugin",
   "client",

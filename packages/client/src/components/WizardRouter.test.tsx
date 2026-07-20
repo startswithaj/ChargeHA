@@ -88,8 +88,7 @@ describe("WizardRouter", () => {
   it("passes the whole flow to the shell, gating rather than composing", () => {
     render(<WizardRouter onComplete={vi.fn()} />);
 
-    // 8 core steps + 1 tesla + 1 fronius. The shell receives every step and
-    // decides presence via `when`, so this count does not vary by selection.
+    // 8 core steps + 1 tesla + 1 fronius; the shell gets every step and gates via `when`.
     expect(screen.getByTestId("flow-length")).toHaveTextContent("10");
   });
 

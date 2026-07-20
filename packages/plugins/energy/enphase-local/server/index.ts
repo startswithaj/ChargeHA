@@ -37,9 +37,7 @@ export class EnphaseLocalPlugin implements EnergyPlugin {
       {
         email,
         password,
-        // A token saved by the wizard's credentials flow is a cached owner
-        // token (renewable); treat it as manual only when no credentials
-        // exist to renew it with.
+        // A wizard-saved token is renewable; only call it manual when there are no credentials.
         manualToken: email && password ? "" : token,
         cachedToken: email && password ? token : "",
       },

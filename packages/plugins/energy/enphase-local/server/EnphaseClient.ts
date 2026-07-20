@@ -8,8 +8,7 @@ const ENTREZ_TOKEN_URL = "https://entrez.enphaseenergy.com/tokens";
 const REQUEST_TIMEOUT_MS = 10000;
 // Refresh the (1-year) owner token when less than this remains before expiry.
 const TOKEN_RENEW_MARGIN_MS = 7 * 24 * 60 * 60 * 1000;
-// After the Envoy rejects a freshly fetched token, hold off further cloud
-// logins for this long — repeated logins risk an Enphase account lockout.
+// Cooldown after a fresh token is rejected — repeated logins risk an Enphase account lockout.
 const AUTH_RETRY_COOLDOWN_MS = 5 * 60 * 1000;
 
 export class EnphaseAuthError extends Error {
@@ -182,10 +181,7 @@ export class EnphaseClient {
     if (this.cachedToken && !this.isExpiring(this.cachedToken)) {
       return this.cachedToken;
     }
-    // The cooldown is gated here rather than only on the 401 path: every route
-    // to the cloud login runs through this method, and a failed login leaves
-    // the cache empty, so the next poll would come straight back in and log in
-    // again — the account lockout this cooldown exists to prevent.
+    // Gated here because every route to the cloud login runs through this method.
     if (this.now() < this.refreshRejectedUntil) {
       throw new EnphaseAuthError(
         "Pausing Enphase cloud token refresh after a failed attempt, to avoid an account lockout",
@@ -221,8 +217,7 @@ export class EnphaseClient {
       );
     }
     this.logger.info("Fetching Enphase owner token from cloud");
-    // Entrez issues tokens per gateway serial; the device at `host` knows its
-    // own serial, so read it from /info rather than storing it as config.
+    // Entrez issues tokens per gateway serial, so read the serial from /info.
     const serial = await this.resolveSerial();
     const sessionId = await this.login();
     const res = await this.fetchFn(ENTREZ_TOKEN_URL, {

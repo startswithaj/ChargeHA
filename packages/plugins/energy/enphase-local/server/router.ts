@@ -40,11 +40,7 @@ export function createEnphaseLocalRouter(deps: PluginDependencies) {
         return { found };
       }),
 
-    // Validates the connection end-to-end. The host is first fingerprinted via
-    // the unauthenticated /info, whose serial is returned for display. When
-    // credentials are supplied the owner token fetched along the way is also
-    // returned so the wizard can persist it, saving a second cloud round-trip
-    // on first poll.
+    // End-to-end connection test: fingerprints via /info and returns the serial plus any owner token.
     testConnection: publicProcedure
       .input(testConnectionInput)
       .mutation(async ({ input }) => {
@@ -77,8 +73,7 @@ export function createEnphaseLocalRouter(deps: PluginDependencies) {
             },
             logger,
           );
-          // Connection tests are interactive — results go back to the caller,
-          // so nothing is persisted to the plugin log.
+          // Interactive test — results go to the caller, nothing is written to the plugin log.
           const noopDbLog = new PluginDbLogger(() => Promise.resolve(), logger);
           const adapter = new EnphaseLocalAdapter(client, logger, noopDbLog);
           try {

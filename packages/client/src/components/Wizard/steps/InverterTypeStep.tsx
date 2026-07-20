@@ -26,8 +26,7 @@ export const inverterTypeStep: StepDef = {
     const { state } = useWizardState();
     const mutation = useEquipmentConfigMutation();
 
-    // "" (None / Skip) is a valid selection but indistinguishable from "not
-    // chosen yet" in config — track this session's explicit choice as well.
+    // "" (None/Skip) is a valid choice but looks like "not chosen" in config, so track it separately.
     const hasSelection = !!currentAdapter || !!state.energyType;
     const selectedType = state.energyType || currentAdapter;
 
@@ -63,9 +62,7 @@ function inverterTypeNext(
     return {
       kind: "ready",
       hint: "Next continues with the selected energy source",
-      // Hand the chosen source back rather than just moving on — the card can
-      // already look selected from saved config while the wizard has nothing
-      // recorded. See the note in VehicleTypeStep for why this matters.
+      // Return the chosen source so the shell saves it — the card can look selected from saved config.
       onNext: () => Promise.resolve({ energyType: selectedType }),
     };
   }

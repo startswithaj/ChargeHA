@@ -477,8 +477,7 @@ function useTeslaSettingsMutations(
     });
   const resetMutation = trpc.plugin.vehicle.tesla.resetOnboarding.useMutation({
     onSuccess: () => {
-      // Config + vehicles are gone: flip the plugin back to "not configured"
-      // so the "+ Set up Tesla" onboarding card reappears in Vehicle settings.
+      // Flip the plugin back to not-configured so the setup card reappears.
       invalidateVehiclePlugins();
       utils.plugin.vehicle.tesla.teslaStatus.invalidate();
       utils.plugin.vehicle.tesla.teslaVehicles.invalidate();

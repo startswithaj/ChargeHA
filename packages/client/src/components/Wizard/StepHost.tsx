@@ -106,9 +106,7 @@ export function StepHost({ def, stepProps, nav, onAdvance }: StepHostProps) {
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
-  // Why the last attempt failed stops being true the moment the step's own
-  // gate moves — a different mode picked, a field fixed. Keeping it would
-  // leave a stale reason next to a button that would now succeed.
+  // Clear the failure reason when the step's gate moves, so it can't go stale.
   const gateText = hintFor(next);
   useEffect(() => {
     setFailure(null);
@@ -119,24 +117,18 @@ export function StepHost({ def, stepProps, nav, onAdvance }: StepHostProps) {
     setPending(true);
     setFailure(null);
     try {
-      // One move, not two: the step reports its selection and the shell applies
-      // it together with the step id. When the step moved itself and the shell
-      // moved again, the second recomputed the destination from state that
-      // predated the selection and silently overwrote the first.
+      // Apply the selection and the step id in one move — two movers used to overwrite each other.
       const selection = await next.onNext();
       onAdvance(selection ?? undefined);
     } catch (err) {
-      // The step said stay, and said why. Show it beside the button that
-      // failed rather than leaving each step to render its own error.
+      // Show the step's reason next to the button that failed.
       setFailure(err instanceof Error ? err.message : String(err));
     } finally {
       setPending(false);
     }
   };
 
-  // A Fragment, not a wrapper element: .stepContent has to stay a direct flex
-  // child of .container, or its flex:1 stops pushing the nav to the bottom of
-  // the viewport and the footer rides up under the content.
+  // Fragment, not a wrapper: .stepContent must stay a direct flex child of .container.
   return (
     <>
       <div className={styles.stepContent}>{view}</div>

@@ -67,8 +67,7 @@ describe("flow", () => {
 
   describe("resolveStepIndex", () => {
     it("indexes against the active list, not the whole flow", () => {
-      // inverter-type is 5th in the flow but 3rd once tesla's steps are gated
-      // off, and 5th again once they are back.
+      // inverter-type is 5th, 3rd with tesla's steps gated off, 5th again when they return.
       expect(resolveStepIndex(FLOW, state({ stepId: "inverter-type" }))).toBe(
         2,
       );
@@ -81,8 +80,7 @@ describe("flow", () => {
     });
 
     it("lands on the next step still in the list when the stored step is gated off", () => {
-      // Was mid-Tesla setup, then switched away: tesla-b is gone, so resume at
-      // the first step at or after it that survives.
+      // tesla-b is gone after switching away, so resume at the first surviving step after it.
       const index = resolveStepIndex(FLOW, state({ stepId: "tesla-b" }));
       expect(activeSteps(FLOW, state())[index].id).toBe("inverter-type");
     });
@@ -142,8 +140,7 @@ describe("flow", () => {
     });
 
     it("steps back over a plugin's whole block rather than into its end", () => {
-      // Skipping out of Tesla setup lands on inverter-type; Back from there
-      // belongs at the choice that led in, not at the last step just escaped.
+      // Back from inverter-type belongs at the choice that led into Tesla setup.
       expect(
         backTargetId(
           FLOW,
@@ -175,8 +172,7 @@ describe("flow", () => {
     });
 
     it("returns null when nothing follows the block — there is no landing spot", () => {
-      // A plugin's own setup run is nothing but its block: skipping any step
-      // in it abandons the run rather than shuffling to its last screen.
+      // A plugin's setup run is only its block, so skipping any step abandons the run.
       const flow = [
         step("tesla-a", { owner: "tesla" }),
         step("tesla-b", { owner: "tesla" }),

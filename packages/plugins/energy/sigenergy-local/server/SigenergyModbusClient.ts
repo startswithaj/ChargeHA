@@ -76,18 +76,12 @@ export class JsmodbusReader implements ModbusReader {
 
   connect(): Promise<void> {
     const socket = this.socketFactory();
-    // Attach the lifetime error handler before connecting — an unhandled
-    // 'error' event (e.g. ECONNRESET when the inverter reboots) would crash the
-    // process, and the one-shot handlers below are removed by cleanup() before
-    // the timeout path calls destroy().
+    // Attach the lifetime error handler before connecting — an unhandled 'error' would crash the process.
     socket.on("error", (err: Error) => {
       this.logger.warn(`Sigenergy socket error: ${err.message}`);
     });
     this.socket = socket;
-    // Construct one jsmodbus client per unit id BEFORE connecting the socket.
-    // jsmodbus latches its "online" state from the socket's `connect` event, so
-    // a client created after the socket has already connected rejects every
-    // read with "no connection to modbus server".
+    // jsmodbus latches "online" from the socket's connect event, so build clients before connecting.
     this.clients = new Map(
       [...new Set(this.unitIds)].map(
         (
@@ -99,9 +93,7 @@ export class JsmodbusReader implements ModbusReader {
       ),
     );
     return new Promise<void>((resolve, reject) => {
-      // Leaving this.socket set after a failed connect makes clientFor() hand
-      // back a client bound to a dead socket, so reads fail with jsmodbus's
-      // opaque "no connection to modbus server" instead of our own message.
+      // Clear the socket so clientFor() can't hand back a client bound to a dead one.
       const failed = () => {
         socket.destroy();
         if (this.socket !== socket) return;

@@ -232,9 +232,7 @@ function useAuthEffects(
         advance();
         return;
       }
-      // Pre-select only an explicitly configured mode. "none" is the server
-      // default on a fresh install — highlighting it reads as a preselection
-      // the user never made.
+      // Only pre-select an explicitly configured mode; "none" is just the fresh-install default.
       if (authMode === "local" || authMode === "oidc") {
         setSelectedMode(authMode);
       }
@@ -260,9 +258,7 @@ function useAuthStepState(advance: () => void) {
 
   const setAuthMode = trpc.wizard.setAuthMode.useMutation();
   const saveOidcConfig = trpc.wizard.saveOidcConfig.useMutation();
-  // Depend on the stable mutate fns, not the mutation objects: react-query
-  // returns a fresh object each render, which would give the Next handler a new
-  // identity on every render and defeat its useCallback.
+  // Depend on the stable mutate fns — mutation objects change identity every render.
   const { mutateAsync: setAuthModeMutate } = setAuthMode;
   const { mutateAsync: saveOidcMutate } = saveOidcConfig;
   const sessionQuery = trpc.auth.session.useQuery(undefined, {
@@ -287,17 +283,13 @@ function useAuthStepState(advance: () => void) {
    *  already throw on failure, so their message surfaces as-is. */
   const handleNext = useCallback(async (): Promise<void> => {
     setValidationError(null);
-    // Unreachable unless the gate is wrong: authNext only hands this back for
-    // a selected, valid mode.
+    // Unreachable unless the gate is wrong: authNext only returns this for a valid mode.
     if (!selectedMode) throw new Error("Please select an authentication mode");
 
     if (selectedMode === "oidc") {
       await saveOidcMutate(oidcForm);
       globalThis.location.href = "/auth/oidc/login?return=wizard";
-      // The browser is leaving for the identity provider, and the wizard
-      // advances on return via useAuthEffects. Never settle: resolving would
-      // advance behind the redirect, throwing would flash an error on the way
-      // out. Next stays pending until the page goes.
+      // Never settle — the page is leaving for the identity provider, so Next stays pending.
       await new Promise<never>(() => {});
     }
 
@@ -344,15 +336,12 @@ function authNext(
   },
 ): WizardNext {
   if (selectedMode) {
-    // Validation gates Next rather than firing on click: the reason shows as
-    // soon as it applies, and stops applying the moment the form or the mode
-    // changes — no stale complaint to clear.
+    // Validation gates Next instead of firing on click, so the reason can't go stale.
     const invalid = validateMode(selectedMode, localForm, oidcForm);
     if (invalid) return { kind: "blocked", reason: invalid };
     return { kind: "ready", hint: authHint(selectedMode), onNext: handleNext };
   }
-  // The session check only decides whether we can yet say *why* Next is
-  // blocked, never whether it is.
+  // The session check only decides whether we can say why Next is blocked.
   if (!sessionChecked) return { kind: "loading" };
   return {
     kind: "blocked",

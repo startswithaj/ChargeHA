@@ -81,8 +81,7 @@ export class WizardService {
   }
 
   async patchState(patch: Partial<WizardNavState>): Promise<void> {
-    // Object.entries widens keys to string; the entries of a Partial<T> are
-    // exactly T's fields, so narrow back before indexing the key map.
+    // Object.entries widens keys to string; narrow back before indexing the key map.
     const entries = Object.entries(patch) as [
       keyof WizardNavState,
       string | undefined,

@@ -139,8 +139,7 @@ describe("useWizardState", () => {
       result.current.patch({ stepId: "authentication" });
     });
 
-    // The optimistic write left the client on a step the server never stored;
-    // without the refetch it survives until the next load, then jumps back.
+    // Without the refetch the client stays on a step the server never stored.
     const opts = hoisted.mutate.mock.calls.at(-1)?.[1] as {
       onError: () => void;
     };
@@ -179,8 +178,7 @@ describe("useWizardState", () => {
       });
     });
 
-    // The step and the type that puts it in the list are written together, and
-    // energyType — not part of this selection — survives untouched.
+    // The step and the type that gates it are written together; energyType is untouched.
     expect(
       applyOptimisticWrite({
         stepId: "vehicle-type",

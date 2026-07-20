@@ -32,8 +32,7 @@ describe("usePluginOnboardingState", () => {
 
       expect(localStorage.getItem("chargeha-plugin-onboarding-tesla"))
         .toBeNull();
-      // A fresh mount after clearing starts at the default step, not the
-      // half-finished one.
+      // A fresh mount after clearing starts at the default step.
       const { result } = renderHook(() =>
         usePluginOnboardingState("tesla", "key-generation", "vehicle")
       );
@@ -86,8 +85,7 @@ describe("usePluginOnboardingState", () => {
     const { result } = renderHook(() =>
       usePluginOnboardingState("tesla", "credentials", "vehicle")
     );
-    // Its steps carry owner: "tesla"; saying nothing is selected would gate
-    // every one of them out of the list.
+    // Its steps carry owner "tesla"; an empty selection would gate them all out.
     expect(result.current.state.vehicleType).toBe("tesla");
     expect(result.current.state.energyType).toBe("");
     expect(result.current.isLoading).toBe(false);

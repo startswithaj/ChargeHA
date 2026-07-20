@@ -461,8 +461,7 @@ export const publicKeyHostingStep: PluginStepDef = {
 
     const saveDomainMutation = useTeslaConfigMutation();
 
-    // Persist the hosting choice — it's the only durable bit; the tunnel URL
-    // itself is live state and never stored.
+    // Only the hosting choice is durable — the tunnel URL is live state.
     const selectMethod = (method: HostingMethod) => {
       setHostingMethod(method);
       if (method === "tunnel") {
@@ -472,8 +471,7 @@ export const publicKeyHostingStep: PluginStepDef = {
 
     const tunnelRunning = tunnelActive && !!tunnelUrl;
     const hosting = teslaConfig?.teslaPublicKeyHosting ?? "";
-    // In tunnel mode only a live tunnel counts — but a completed Tesla setup
-    // no longer needs one (it was torn down on purpose after pairing).
+    // In tunnel mode a live tunnel is required, unless setup already completed.
     const teslaWorking = useTeslaWorking();
     const { customConfigured, tunnelChosen, domainConfigured } = resolveHosting(
       {

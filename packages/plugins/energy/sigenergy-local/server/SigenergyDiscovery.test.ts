@@ -169,9 +169,7 @@ describe("discoverSigenergy", () => {
     });
 
     it("short-circuits at the first device found and ignores the rest", async () => {
-      // ChargeHA supports one inverter, so discovery stops once it finds one.
-      // .10 sits in the first probe batch (ARP IP leads the candidate list);
-      // .50 lands in a later batch that should never be scanned.
+      // Discovery stops at the first inverter: .10 is in the first batch, .50 in a batch never scanned.
       stubs.setArpOutput("? (192.168.1.10) at aa:bb:cc:dd:ee:ff\n");
       stubs.setDevice("192.168.1.10", { model: SIGENSTOR_MODEL });
       stubs.setDevice("192.168.1.50", { model: "Sigenergy Neo" });

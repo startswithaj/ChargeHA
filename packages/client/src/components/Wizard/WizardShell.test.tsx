@@ -175,8 +175,7 @@ describe("WizardShell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
-    // Next runs the step's handler before advancing, so the patch lands a tick
-    // later even when that handler does nothing.
+    // Next runs the step's handler first, so the patch lands a tick later.
     await waitFor(() =>
       expect(mockPatch).toHaveBeenCalledWith({ stepId: "timezone" })
     );
@@ -310,8 +309,7 @@ describe("WizardShell", () => {
       />,
     );
 
-    // Resumes at the first step still in the list at or after where they were,
-    // rather than restarting setup from the top.
+    // Resumes at the first surviving step at or after the stored one.
     expect(screen.getByText("Step 4 of 6")).toBeInTheDocument();
     expect(screen.getByText("Inverter Type")).toBeInTheDocument();
   });
@@ -538,8 +536,7 @@ describe("WizardShell", () => {
       renderNext({ kind: "loading" });
 
       expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
-      // No hint yet — a reason that flips to ready milliseconds after mount
-      // reads as a flash in the nav.
+      // No hint yet — a reason that clears just after mount would flash in the nav.
       expect(screen.queryByText(/continue/)).not.toBeInTheDocument();
     });
 
@@ -628,8 +625,7 @@ describe("WizardShell", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "pick" }));
 
-      // The next step is read from the flow the new selection produces, so the
-      // step id and the type that puts it in the list land together.
+      // The next step is read from the flow the new selection produces.
       expect(mockPatch).toHaveBeenCalledWith({
         vehicleType: "tesla",
         stepId: "tesla-key-generation",
@@ -680,9 +676,7 @@ describe("WizardShell", () => {
     });
 
     it("carries a selection returned from Next into the same move", async () => {
-      // Two movers used to run on one click: the step applied its selection,
-      // then the shell moved again from state that predated it and overwrote
-      // where the step had landed — skipping the whole plugin block.
+      // Regression: two movers on one click skipped the whole plugin block.
       const flow: StepDef[] = [
         {
           id: "vehicle-type",
@@ -725,8 +719,7 @@ describe("WizardShell", () => {
     });
 
     it("saves the selection and completes when the selecting step is last", async () => {
-      // The end of the flow used to write the current step onto itself, so a
-      // selection step in last position applied nothing and went nowhere.
+      // Regression: a selection step in last position wrote itself and went nowhere.
       const onComplete = vi.fn();
       const flow: StepDef[] = [
         {

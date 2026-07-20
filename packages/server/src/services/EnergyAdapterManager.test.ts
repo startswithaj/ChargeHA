@@ -229,8 +229,7 @@ describe("EnergyAdapterManager", () => {
       // deno-lint-ignore no-explicit-any
       await (mgr as any).initializationPromise;
 
-      // Source selected before host: build failed, but its keys must stay
-      // relevant or the wizard's later host save never triggers a rebuild.
+      // Build failed but the keys must stay relevant, or a later host save never rebuilds.
       expect(mgr.isRelevantConfigKey("late-config.host")).toBe(true);
 
       host = "192.0.2.10"; // the wizard's setup step saves the host
