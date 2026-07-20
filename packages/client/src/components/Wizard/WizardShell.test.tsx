@@ -678,5 +678,85 @@ describe("WizardShell", () => {
         stepId: "done",
       });
     });
+
+    it("carries a selection returned from Next into the same move", async () => {
+      // Two movers used to run on one click: the step applied its selection,
+      // then the shell moved again from state that predated it and overwrote
+      // where the step had landed — skipping the whole plugin block.
+      const flow: StepDef[] = [
+        {
+          id: "vehicle-type",
+          label: "Vehicle Type",
+          useStep: () => ({
+            next: {
+              kind: "ready",
+              hint: null,
+              onNext: () => Promise.resolve({ vehicleType: "tesla" }),
+            },
+            view: <div>vehicle-type</div>,
+          }),
+        },
+        {
+          id: "tesla-key-generation",
+          label: "Tesla Key Generation",
+          owner: "tesla",
+          useStep: () => ({ next: { kind: "hidden" }, view: <div>tesla</div> }),
+        },
+        {
+          id: "inverter-type",
+          label: "Inverter Type",
+          useStep: () => ({ next: { kind: "hidden" }, view: <div>inv</div> }),
+        },
+      ];
+      setStepId("vehicle-type");
+
+      renderWithProviders(
+        <WizardShell flow={flow} store={makeStore()} basePath="/wizard" />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+      // The move lands after the step's Next handler resolves.
+      await waitFor(() => expect(mockPatch).toHaveBeenCalledTimes(1));
+      expect(mockPatch).toHaveBeenCalledWith({
+        vehicleType: "tesla",
+        stepId: "tesla-key-generation",
+      });
+    });
+
+    it("saves the selection and completes when the selecting step is last", async () => {
+      // The end of the flow used to write the current step onto itself, so a
+      // selection step in last position applied nothing and went nowhere.
+      const onComplete = vi.fn();
+      const flow: StepDef[] = [
+        {
+          id: "vehicle-type",
+          label: "Vehicle Type",
+          useStep: () => ({
+            next: {
+              kind: "ready",
+              hint: null,
+              onNext: () => Promise.resolve({ vehicleType: "tesla" }),
+            },
+            view: <div>vehicle-type</div>,
+          }),
+        },
+      ];
+      setStepId("vehicle-type");
+
+      renderWithProviders(
+        <WizardShell
+          flow={flow}
+          store={makeStore()}
+          basePath="/wizard"
+          onComplete={onComplete}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Finish" }));
+
+      await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+      expect(mockPatch).toHaveBeenCalledWith({ vehicleType: "tesla" });
+    });
   });
 });
