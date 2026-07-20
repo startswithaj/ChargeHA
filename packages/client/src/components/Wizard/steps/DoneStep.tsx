@@ -4,19 +4,21 @@ import { AlertTriangle, CheckCircle, PartyPopper, Pencil } from "lucide-react";
 import type { VehicleWithState } from "@chargeha/shared";
 import { trpc } from "../../../trpc.ts";
 import { useRouter } from "../../../hooks/useRouter.ts";
-import type { StepProps } from "../WizardShell.tsx";
+import type { StepDef, StepProps } from "../flow.ts";
 import styles from "./steps.module.css";
 
 interface ChecklistItem {
   label: string;
   completed: boolean;
-  step: number;
+  /** The step this item's Edit button jumps to. An id, not a position: which
+   *  index a step sits at depends on the plugins selected. */
+  stepId: string;
 }
 
 function ChecklistView(
   { checklist, onSkipTo }: {
     checklist: ChecklistItem[];
-    onSkipTo: (step: number) => void;
+    onSkipTo: (id: string) => void;
   },
 ) {
   return (
@@ -36,7 +38,7 @@ function ChecklistView(
             size="1"
             variant="ghost"
             color="gray"
-            onClick={() => onSkipTo(item.step)}
+            onClick={() => onSkipTo(item.stepId)}
             style={{ marginLeft: "auto" }}
           >
             <Pencil size={12} />
@@ -59,6 +61,7 @@ function buildChecklist(
       | undefined;
   },
 ): ChecklistItem[] {
+  // Every target is a core step, so it is always in the list.
   return [
     {
       label: authMode === "none"
@@ -66,46 +69,56 @@ function buildChecklist(
         : "Authentication configured",
       completed: authMode === "local" || authMode === "oidc" ||
         authMode === "none",
-      step: 1,
+      stepId: "authentication",
     },
     {
       label: "Timezone configured",
       completed: !!systemConfig?.timezone,
-      step: 2,
+      stepId: "timezone",
     },
     {
       label: "Vehicle connected",
       completed: vehicles.length > 0,
-      step: 2,
+      stepId: "vehicle-type",
     },
     {
       label: "Energy source configured",
       completed: !!equipmentConfig?.energyAdapterType &&
         equipmentConfig.energyAdapterType !== "",
-      step: 10,
+      stepId: "inverter-type",
     },
     {
       label: "Home location set",
       completed: !!(homeConfig?.homeLatitude && homeConfig?.homeLongitude),
-      step: 12,
+      stepId: "home-location",
     },
   ];
 }
 
-export function DoneStep({ onSkipTo }: StepProps) {
+export const doneStep: StepDef = {
+  id: "done",
+  label: "Done",
+  // No Next: the step finishes setup through its own "Go to Dashboard" CTA.
+  useStep: (props) => ({
+    next: { kind: "hidden" },
+    view: <DoneSummary {...props} />,
+  }),
+};
+
+function DoneSummary({ onSkipTo }: StepProps) {
   const { navigate } = useRouter();
   // Always refetch on mount so the summary reflects the just-finished setup,
   // not a stale cache from an earlier step or the quick demo setup.
   const fresh = { refetchOnMount: "always" } as const;
-  const { data: systemConfig, isFetching: systemFetching } = trpc.config.system
+  const { data: systemConfig, isLoading: systemLoading } = trpc.config.system
     .get.useQuery(undefined, fresh);
-  const { data: equipmentConfig, isFetching: equipmentFetching } = trpc.config
+  const { data: equipmentConfig, isLoading: equipmentLoading } = trpc.config
     .equipment.get.useQuery(undefined, fresh);
-  const { data: homeConfig, isFetching: homeFetching } = trpc.config.home.get
+  const { data: homeConfig, isLoading: homeLoading } = trpc.config.home.get
     .useQuery(undefined, fresh);
-  const { data: authSession, isFetching: authFetching } = trpc.auth.session
+  const { data: authSession, isLoading: authLoading } = trpc.auth.session
     .useQuery(undefined, fresh);
-  const { data: vehiclesData, isFetching: vehiclesFetching } = trpc.vehicle.list
+  const { data: vehiclesData, isLoading: vehiclesLoading } = trpc.vehicle.list
     .useQuery(undefined, fresh);
   const vehicles = useMemo(
     () => (vehiclesData?.vehicles ?? []) as VehicleWithState[],
@@ -128,8 +141,9 @@ export function DoneStep({ onSkipTo }: StepProps) {
 
   const authMode = authSession?.authMode ?? "none";
 
-  const loading = systemFetching || equipmentFetching || homeFetching ||
-    vehiclesFetching || authFetching;
+  // isLoading, not isFetching — the summary must not blank out on background refetches.
+  const loading = systemLoading || equipmentLoading || homeLoading ||
+    vehiclesLoading || authLoading;
 
   const checklist = buildChecklist({
     authMode,

@@ -1,6 +1,4 @@
-// ── Envoy `/info` helpers ────────────────────────────────────────────────────
-// `/info` needs no auth on any firmware and returns an `<envoy_info>` XML
-// document carrying the gateway serial and part number.
+// Envoy /info helpers — unauthenticated XML carrying the gateway serial and part number.
 
 export const INFO_PATH = "/info";
 

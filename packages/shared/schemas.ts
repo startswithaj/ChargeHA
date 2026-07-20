@@ -402,17 +402,16 @@ export type WizardSaveOidcConfigInput = z.infer<
   typeof wizardSaveOidcConfigInput
 >;
 
-export const wizardSetStepInput: z.ZodType<{ stepId: string }> = z.object({
-  stepId: z.string(),
+export const wizardPatchStateInput: z.ZodType<{
+  stepId?: string;
+  vehicleType?: string;
+  energyType?: string;
+}> = z.object({
+  stepId: z.string().optional(),
+  vehicleType: z.string().optional(),
+  energyType: z.string().optional(),
 });
-
-export const wizardSetVehicleTypeInput: z.ZodType<{ type: string }> = z.object({
-  type: z.string(),
-});
-
-export const wizardSetEnergyTypeInput: z.ZodType<{ type: string }> = z.object({
-  type: z.string(),
-});
+export type WizardPatchStateInput = z.infer<typeof wizardPatchStateInput>;
 
 // ---- Auth inputs ----
 
@@ -444,6 +443,17 @@ export const authSelectVehicleInput: z.ZodType<{
   name: z.string().optional(),
 });
 export type AuthSelectVehicleInput = z.infer<typeof authSelectVehicleInput>;
+
+export const authSelectVehiclesInput: z.ZodType<{
+  vehicles: { vin: string; name?: string | undefined; priority: number }[];
+}> = z.object({
+  vehicles: z.array(z.object({
+    vin: z.string(),
+    name: z.string().optional(),
+    priority: z.number().int().min(1),
+  })).min(1),
+});
+export type AuthSelectVehiclesInput = z.infer<typeof authSelectVehiclesInput>;
 
 // ---- Logs inputs ----
 

@@ -2,9 +2,10 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../test-utils.tsx";
-import { DoneStep } from "./DoneStep.tsx";
+import { doneStep } from "./DoneStep.tsx";
 import { trpc } from "../../../trpc.ts";
-import type { StepProps } from "../WizardShell.tsx";
+import type { StepProps } from "../flow.ts";
+import { StepNextHarness } from "./test-helpers/StepNextHarness.tsx";
 
 const { mockCompleteMutate, captured } = vi.hoisted(() => ({
   mockCompleteMutate: vi.fn(),
@@ -94,9 +95,8 @@ vi.mock("../../../trpc.ts", () => ({
 
 describe("DoneStep", () => {
   const makeStepProps = (overrides: Partial<StepProps> = {}): StepProps => ({
-    onNext: vi.fn(),
+    onAdvance: vi.fn(),
     onBack: vi.fn(),
-    onSkip: vi.fn(),
     onSkipTo: vi.fn(),
     onSkipToEnd: vi.fn(),
     ...overrides,
@@ -160,7 +160,9 @@ describe("DoneStep", () => {
       error: null,
     } as never);
 
-    renderWithProviders(<DoneStep {...makeStepProps()} />);
+    renderWithProviders(
+      <StepNextHarness def={doneStep} stepProps={makeStepProps()} />,
+    );
 
     await waitFor(() => {
       expect(screen.getByText("Authentication configured")).toBeInTheDocument();
@@ -199,7 +201,9 @@ describe("DoneStep", () => {
       error: null,
     } as never);
 
-    renderWithProviders(<DoneStep {...makeStepProps()} />);
+    renderWithProviders(
+      <StepNextHarness def={doneStep} stepProps={makeStepProps()} />,
+    );
 
     await waitFor(() => {
       expect(screen.getByText("Setup Complete!")).toBeInTheDocument();
@@ -232,7 +236,9 @@ describe("DoneStep", () => {
       error: null,
     } as never);
 
-    renderWithProviders(<DoneStep {...makeStepProps()} />);
+    renderWithProviders(
+      <StepNextHarness def={doneStep} stepProps={makeStepProps()} />,
+    );
 
     await waitFor(() => {
       expect(screen.getByText("Setup Complete!")).toBeInTheDocument();
@@ -262,7 +268,9 @@ describe("DoneStep", () => {
         error: null,
       } as never);
 
-      renderWithProviders(<DoneStep {...makeStepProps()} />);
+      renderWithProviders(
+        <StepNextHarness def={doneStep} stepProps={makeStepProps()} />,
+      );
 
       await waitFor(() => {
         expect(screen.getByText(expected)).toBeInTheDocument();
@@ -278,7 +286,12 @@ describe("DoneStep", () => {
     } as never);
 
     const onSkipTo = vi.fn();
-    renderWithProviders(<DoneStep {...makeStepProps({ onSkipTo })} />);
+    renderWithProviders(
+      <StepNextHarness
+        def={doneStep}
+        stepProps={makeStepProps({ onSkipTo })}
+      />,
+    );
 
     await waitFor(() => {
       expect(screen.getByText("Authentication configured")).toBeInTheDocument();
@@ -288,8 +301,35 @@ describe("DoneStep", () => {
     const editButtons = screen.getAllByRole("button", { name: /Edit/ });
     fireEvent.click(editButtons[0]);
 
-    expect(onSkipTo).toHaveBeenCalledWith(1);
+    // By id, not position — indices shift with the selected plugins.
+    expect(onSkipTo).toHaveBeenCalledWith("authentication");
   });
+
+  it.each([
+    [1, "timezone"],
+    [2, "vehicle-type"],
+    [3, "inverter-type"],
+    [4, "home-location"],
+  ])(
+    "checklist item %i edits the %s step",
+    async (index, stepId) => {
+      const onSkipTo = vi.fn();
+      renderWithProviders(
+        <StepNextHarness
+          def={doneStep}
+          stepProps={makeStepProps({ onSkipTo })}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getAllByRole("button", { name: /Edit/ })).toHaveLength(5);
+      });
+
+      fireEvent.click(screen.getAllByRole("button", { name: /Edit/ })[index]);
+
+      expect(onSkipTo).toHaveBeenCalledWith(stepId);
+    },
+  );
 
   // ---- API calls ----
 
@@ -310,7 +350,9 @@ describe("DoneStep", () => {
       captured.completeOnSuccess?.();
     });
 
-    renderWithProviders(<DoneStep {...makeStepProps()} />);
+    renderWithProviders(
+      <StepNextHarness def={doneStep} stepProps={makeStepProps()} />,
+    );
 
     await waitFor(() => {
       expect(screen.getByText("Setup Complete!")).toBeInTheDocument();

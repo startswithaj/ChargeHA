@@ -2,38 +2,47 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../../client/src/test-utils.tsx";
-import { VehicleSelectionStep } from "./VehicleSelectionStep.tsx";
-import { makeStepProps } from "./test-helpers/stepProps.ts";
+import { vehicleSelectionStep } from "./VehicleSelectionStep.tsx";
+import { StepNextHarness } from "../../../../client/src/components/Wizard/steps/test-helpers/StepNextHarness.tsx";
 
 const mocks = vi.hoisted(() => ({
-  selectVehicleMutate: vi.fn().mockResolvedValue({ success: true }),
-  setPriorityMutate: vi.fn().mockResolvedValue({ success: true }),
+  selectVehiclesMutate: vi.fn().mockResolvedValue({ success: true }),
   teslaVehiclesUseQuery: vi.fn(),
   vehicleListUseQuery: vi.fn(),
 }));
 
 vi.mock("./trpc.ts", () => ({
   trpc: {
-    tesla: {
-      teslaVehicles: {
-        useQuery: (...args: unknown[]) => mocks.teslaVehiclesUseQuery(...args),
-      },
-    },
-    vehicle: {
-      list: {
-        useQuery: (...args: unknown[]) => mocks.vehicleListUseQuery(...args),
+    plugin: {
+      vehicle: {
+        tesla: {
+          teslaVehicles: {
+            useQuery: (...args: unknown[]) =>
+              mocks.teslaVehiclesUseQuery(...args),
+          },
+          listVehicles: {
+            useQuery: (...args: unknown[]) =>
+              mocks.vehicleListUseQuery(...args),
+          },
+        },
       },
     },
     useUtils: vi.fn(() => ({
       client: {
-        tesla: {
-          selectVehicle: {
-            mutate: mocks.selectVehicleMutate,
+        plugin: {
+          vehicle: {
+            tesla: {
+              selectVehicles: {
+                mutate: mocks.selectVehiclesMutate,
+              },
+            },
           },
         },
+      },
+      plugin: {
         vehicle: {
-          setPriority: {
-            mutate: mocks.setPriorityMutate,
+          tesla: {
+            listVehicles: { invalidate: vi.fn(() => Promise.resolve()) },
           },
         },
       },
@@ -80,7 +89,7 @@ describe("VehicleSelectionStep", () => {
       error: null,
     });
 
-    renderWithProviders(<VehicleSelectionStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={vehicleSelectionStep} />);
 
     expect(screen.getByText("Discovering vehicles...")).toBeInTheDocument();
   });
@@ -88,7 +97,7 @@ describe("VehicleSelectionStep", () => {
   it("shows empty state when no vehicles found", async () => {
     setVehicles([]);
 
-    renderWithProviders(<VehicleSelectionStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={vehicleSelectionStep} />);
 
     await waitFor(() => {
       expect(screen.getByText(/No vehicles found/)).toBeInTheDocument();
@@ -96,7 +105,7 @@ describe("VehicleSelectionStep", () => {
   });
 
   it("displays vehicle list on mount", async () => {
-    renderWithProviders(<VehicleSelectionStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={vehicleSelectionStep} />);
 
     await waitFor(() => {
       expect(screen.getByText("My Model 3")).toBeInTheDocument();
@@ -107,7 +116,7 @@ describe("VehicleSelectionStep", () => {
   it("renders name, VIN, and battery label", async () => {
     setVehicles([mockVehicles[0]]);
 
-    renderWithProviders(<VehicleSelectionStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={vehicleSelectionStep} />);
 
     await waitFor(() => {
       expect(screen.getByText("My Model 3")).toBeInTheDocument();
@@ -126,7 +135,7 @@ describe("VehicleSelectionStep", () => {
     async (count, shouldShow) => {
       setVehicles(mockVehicles.slice(0, count));
 
-      renderWithProviders(<VehicleSelectionStep {...makeStepProps()} />);
+      renderWithProviders(<StepNextHarness def={vehicleSelectionStep} />);
 
       await waitFor(() => {
         expect(screen.getByText("My Model 3")).toBeInTheDocument();
@@ -139,53 +148,61 @@ describe("VehicleSelectionStep", () => {
 
   // ---- API calls ----
 
-  it("clicking Save & Continue saves selected vehicles via tRPC", async () => {
+  it("clicking Next saves selected vehicles via tRPC", async () => {
     const onNext = vi.fn();
     setVehicles([mockVehicles[0]]);
 
     renderWithProviders(
-      <VehicleSelectionStep {...makeStepProps({ onNext })} />,
+      <StepNextHarness def={vehicleSelectionStep} onAdvance={onNext} />,
     );
 
     await waitFor(() => {
       expect(screen.getByText("My Model 3")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText("Save & Continue"));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
-      expect(mocks.selectVehicleMutate).toHaveBeenCalledWith({
-        vin: "5YJ3E1EA1LF000001",
-        name: "My Model 3",
+      expect(mocks.selectVehiclesMutate).toHaveBeenCalledWith({
+        vehicles: [
+          { vin: "5YJ3E1EA1LF000001", name: "My Model 3", priority: 1 },
+        ],
       });
       expect(onNext).toHaveBeenCalled();
     });
   });
 
-  it("sets priority for each vehicle when multiple are selected", async () => {
+  it("saves all selected vehicles with priorities in one call", async () => {
     const onNext = vi.fn();
 
     renderWithProviders(
-      <VehicleSelectionStep {...makeStepProps({ onNext })} />,
+      <StepNextHarness def={vehicleSelectionStep} onAdvance={onNext} />,
     );
 
     await waitFor(() => {
       expect(screen.getByText("My Model 3")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText("Save & Continue"));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
-      expect(mocks.selectVehicleMutate).toHaveBeenCalledTimes(2);
-      expect(mocks.setPriorityMutate).toHaveBeenCalledTimes(2);
+      expect(mocks.selectVehiclesMutate).toHaveBeenCalledTimes(1);
+      expect(mocks.selectVehiclesMutate).toHaveBeenCalledWith({
+        vehicles: [
+          { vin: "5YJ3E1EA1LF000001", name: "My Model 3", priority: 1 },
+          { vin: "7SAYGDEE5PA000002", name: "Family Model Y", priority: 2 },
+        ],
+      });
       expect(onNext).toHaveBeenCalled();
     });
   });
 
-  it("Save button disabled when no vehicles selected", async () => {
+  it("Next disabled when no vehicles selected", async () => {
     setVehicles([mockVehicles[0]]);
 
-    renderWithProviders(<VehicleSelectionStep {...makeStepProps()} />);
+    renderWithProviders(
+      <StepNextHarness def={vehicleSelectionStep} onAdvance={vi.fn()} />,
+    );
 
     await waitFor(() => {
       expect(screen.getByText("My Model 3")).toBeInTheDocument();
@@ -196,8 +213,9 @@ describe("VehicleSelectionStep", () => {
       screen.getByRole("checkbox", { name: /Select My Model 3/ }),
     );
 
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
     expect(
-      screen.getByRole("button", { name: /Save & Continue/ }),
-    ).toBeDisabled();
+      screen.getByText("Select at least one vehicle to continue"),
+    ).toBeInTheDocument();
   });
 });

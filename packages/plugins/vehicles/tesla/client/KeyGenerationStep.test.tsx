@@ -2,9 +2,9 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../../client/src/test-utils.tsx";
-import { KeyGenerationStep } from "./KeyGenerationStep.tsx";
+import { keyGenerationStep } from "./KeyGenerationStep.tsx";
+import { StepNextHarness } from "../../../../client/src/components/Wizard/steps/test-helpers/StepNextHarness.tsx";
 import { trpc } from "./trpc.ts";
-import { makeStepProps } from "./test-helpers/stepProps.ts";
 
 const mocks = vi.hoisted(() => ({
   generateMutate: vi.fn(),
@@ -15,35 +15,46 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("./trpc.ts", () => ({
   trpc: {
-    tesla: {
-      getConfig: {
-        useQuery: vi.fn(() => ({ data: {}, isLoading: false, error: null })),
+    useUtils: vi.fn(() => ({
+      plugin: {
+        vehicle: { tesla: { getConfig: { invalidate: vi.fn() } } },
       },
-      generateKeys: {
-        useMutation: vi.fn(() => ({
-          mutate: mocks.generateMutate,
-          isSuccess: false,
-          isPending: false,
-          error: null,
-          reset: mocks.generateReset,
-        })),
-      },
-      importKeys: {
-        useMutation: vi.fn(() => ({
-          mutate: mocks.importMutate,
-          isSuccess: false,
-          isPending: false,
-          error: null,
-          reset: mocks.importReset,
-        })),
-      },
-    },
-    health: {
-      encryption: {
-        useQuery: vi.fn(() => ({
-          data: { configured: true },
-          isLoading: false,
-        })),
+    })),
+    plugin: {
+      vehicle: {
+        tesla: {
+          getConfig: {
+            useQuery: vi.fn(() => ({
+              data: {},
+              isLoading: false,
+              error: null,
+            })),
+          },
+          generateKeys: {
+            useMutation: vi.fn(() => ({
+              mutate: mocks.generateMutate,
+              isSuccess: false,
+              isPending: false,
+              error: null,
+              reset: mocks.generateReset,
+            })),
+          },
+          encryptionStatus: {
+            useQuery: vi.fn(() => ({
+              data: { configured: true },
+              isLoading: false,
+            })),
+          },
+          importKeys: {
+            useMutation: vi.fn(() => ({
+              mutate: mocks.importMutate,
+              isSuccess: false,
+              isPending: false,
+              error: null,
+              reset: mocks.importReset,
+            })),
+          },
+        },
       },
     },
   },
@@ -89,27 +100,31 @@ describe("KeyGenerationStep", () => {
   };
 
   function setGenerateState(overrides: Partial<MutationResult>): void {
-    vi.mocked(trpc.tesla.generateKeys.useMutation).mockReturnValue({
-      ...defaultGenerate,
-      ...overrides,
-    } as never);
+    vi.mocked(trpc.plugin.vehicle.tesla.generateKeys.useMutation)
+      .mockReturnValue({
+        ...defaultGenerate,
+        ...overrides,
+      } as never);
   }
 
   function setImportState(overrides: Partial<MutationResult>): void {
-    vi.mocked(trpc.tesla.importKeys.useMutation).mockReturnValue({
-      ...defaultImport,
-      ...overrides,
-    } as never);
+    vi.mocked(trpc.plugin.vehicle.tesla.importKeys.useMutation).mockReturnValue(
+      {
+        ...defaultImport,
+        ...overrides,
+      } as never,
+    );
   }
 
   beforeEach(() => {
     vi.clearAllMocks();
     setGenerateState({});
     setImportState({});
-    vi.mocked(trpc.health.encryption.useQuery).mockReturnValue({
-      data: { configured: true },
-      isLoading: false,
-    } as never);
+    vi.mocked(trpc.plugin.vehicle.tesla.encryptionStatus.useQuery)
+      .mockReturnValue({
+        data: { configured: true },
+        isLoading: false,
+      } as never);
   });
 
   afterEach(() => {
@@ -119,25 +134,26 @@ describe("KeyGenerationStep", () => {
   // ---- Initial render ----
 
   it("shows two option cards on initial render", () => {
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     expect(screen.getByText("Generate a key pair for me")).toBeInTheDocument();
     expect(screen.getByText("I have my own key pair")).toBeInTheDocument();
   });
 
   it("shows encryption warning when ENCRYPTION_KEY is not set", () => {
-    vi.mocked(trpc.health.encryption.useQuery).mockReturnValue({
-      data: { configured: false },
-      isLoading: false,
-    } as never);
+    vi.mocked(trpc.plugin.vehicle.tesla.encryptionStatus.useQuery)
+      .mockReturnValue({
+        data: { configured: false },
+        isLoading: false,
+      } as never);
 
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     expect(screen.getByText(/stored in plain text/)).toBeInTheDocument();
   });
 
   it("hides encryption warning when ENCRYPTION_KEY is set", () => {
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     expect(screen.queryByText(/stored in plain text/)).not.toBeInTheDocument();
   });
@@ -145,7 +161,7 @@ describe("KeyGenerationStep", () => {
   // ---- Generate flow ----
 
   it("calls generateKeys mutation when Generate option is clicked", async () => {
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     fireEvent.click(screen.getByText("Generate a key pair for me"));
 
@@ -157,7 +173,7 @@ describe("KeyGenerationStep", () => {
   it("shows spinner during generate API call", async () => {
     setGenerateState({ isPending: true });
 
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     fireEvent.click(screen.getByText("Generate a key pair for me"));
 
@@ -175,7 +191,7 @@ describe("KeyGenerationStep", () => {
     // Render with default state so ChooseModeCards is visible, then click
     // Generate to set mode="generate"; switching the mock to isSuccess
     // mid-flow drives the re-render into SuccessView with the right mode.
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     setGenerateState({ isSuccess: true });
 
@@ -191,7 +207,7 @@ describe("KeyGenerationStep", () => {
   it("shows success after successful import", () => {
     setImportState({ isSuccess: true });
 
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     expect(
       screen.getByText(/imported and stored successfully/),
@@ -218,7 +234,7 @@ describe("KeyGenerationStep", () => {
     (_flow, setter, errorMsg, expected) => {
       setter({ error: { message: errorMsg } });
 
-      renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+      renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
       expect(screen.getByText(expected)).toBeInTheDocument();
     },
@@ -227,7 +243,7 @@ describe("KeyGenerationStep", () => {
   it("Try Again button from error resets mutations", () => {
     setGenerateState({ error: { message: "Key generation failed" } });
 
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     expect(screen.getByText("Key generation failed")).toBeInTheDocument();
 
@@ -236,25 +252,26 @@ describe("KeyGenerationStep", () => {
     expect(mocks.generateReset).toHaveBeenCalled();
   });
 
-  it("Continue button calls onNext after successful generation", () => {
+  it("enables Next after successful generation", async () => {
     const onNext = vi.fn();
     setGenerateState({ isSuccess: true });
 
     renderWithProviders(
-      <KeyGenerationStep {...makeStepProps({ onNext })} />,
+      <StepNextHarness def={keyGenerationStep} onAdvance={onNext} />,
     );
 
-    expect(screen.getByRole("button", { name: "Continue" }))
-      .toBeInTheDocument();
+    const nextButton = screen.getByRole("button", { name: "Next" });
+    expect(nextButton).toBeEnabled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(onNext).toHaveBeenCalledTimes(1);
+    fireEvent.click(nextButton);
+    // Next runs the step's handler before advancing, so this lands a tick later.
+    await waitFor(() => expect(onNext).toHaveBeenCalledTimes(1));
   });
 
   // ---- Import flow ----
 
   it("shows import form when 'I have my own key pair' is clicked", () => {
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     fireEvent.click(screen.getByText("I have my own key pair"));
 
@@ -265,7 +282,7 @@ describe("KeyGenerationStep", () => {
   });
 
   it("disables Save Keys button when textareas are empty", () => {
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     fireEvent.click(screen.getByText("I have my own key pair"));
 
@@ -273,7 +290,7 @@ describe("KeyGenerationStep", () => {
   });
 
   it("calls importKeys mutation with PEM values", async () => {
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     fireEvent.click(screen.getByText("I have my own key pair"));
 
@@ -292,7 +309,7 @@ describe("KeyGenerationStep", () => {
   });
 
   it("Back button from import returns to choose mode", () => {
-    renderWithProviders(<KeyGenerationStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={keyGenerationStep} />);
 
     fireEvent.click(screen.getByText("I have my own key pair"));
     expect(screen.getByText("Public Key (PEM)")).toBeInTheDocument();

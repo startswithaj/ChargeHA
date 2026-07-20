@@ -1,11 +1,11 @@
 import type { AnyRouter } from "@trpc/server";
 import type { EnergySourceAdapter } from "@chargeha/shared";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
-import type { EnergyPlugin } from "@chargeha/plugins/types";
+import type { EnergyPlugin, PluginHealthCheck } from "@chargeha/plugins/types";
 import { sigenergyLocalConfigDef } from "./config.ts";
 import { SigenergyLocalAdapter } from "./SigenergyLocalAdapter.ts";
 import { JsmodbusReader } from "./SigenergyModbusClient.ts";
-import { sigenergyLocalRouter } from "./router.ts";
+import { createSigenergyLocalRouter } from "./router.ts";
 
 /**
  * Sigenergy energy plugin — reads a Sigenergy inverter / energy-storage system
@@ -57,6 +57,10 @@ export class SigenergyLocalPlugin implements EnergyPlugin {
   }
 
   getRouter(): AnyRouter {
-    return sigenergyLocalRouter;
+    return createSigenergyLocalRouter(this.deps);
+  }
+
+  getHealthChecks(): PluginHealthCheck[] {
+    return [];
   }
 }

@@ -2,9 +2,10 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../test-utils.tsx";
-import { WelcomeStep } from "./WelcomeStep.tsx";
+import { welcomeStep } from "./WelcomeStep.tsx";
 import { trpc } from "../../../trpc.ts";
-import type { StepProps } from "../WizardShell.tsx";
+import type { StepProps } from "../flow.ts";
+import { StepNextHarness } from "./test-helpers/StepNextHarness.tsx";
 
 const { mockDemoSetupMutate, mockCompleteMutate, captured } = vi.hoisted(
   () => ({
@@ -57,9 +58,8 @@ vi.mock("../../../trpc.ts", () => ({
 
 describe("WelcomeStep", () => {
   const makeStepProps = (overrides: Partial<StepProps> = {}): StepProps => ({
-    onNext: vi.fn(),
+    onAdvance: vi.fn(),
     onBack: vi.fn(),
-    onSkip: vi.fn(),
     onSkipTo: vi.fn(),
     onSkipToEnd: vi.fn(),
     ...overrides,
@@ -86,7 +86,9 @@ describe("WelcomeStep", () => {
   // ---- Initial render ----
 
   it("renders welcome content: logo, copy, both buttons, both descriptions", () => {
-    renderWithProviders(<WelcomeStep {...makeStepProps()} />);
+    renderWithProviders(
+      <StepNextHarness def={welcomeStep} stepProps={makeStepProps()} />,
+    );
 
     expect(screen.getByAltText("ChargeHA")).toBeInTheDocument();
     expect(screen.getByText(/ChargeHA is a smart home charging controller/))
@@ -103,20 +105,30 @@ describe("WelcomeStep", () => {
 
   // ---- User interactions ----
 
-  it("clicking 'Full Setup' calls onNext callback", () => {
-    const onNext = vi.fn();
-    renderWithProviders(<WelcomeStep {...makeStepProps({ onNext })} />);
+  it("clicking 'Full Setup' calls onAdvance callback", () => {
+    const onAdvance = vi.fn();
+    renderWithProviders(
+      <StepNextHarness
+        def={welcomeStep}
+        stepProps={makeStepProps({ onAdvance })}
+      />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /Full Setup/ }));
 
-    expect(onNext).toHaveBeenCalledTimes(1);
+    expect(onAdvance).toHaveBeenCalledTimes(1);
   });
 
   // ---- API calls ----
 
   it("clicking 'Demo Mode' calls demo setup then complete then onSkipToEnd", async () => {
     const onSkipToEnd = vi.fn();
-    renderWithProviders(<WelcomeStep {...makeStepProps({ onSkipToEnd })} />);
+    renderWithProviders(
+      <StepNextHarness
+        def={welcomeStep}
+        stepProps={makeStepProps({ onSkipToEnd })}
+      />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /Demo Mode/ }));
 
@@ -139,7 +151,9 @@ describe("WelcomeStep", () => {
       reset: vi.fn(),
     } as never);
 
-    renderWithProviders(<WelcomeStep {...makeStepProps()} />);
+    renderWithProviders(
+      <StepNextHarness def={welcomeStep} stepProps={makeStepProps()} />,
+    );
 
     expect(screen.getByText("Setting up...")).toBeInTheDocument();
     expect(
@@ -155,7 +169,9 @@ describe("WelcomeStep", () => {
       reset: vi.fn(),
     } as never);
 
-    renderWithProviders(<WelcomeStep {...makeStepProps()} />);
+    renderWithProviders(
+      <StepNextHarness def={welcomeStep} stepProps={makeStepProps()} />,
+    );
 
     expect(screen.getByText("Setup failed")).toBeInTheDocument();
   });

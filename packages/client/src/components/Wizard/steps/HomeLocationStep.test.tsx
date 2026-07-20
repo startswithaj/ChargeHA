@@ -2,9 +2,9 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../test-utils.tsx";
-import { HomeLocationStep } from "./HomeLocationStep.tsx";
+import { homeLocationStep } from "./HomeLocationStep.tsx";
+import { StepNextHarness } from "./test-helpers/StepNextHarness.tsx";
 import { trpc } from "../../../trpc.ts";
-import type { StepProps } from "../WizardShell.tsx";
 
 const { mockHomeSetMutateAsync, mockHomeGetInvalidate } = vi.hoisted(() => ({
   mockHomeSetMutateAsync: vi.fn(),
@@ -95,15 +95,6 @@ vi.mock("../../StaticMap/StaticMap.tsx", () => ({
 // ---- Tests ----
 
 describe("HomeLocationStep", () => {
-  const makeStepProps = (overrides: Partial<StepProps> = {}): StepProps => ({
-    onNext: vi.fn(),
-    onBack: vi.fn(),
-    onSkip: vi.fn(),
-    onSkipTo: vi.fn(),
-    onSkipToEnd: vi.fn(),
-    ...overrides,
-  });
-
   beforeEach(() => {
     vi.clearAllMocks();
     mockHomeSetMutateAsync.mockResolvedValue({});
@@ -121,7 +112,7 @@ describe("HomeLocationStep", () => {
   // ---- Initial render ----
 
   it("renders address search component", async () => {
-    renderWithProviders(<HomeLocationStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={homeLocationStep} />);
 
     await waitFor(() => {
       expect(screen.getByTestId("address-search")).toBeInTheDocument();
@@ -129,7 +120,7 @@ describe("HomeLocationStep", () => {
   });
 
   it("renders GPS button", () => {
-    renderWithProviders(<HomeLocationStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={homeLocationStep} />);
 
     expect(
       screen.getByRole("button", { name: /Use my current location/ }),
@@ -146,15 +137,16 @@ describe("HomeLocationStep", () => {
     } as never);
 
     const onNext = vi.fn();
-    renderWithProviders(<HomeLocationStep {...makeStepProps({ onNext })} />);
+    renderWithProviders(
+      <StepNextHarness def={homeLocationStep} onAdvance={onNext} />,
+    );
 
     // Wait for config to load and coordinates to be set
     await waitFor(() => {
       expect(screen.getByText(/Location set/)).toBeInTheDocument();
     });
 
-    // Click Save & Continue
-    fireEvent.click(screen.getByRole("button", { name: /Save & Continue/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
       expect(mockHomeSetMutateAsync).toHaveBeenCalledWith({

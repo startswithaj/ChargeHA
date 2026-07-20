@@ -1,9 +1,9 @@
-import { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
+import {
+  PluginDependencies,
+  type PluginDependenciesInit,
+} from "@chargeha/server/bootstrap/PluginDependencies";
 import type { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
 import type { EnergyPluginRegistry } from "@chargeha/server/bootstrap/EnergyPluginRegistry";
-import type { AppDatabase } from "@chargeha/server/db";
-import type { VehicleManager } from "@chargeha/server/services/VehicleManager";
-import type { EnergyAdapterManager } from "@chargeha/server/services/EnergyAdapterManager";
 import { TeslaVehiclePlugin } from "./vehicles/tesla/server/index.ts";
 import { TeslaProxyManager } from "./vehicles/tesla/server/TeslaProxyManager.ts";
 import { SimulatedVehiclePlugin } from "./vehicles/simulated/server/index.ts";
@@ -22,14 +22,12 @@ import { SimulatedEnergyPlugin } from "./energy/simulated/server/index.ts";
  * storage is encapsulated inside `AppDatabase`.
  */
 export function registerPlugins(
-  db: AppDatabase,
-  vehicleManager: VehicleManager,
-  energyManager: EnergyAdapterManager,
+  host: Omit<PluginDependenciesInit, "pluginId">,
   vehicleRegistry: VehiclePluginRegistry,
   energyRegistry: EnergyPluginRegistry,
 ): void {
   const make = (id: string) =>
-    PluginDependencies.create(db, vehicleManager, energyManager, id);
+    PluginDependencies.create({ ...host, pluginId: id });
 
   const teslaDeps = make("tesla");
   vehicleRegistry.register(

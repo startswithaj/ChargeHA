@@ -1,5 +1,5 @@
-import { Button, Callout, Select, Text } from "@radix-ui/themes";
-import { Info, Zap } from "lucide-react";
+import { Callout, Select, Text } from "@radix-ui/themes";
+import { Info } from "lucide-react";
 import { trpc } from "../../../trpc.ts";
 import {
   useSolarConfig,
@@ -7,10 +7,20 @@ import {
 } from "../../../hooks/useSectionConfig.ts";
 import { useEnergyData } from "../../../hooks/useEnergyData.ts";
 import type { VehicleWithState } from "@chargeha/shared";
-import type { StepProps } from "../WizardShell.tsx";
+import { advanceOnly, type StepDef } from "../flow.ts";
 import styles from "./steps.module.css";
 
-export function GridVoltageStep({ onNext }: StepProps) {
+export const gridVoltageStep: StepDef = {
+  id: "grid-voltage",
+  label: "Grid Voltage",
+  // Nothing to save and nothing to wait for — Next just moves on.
+  useStep: () => ({
+    next: { kind: "ready", hint: null, onNext: advanceOnly },
+    view: <GridVoltageFields />,
+  }),
+};
+
+function GridVoltageFields() {
   const { data: solarConfig } = useSolarConfig();
   const mutation = useSolarConfigMutation();
   const { data: energyData } = useEnergyData();
@@ -86,13 +96,6 @@ export function GridVoltageStep({ onNext }: StepProps) {
           when available, so this setting only applies as a fallback.
         </Text>
       )}
-
-      <div className={styles.stepActions}>
-        <Button size="2" onClick={onNext}>
-          <Zap size={14} />
-          Continue
-        </Button>
-      </div>
     </div>
   );
 }

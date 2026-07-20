@@ -13,12 +13,20 @@ describe("TeslaTokenManager", () => {
   const testLogger = new Logger("Tesla", "error");
 
   const makeDeps = (appDb: AppDatabase): PluginDependencies =>
-    PluginDependencies.create(
-      appDb,
-      throwingMock<VehicleManager>("VehicleManager"),
-      throwingMock<EnergyAdapterManager>("EnergyAdapterManager"),
-      "tesla",
-    );
+    PluginDependencies.create({
+      db: appDb,
+      vehicleManager: throwingMock<VehicleManager>("VehicleManager"),
+      energyManager: throwingMock<EnergyAdapterManager>("EnergyAdapterManager"),
+      tunnel: {
+        getUrl: () => null,
+        start: () => Promise.reject(new Error("tunnel not mocked")),
+        stop: () => Promise.resolve(),
+        getExpiryMinutes: () => null,
+      },
+      geocode: () => Promise.reject(new Error("geocode not mocked")),
+      encryptionConfigured: () => false,
+      pluginId: "tesla",
+    });
 
   /** Seed tokens directly into the DB using namespaced config keys. */
   const seedTokens = async (
@@ -43,12 +51,20 @@ describe("TeslaTokenManager", () => {
     await db.setPluginConfig("tesla.client_id", "test-client-id");
     await db.setPluginConfig("tesla.client_secret", "test-client-secret");
     await db.setPluginConfig("tesla.region", "na");
-    deps = PluginDependencies.create(
+    deps = PluginDependencies.create({
       db,
-      throwingMock<VehicleManager>("VehicleManager"),
-      throwingMock<EnergyAdapterManager>("EnergyAdapterManager"),
-      "tesla",
-    );
+      vehicleManager: throwingMock<VehicleManager>("VehicleManager"),
+      energyManager: throwingMock<EnergyAdapterManager>("EnergyAdapterManager"),
+      tunnel: {
+        getUrl: () => null,
+        start: () => Promise.reject(new Error("tunnel not mocked")),
+        stop: () => Promise.resolve(),
+        getExpiryMinutes: () => null,
+      },
+      geocode: () => Promise.reject(new Error("geocode not mocked")),
+      encryptionConfigured: () => false,
+      pluginId: "tesla",
+    });
     manager = new TeslaTokenManager(deps, testLogger);
   });
 
@@ -88,6 +104,20 @@ describe("TeslaTokenManager", () => {
       expect(scope).toContain("offline_access");
       expect(scope).toContain("vehicle_device_data");
       expect(scope).toContain("vehicle_charging_cmds");
+    });
+
+    it("records the origin per state for the callback, consumed on read", async () => {
+      await manager.getAuthorizationUrl(
+        "state-1",
+        "https://chargeha.example.com",
+      );
+
+      expect(manager.takeAuthOrigin("state-1")).toBe(
+        "https://chargeha.example.com",
+      );
+      // Consumed — a second read (or an unknown state) yields null.
+      expect(manager.takeAuthOrigin("state-1")).toBeNull();
+      expect(manager.takeAuthOrigin("unknown-state")).toBeNull();
     });
   });
 
@@ -271,6 +301,43 @@ describe("TeslaTokenManager", () => {
         expect(params.get("redirect_uri")).toBe(
           "https://cb.example.com/api/vehicle/tesla/callback",
         );
+      } finally {
+        m.stopAutoRefresh();
+      }
+    });
+
+    it("shares one refresh request across concurrent callers", async () => {
+      const d = makeDeps(db);
+      // Expired access token, so every entry point below triggers a refresh.
+      const expiredAt = new Date(Date.now() - 1000).toISOString();
+      await seedTokens(db, "old-access", "old-refresh", expiredAt);
+
+      let calls = 0;
+      let release = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const fakeFetch = async () => {
+        calls++;
+        // Hold the request open so the second caller arrives mid-flight.
+        await gate;
+        return new Response(
+          JSON.stringify({
+            access_token: "new-access",
+            refresh_token: "new-refresh",
+            expires_in: 3600,
+          }),
+          { status: 200 },
+        );
+      };
+      const m = new TeslaTokenManager(d, testLogger, fakeFetch);
+
+      try {
+        const both = Promise.all([m.getAccessToken(), m.isAuthenticated()]);
+        release();
+        const [token] = await both;
+        expect(calls).toBe(1);
+        expect(token).toBe("new-access");
       } finally {
         m.stopAutoRefresh();
       }

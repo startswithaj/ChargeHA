@@ -1,5 +1,5 @@
 import type { AnyRouter } from "@trpc/server";
-import type { EnergyPlugin } from "@chargeha/plugins/types";
+import type { EnergyPlugin, PluginHealthCheck } from "@chargeha/plugins/types";
 
 /**
  * Thin container for energy plugins. Starts empty; plugins are constructed
@@ -32,6 +32,10 @@ export class EnergyPluginRegistry {
         .map(([id, plugin]) => [id, plugin.getRouter()] as const)
         .filter((entry): entry is [string, AnyRouter] => entry[1] != null),
     );
+  }
+
+  getHealthChecks(): PluginHealthCheck[] {
+    return [...this.plugins.values()].flatMap((p) => p.getHealthChecks());
   }
 
   /** Shuts down every registered plugin. */

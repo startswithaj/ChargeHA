@@ -1,114 +1,100 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect } from "react";
 import { Button, Text } from "@radix-ui/themes";
-import { ArrowLeft, ArrowRight, SkipForward, X } from "lucide-react";
-import { useWizardState } from "../../hooks/useWizardState.ts";
+import { X } from "lucide-react";
 import { useRouter } from "../../hooks/useRouter.ts";
 import { StepIndicator } from "./StepIndicator.tsx";
+import { StepHost } from "./StepHost.tsx";
+import {
+  activeSteps,
+  backTargetId,
+  nextStepId,
+  resolveStepIndex,
+  skipTargetId,
+  type StepDef,
+  type StepProps,
+  type WizardAdvance,
+  type WizardStore,
+} from "./flow.ts";
 import styles from "./WizardShell.module.css";
-import type { ReactNode } from "react";
-
-export interface StepProps {
-  onNext: () => void;
-  onBack: () => void;
-  onSkip: () => void;
-  onSkipTo: (step: number) => void;
-  onSkipToEnd: () => void;
-}
-
-export interface WizardStepConfig {
-  /** Unique string identifier for this step (persisted to the database). */
-  id: string;
-  label: string;
-  /** Hide the Next/Finish button (Back stays) — e.g. the Done step completes via its own CTA. */
-  hideNext?: boolean;
-  render: (props: StepProps) => ReactNode;
-}
 
 interface WizardShellProps {
-  steps?: WizardStepConfig[];
+  flow: StepDef[];
+  store: WizardStore;
+  /** Steps are addressed as `${basePath}/${stepId}`. */
+  basePath: string;
   onComplete?: () => void;
   /** When set, an "Exit setup" button is shown that abandons the wizard —
    *  provided only when the wizard was previously completed. */
   onExit?: () => void;
+  /** Called when Back is pressed on the first step. Without it, Back is
+   *  disabled there. */
+  onBackOut?: () => void;
 }
 
 function useWizardCallbacks(
-  { steps, currentStep, wizardState, onComplete }: {
-    steps: WizardStepConfig[] | undefined;
-    currentStep: number;
-    wizardState: ReturnType<typeof useWizardState>;
+  { flow, store, onComplete, onBackOut }: {
+    flow: StepDef[];
+    store: WizardStore;
     onComplete?: () => void;
+    onBackOut?: () => void;
   },
 ) {
-  const goToStep = useCallback(
-    (step: number) => {
-      if (!steps || steps.length === 0) return;
-      const clamped = Math.max(0, Math.min(step, steps.length - 1));
-      wizardState.setStepId(steps[clamped].id);
-    },
-    [steps, wizardState],
-  );
+  const { state, patch } = store;
 
-  const handleNext = useCallback(() => {
-    if (!steps) return;
-    if (currentStep < steps.length - 1) goToStep(currentStep + 1);
-    else if (onComplete) onComplete();
-  }, [currentStep, steps, goToStep, onComplete]);
+  const goToStep = useCallback(
+    (id: string) => {
+      const active = activeSteps(flow, state);
+      if (!active.some((step) => step.id === id)) {
+        // A missed id means the caller is wrong; landing near it would hide that.
+        throw new Error(
+          `Cannot jump to unknown or excluded wizard step "${id}".`,
+        );
+      }
+      patch({ stepId: id });
+    },
+    [flow, state, patch],
+  );
 
   const handleBack = useCallback(() => {
-    if (currentStep > 0) goToStep(currentStep - 1);
-  }, [currentStep, goToStep]);
+    const target = backTargetId(flow, state);
+    if (target) patch({ stepId: target });
+    else onBackOut?.();
+  }, [flow, state, patch, onBackOut]);
 
   const handleSkip = useCallback(() => {
-    if (!steps) return;
-    if (currentStep < steps.length - 1) goToStep(currentStep + 1);
-  }, [currentStep, steps, goToStep]);
+    const target = skipTargetId(flow, state);
+    // Skipping part of a plugin's chain abandons the whole run.
+    if (target) patch({ stepId: target });
+    else onBackOut?.();
+  }, [flow, state, patch, onBackOut]);
 
   const handleSkipToEnd = useCallback(() => {
-    if (!steps) return;
-    goToStep(steps.length - 1);
-  }, [steps, goToStep]);
+    const last = activeSteps(flow, state).at(-1);
+    if (last) patch({ stepId: last.id });
+  }, [flow, state, patch]);
 
-  return { goToStep, handleNext, handleBack, handleSkip, handleSkipToEnd };
-}
-
-function WizardNav(
-  { isFirstStep, isLastStep, hideNext, onBack, onSkip, onNext }: {
-    isFirstStep: boolean;
-    isLastStep: boolean;
-    hideNext: boolean;
-    onBack: () => void;
-    onSkip: () => void;
-    onNext: () => void;
-  },
-) {
-  return (
-    <div className={styles.navigation}>
-      <Button
-        variant="soft"
-        onClick={onBack}
-        disabled={isFirstStep}
-        aria-label="Back"
-      >
-        <ArrowLeft size={16} />
-        Back
-      </Button>
-      <div className={styles.navigationRight}>
-        {!isLastStep && (
-          <Button variant="ghost" onClick={onSkip} aria-label="Skip">
-            Skip
-            <SkipForward size={16} />
-          </Button>
-        )}
-        {!hideNext && (
-          <Button onClick={onNext} aria-label={isLastStep ? "Finish" : "Next"}>
-            {isLastStep ? "Finish" : "Next"}
-            {!isLastStep && <ArrowRight size={16} />}
-          </Button>
-        )}
-      </div>
-    </div>
+  // The only way forward: the selection and the step it leads to are written together.
+  const advance = useCallback<WizardAdvance>(
+    (selection = {}) => {
+      const nextState = { ...state, ...selection };
+      const next = nextStepId(flow, nextState);
+      if (next) {
+        patch({ ...selection, stepId: next });
+        return;
+      }
+      if (Object.keys(selection).length > 0) patch(selection);
+      onComplete?.();
+    },
+    [flow, state, patch, onComplete],
   );
+
+  return {
+    goToStep,
+    handleBack,
+    handleSkip,
+    handleSkipToEnd,
+    advance,
+  };
 }
 
 function ExitRow({ onExit }: { onExit: () => void }) {
@@ -127,56 +113,29 @@ function ExitRow({ onExit }: { onExit: () => void }) {
   );
 }
 
-export function WizardShell({ steps, onComplete, onExit }: WizardShellProps) {
-  const wizardState = useWizardState();
+export function WizardShell(
+  { flow, store, basePath, onComplete, onExit, onBackOut }: WizardShellProps,
+) {
   const { replacePath } = useRouter();
-  const stepsTotal = steps?.length ?? 0;
+  const active = activeSteps(flow, store.state);
+  const currentStep = resolveStepIndex(flow, store.state);
+  const stepConfig = active[currentStep];
 
-  // Resolve current step index from DB-persisted step ID.
-  // If step ID is not found (plugin steps removed or invalid ID), fall back to 0.
-  // Normal selection changes are handled by VehicleTypeStep/InverterTypeStep
-  // which navigate directly to the correct step ID after changing selections.
-  const currentStep = useMemo(() => {
-    if (!steps || steps.length === 0) return 0;
-    const idx = steps.findIndex((s) => s.id === wizardState.stepId);
-    if (idx >= 0) return idx;
-    // Clamp: try step after vehicle-type (covers removed plugin steps)
-    const vehicleIdx = steps.findIndex((s) => s.id === "vehicle-type");
-    if (vehicleIdx >= 0 && vehicleIdx + 1 < steps.length) {
-      return vehicleIdx + 1;
-    }
-    return 0;
-  }, [steps, wizardState.stepId]);
+  const {
+    goToStep,
+    handleBack,
+    handleSkip,
+    handleSkipToEnd,
+    advance,
+  } = useWizardCallbacks({ flow, store, onComplete, onBackOut });
 
-  // Sync DB stepId when the resolved index doesn't match the stored ID
-  // (happens after clamping due to plugin step removal or invalid stored ID)
+  // Keep the URL on the step actually rendered, which may differ from the stored id.
+  const shownStepId = stepConfig?.id;
   useEffect(() => {
-    if (!steps || steps.length === 0) return;
-    const resolved = steps[currentStep];
-    if (resolved && resolved.id !== wizardState.stepId) {
-      wizardState.setStepId(resolved.id);
-    }
-  }, [steps, currentStep, wizardState]);
+    if (shownStepId) replacePath(`${basePath}/${shownStepId}`);
+  }, [shownStepId, basePath, replacePath]);
 
-  // Keep URL in sync with current step
-  useEffect(() => {
-    if (!steps || steps.length === 0) return;
-    const stepId = steps[currentStep]?.id;
-    if (stepId) replacePath(`/wizard/${stepId}`);
-  }, [steps, currentStep, replacePath]);
-
-  const { goToStep, handleNext, handleBack, handleSkip, handleSkipToEnd } =
-    useWizardCallbacks({ steps, currentStep, wizardState, onComplete });
-
-  const stepProps: StepProps = {
-    onNext: handleNext,
-    onBack: handleBack,
-    onSkip: handleSkip,
-    onSkipTo: goToStep,
-    onSkipToEnd: handleSkipToEnd,
-  };
-
-  if (wizardState.isLoading) {
+  if (store.isLoading) {
     return (
       <div className={styles.container}>
         <Text color="gray">Loading wizard...</Text>
@@ -184,7 +143,7 @@ export function WizardShell({ steps, onComplete, onExit }: WizardShellProps) {
     );
   }
 
-  if (!steps || steps.length === 0) {
+  if (active.length === 0 || !stepConfig) {
     return (
       <div className={styles.container}>
         <Text color="gray">No wizard steps configured.</Text>
@@ -192,45 +151,47 @@ export function WizardShell({ steps, onComplete, onExit }: WizardShellProps) {
     );
   }
 
-  const stepConfig = steps[currentStep];
-  const label = stepConfig?.label ?? `Step ${currentStep + 1}`;
-  const labels = steps.map((s) => s.label);
+  const stepProps: StepProps = {
+    onAdvance: advance,
+    onBack: handleBack,
+    onSkipTo: goToStep,
+    onSkipToEnd: handleSkipToEnd,
+  };
+
   const isFirstStep = currentStep === 0;
-  const isLastStep = currentStep === stepsTotal - 1;
+  const isLastStep = currentStep === active.length - 1;
 
   return (
     <div className={styles.container}>
       {onExit && <ExitRow onExit={onExit} />}
       <StepIndicator
-        total={stepsTotal}
+        total={active.length}
         current={currentStep}
-        labels={labels}
+        labels={active.map((s) => s.label)}
       />
 
       {/* Step header */}
       <div className={styles.stepHeader}>
         <Text size="1" color="gray">
-          Step {currentStep + 1} of {stepsTotal}
+          Step {currentStep + 1} of {active.length}
         </Text>
         <Text size="5" weight="bold">
-          {label}
+          {stepConfig.label}
         </Text>
       </div>
 
-      {/* Step content */}
-      <div className={styles.stepContent}>
-        {stepConfig
-          ? stepConfig.render(stepProps)
-          : <Text color="gray">{label} — not yet implemented</Text>}
-      </div>
-
-      <WizardNav
-        isFirstStep={isFirstStep}
-        isLastStep={isLastStep}
-        hideNext={!!stepConfig?.hideNext}
-        onBack={handleBack}
-        onSkip={handleSkip}
-        onNext={handleNext}
+      <StepHost
+        key={stepConfig.id}
+        def={stepConfig}
+        stepProps={stepProps}
+        nav={{
+          isFirstStep,
+          isLastStep,
+          canBack: !isFirstStep || !!onBackOut,
+          onBack: handleBack,
+          onSkip: handleSkip,
+        }}
+        onAdvance={advance}
       />
     </div>
   );

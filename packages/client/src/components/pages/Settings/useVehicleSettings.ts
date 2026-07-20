@@ -5,6 +5,7 @@ import { vehiclePluginOptions } from "@chargeha/plugins/componentRegistry";
 import { useHomeConfig } from "../../../hooks/useSectionConfig.ts";
 import { trpc } from "../../../trpc.ts";
 import { useRouter } from "../../../hooks/useRouter.ts";
+import { clearPluginOnboarding } from "../../../hooks/usePluginOnboardingState.ts";
 
 const demoPlugin = vehiclePluginOptions.find((o) => o.demoSetup);
 
@@ -50,7 +51,7 @@ function useAddSimulatedVehicleMutation(
       return id;
     },
     onSuccess: (id) => {
-      utils.vehicle.list.invalidate();
+      // Cache refresh is driven by the server's vehicles_changed event in RealtimeSync.
       setRecentlyAddedVins(new Set([id]));
       setTimeout(() => setRecentlyAddedVins(new Set()), 4000);
     },
@@ -116,11 +117,8 @@ export function useVehicleSettings() {
 
   // --- Mutations ---
 
-  const deleteMutation = trpc.vehicle.delete.useMutation({
-    onSuccess: () => {
-      utils.vehicle.list.invalidate();
-    },
-  });
+  // No onSuccess cache work: RealtimeSync handles vehicles_changed invalidation.
+  const deleteMutation = trpc.vehicle.delete.useMutation();
 
   const priorityMutation = usePriorityMutation(utils);
   const addSimMutation = useAddSimulatedVehicleMutation({
@@ -149,6 +147,8 @@ export function useVehicleSettings() {
   const vehiclePlugins = vehiclePluginsQuery.data ?? [];
 
   const handleStartOnboarding = useCallback((pluginId: string) => {
+    // Launching from settings is a fresh run, so drop any half-finished state.
+    clearPluginOnboarding(pluginId);
     navigate({ type: "pluginSetup", pluginId });
   }, []);
 

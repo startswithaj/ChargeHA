@@ -1,79 +1,52 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { trpc } from "../trpc.ts";
+import type { WizardStore } from "../components/Wizard/flow.ts";
+import type { WizardNavState } from "@chargeha/shared";
 
-export interface WizardState {
-  /** Current step ID (e.g. "welcome", "tesla-credentials"). */
-  stepId: string;
-  /** Selected vehicle type (e.g. "tesla", "simulated"). */
-  vehicleType: string;
-  /** Selected energy type (e.g. "fronius_local", "fronius_cloud", ""). */
-  energyType: string;
-  /** Set the current step by string ID. */
-  setStepId: (id: string) => void;
-  /** Set the selected vehicle type. */
-  setVehicleType: (type: string) => void;
-  /** Set the selected energy type. */
-  setEnergyType: (type: string) => void;
-  /** Whether the initial data has loaded from the server. */
-  isLoading: boolean;
-}
+const EMPTY_STATE: WizardNavState = {
+  stepId: "",
+  vehicleType: "",
+  energyType: "",
+};
 
 /**
- * Hook that persists wizard navigation state to the database via tRPC.
+ * The setup wizard's store, persisted to the database via tRPC.
  * Steps are identified by string IDs (not numeric indices) so the wizard
  * can resume correctly even when the step list changes dynamically.
  */
-export function useWizardState(): WizardState {
+export function useWizardState(): WizardStore {
   const utils = trpc.useUtils();
 
-  const stepQuery = trpc.wizard.getStep.useQuery();
-  const vehicleTypeQuery = trpc.wizard.getVehicleType.useQuery();
-  const energyTypeQuery = trpc.wizard.getEnergyType.useQuery();
+  const stateQuery = trpc.wizard.state.useQuery();
+  const patchMutation = trpc.wizard.patchState.useMutation();
 
-  const stepMutation = trpc.wizard.setStep.useMutation({
-    onMutate: async ({ stepId }) => {
-      await utils.wizard.getStep.cancel();
-      utils.wizard.getStep.setData(undefined, stepId);
+  const patch = useCallback(
+    (next: Partial<WizardNavState>) => {
+      // One cache entry, so the step id and the gating types can't disagree for a render.
+      utils.wizard.state.cancel();
+      utils.wizard.state.setData(undefined, (prev) => ({
+        ...(prev ?? EMPTY_STATE),
+        ...next,
+      }));
+      patchMutation.mutate(next, {
+        // Refetch so the client doesn't sit on a step the server never stored.
+        onError: () => {
+          utils.wizard.state.invalidate();
+        },
+      });
     },
-  });
-
-  const vehicleTypeMutation = trpc.wizard.setVehicleType.useMutation({
-    onMutate: async ({ type }) => {
-      await utils.wizard.getVehicleType.cancel();
-      utils.wizard.getVehicleType.setData(undefined, type);
-    },
-  });
-
-  const energyTypeMutation = trpc.wizard.setEnergyType.useMutation({
-    onMutate: async ({ type }) => {
-      await utils.wizard.getEnergyType.cancel();
-      utils.wizard.getEnergyType.setData(undefined, type);
-    },
-  });
-
-  const setStepId = useCallback(
-    (id: string) => stepMutation.mutate({ stepId: id }),
-    [stepMutation],
+    [utils, patchMutation],
   );
 
-  const setVehicleType = useCallback(
-    (type: string) => vehicleTypeMutation.mutate({ type }),
-    [vehicleTypeMutation],
-  );
+  const state = useMemo(() => ({
+    stepId: stateQuery.data?.stepId || "welcome",
+    vehicleType: stateQuery.data?.vehicleType ?? "",
+    energyType: stateQuery.data?.energyType ?? "",
+  }), [
+    stateQuery.data?.stepId,
+    stateQuery.data?.vehicleType,
+    stateQuery.data?.energyType,
+  ]);
 
-  const setEnergyType = useCallback(
-    (type: string) => energyTypeMutation.mutate({ type }),
-    [energyTypeMutation],
-  );
-
-  return {
-    stepId: stepQuery.data || "welcome",
-    vehicleType: vehicleTypeQuery.data || "",
-    energyType: energyTypeQuery.data || "",
-    setStepId,
-    setVehicleType,
-    setEnergyType,
-    isLoading: stepQuery.isLoading || vehicleTypeQuery.isLoading ||
-      energyTypeQuery.isLoading,
-  };
+  return { state, patch, isLoading: stateQuery.isLoading };
 }

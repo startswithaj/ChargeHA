@@ -10,10 +10,13 @@ import {
 } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../test-utils.tsx";
-import { TimezoneStep } from "./TimezoneStep.tsx";
-import type { StepProps } from "../WizardShell.tsx";
+import { timezoneStep } from "./TimezoneStep.tsx";
+import { StepNextHarness } from "./test-helpers/StepNextHarness.tsx";
 
-const { mockMutate } = vi.hoisted(() => ({ mockMutate: vi.fn() }));
+const { mockMutate, mockMutateAsync } = vi.hoisted(() => ({
+  mockMutate: vi.fn(),
+  mockMutateAsync: vi.fn(),
+}));
 
 vi.mock("../../../trpc.ts", () => ({
   widenTrpc: vi.fn(),
@@ -38,7 +41,7 @@ vi.mock("../../../trpc.ts", () => ({
             (_opts?: { onSuccess?: (...args: unknown[]) => void }) => {
               return {
                 mutate: mockMutate,
-                mutateAsync: vi.fn(),
+                mutateAsync: mockMutateAsync,
                 isPending: false,
                 isSuccess: false,
                 isError: false,
@@ -122,15 +125,6 @@ const { originalSupportedValuesOf, originalDateTimeFormat, FAKE_DETECTED_TZ } =
 // ---- Tests ----
 
 describe("TimezoneStep", () => {
-  const makeStepProps = (overrides: Partial<StepProps> = {}): StepProps => ({
-    onNext: vi.fn(),
-    onBack: vi.fn(),
-    onSkip: vi.fn(),
-    onSkipTo: vi.fn(),
-    onSkipToEnd: vi.fn(),
-    ...overrides,
-  });
-
   afterAll(() => {
     Intl.supportedValuesOf = originalSupportedValuesOf;
     Intl.DateTimeFormat = originalDateTimeFormat;
@@ -152,7 +146,7 @@ describe("TimezoneStep", () => {
   // ---- Initial render ----
 
   it("renders timezone dropdown with auto-detected value", () => {
-    renderWithProviders(<TimezoneStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={timezoneStep} />);
 
     expect(screen.getByText(/Select your timezone/)).toBeInTheDocument();
     // The trigger should show the auto-detected timezone
@@ -166,7 +160,7 @@ describe("TimezoneStep", () => {
   // ---- User interactions ----
 
   it("dropdown contains IANA timezone options", async () => {
-    renderWithProviders(<TimezoneStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={timezoneStep} />);
 
     // Open the select dropdown
     const trigger = screen.getByRole("combobox", { name: "Timezone" });
@@ -183,7 +177,7 @@ describe("TimezoneStep", () => {
   });
 
   it("selecting a timezone updates the selected value", async () => {
-    renderWithProviders(<TimezoneStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={timezoneStep} />);
 
     const trigger = screen.getByRole("combobox", { name: "Timezone" });
     fireEvent.click(trigger);
@@ -206,17 +200,21 @@ describe("TimezoneStep", () => {
 
   it("clicking Next saves timezone to API", async () => {
     const onNext = vi.fn();
-    renderWithProviders(<TimezoneStep {...makeStepProps({ onNext })} />);
+    mockMutateAsync.mockResolvedValue({});
+    renderWithProviders(
+      <StepNextHarness def={timezoneStep} onAdvance={onNext} />,
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: /Save & Continue/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
-      expect(mockMutate).toHaveBeenCalledWith(
-        { timezone: FAKE_DETECTED_TZ },
-        expect.objectContaining({ onSuccess: expect.any(Function) }),
-      );
+      expect(mockMutateAsync).toHaveBeenCalledWith({
+        timezone: FAKE_DETECTED_TZ,
+      });
     });
 
-    expect(onNext).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(onNext).toHaveBeenCalledTimes(1);
+    });
   });
 });

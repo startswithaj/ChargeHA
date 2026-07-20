@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { Button, Callout, Select, Text } from "@radix-ui/themes";
+import { Callout, Select, Text } from "@radix-ui/themes";
 import { CheckCircle } from "lucide-react";
 import {
   useSystemConfig,
   useSystemConfigMutation,
 } from "../../../hooks/useSectionConfig.ts";
-import type { StepProps } from "../WizardShell.tsx";
+import type { StepDef } from "../flow.ts";
 import styles from "./steps.module.css";
 import { buildTimezoneOptions } from "../../../lib/timezones.ts";
 
@@ -17,15 +17,47 @@ function detectTimezone(): string {
   }
 }
 
-export function TimezoneStep({ onNext }: StepProps) {
-  const { data: systemConfig } = useSystemConfig();
-  const detectedTimezone = useMemo(detectTimezone, []);
-  const timezoneOptions = useMemo(buildTimezoneOptions, []);
-  const [selectedTimezone, setSelectedTimezone] = useState(
-    systemConfig?.timezone || detectedTimezone,
-  );
+export const timezoneStep: StepDef = {
+  id: "timezone",
+  label: "Timezone",
+  useStep: () => {
+    const { data: systemConfig } = useSystemConfig();
+    const detectedTimezone = useMemo(detectTimezone, []);
+    const [selectedTimezone, setSelectedTimezone] = useState(
+      systemConfig?.timezone || detectedTimezone,
+    );
+    const saveMutation = useSystemConfigMutation();
 
-  const saveMutation = useSystemConfigMutation();
+    return {
+      next: {
+        kind: "ready",
+        hint: "Next saves your timezone",
+        // mutateAsync throws on failure; the host shows the message and the wizard stays put.
+        onNext: async () => {
+          await saveMutation.mutateAsync({ timezone: selectedTimezone });
+        },
+      },
+      view: (
+        <TimezoneFields
+          configuredTimezone={systemConfig?.timezone ?? null}
+          detectedTimezone={detectedTimezone}
+          selectedTimezone={selectedTimezone}
+          onSelect={setSelectedTimezone}
+        />
+      ),
+    };
+  },
+};
+
+function TimezoneFields(
+  { configuredTimezone, detectedTimezone, selectedTimezone, onSelect }: {
+    configuredTimezone: string | null;
+    detectedTimezone: string;
+    selectedTimezone: string;
+    onSelect: (timezone: string) => void;
+  },
+) {
+  const timezoneOptions = useMemo(buildTimezoneOptions, []);
 
   return (
     <div className={styles.stepContainer}>
@@ -34,14 +66,14 @@ export function TimezoneStep({ onNext }: StepProps) {
         formatting.
       </Text>
 
-      {systemConfig?.timezone && (
+      {configuredTimezone && (
         <Callout.Root color="green">
           <Callout.Icon>
             <CheckCircle size={16} />
           </Callout.Icon>
           <Callout.Text>
             Timezone is already set to{" "}
-            {systemConfig.timezone}. You can continue or change it below.
+            {configuredTimezone}. You can continue or change it below.
           </Callout.Text>
         </Callout.Root>
       )}
@@ -50,10 +82,7 @@ export function TimezoneStep({ onNext }: StepProps) {
         <Text as="label" size="2" weight="medium">
           Timezone
         </Text>
-        <Select.Root
-          value={selectedTimezone}
-          onValueChange={setSelectedTimezone}
-        >
+        <Select.Root value={selectedTimezone} onValueChange={onSelect}>
           <Select.Trigger aria-label="Timezone" />
           <Select.Content>
             {timezoneOptions.map((opt) => (
@@ -69,26 +98,6 @@ export function TimezoneStep({ onNext }: StepProps) {
           </Text>
         )}
       </div>
-
-      <div className={styles.stepActions}>
-        <Button
-          onClick={() => {
-            saveMutation.mutate(
-              { timezone: selectedTimezone },
-              { onSuccess: () => onNext() },
-            );
-          }}
-          disabled={saveMutation.isPending}
-        >
-          {saveMutation.isPending ? "Saving..." : "Save & Continue"}
-        </Button>
-      </div>
-
-      {saveMutation.error && (
-        <Text as="p" size="2" color="red">
-          {saveMutation.error.message}
-        </Text>
-      )}
     </div>
   );
 }

@@ -1,12 +1,9 @@
 import { useEffect, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button, Text, TextField } from "@radix-ui/themes";
-import {
-  type PhotonResult,
-  useAddressAutocomplete,
-} from "../../../../client/src/hooks/useAddressAutocomplete.ts";
+import { type PhotonResult, useAddressAutocomplete } from "../../../hostUi.ts";
 import { trpc } from "./trpc.ts";
-import styles from "../../../../client/src/components/ScheduleDialog/ScheduleDialog.module.css";
+import { dialogStyles as styles } from "../../../hostUi.ts";
 
 interface LocationFieldProps {
   lat: string;
@@ -119,7 +116,7 @@ export function LocationField({
 
   const geocodeMutation = useMutation({
     mutationFn: (query: string) =>
-      utils.client.config.geocode.query({ q: query }),
+      utils.client.plugin.vehicle.simulated.geocode.query({ q: query }),
     onSuccess: (
       result: { latitude: number; longitude: number; displayName: string },
     ) => {

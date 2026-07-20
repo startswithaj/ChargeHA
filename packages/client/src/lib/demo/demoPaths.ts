@@ -19,15 +19,17 @@ import type { MutationPath, QueryPath } from "./queryPaths.ts";
 /** Queries deliberately unreachable in demo (disabled plugins / features). */
 export const GATED_QUERIES: readonly string[] = [
   // Tesla — disabled in the wizard, no tesla vehicle ever exists.
-  "tesla.commandStatus",
-  "tesla.getConfig",
-  "tesla.teslaStatus",
-  "tesla.teslaVehicles",
+  "plugin.vehicle.tesla.encryptionStatus",
+  "plugin.vehicle.tesla.getConfig",
+  "plugin.vehicle.tesla.listVehicles",
+  "plugin.vehicle.tesla.proxyHealth",
+  "plugin.vehicle.tesla.teslaStatus",
+  "plugin.vehicle.tesla.teslaVehicles",
   // Fronius — disabled in the wizard, never the active adapter.
-  "energy.fronius_local.getConfig",
-  "energy.fronius_cloud.getConfig",
-  // Cloudflare tunnel — Tesla-only setup step, never reached.
-  "wizard.tunnelStatus",
+  "plugin.energy.fronius_local.getConfig",
+  "plugin.energy.fronius_cloud.getConfig",
+  // Setup tunnel — Tesla-only setup step, never reached.
+  "plugin.vehicle.tesla.tunnelStatus",
 ] as const satisfies readonly QueryPath[];
 
 /** Queries known to exist but not yet implemented. Empty — all are handled. */
@@ -37,27 +39,28 @@ export const PENDING_QUERIES: readonly string[] =
 /** Mutations deliberately unreachable in demo (disabled plugins / features). */
 export const GATED_MUTATIONS = [
   // Tesla — disabled in the wizard, no tesla vehicle ever exists.
-  "tesla.checkKeyPairing",
-  "tesla.disconnect",
-  "tesla.generateKeys",
-  "tesla.getAuthUrl",
-  "tesla.importKeys",
-  "tesla.registerPartner",
-  "tesla.selectVehicle",
-  "tesla.setConfig",
+  "plugin.vehicle.tesla.checkKeyPairing",
+  "plugin.vehicle.tesla.generateKeys",
+  "plugin.vehicle.tesla.getAuthUrl",
+  "plugin.vehicle.tesla.importKeys",
+  "plugin.vehicle.tesla.registerPartner",
+  "plugin.vehicle.tesla.resetOnboarding",
+  "plugin.vehicle.tesla.selectVehicle",
+  "plugin.vehicle.tesla.selectVehicles",
+  "plugin.vehicle.tesla.setConfig",
   // Fronius — disabled in the wizard, never the active adapter.
-  "energy.fronius_cloud.setConfig",
-  "energy.fronius_cloud.testConnection",
-  "energy.fronius_local.discover",
-  "energy.fronius_local.setConfig",
-  "energy.fronius_local.testConnection",
+  "plugin.energy.fronius_cloud.setConfig",
+  "plugin.energy.fronius_cloud.testConnection",
+  "plugin.energy.fronius_local.discover",
+  "plugin.energy.fronius_local.setConfig",
+  "plugin.energy.fronius_local.testConnection",
   // OIDC — disabled in demo (Feature.OidcAuth off).
   "auth.updateOidcConfig",
   "wizard.saveOidcConfig",
   "wizard.testOidcDiscovery",
-  // Cloudflare tunnel — Tesla-only setup step, never reached.
-  "wizard.startTunnel",
-  "wizard.stopTunnel",
+  // Setup tunnel — Tesla-only setup step, never reached.
+  "plugin.vehicle.tesla.startTunnel",
+  "plugin.vehicle.tesla.stopTunnel",
 ] as const satisfies readonly MutationPath[];
 
 /** The gated mutation paths as a literal union. */

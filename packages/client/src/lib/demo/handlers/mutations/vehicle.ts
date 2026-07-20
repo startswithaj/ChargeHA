@@ -16,7 +16,7 @@ type VehicleMutations = Pick<
   | "vehicle.command"
   | "vehicle.setAmps"
   | "vehicle.refreshState"
-  | "simulated.updateState"
+  | "plugin.vehicle.simulated.updateState"
 >;
 
 /** The live state of a vehicle after a mutation, or null if it's gone. */
@@ -147,7 +147,7 @@ export const vehicleMutations: VehicleMutations = {
     state: stateOf(getDemoState(), input.vehicleId),
   }),
 
-  "simulated.updateState": (input) => {
+  "plugin.vehicle.simulated.updateState": (input) => {
     const next = patchVehicle(input.vehicleId, (v) => ({
       ...v,
       isPluggedIn: input.isPluggedIn ?? v.isPluggedIn,

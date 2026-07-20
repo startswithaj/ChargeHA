@@ -1,10 +1,10 @@
 import type { AnyRouter } from "@trpc/server";
 import type { EnergySourceAdapter } from "@chargeha/shared";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
-import type { EnergyPlugin } from "@chargeha/plugins/types";
+import type { EnergyPlugin, PluginHealthCheck } from "@chargeha/plugins/types";
 import { froniusLocalConfigDef } from "./config.ts";
 import { FroniusLocalAdapter } from "./FroniusLocalAdapter.ts";
-import { froniusLocalRouter } from "./router.ts";
+import { createFroniusLocalRouter } from "./router.ts";
 
 /**
  * Fronius Local energy plugin — manages local network inverter communication
@@ -37,6 +37,10 @@ export class FroniusLocalPlugin implements EnergyPlugin {
   }
 
   getRouter(): AnyRouter {
-    return froniusLocalRouter;
+    return createFroniusLocalRouter(this.deps);
+  }
+
+  getHealthChecks(): PluginHealthCheck[] {
+    return [];
   }
 }

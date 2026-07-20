@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Text, TextField } from "@radix-ui/themes";
+import { Text, TextField } from "@radix-ui/themes";
 import { Globe, KeyRound, ShieldOff } from "lucide-react";
 import { trpc } from "../../../trpc.ts";
 import { demoMode, Feature } from "../../../lib/featureFlags.ts";
-import type { StepProps } from "../WizardShell.tsx";
+import type { StepDef, WizardNext } from "../flow.ts";
 import styles from "./steps.module.css";
 
 type AuthMode = "none" | "local" | "oidc";
@@ -43,6 +43,17 @@ function validateOidc(form: OidcForm): string | null {
   if (!form.clientId) return "Client ID is required";
   if (!form.clientSecret) return "Client secret is required";
   if (!form.baseUrl) return "Base URL is required";
+  return null;
+}
+
+/** The first thing stopping this mode from being saved, or null. */
+function validateMode(
+  mode: AuthMode,
+  localForm: LocalForm,
+  oidcForm: OidcForm,
+): string | null {
+  if (mode === "local") return validateLocal(localForm);
+  if (mode === "oidc") return validateOidc(oidcForm);
   return null;
 }
 
@@ -195,7 +206,8 @@ function useAuthEffects(
   sessionRefetch: () => Promise<
     { data?: { authenticated: boolean; authMode: string } | undefined }
   >,
-  onNext: () => void,
+  advance: () => void,
+  setSessionChecked: (v: boolean) => void,
 ) {
   useEffect(() => {
     const params = new URLSearchParams(globalThis.location?.search);
@@ -217,18 +229,19 @@ function useAuthEffects(
     sessionRefetch().then((result) => {
       const authMode = result.data?.authMode;
       if (result.data?.authenticated && authMode === "oidc") {
-        onNext();
+        advance();
         return;
       }
-      // Pre-select whatever auth mode is already configured.
-      if (authMode === "none" || authMode === "local" || authMode === "oidc") {
+      // Only pre-select an explicitly configured mode; "none" is just the fresh-install default.
+      if (authMode === "local" || authMode === "oidc") {
         setSelectedMode(authMode);
       }
+      setSessionChecked(true);
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
-function useAuthStepState(onNext: () => void) {
+function useAuthStepState(advance: () => void) {
   const [selectedMode, setSelectedMode] = useState<AuthMode | null>(null);
   const [localForm, setLocalForm] = useState<LocalForm>({
     username: "",
@@ -241,10 +254,13 @@ function useAuthStepState(onNext: () => void) {
     baseUrl: "",
   });
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   const setAuthMode = trpc.wizard.setAuthMode.useMutation();
   const saveOidcConfig = trpc.wizard.saveOidcConfig.useMutation();
+  // Depend on the stable mutate fns — mutation objects change identity every render.
+  const { mutateAsync: setAuthModeMutate } = setAuthMode;
+  const { mutateAsync: saveOidcMutate } = saveOidcConfig;
   const sessionQuery = trpc.auth.session.useQuery(undefined, {
     enabled: false,
   });
@@ -253,7 +269,8 @@ function useAuthStepState(onNext: () => void) {
     setSelectedMode,
     setValidationError,
     sessionQuery.refetch,
-    onNext,
+    advance,
+    setSessionChecked,
   );
 
   const redirectUri = useMemo(() => {
@@ -262,47 +279,26 @@ function useAuthStepState(onNext: () => void) {
     return `${base}/auth/oidc/callback`;
   }, [oidcForm.baseUrl]);
 
-  const handleNext = useCallback(async () => {
+  /** Validate + save. Throws the reason to stay on the step; the mutations
+   *  already throw on failure, so their message surfaces as-is. */
+  const handleNext = useCallback(async (): Promise<void> => {
     setValidationError(null);
-    if (!selectedMode) {
-      setValidationError("Please select an authentication mode");
-      return;
-    }
-    if (selectedMode === "local") {
-      const error = validateLocal(localForm);
-      if (error) {
-        setValidationError(error);
-        return;
-      }
-    }
+    // Unreachable unless the gate is wrong: authNext only returns this for a valid mode.
+    if (!selectedMode) throw new Error("Please select an authentication mode");
+
     if (selectedMode === "oidc") {
-      const error = validateOidc(oidcForm);
-      if (error) {
-        setValidationError(error);
-        return;
-      }
+      await saveOidcMutate(oidcForm);
+      globalThis.location.href = "/auth/oidc/login?return=wizard";
+      // Never settle — the page is leaving for the identity provider, so Next stays pending.
+      await new Promise<never>(() => {});
     }
-    setSaving(true);
-    try {
-      if (selectedMode === "oidc") {
-        await saveOidcConfig.mutateAsync(oidcForm);
-        globalThis.location.href = "/auth/oidc/login?return=wizard";
-        return;
-      }
-      await setAuthMode.mutateAsync({
-        mode: selectedMode,
-        localConfig: selectedMode === "local" ? localForm : undefined,
-        oidcConfig: undefined,
-      });
-      onNext();
-    } catch (err) {
-      setValidationError(
-        err instanceof Error ? err.message : "Failed to save auth settings",
-      );
-    } finally {
-      setSaving(false);
-    }
-  }, [selectedMode, localForm, oidcForm, onNext, setAuthMode, saveOidcConfig]);
+
+    await setAuthModeMutate({
+      mode: selectedMode,
+      localConfig: selectedMode === "local" ? localForm : undefined,
+      oidcConfig: undefined,
+    });
+  }, [selectedMode, localForm, oidcForm, setAuthModeMutate, saveOidcMutate]);
 
   const selectMode = (mode: AuthMode) => {
     setSelectedMode(mode);
@@ -316,27 +312,69 @@ function useAuthStepState(onNext: () => void) {
     oidcForm,
     setOidcForm,
     validationError,
-    saving,
     redirectUri,
     handleNext,
     selectMode,
+    sessionChecked,
   };
 }
 
-export function AuthStep({ onNext }: StepProps) {
-  const {
+function authHint(mode: AuthMode): string {
+  if (mode === "oidc") {
+    return "Next saves and redirects to your identity provider";
+  }
+  return "Next saves your authentication settings";
+}
+
+function authNext(
+  { sessionChecked, selectedMode, localForm, oidcForm, handleNext }: {
+    sessionChecked: boolean;
+    selectedMode: AuthMode | null;
+    localForm: LocalForm;
+    oidcForm: OidcForm;
+    handleNext: () => Promise<void>;
+  },
+): WizardNext {
+  if (selectedMode) {
+    // Validation gates Next instead of firing on click, so the reason can't go stale.
+    const invalid = validateMode(selectedMode, localForm, oidcForm);
+    if (invalid) return { kind: "blocked", reason: invalid };
+    return { kind: "ready", hint: authHint(selectedMode), onNext: handleNext };
+  }
+  // The session check only decides whether we can say why Next is blocked.
+  if (!sessionChecked) return { kind: "loading" };
+  return {
+    kind: "blocked",
+    reason: "Select an authentication mode to continue",
+  };
+}
+
+export const authStep: StepDef = {
+  id: "authentication",
+  label: "Authentication",
+  useStep: (props) => {
+    const auth = useAuthStepState(props.onAdvance);
+    return {
+      next: authNext(auth),
+      view: <AuthModes {...auth} />,
+    };
+  },
+};
+
+type AuthView = ReturnType<typeof useAuthStepState>;
+
+function AuthModes(
+  {
     selectedMode,
     localForm,
     setLocalForm,
     oidcForm,
     setOidcForm,
     validationError,
-    saving,
     redirectUri,
-    handleNext,
     selectMode,
-  } = useAuthStepState(onNext);
-
+  }: AuthView,
+) {
   const oidcEnabled = demoMode.allows(Feature.OidcAuth);
 
   return (
@@ -391,12 +429,6 @@ export function AuthStep({ onNext }: StepProps) {
           {validationError}
         </Text>
       )}
-
-      <div className={styles.stepActions}>
-        <Button onClick={handleNext} disabled={saving}>
-          {saving ? "Saving…" : "Continue"}
-        </Button>
-      </div>
     </div>
   );
 }

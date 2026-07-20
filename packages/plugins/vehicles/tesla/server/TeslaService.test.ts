@@ -57,6 +57,12 @@ describe("TeslaService", () => {
       upsertVehicleRow: () => Promise.resolve(),
       addVehicle: () => Promise.resolve(),
       deleteVehicle: () => Promise.resolve(),
+      tunnel: {
+        getUrl: () => null,
+        start: () => Promise.reject(new Error("tunnel start not mocked")),
+        stop: () => Promise.resolve(),
+        getExpiryMinutes: () => null,
+      },
       setSimulatedLoad: () => {},
       log: mockLogger(),
       dbLog: mockLogger() as unknown as PluginDependencies["dbLog"],
@@ -108,12 +114,13 @@ describe("TeslaService", () => {
     getConfig: (key: string) => {
       const config: Record<string, string> = {
         client_id: "id",
-        client_secret: "secret",
         region: "na",
         public_key_domain: "https://example.com",
       };
       return Promise.resolve(config[key] ?? null);
     },
+    getSecret: (key: string) =>
+      Promise.resolve(key === "client_secret" ? "secret" : null),
   };
 
   // ── listFleetVehicles ───────────────────────────────────────────────────────
@@ -156,13 +163,14 @@ describe("TeslaService", () => {
     });
   });
 
-  // ── disconnect ──────────────────────────────────────────────────────────────
+  // ── resetOnboarding ─────────────────────────────────────────────────────────
 
-  describe("TeslaService.disconnect", () => {
-    it("removes vehicles, clears tokens, and stops refresh", async () => {
+  describe("TeslaService.resetOnboarding", () => {
+    it("removes vehicles, resets config to defaults, and stops refresh", async () => {
       const deleted: string[] = [];
       const stopCalls: boolean[] = [];
-      const deleteTokenCalls: boolean[] = [];
+      const configSet: string[] = [];
+      const secretSet: string[] = [];
 
       const service = makeService({
         deps: {
@@ -171,23 +179,90 @@ describe("TeslaService", () => {
             deleted.push(id);
             return Promise.resolve();
           },
+          setConfig: (key: string) => {
+            configSet.push(key);
+            return Promise.resolve();
+          },
+          setSecret: (key: string) => {
+            secretSet.push(key);
+            return Promise.resolve();
+          },
         },
         tokenManager: {
           stopAutoRefresh: () => {
             stopCalls.push(true);
           },
-          deleteTokens: () => {
-            deleteTokenCalls.push(true);
-            return Promise.resolve();
-          },
         } as unknown as Partial<TeslaTokenManager>,
       });
 
-      const result = await service.disconnect();
+      const result = await service.resetOnboarding();
       expect(result.success).toBe(true);
       expect(stopCalls).toHaveLength(1);
       expect(deleted).toEqual(["VIN123"]);
-      expect(deleteTokenCalls).toHaveLength(1);
+      // Secret keys reset via setSecret, the rest via setConfig.
+      expect(secretSet).toEqual(
+        expect.arrayContaining([
+          "client_secret",
+          "access_token",
+          "refresh_token",
+        ]),
+      );
+      expect(configSet).toEqual(
+        expect.arrayContaining(["client_id", "region"]),
+      );
+    });
+
+    it("keeps the EC keypair and a self-hosted domain + hosting mode", async () => {
+      const configSet: string[] = [];
+      const secretSet: string[] = [];
+
+      const service = makeService({
+        deps: {
+          getConfig: (key: string) =>
+            Promise.resolve(key === "public_key_hosting" ? "custom" : null),
+          getVehicleRows: () => Promise.resolve([VEHICLE_ROW]),
+          deleteVehicle: () => Promise.resolve(),
+          setConfig: (key: string) => {
+            configSet.push(key);
+            return Promise.resolve();
+          },
+          setSecret: (key: string) => {
+            secretSet.push(key);
+            return Promise.resolve();
+          },
+        },
+      });
+
+      await service.resetOnboarding();
+      expect(secretSet).not.toContain("ec_private_key");
+      expect(configSet).not.toContain("ec_public_key_pem");
+      expect(configSet).not.toContain("public_key_domain");
+      expect(configSet).not.toContain("public_key_hosting");
+    });
+
+    it("clears the domain and hosting mode when hosting was a tunnel", async () => {
+      const configSet: string[] = [];
+
+      const service = makeService({
+        deps: {
+          getConfig: (key: string) =>
+            Promise.resolve(key === "public_key_hosting" ? "tunnel" : null),
+          getVehicleRows: () => Promise.resolve([VEHICLE_ROW]),
+          deleteVehicle: () => Promise.resolve(),
+          setConfig: (key: string) => {
+            configSet.push(key);
+            return Promise.resolve();
+          },
+          setSecret: () => Promise.resolve(),
+        },
+      });
+
+      await service.resetOnboarding();
+      // A tunnel URL is dead after a reset — cleared like everything else.
+      expect(configSet).toContain("public_key_domain");
+      expect(configSet).toContain("public_key_hosting");
+      // The keypair still survives regardless of hosting mode.
+      expect(configSet).not.toContain("ec_public_key_pem");
     });
   });
 
@@ -238,11 +313,10 @@ describe("TeslaService", () => {
     it("throws when domain is not configured", async () => {
       const service = makeService({
         deps: {
-          getConfig: (key: string) => {
-            if (key === "client_id") return Promise.resolve("id");
-            if (key === "client_secret") return Promise.resolve("secret");
-            return Promise.resolve(null);
-          },
+          getConfig: (key: string) =>
+            Promise.resolve(key === "client_id" ? "id" : null),
+          getSecret: (key: string) =>
+            Promise.resolve(key === "client_secret" ? "secret" : null),
         },
       });
       await expect(service.registerPartner()).rejects.toThrow(
@@ -281,6 +355,64 @@ describe("TeslaService", () => {
       await expect(service.registerPartner()).rejects.toThrow(
         "Failed to obtain partner token",
       );
+    });
+
+    const tunnelModeConfig = (key: string) => {
+      const config: Record<string, string> = {
+        client_id: "id",
+        region: "na",
+        public_key_hosting: "tunnel",
+      };
+      return Promise.resolve(config[key] ?? null);
+    };
+
+    it("throws with a start-tunnel hint in tunnel mode when the tunnel is down", async () => {
+      const service = makeService({
+        deps: {
+          getConfig: tunnelModeConfig,
+          getSecret: (key: string) =>
+            Promise.resolve(key === "client_secret" ? "secret" : null),
+          tunnel: {
+            getUrl: () => null,
+            start: () => Promise.reject(new Error("tunnel start not mocked")),
+            stop: () => Promise.resolve(),
+            getExpiryMinutes: () => null,
+          },
+        },
+      });
+      await expect(service.registerPartner()).rejects.toThrow(
+        "Tunnel is not running",
+      );
+    });
+
+    it("registers the live tunnel URL in tunnel mode", async () => {
+      const bodies: string[] = [];
+      const io = mockIo((url, init) => {
+        if (url.includes("oauth2")) {
+          return new Response(JSON.stringify({ access_token: "tok" }), {
+            status: 200,
+          });
+        }
+        bodies.push(String(init?.body));
+        return new Response(JSON.stringify({ response: {} }), { status: 200 });
+      });
+      const service = makeService({
+        deps: {
+          getConfig: tunnelModeConfig,
+          getSecret: (key: string) =>
+            Promise.resolve(key === "client_secret" ? "secret" : null),
+          tunnel: {
+            getUrl: () => "https://abc.trycloudflare.com",
+            start: () => Promise.reject(new Error("tunnel start not mocked")),
+            stop: () => Promise.resolve(),
+            getExpiryMinutes: () => null,
+          },
+        },
+        io,
+      });
+      const result = await service.registerPartner();
+      expect(result.success).toBe(true);
+      expect(bodies[0]).toContain("abc.trycloudflare.com");
     });
   });
 

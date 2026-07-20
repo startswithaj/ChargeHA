@@ -7,13 +7,7 @@ import type {
 import type { Logger } from "@chargeha/server/lib/Logger";
 import type { ModbusReader } from "./SigenergyModbusClient.ts";
 
-// ── Register map (all input registers, function code 0x04) ──────────────────
-// Addresses, data types, scales and sign conventions come from the Sigenergy
-// Modbus protocol as documented in the Home Assistant integration:
-// https://github.com/TypQxQ/Sigenergy-Home-Assistant-Integration
-//
-// Plant/EMS registers live on the plant unit id (default 247); per-device
-// registers live on the device unit id (default 1).
+// Register map (input registers, 0x04) per https://github.com/TypQxQ/Sigenergy-Home-Assistant-Integration
 
 const PLANT_GRID_POWER = 30005; // int32, kW ×0.001. <0 = export, >0 = import
 const PLANT_ESS_SOC = 30014; // uint16, % ×0.1
@@ -84,8 +78,7 @@ export class SigenergyLocalAdapter implements EnergySourceAdapter {
 
   async connect(): Promise<void> {
     await this.reader.connect();
-    // Probe the plant PV-power register: confirms the device speaks Modbus and
-    // the plant unit id is correct, surfacing misconfiguration immediately.
+    // Probing the plant PV-power register confirms Modbus works and the plant unit id is right.
     await this.reader.readInputRegisters(this.plantUnitId, PLANT_PV_POWER, 2);
   }
 

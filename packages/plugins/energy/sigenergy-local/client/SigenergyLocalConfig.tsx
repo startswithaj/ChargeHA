@@ -1,6 +1,6 @@
 import { Badge, Button, Text, TextField } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
-import { SettingsRow } from "../../../../client/src/components/pages/Settings/SettingsLayout.tsx";
+import { SettingsRow } from "../../../hostUi.ts";
 
 interface SigenergyLocalConfigValues {
   host: string;
@@ -39,12 +39,16 @@ function RealtimePreview(
 }
 
 export function SigenergyLocalConfig(): JSX.Element | null {
-  const { data: config } = trpc.energy.sigenergy_local.getConfig.useQuery();
+  const { data: config } = trpc.plugin.energy.sigenergy_local.getConfig
+    .useQuery();
   const utils = trpc.useUtils();
-  const configMutation = trpc.energy.sigenergy_local.setConfig.useMutation({
-    onSuccess: () => utils.energy.sigenergy_local.getConfig.invalidate(),
-  });
-  const testMutation = trpc.energy.sigenergy_local.testConnection.useMutation();
+  const configMutation = trpc.plugin.energy.sigenergy_local.setConfig
+    .useMutation({
+      onSuccess: () =>
+        utils.plugin.energy.sigenergy_local.getConfig.invalidate(),
+    });
+  const testMutation = trpc.plugin.energy.sigenergy_local.testConnection
+    .useMutation();
 
   if (!config) return null;
 

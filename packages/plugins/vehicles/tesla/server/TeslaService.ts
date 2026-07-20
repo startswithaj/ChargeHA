@@ -1,8 +1,17 @@
 /// <reference lib="deno.ns" />
 import { TRPCError } from "@trpc/server";
-import { sleep } from "@chargeha/shared/async";
+import { inSequence, sleep } from "@chargeha/shared/async";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import type { TeslaTokenManager } from "./TeslaTokenManager.ts";
+import {
+  TESLA_RESET_PRESERVED_KEYS,
+  TESLA_SECRET_KEYS,
+  teslaConfigDef,
+} from "./config.ts";
+import {
+  type PublicKeyHosting,
+  resolvePublicKeyDomain,
+} from "../shared/publicKeyDomain.ts";
 import type { Logger } from "@chargeha/server/lib/Logger";
 
 const TOKEN_URL = "https://fleet-auth.prd.vn.cloud.tesla.com/oauth2/v3/token";
@@ -74,66 +83,87 @@ export class TeslaService {
     }
   }
 
-  /** Disconnect Tesla: stop refresh, remove vehicles, clear tokens. */
-  async disconnect(): Promise<{ success: true }> {
-    try {
-      // Stop auto-refresh
-      this.tokenManager.stopAutoRefresh();
+  /** Erase Tesla configuration and vehicles so onboarding can start fresh from
+   *  the first wizard step, clearing credentials, hosting, partner
+   *  registration, and tokens. The EC keypair survives — see
+   *  TESLA_RESET_PRESERVED_KEYS. */
+  async resetOnboarding(): Promise<{ success: true }> {
+    this.tokenManager.stopAutoRefresh();
 
-      // Remove all Tesla vehicles from the manager
-      const vehicles = await this.deps.getVehicleRows();
-      await vehicles.reduce(async (prev, v) => {
-        await prev;
-        await this.deps.deleteVehicle(v.id);
-      }, Promise.resolve());
+    const vehicles = await this.deps.getVehicleRows();
+    await inSequence(vehicles, (v) => this.deps.deleteVehicle(v.id));
 
-      // Clear stored tokens
-      await this.tokenManager.deleteTokens();
-
-      this.logger.info(
-        "Tesla disconnected — tokens cleared, vehicles removed",
-      );
-      return { success: true as const };
-    } catch (err) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: err instanceof Error ? err.message : "Disconnect failed",
-      });
+    const preserved = new Set<string>(TESLA_RESET_PRESERVED_KEYS);
+    // Keep a self-hosted domain across a reset; clear a tunnel domain since the URL is dead.
+    if ((await this.deps.getConfig("public_key_hosting")) !== "tunnel") {
+      preserved.add("public_key_domain");
+      preserved.add("public_key_hosting");
     }
+
+    const secretKeys = new Set<string>(TESLA_SECRET_KEYS);
+    await inSequence(
+      Object.values(teslaConfigDef).filter((def) => !preserved.has(def.key)),
+      (def) =>
+        secretKeys.has(def.key)
+          ? this.deps.setSecret(def.key, String(def.default))
+          : this.deps.setConfig(def.key, String(def.default)),
+    );
+
+    this.logger.info(
+      "Tesla onboarding reset — config and vehicles cleared, keypair kept",
+    );
+    return { success: true as const };
   }
 
   /** Select and register a vehicle from Tesla Fleet API. */
   async selectVehicle(
     input: { vin: string; name?: string },
   ): Promise<{ success: true; vin: string }> {
-    const row = {
-      id: input.vin,
-      name: input.name ?? "Tesla",
-      adapterType: "tesla" as const,
-      priority: 1,
+    await this.selectVehicles({
+      vehicles: [{ vin: input.vin, name: input.name, priority: 1 }],
+    });
+    return { success: true as const, vin: input.vin };
+  }
+
+  /** Select and register multiple vehicles with their charging priorities in
+   *  one call — the wizard saves its whole selection server-side instead of
+   *  chaining per-vehicle mutations from the browser. */
+  async selectVehicles(
+    input: { vehicles: { vin: string; name?: string; priority: number }[] },
+  ): Promise<{ success: true; vins: string[] }> {
+    await inSequence(input.vehicles, (vehicle) => this.saveVehicle(vehicle));
+
+    // Trigger pairing check in the background after adding vehicles
+    this.checkKeyPairing().catch((err) => {
+      this.logger.error("Background key pairing check failed:", err);
+    });
+
+    return { success: true as const, vins: input.vehicles.map((v) => v.vin) };
+  }
+
+  private async saveVehicle(
+    vehicle: { vin: string; name?: string; priority: number },
+  ): Promise<void> {
+    await this.deps.upsertVehicleRow({
+      id: vehicle.vin,
+      name: vehicle.name ?? "Tesla",
+      priority: vehicle.priority,
       config: JSON.stringify({}),
       mode: "auto" as const,
-    };
-
-    await this.deps.upsertVehicleRow(row);
+    });
 
     // Register with VehicleManager via deps (idempotent; safe to call each time)
     try {
-      const vehicleRow = await this.deps.getVehicleRow(input.vin);
+      const vehicleRow = await this.deps.getVehicleRow(vehicle.vin);
       if (vehicleRow) {
         await this.deps.addVehicle(vehicleRow);
       }
     } catch (err) {
       this.logger.error(
-        `Failed to register vehicle ${input.vin} with manager:`,
+        `Failed to register vehicle ${vehicle.vin} with manager:`,
         err,
       );
     }
-
-    // Trigger pairing check in the background after adding a vehicle
-    this.checkKeyPairing().catch(() => {});
-
-    return { success: true as const, vin: input.vin };
   }
 
   /** Register as a Tesla partner (client_credentials grant + partner_accounts call). */
@@ -143,8 +173,13 @@ export class TeslaService {
     data: unknown;
   }> {
     const clientId = await this.deps.getConfig("client_id");
-    const clientSecret = await this.deps.getConfig("client_secret");
-    const domain = await this.deps.getConfig("public_key_domain");
+    const clientSecret = await this.deps.getSecret("client_secret");
+    const hosting = (await this.deps.getConfig("public_key_hosting")) ?? "";
+    const domain = resolvePublicKeyDomain(
+      hosting as PublicKeyHosting,
+      await this.deps.getConfig("public_key_domain"),
+      this.deps.tunnel.getUrl(),
+    );
 
     if (!clientId || !clientSecret) {
       throw new TRPCError({
@@ -156,7 +191,9 @@ export class TeslaService {
     if (!domain) {
       throw new TRPCError({
         code: "BAD_REQUEST",
-        message: "Tesla domain not configured",
+        message: hosting === "tunnel"
+          ? "Tunnel is not running — start it on the hosting step before registering"
+          : "Tesla domain not configured",
       });
     }
 

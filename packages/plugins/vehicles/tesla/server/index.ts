@@ -5,6 +5,7 @@ import type { VehicleRow } from "@chargeha/server/db/types";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import { generateEcKeyPair } from "@chargeha/server/lib/Encryption";
 import type {
+  CommandStatus,
   HealthCheckResult,
   PluginHealthCheck,
   PluginTunnelRoute,
@@ -18,7 +19,7 @@ import { TeslaService, type TeslaServiceIo } from "./TeslaService.ts";
 import { TeslaTokenManager } from "./TeslaTokenManager.ts";
 import { TESLA_SECRET_KEYS, teslaConfigDef } from "./config.ts";
 import { createTeslaHttpRoutes } from "./routes.ts";
-import { teslaRouter } from "./router.ts";
+import { createTeslaRouter } from "./router.ts";
 
 const DEFAULT_PROXY_URL = "https://localhost:4443";
 
@@ -85,6 +86,16 @@ export class TeslaVehiclePlugin implements VehiclePlugin {
   }
 
   private async startup(): Promise<void> {
+    // Migrate old data: a persisted tunnel URL can't survive a restart, so clear it and record tunnel mode.
+    const domain = await this.deps.getConfig("public_key_domain");
+    if (domain?.endsWith(".trycloudflare.com")) {
+      await this.deps.setConfig("public_key_domain", "");
+      await this.deps.setConfig("public_key_hosting", "tunnel");
+      this.deps.log.info(
+        `Cleared expired tunnel public key domain ${domain}`,
+      );
+    }
+
     await this.teslaProxyManager.start();
 
     const hasCredentials = await this.deps.getConfig("client_id");
@@ -110,7 +121,9 @@ export class TeslaVehiclePlugin implements VehiclePlugin {
   }
 
   async shutdown(): Promise<void> {
-    await this.startupPromise.catch(() => {});
+    await this.startupPromise.catch((err) => {
+      this.deps.log.error("Startup had failed before shutdown:", err);
+    });
     this.teslaTokenManager.stopAutoRefresh();
     await this.teslaProxyManager.stop();
   }
@@ -166,7 +179,35 @@ export class TeslaVehiclePlugin implements VehiclePlugin {
   // ── Plugin interface implementations ────────────────────────────────────
 
   getRouter() {
-    return teslaRouter;
+    return createTeslaRouter(this, this.deps);
+  }
+
+  /** Commands need the tesla-http-proxy up and the virtual key paired. */
+  async getCommandStatus(): Promise<CommandStatus> {
+    const checks = this.getHealthChecks();
+    const checkResults = checks.length > 0
+      ? await Promise.all(checks.map((c) => c.run()))
+      : [];
+    const proxyOk = checkResults.every((r) => r.status === "ok") &&
+      checks.length > 0;
+
+    if (!proxyOk) {
+      return {
+        commandsDisabled: true,
+        reason: "The Tesla command proxy is not running.",
+      };
+    }
+
+    const status = await this.teslaTokenManager.getStatus();
+    if (status.vehicleConfigured && status.keyPaired !== true) {
+      return {
+        commandsDisabled: true,
+        reason:
+          "Your vehicle's key pairing is incomplete — the key must be approved on the vehicle's touchscreen before commands can be sent.",
+      };
+    }
+
+    return { commandsDisabled: false, reason: null };
   }
 
   getHttpRoutes(): Hono | null {

@@ -45,6 +45,10 @@ export interface BasePlugin {
   readonly configDef: SectionDef;
   readonly secretKeys: readonly string[];
   getRouter(): AnyRouter | null;
+  /** Health checks surfaced as dashboard warnings when they fail. Checks
+   *  should self-guard on "am I configured" so unconfigured plugins stay
+   *  silent. Return [] when the plugin has nothing to report. */
+  getHealthChecks(): PluginHealthCheck[];
   /** Await any in-flight startup work and release resources. */
   shutdown(): Promise<void>;
 }
@@ -56,12 +60,19 @@ export interface BasePlugin {
  * its constructor and kicks off async startup internally — no separate
  * `initialize(deps)` call, no separate instance wrapper.
  */
+export interface CommandStatus {
+  commandsDisabled: boolean;
+  reason: string | null;
+}
+
 export interface VehiclePlugin extends BasePlugin {
   readonly settingsComponentKey: string | null;
   createMiddleware(row: VehicleRow): Promise<VehicleMiddleware>;
   getHttpRoutes(): Hono | null;
-  getHealthChecks(): PluginHealthCheck[];
   getTunnelRoutes(): PluginTunnelRoute[];
+  /** Whether this plugin's vehicles can accept commands right now, with a
+   *  user-facing reason when they can't. */
+  getCommandStatus(): Promise<CommandStatus>;
 }
 
 // ── Vehicle Middleware ──────────────────────────────────────────────────────

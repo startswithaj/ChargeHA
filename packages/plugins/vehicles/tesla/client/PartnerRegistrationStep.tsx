@@ -2,29 +2,65 @@ import { useEffect, useRef } from "react";
 import { Button, Callout, Text } from "@radix-ui/themes";
 import { AlertCircle, CheckCircle, Loader2, RefreshCw } from "lucide-react";
 import { trpc } from "./trpc.ts";
-import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import {
+  advanceOnly,
+  type PluginStepDef,
+  stepStyles as styles,
+  type WizardNext,
+} from "../../../hostUi.ts";
 
-export function PartnerRegistrationStep({ onNext }: StepProps): JSX.Element {
-  const calledRef = useRef(false);
+function partnerNext(isSuccess: boolean): WizardNext {
+  if (!isSuccess) {
+    return {
+      kind: "blocked",
+      reason: "Partner registration must succeed to continue",
+    };
+  }
+  return {
+    kind: "ready",
+    hint: "Partner registered — Next continues",
+    onNext: advanceOnly,
+  };
+}
 
-  const registerMutation = trpc.tesla.registerPartner.useMutation();
+export const partnerRegistrationStep: PluginStepDef = {
+  id: "tesla-partner-registration",
+  label: "Partner Registration",
+  useStep: () => {
+    const calledRef = useRef(false);
+    const registerMutation = trpc.plugin.vehicle.tesla.registerPartner
+      .useMutation();
 
-  // Register partner on mount. The Tesla partner_accounts API is idempotent,
-  // so re-registering on every visit is safe and avoids the need to track
-  // registration state in config.
-  useEffect(() => {
-    if (calledRef.current) return;
-    calledRef.current = true;
-    registerMutation.mutate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // Register on mount; Tesla's partner_accounts API is idempotent so there is no state to track.
+    useEffect(() => {
+      if (calledRef.current) return;
+      calledRef.current = true;
+      registerMutation.mutate();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
-  const isSuccess = registerMutation.isSuccess;
-  const isError = registerMutation.isError;
+    return {
+      next: partnerNext(registerMutation.isSuccess),
+      view: (
+        <PartnerRegistrationView
+          isPending={registerMutation.isPending}
+          isSuccess={registerMutation.isSuccess}
+          errorMessage={registerMutation.error?.message ?? null}
+          onRetry={() => registerMutation.mutate()}
+        />
+      ),
+    };
+  },
+};
 
-  const errorMessage = registerMutation.error?.message;
-
+function PartnerRegistrationView(
+  { isPending, isSuccess, errorMessage, onRetry }: {
+    isPending: boolean;
+    isSuccess: boolean;
+    errorMessage: string | null;
+    onRetry: () => void;
+  },
+) {
   return (
     <div className={styles.stepContainer}>
       <Text as="p" size="3" color="gray">
@@ -32,7 +68,7 @@ export function PartnerRegistrationStep({ onNext }: StepProps): JSX.Element {
         ChargeHA to communicate with Tesla&apos;s servers on your behalf.
       </Text>
 
-      {registerMutation.isPending && (
+      {isPending && (
         <Callout.Root color="blue">
           <Callout.Icon>
             <Loader2 size={16} className={styles.spinner} />
@@ -53,7 +89,7 @@ export function PartnerRegistrationStep({ onNext }: StepProps): JSX.Element {
         </Callout.Root>
       )}
 
-      {isError && (
+      {errorMessage && (
         <>
           <Callout.Root color="red">
             <Callout.Icon>
@@ -63,18 +99,12 @@ export function PartnerRegistrationStep({ onNext }: StepProps): JSX.Element {
           </Callout.Root>
 
           <div className={styles.stepActions}>
-            <Button variant="soft" onClick={() => registerMutation.mutate()}>
+            <Button variant="soft" onClick={onRetry}>
               <RefreshCw size={16} />
               Retry
             </Button>
           </div>
         </>
-      )}
-
-      {isSuccess && (
-        <div className={styles.stepActions}>
-          <Button onClick={onNext}>Continue</Button>
-        </div>
       )}
     </div>
   );

@@ -15,7 +15,7 @@ import { throwingMock } from "../../../../server/src/test-helpers/throwingMock.t
 import type { TeslaServiceIo } from "./TeslaService.ts";
 import { Logger } from "@chargeha/server/lib/Logger";
 import { decrypt } from "@chargeha/server/lib/Encryption";
-import { teslaRouter } from "./router.ts";
+import { createTeslaRouter } from "./router.ts";
 import { TeslaVehiclePlugin } from "./index.ts";
 import { StubTeslaProxyManager } from "./test-helpers/StubTeslaProxyManager.ts";
 
@@ -46,33 +46,18 @@ describe("Tesla Plugin Router", () => {
     ),
   );
 
-  const appRouter = createAppRouter({
-    vehicle: { tesla: teslaRouter },
-    energy: {},
-  });
-  const createCaller = createCallerFactory(appRouter);
-
-  // Tesla router is dynamically mounted at runtime, so the static root
-  // router type doesn't include it.
-  // deno-lint-ignore no-explicit-any
-  type CallerWithPlugins = ReturnType<typeof createCaller> & { tesla: any };
-
   /**
    * Build a full test context: real DB, registries, VehicleManager, and a
-   * registered TeslaVehiclePlugin. Returns a tRPC caller and the pieces
-   * tests need to inspect. Tests that need to mock Fleet API calls pass in
-   * a `serviceIo`, which is forwarded to the plugin's TeslaService.
+   * registered TeslaVehiclePlugin. Returns a tRPC caller (fully typed — the
+   * router is built from the plugin instance) and the pieces tests need to
+   * inspect. Tests that need to mock Fleet API calls pass in a `serviceIo`,
+   * which is forwarded to the plugin's TeslaService.
    */
   async function setupCaller(opts: {
     encryptionKey?: string | null;
     serviceIo?: TeslaServiceIo;
     seedCredentials?: boolean;
-  } = {}): Promise<{
-    caller: CallerWithPlugins;
-    db: AppDatabase;
-    plugin: TeslaVehiclePlugin;
-    cleanup: () => Promise<void>;
-  }> {
+  } = {}) {
     const encryptionKey = opts.encryptionKey ?? null;
     const db = new AppDatabase(":memory:", encryptionKey, null);
     await db.init();
@@ -96,15 +81,29 @@ describe("Tesla Plugin Router", () => {
       "EnergyAdapterManager",
     );
 
-    const deps = PluginDependencies.create(
+    const deps = PluginDependencies.create({
       db,
       vehicleManager,
       energyManager,
-      "tesla",
-    );
+      tunnel: {
+        getUrl: () => null,
+        start: () => Promise.reject(new Error("tunnel not mocked")),
+        stop: () => Promise.resolve(),
+        getExpiryMinutes: () => null,
+      },
+      geocode: () => Promise.reject(new Error("geocode not mocked")),
+      encryptionConfigured: () => false,
+      pluginId: "tesla",
+    });
     const proxyManager = new StubTeslaProxyManager(deps, deps.log);
     const plugin = new TeslaVehiclePlugin(deps, proxyManager, opts.serviceIo);
     vehicleRegistry.register(plugin);
+
+    const appRouter = createAppRouter({
+      vehicle: { tesla: createTeslaRouter(plugin, deps) },
+      energy: {},
+    });
+    const createCaller = createCallerFactory(appRouter);
 
     const ctx = throwingMock<TrpcContext>("TrpcContext", {
       db,
@@ -115,7 +114,7 @@ describe("Tesla Plugin Router", () => {
       logger: testLogger,
     });
 
-    const caller = createCaller(ctx) as CallerWithPlugins;
+    const caller = createCaller(ctx);
 
     return {
       caller,
@@ -146,7 +145,7 @@ describe("Tesla Plugin Router", () => {
 
   describe("tesla.teslaStatus", () => {
     it("returns unauthenticated status when no tokens", async () => {
-      const data = await ctx.caller.tesla.teslaStatus();
+      const data = await ctx.caller.plugin.vehicle.tesla.teslaStatus();
       expect(data.authenticated).toBe(false);
       expect(data.vehicleConfigured).toBe(false);
       expect(data.vin).toBeNull();
@@ -156,14 +155,14 @@ describe("Tesla Plugin Router", () => {
       const expiresAt = new Date(Date.now() + 3600000).toISOString();
       await seedTokens(ctx.db, "access", "refresh", expiresAt);
 
-      const data = await ctx.caller.tesla.teslaStatus();
+      const data = await ctx.caller.plugin.vehicle.tesla.teslaStatus();
       expect(data.authenticated).toBe(true);
     });
   });
 
   describe("tesla.getAuthUrl", () => {
     it("returns an authorization URL", async () => {
-      const data = await ctx.caller.tesla.getAuthUrl({
+      const data = await ctx.caller.plugin.vehicle.tesla.getAuthUrl({
         origin: "https://chargeha.example.com",
       });
       expect(data.url).toContain("https://auth.tesla.com");
@@ -173,7 +172,7 @@ describe("Tesla Plugin Router", () => {
 
   describe("tesla.selectVehicle", () => {
     it("saves vehicle to database", async () => {
-      const data = await ctx.caller.tesla.selectVehicle({
+      const data = await ctx.caller.plugin.vehicle.tesla.selectVehicle({
         vin: "VIN123",
         name: "My Tesla",
       });
@@ -186,8 +185,34 @@ describe("Tesla Plugin Router", () => {
     });
   });
 
-  describe("tesla.disconnect", () => {
-    it("clears tokens and removes Tesla vehicles", async () => {
+  describe("tesla.selectVehicles", () => {
+    it("saves all vehicles with their priorities", async () => {
+      const data = await ctx.caller.plugin.vehicle.tesla.selectVehicles({
+        vehicles: [
+          { vin: "VIN1", name: "Car A", priority: 2 },
+          { vin: "VIN2", name: "Car B", priority: 1 },
+        ],
+      });
+      expect(data.success).toBe(true);
+      expect(data.vins).toEqual(["VIN1", "VIN2"]);
+
+      const carA = await ctx.db.getVehicle("VIN1");
+      const carB = await ctx.db.getVehicle("VIN2");
+      assertExists(carA);
+      assertExists(carB);
+      expect(carA.priority).toBe(2);
+      expect(carB.priority).toBe(1);
+    });
+
+    it("rejects an empty vehicle list", async () => {
+      await expect(
+        ctx.caller.plugin.vehicle.tesla.selectVehicles({ vehicles: [] }),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe("tesla.resetOnboarding", () => {
+    it("clears config and removes Tesla vehicles", async () => {
       const expiresAt = new Date(Date.now() + 3600000).toISOString();
       await seedTokens(ctx.db, "access", "refresh", expiresAt);
       await ctx.db.upsertVehicle({
@@ -202,15 +227,15 @@ describe("Tesla Plugin Router", () => {
       expect(await ctx.db.getPluginConfig("tesla.access_token")).toBe("access");
       expect(await ctx.db.getVehicle("VIN123")).not.toBeNull();
 
-      const data = await ctx.caller.tesla.disconnect();
+      const data = await ctx.caller.plugin.vehicle.tesla.resetOnboarding();
       expect(data.success).toBe(true);
 
       expect(await ctx.db.getPluginConfig("tesla.access_token")).toBeFalsy();
       expect(await ctx.db.getVehicle("VIN123")).toBeNull();
     });
 
-    it("succeeds even when no tokens exist", async () => {
-      const data = await ctx.caller.tesla.disconnect();
+    it("succeeds even when nothing is configured", async () => {
+      const data = await ctx.caller.plugin.vehicle.tesla.resetOnboarding();
       expect(data.success).toBe(true);
     });
   });
@@ -222,7 +247,7 @@ describe("Tesla Plugin Router", () => {
     it("returns success and stores public key in DB (tesla-prefixed)", async () => {
       const keyCtx = await setupCaller({ encryptionKey: TEST_ENCRYPTION_KEY });
       try {
-        const result = await keyCtx.caller.tesla.generateKeys();
+        const result = await keyCtx.caller.plugin.vehicle.tesla.generateKeys();
         expect(result.success).toBe(true);
         expect(result.publicKey).toContain("-----BEGIN PUBLIC KEY-----");
 
@@ -239,7 +264,7 @@ describe("Tesla Plugin Router", () => {
     it("stores encrypted private key when encryption key provided", async () => {
       const keyCtx = await setupCaller({ encryptionKey: TEST_ENCRYPTION_KEY });
       try {
-        await keyCtx.caller.tesla.generateKeys();
+        await keyCtx.caller.plugin.vehicle.tesla.generateKeys();
         const secret = await keyCtx.db.getSecret("tesla.ec_private_key");
         assertExists(secret);
         expect(secret.isEncrypted).toBe(true);
@@ -252,7 +277,7 @@ describe("Tesla Plugin Router", () => {
     });
 
     it("stores plain private key when no encryption key", async () => {
-      const result = await ctx.caller.tesla.generateKeys();
+      const result = await ctx.caller.plugin.vehicle.tesla.generateKeys();
       expect(result.success).toBe(true);
 
       const secret = await ctx.db.getSecret("tesla.ec_private_key");
@@ -269,7 +294,7 @@ describe("Tesla Plugin Router", () => {
       "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHtest\n-----END PRIVATE KEY-----\n";
 
     it("imports valid PEM keys and stores them under tesla.*", async () => {
-      const result = await ctx.caller.tesla.importKeys({
+      const result = await ctx.caller.plugin.vehicle.tesla.importKeys({
         publicKeyPem: validPublicKey,
         privateKeyPem: validPrivateKey,
       });
@@ -289,7 +314,7 @@ describe("Tesla Plugin Router", () => {
     it("encrypts private key when encryption key available", async () => {
       const keyCtx = await setupCaller({ encryptionKey: TEST_ENCRYPTION_KEY });
       try {
-        await keyCtx.caller.tesla.importKeys({
+        await keyCtx.caller.plugin.vehicle.tesla.importKeys({
           publicKeyPem: validPublicKey,
           privateKeyPem: validPrivateKey,
         });
@@ -307,7 +332,7 @@ describe("Tesla Plugin Router", () => {
 
     it("rejects invalid private key format", async () => {
       await expect(
-        ctx.caller.tesla.importKeys({
+        ctx.caller.plugin.vehicle.tesla.importKeys({
           publicKeyPem: validPublicKey,
           privateKeyPem: "not a pem key",
         }),
@@ -319,7 +344,8 @@ describe("Tesla Plugin Router", () => {
     it("returns error when client credentials not configured", async () => {
       const freshCtx = await setupCaller({ seedCredentials: false });
       try {
-        await expect(freshCtx.caller.tesla.registerPartner()).rejects
+        await expect(freshCtx.caller.plugin.vehicle.tesla.registerPartner())
+          .rejects
           .toThrow("credentials not configured");
       } finally {
         await freshCtx.cleanup();
@@ -327,9 +353,10 @@ describe("Tesla Plugin Router", () => {
     });
 
     it("returns error when domain not configured", async () => {
-      await expect(ctx.caller.tesla.registerPartner()).rejects.toThrow(
-        "domain not configured",
-      );
+      await expect(ctx.caller.plugin.vehicle.tesla.registerPartner()).rejects
+        .toThrow(
+          "domain not configured",
+        );
     });
 
     it("succeeds with mocked fetch", async () => {
@@ -374,7 +401,8 @@ describe("Tesla Plugin Router", () => {
           "tesla.public_key_domain",
           "example.github.io",
         );
-        const result = await mockedCtx.caller.tesla.registerPartner();
+        const result = await mockedCtx.caller.plugin.vehicle.tesla
+          .registerPartner();
         expect(result.success).toBe(true);
         expect(result.message).toContain("successful");
         expect(capturedPartnerAuthHeader).toBe("Bearer mock-partner-token");

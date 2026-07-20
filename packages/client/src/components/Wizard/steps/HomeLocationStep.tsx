@@ -10,7 +10,7 @@ import {
 import { useLocationFetcher } from "../../../hooks/useLocationFetcher.ts";
 import { trpc } from "../../../trpc.ts";
 import { AddressSearch } from "./HomeLocationParts.tsx";
-import type { StepProps } from "../WizardShell.tsx";
+import type { StepDef, WizardNext } from "../flow.ts";
 import styles from "./steps.module.css";
 
 function QuickActions(
@@ -88,113 +88,113 @@ function StatusMessages(
   );
 }
 
-export function HomeLocationStep({ onNext }: StepProps) {
-  const [lat, setLat] = useState("");
-  const [lng, setLng] = useState("");
-  const initializedRef = useRef(false);
+function homeLocationNext(
+  hasCoords: boolean,
+  save: () => Promise<void>,
+): WizardNext {
+  if (!hasCoords) {
+    return { kind: "blocked", reason: "Set your home location to continue" };
+  }
+  return { kind: "ready", hint: "Next saves your home location", onNext: save };
+}
 
-  const geo = useLocationFetcher();
+export const homeLocationStep: StepDef = {
+  id: "home-location",
+  label: "Home Location",
+  useStep: () => {
+    const [lat, setLat] = useState("");
+    const [lng, setLng] = useState("");
+    const initializedRef = useRef(false);
 
-  const setCoords = useCallback((newLat: string, newLng: string) => {
-    setLat(newLat);
-    setLng(newLng);
-  }, []);
+    const geo = useLocationFetcher();
 
-  const hasCoords = !!(lat && lng);
-  const latNum = parseFloat(lat || "0");
-  const lngNum = parseFloat(lng || "0");
+    const setCoords = useCallback((newLat: string, newLng: string) => {
+      setLat(newLat);
+      setLng(newLng);
+    }, []);
 
-  // Load existing config via typed hook
-  const { data: homeConfig } = useHomeConfig();
+    const hasCoords = !!(lat && lng);
+    const latNum = parseFloat(lat || "0");
+    const lngNum = parseFloat(lng || "0");
 
-  // Load vehicles via tRPC
-  const { data: vehiclesData } = trpc.vehicle.list.useQuery();
-  const vehicles = useMemo(
-    () => (vehiclesData?.vehicles ?? []) as VehicleWithState[],
-    [vehiclesData],
-  );
+    // Load existing config via typed hook
+    const { data: homeConfig } = useHomeConfig();
 
-  // Initialize coordinates from config once
-  useEffect(() => {
-    if (initializedRef.current) return;
-    if (homeConfig?.homeLatitude) {
-      setLat(String(homeConfig.homeLatitude));
-      initializedRef.current = true;
-    }
-    if (homeConfig?.homeLongitude) {
-      setLng(String(homeConfig.homeLongitude));
-      initializedRef.current = true;
-    }
-  }, [homeConfig]);
+    // Load vehicles via tRPC
+    const { data: vehiclesData } = trpc.vehicle.list.useQuery();
+    const vehicles = useMemo(
+      () => (vehiclesData?.vehicles ?? []) as VehicleWithState[],
+      [vehiclesData],
+    );
 
-  const saveMutation = useHomeConfigMutation();
-  const utils = trpc.useUtils();
+    // Initialize coordinates from config once
+    useEffect(() => {
+      if (initializedRef.current) return;
+      if (homeConfig?.homeLatitude) {
+        setLat(String(homeConfig.homeLatitude));
+        initializedRef.current = true;
+      }
+      if (homeConfig?.homeLongitude) {
+        setLng(String(homeConfig.homeLongitude));
+        initializedRef.current = true;
+      }
+    }, [homeConfig]);
 
-  const handleSave = useCallback(async () => {
-    if (!lat || !lng) return;
-    try {
+    const saveMutation = useHomeConfigMutation();
+    const utils = trpc.useUtils();
+
+    // Only the has-coords branch renders this handler.
+    const save = useCallback(async () => {
       await saveMutation.mutateAsync({
         homeLatitude: parseFloat(lat),
         homeLongitude: parseFloat(lng),
       });
       // Wait for cache to update before navigating so DoneStep sees fresh data
       await utils.config.home.get.invalidate();
-      onNext();
-    } catch {
-      geo.setGeoError("Failed to save location");
-      geo.setGeoStatus("error");
-    }
-  }, [lat, lng, saveMutation, utils, onNext, geo]);
+    }, [lat, lng, saveMutation, utils]);
 
-  return (
-    <div className={styles.stepContainer}>
-      <Text size="2" color="gray">
-        Set your home location so ChargeHA knows when your vehicle is home and
-        can manage charging automatically.
-      </Text>
+    return {
+      next: homeLocationNext(hasCoords, save),
+      view: (
+        <div className={styles.stepContainer}>
+          <Text size="2" color="gray">
+            Set your home location so ChargeHA knows when your vehicle is home
+            and can manage charging automatically.
+          </Text>
 
-      {/* Map preview */}
-      {hasCoords && (
-        <div style={{ borderRadius: 8, overflow: "hidden", height: 160 }}>
-          <StaticMap
-            latitude={latNum}
-            longitude={lngNum}
-            width={600}
-            height={160}
+          {/* Map preview */}
+          {hasCoords && (
+            <div style={{ borderRadius: 8, overflow: "hidden", height: 160 }}>
+              <StaticMap
+                latitude={latNum}
+                longitude={lngNum}
+                width={600}
+                height={160}
+              />
+            </div>
+          )}
+
+          <QuickActions vehicles={vehicles} geo={geo} setCoords={setCoords} />
+
+          <AddressSearch
+            geoStatus={geo.geoStatus}
+            onCoordinatesFound={(newLat, newLng) => {
+              setLat(newLat);
+              setLng(newLng);
+            }}
+            onGeoStatusChange={geo.setGeoStatus}
+            onGeoError={geo.setGeoError}
+            onGeoLoadingMsg={geo.setGeoLoadingMsg}
+          />
+
+          <StatusMessages
+            geo={geo}
+            hasCoords={hasCoords}
+            latNum={latNum}
+            lngNum={lngNum}
           />
         </div>
-      )}
-
-      <QuickActions vehicles={vehicles} geo={geo} setCoords={setCoords} />
-
-      <AddressSearch
-        geoStatus={geo.geoStatus}
-        onCoordinatesFound={(newLat, newLng) => {
-          setLat(newLat);
-          setLng(newLng);
-        }}
-        onGeoStatusChange={geo.setGeoStatus}
-        onGeoError={geo.setGeoError}
-        onGeoLoadingMsg={geo.setGeoLoadingMsg}
-      />
-
-      <StatusMessages
-        geo={geo}
-        hasCoords={hasCoords}
-        latNum={latNum}
-        lngNum={lngNum}
-      />
-
-      {/* Actions */}
-      <div className={styles.stepActions}>
-        <Button
-          size="2"
-          disabled={!hasCoords || saveMutation.isPending}
-          onClick={handleSave}
-        >
-          Save &amp; Continue
-        </Button>
-      </div>
-    </div>
-  );
-}
+      ),
+    };
+  },
+};

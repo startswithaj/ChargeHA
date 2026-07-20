@@ -1,7 +1,6 @@
 import { ServiceError } from "../lib/ServiceError.ts";
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { Logger } from "../lib/Logger.ts";
-import type { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
 import type { TunnelManager } from "./TunnelManager.ts";
 import type { VehicleManager } from "./VehicleManager.ts";
 import type { AuthService, ChangeModeInput } from "./AuthService.ts";
@@ -12,13 +11,20 @@ import type {
   WizardSaveOidcConfigInput,
   WizardSetAuthModeInput,
 } from "@chargeha/shared/schemas";
+import type { WizardNavState } from "@chargeha/shared";
+import type { CoreConfigKey } from "@chargeha/shared/configSections";
+
+const NAV_CONFIG_KEYS: Record<keyof WizardNavState, CoreConfigKey> = {
+  stepId: "wizard_step",
+  vehicleType: "wizard_vehicle_type",
+  energyType: "wizard_energy_type",
+};
 
 export class WizardService {
   constructor(
     private db: AppDatabase,
     private encryptionKey: string | null,
     private logger: Logger,
-    private vehiclePlugins: VehiclePluginRegistry,
     private tunnelManager: TunnelManager,
     private vehicleManager: VehicleManager,
     private authService: AuthService,
@@ -49,9 +55,7 @@ export class WizardService {
     }
 
     // Clear wizard navigation state from DB
-    await this.db.setConfig("wizard_step", "");
-    await this.db.setConfig("wizard_vehicle_type", "");
-    await this.db.setConfig("wizard_energy_type", "");
+    await this.patchState({ stepId: "", vehicleType: "", energyType: "" });
 
     // Clear OIDC pending flag if set
     await this.db.setConfig("wizard_oidc_pending", "");
@@ -63,61 +67,34 @@ export class WizardService {
 
   // ── Wizard navigation state (persisted to DB config keys) ────────────────
 
-  async getStep(): Promise<string> {
-    return (await this.db.getConfig("wizard_step")) ?? "";
-  }
-
-  async setStep(stepId: string): Promise<void> {
-    await this.db.setConfig("wizard_step", stepId);
-  }
-
-  async getVehicleType(): Promise<string> {
-    return (await this.db.getConfig("wizard_vehicle_type")) ?? "";
-  }
-
-  async setVehicleType(type: string): Promise<void> {
-    await this.db.setConfig("wizard_vehicle_type", type);
-  }
-
-  async getEnergyType(): Promise<string> {
-    return (await this.db.getConfig("wizard_energy_type")) ?? "";
-  }
-
-  async setEnergyType(type: string): Promise<void> {
-    await this.db.setConfig("wizard_energy_type", type);
-  }
-
-  async startTunnel() {
-    try {
-      // Pull plugin-provided tunnel routes at call time — registry already
-      // holds every registered vehicle plugin.
-      const routes = this.vehiclePlugins.getAll().flatMap((p) =>
-        p.getTunnelRoutes()
-      );
-      const url = await this.tunnelManager.start(routes);
-      this.logger.info(`Tunnel started: ${url}`);
-      return { url };
-    } catch (err) {
-      this.logger.error("Failed to start tunnel", err);
-      throw new ServiceError(
-        err instanceof Error ? err.message : "Failed to start tunnel",
-        "INTERNAL_SERVER_ERROR",
-        { cause: err },
-      );
-    }
-  }
-
-  async stopTunnel() {
-    await this.tunnelManager.stop();
-    this.logger.info("Tunnel stopped");
-    return { stopped: true };
-  }
-
-  getTunnelStatus() {
+  async getState(): Promise<WizardNavState> {
+    const [stepId, vehicleType, energyType] = await Promise.all([
+      this.db.getConfig(NAV_CONFIG_KEYS.stepId),
+      this.db.getConfig(NAV_CONFIG_KEYS.vehicleType),
+      this.db.getConfig(NAV_CONFIG_KEYS.energyType),
+    ]);
     return {
-      active: this.tunnelManager.isRunning,
-      url: this.tunnelManager.tunnelUrl,
+      stepId: stepId ?? "",
+      vehicleType: vehicleType ?? "",
+      energyType: energyType ?? "",
     };
+  }
+
+  async patchState(patch: Partial<WizardNavState>): Promise<void> {
+    // Object.entries widens keys to string; narrow back before indexing the key map.
+    const entries = Object.entries(patch) as [
+      keyof WizardNavState,
+      string | undefined,
+    ][];
+    await Promise.all(
+      entries
+        .filter((entry): entry is [keyof WizardNavState, string] =>
+          entry[1] !== undefined
+        )
+        .map(([field, value]) =>
+          this.db.setConfig(NAV_CONFIG_KEYS[field], value)
+        ),
+    );
   }
 
   async setAuthMode(
@@ -214,7 +191,6 @@ export class WizardService {
         mode: "auto",
       });
 
-      await this.db.setConfig("energy_adapter_type", "simulated_energy");
       await this.db.setConfig("home_latitude", "-33.8688");
       await this.db.setConfig("home_longitude", "151.2093");
 

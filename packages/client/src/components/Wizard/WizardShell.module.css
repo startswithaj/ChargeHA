@@ -56,12 +56,21 @@
   padding-bottom: 2rem;
 }
 
+.navFooter {
+  padding-top: 1rem;
+  border-top: 1px solid var(--gray-4);
+}
+
+.navHintRow {
+  text-align: right;
+  margin-bottom: 0.75rem;
+  line-height: 1.4;
+}
+
 .navigation {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 1rem;
-  border-top: 1px solid var(--gray-4);
 }
 
 .navigationRight {

@@ -6,66 +6,66 @@ import {
 } from "@chargeha/shared/configSections";
 
 // ── Tesla plugin config section ─────────────────────────────────────────────
-// All keys use dot-namespaced format: tesla.{key}
+// Keys are relative — PluginDependencies prefixes them with the plugin id.
 
 export const teslaConfigDef = defineSection({
   teslaClientId: {
-    key: "tesla.client_id",
+    key: "client_id",
     schema: z.string(),
     default: "",
   },
   teslaClientSecret: {
-    key: "tesla.client_secret",
+    key: "client_secret",
     schema: z.string(),
     default: "",
   },
   teslaRegion: {
-    key: "tesla.region",
+    key: "region",
     schema: z.enum(["na", "eu", "cn"]),
     default: "na" as const,
   },
   teslaPublicKeyDomain: {
-    key: "tesla.public_key_domain",
+    key: "public_key_domain",
     schema: z.string(),
     default: "",
   },
+  teslaPublicKeyHosting: {
+    key: "public_key_hosting",
+    schema: z.enum(["", "custom", "tunnel"]),
+    default: "" as const,
+  },
   teslaProxyUrl: {
-    key: "tesla.proxy_url",
+    key: "proxy_url",
     schema: z.string(),
     default: "https://localhost:4443",
   },
   ecPublicKeyPem: {
-    key: "tesla.ec_public_key_pem",
+    key: "ec_public_key_pem",
     schema: z.string(),
     default: "",
   },
   ecPrivateKey: {
-    key: "tesla.ec_private_key",
+    key: "ec_private_key",
     schema: z.string(),
     default: "",
   },
   teslaAccessToken: {
-    key: "tesla.access_token",
+    key: "access_token",
     schema: z.string(),
     default: "",
   },
   teslaRefreshToken: {
-    key: "tesla.refresh_token",
+    key: "refresh_token",
     schema: z.string(),
     default: "",
   },
   teslaTokenExpiresAt: {
-    key: "tesla.token_expires_at",
-    schema: z.string(),
-    default: "",
-  },
-  teslaOauthOrigin: {
-    key: "tesla.oauth_origin",
+    key: "token_expires_at",
     schema: z.string(),
     default: "",
   },
   teslaKeyPaired: {
-    key: "tesla.key_paired",
+    key: "key_paired",
     schema: z.string(),
     default: "",
   },
@@ -76,8 +76,18 @@ export type TeslaConfig = SectionType<typeof teslaConfigDef>;
 export type TeslaConfigKey = SectionKeys<typeof teslaConfigDef>;
 
 export const TESLA_SECRET_KEYS = [
-  "tesla.ec_private_key",
-  "tesla.client_secret",
-  "tesla.access_token",
-  "tesla.refresh_token",
+  "ec_private_key",
+  "client_secret",
+  "access_token",
+  "refresh_token",
+] as const satisfies readonly TeslaConfigKey[];
+
+/** Config resetOnboarding always keeps: the EC keypair. The public key domain
+ *  and its hosting mode are kept too, but only when self-hosted — a tunnel URL
+ *  is ephemeral and dead after a reset, so it is cleared (see resetOnboarding).
+ *  The user hosts a self-hosted key themselves, so wiping it would force them to
+ *  re-host or re-type a still-valid setup. */
+export const TESLA_RESET_PRESERVED_KEYS = [
+  "ec_private_key",
+  "ec_public_key_pem",
 ] as const satisfies readonly TeslaConfigKey[];

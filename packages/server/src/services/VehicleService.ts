@@ -10,8 +10,32 @@ import type { VehicleManager } from "./VehicleManager.ts";
 import type { TypedEventEmitter } from "./TypedEventEmitter.ts";
 import type { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
 import type { Logger } from "../lib/Logger.ts";
-import { createCallerFactory } from "../trpc/trpc.ts";
-import type { TrpcContext } from "../trpc/trpc.ts";
+
+export type VehicleWithLiveState = Awaited<
+  ReturnType<typeof enrichVehicleRows>
+>[number];
+
+/** Enrich vehicle rows with live state, location, and last error — shared by
+ *  the main vehicle list and plugin-scoped lists so the shapes never drift. */
+export async function enrichVehicleRows(
+  rows: VehicleRow[],
+  vehicleManager: VehicleManager,
+) {
+  return await Promise.all(rows.map(async (v) => {
+    const error = vehicleManager.getVehicleError(v.id);
+    const state = await vehicleManager.getState(v.id);
+    const lastLocation = state?.latitude != null && state?.longitude != null
+      ? { latitude: state.latitude, longitude: state.longitude }
+      : null;
+    return {
+      ...v,
+      state,
+      lastLocation,
+      lastError: error?.message ?? null,
+      lastErrorAt: error?.at ?? null,
+    };
+  }));
+}
 
 /**
  * tRPC-facing API layer for the dashboard. Each method maps to a tRPC
@@ -63,30 +87,13 @@ export class VehicleService {
   /** Check command readiness for a specific vehicle, delegating to its plugin. */
   async getCommandStatus(
     vehicleId: string,
-    ctx: TrpcContext,
   ): Promise<{ commandsDisabled: boolean; reason: string | null }> {
     const vehicle = await this.db.getVehicle(vehicleId);
-    if (!vehicle) {
+    const plugin = vehicle && this.vehiclePlugins.get(vehicle.adapterType);
+    if (!plugin) {
       return { commandsDisabled: false, reason: null };
     }
-
-    const plugin = this.vehiclePlugins.get(vehicle.adapterType);
-    const pluginRouter = plugin?.getRouter();
-    if (!pluginRouter) {
-      return { commandsDisabled: false, reason: null };
-    }
-
-    // Delegate to the plugin router's commandStatus procedure
-    const caller = createCallerFactory(pluginRouter)(ctx);
-    if ("commandStatus" in caller) {
-      return await (caller as {
-        commandStatus: () => Promise<
-          { commandsDisabled: boolean; reason: string | null }
-        >;
-      }).commandStatus();
-    }
-
-    return { commandsDisabled: false, reason: null };
+    return await plugin.getCommandStatus();
   }
 
   /** Get a vehicle row or throw NOT_FOUND. */
@@ -100,21 +107,10 @@ export class VehicleService {
 
   /** List all configured vehicles with latest state and location. */
   async listVehicles() {
-    const vehicles = await this.db.getVehicles();
-    return await Promise.all(vehicles.map(async (v) => {
-      const error = this.vehicleManager.getVehicleError(v.id);
-      const state = await this.vehicleManager.getState(v.id);
-      const lastLocation = state?.latitude != null && state?.longitude != null
-        ? { latitude: state.latitude, longitude: state.longitude }
-        : null;
-      return {
-        ...v,
-        state,
-        lastLocation,
-        lastError: error?.message ?? null,
-        lastErrorAt: error?.at ?? null,
-      };
-    }));
+    return await enrichVehicleRows(
+      await this.db.getVehicles(),
+      this.vehicleManager,
+    );
   }
 
   /** Create a new vehicle and register it with the manager. */

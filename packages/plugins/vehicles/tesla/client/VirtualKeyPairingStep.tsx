@@ -2,11 +2,18 @@ import { useMemo, useState } from "react";
 import { Button, Callout, Text } from "@radix-ui/themes";
 import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import type { VehicleWithState } from "@chargeha/shared";
 import { trpc } from "./trpc.ts";
 import { useTeslaConfig } from "./useTeslaConfig.ts";
-import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import {
+  type PublicKeyHosting,
+  resolvePublicKeyDomain,
+} from "../shared/publicKeyDomain.ts";
+import {
+  advanceOnly,
+  type PluginStepDef,
+  stepStyles as styles,
+  type WizardNext,
+} from "../../../hostUi.ts";
 
 function parseHostname(domain: string): string {
   try {
@@ -21,8 +28,49 @@ function getPairingUrl(domain: string): string {
   return hostname ? `https://tesla.com/_ak/${hostname}` : "";
 }
 
+/** Pairing URL for the resolved key domain, or "" when the domain rides the
+ *  tunnel and the tunnel is down (pairing is impossible then). */
+function computePairingUrl(
+  hosting: PublicKeyHosting,
+  savedDomain: string | null,
+  tunnelUrl: string | null,
+): { pairingUrl: string; tunnelDown: boolean } {
+  const tunnelDown = hosting === "tunnel" && !tunnelUrl;
+  const domain = resolvePublicKeyDomain(hosting, savedDomain, tunnelUrl) ??
+    globalThis.location?.origin ?? "";
+  return { pairingUrl: tunnelDown ? "" : getPairingUrl(domain), tunnelDown };
+}
+
+function LoadingView() {
+  return (
+    <div className={styles.stepContainer}>
+      <Callout.Root color="blue">
+        <Callout.Icon>
+          <Loader2 size={16} className={styles.spinner} />
+        </Callout.Icon>
+        <Callout.Text>Loading vehicle data...</Callout.Text>
+      </Callout.Root>
+    </div>
+  );
+}
+
+function TunnelDownCallout() {
+  return (
+    <Callout.Root color="red">
+      <Callout.Text>
+        The tunnel is not running. Pairing needs the tunnel up for the whole
+        process — if it stopped since partner registration, restart it on the
+        hosting step and re-run registration (the tunnel URL changes on every
+        start).
+      </Callout.Text>
+    </Callout.Root>
+  );
+}
+
 function deriveVerifyError(
-  verifyMutation: ReturnType<typeof trpc.tesla.checkKeyPairing.useMutation>,
+  verifyMutation: ReturnType<
+    typeof trpc.plugin.vehicle.tesla.checkKeyPairing.useMutation
+  >,
 ): string | null | undefined {
   const notPairedMessage = verifyMutation.data?.error ||
     "Virtual key not yet paired. Please complete the pairing steps first.";
@@ -72,16 +120,45 @@ function PairingInstructions() {
   );
 }
 
-export function VirtualKeyPairingStep({ onNext }: StepProps): JSX.Element {
+export const virtualKeyPairingStep: PluginStepDef = {
+  id: "tesla-virtual-key-pairing",
+  label: "Virtual Key Pairing",
+  useStep: () => {
+    const pairing = useVirtualKeyPairing();
+    return {
+      next: pairingNext(pairing.loading, pairing.verified),
+      view: pairing.loading
+        ? <LoadingView />
+        : <VirtualKeyPairingView {...pairing} />,
+    };
+  },
+};
+
+function pairingNext(loading: boolean, verified: boolean): WizardNext {
+  if (verified) {
+    return {
+      kind: "ready",
+      hint: "Virtual key paired — Next continues",
+      onNext: advanceOnly,
+    };
+  }
+  if (loading) return { kind: "loading" };
+  return {
+    kind: "blocked",
+    reason: "Pair and verify the virtual key to continue",
+  };
+}
+
+function useVirtualKeyPairing() {
   const [verified, setVerified] = useState(false);
 
   const {
     data: vehiclesData,
     isLoading: vehiclesLoading,
     error: vehiclesError,
-  } = trpc.vehicle.list.useQuery();
+  } = trpc.plugin.vehicle.tesla.listVehicles.useQuery();
   const vehicles = useMemo(
-    () => (vehiclesData?.vehicles ?? []) as VehicleWithState[],
+    () => vehiclesData?.vehicles ?? [],
     [vehiclesData],
   );
 
@@ -91,7 +168,9 @@ export function VirtualKeyPairingStep({ onNext }: StepProps): JSX.Element {
     error: configError,
   } = useTeslaConfig();
 
-  const verifyMutation = trpc.tesla.checkKeyPairing.useMutation({
+  const tunnelStatus = trpc.plugin.vehicle.tesla.tunnelStatus.useQuery();
+
+  const verifyMutation = trpc.plugin.vehicle.tesla.checkKeyPairing.useMutation({
     onSuccess: (result: { paired: boolean | null; error?: string }) => {
       if (result.paired) {
         setVerified(true);
@@ -99,28 +178,30 @@ export function VirtualKeyPairingStep({ onNext }: StepProps): JSX.Element {
     },
   });
 
-  const loading = vehiclesLoading || configLoading;
   const queryError = vehiclesError ?? configError;
 
-  const domain = teslaConfig?.teslaPublicKeyDomain ||
-    (typeof globalThis !== "undefined" ? globalThis.location.origin : "");
-  const pairingUrl = getPairingUrl(domain);
+  const { pairingUrl, tunnelDown } = computePairingUrl(
+    teslaConfig?.teslaPublicKeyHosting ?? "",
+    teslaConfig?.teslaPublicKeyDomain ?? null,
+    tunnelStatus.data?.url ?? null,
+  );
 
-  const error = queryError?.message ?? deriveVerifyError(verifyMutation);
+  return {
+    verified,
+    loading: vehiclesLoading || configLoading,
+    vehicles,
+    pairingUrl,
+    tunnelDown,
+    verifying: verifyMutation.isPending,
+    verify: () => verifyMutation.mutate(),
+    error: queryError?.message ?? deriveVerifyError(verifyMutation),
+  };
+}
 
-  if (loading) {
-    return (
-      <div className={styles.stepContainer}>
-        <Callout.Root color="blue">
-          <Callout.Icon>
-            <Loader2 size={16} className={styles.spinner} />
-          </Callout.Icon>
-          <Callout.Text>Loading vehicle data...</Callout.Text>
-        </Callout.Root>
-      </div>
-    );
-  }
-
+function VirtualKeyPairingView(
+  { verified, vehicles, pairingUrl, tunnelDown, verifying, verify, error }:
+    ReturnType<typeof useVirtualKeyPairing>,
+) {
   return (
     <div className={styles.stepContainer}>
       <Text as="p" size="3" color="gray">
@@ -135,20 +216,16 @@ export function VirtualKeyPairingStep({ onNext }: StepProps): JSX.Element {
         </div>
       ))}
 
+      {tunnelDown && <TunnelDownCallout />}
+
       {pairingUrl && <PairingUrlDisplay pairingUrl={pairingUrl} />}
 
       <PairingInstructions />
 
       <div className={styles.verifyRow}>
-        <Button
-          variant="soft"
-          onClick={() => verifyMutation.mutate()}
-          disabled={verifyMutation.isPending}
-        >
-          {verifyMutation.isPending && (
-            <Loader2 size={16} className={styles.spinner} />
-          )}
-          {verifyMutation.isPending ? "Verifying..." : "Verify Pairing"}
+        <Button variant="soft" onClick={verify} disabled={verifying}>
+          {verifying && <Loader2 size={16} className={styles.spinner} />}
+          {verifying ? "Verifying..." : "Verify Pairing"}
         </Button>
       </div>
 
@@ -168,12 +245,6 @@ export function VirtualKeyPairingStep({ onNext }: StepProps): JSX.Element {
           </Callout.Icon>
           <Callout.Text>{error}</Callout.Text>
         </Callout.Root>
-      )}
-
-      {verified && (
-        <div className={styles.stepActions}>
-          <Button onClick={onNext}>Continue</Button>
-        </div>
       )}
     </div>
   );

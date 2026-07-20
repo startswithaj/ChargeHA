@@ -1,21 +1,22 @@
 import { useState } from "react";
 import { Badge, Button, Text } from "@radix-ui/themes";
-import { Pencil } from "lucide-react";
+import { FlaskConical, Pencil } from "lucide-react";
 import type { VehicleWithState } from "@chargeha/shared";
 import { trpc } from "./trpc.ts";
 import { SimulatedVehicleDialog } from "./SimulatedVehicleDialog.tsx";
 
 /** Wrapper that renders one SimulatedVehicleDialog per simulated vehicle. */
 export function SimulatedVehicleSettings(): JSX.Element | null {
-  const vehiclesQuery = trpc.vehicle.list.useQuery(undefined, {
-    select: (data: { vehicles: VehicleWithState[] }) =>
-      data.vehicles.filter(
-        (v) => v.adapterType === "simulated",
-      ),
-  });
-  const simulateMutation = trpc.simulated.updateState.useMutation({
-    onSuccess: () => vehiclesQuery.refetch(),
-  });
+  const vehiclesQuery = trpc.plugin.vehicle.simulated.listVehicles.useQuery(
+    undefined,
+    {
+      select: (data: { vehicles: VehicleWithState[] }) => data.vehicles,
+    },
+  );
+  const simulateMutation = trpc.plugin.vehicle.simulated.updateState
+    .useMutation({
+      onSuccess: () => vehiclesQuery.refetch(),
+    });
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -38,13 +39,17 @@ export function SimulatedVehicleSettings(): JSX.Element | null {
         borderTop: "1px solid var(--gray-a4)",
       }}
     >
-      <Text
-        size="2"
-        weight="medium"
-        style={{ display: "block", marginBottom: 8 }}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 8,
+        }}
       >
-        Simulated Vehicle Settings
-      </Text>
+        <FlaskConical size={14} />
+        <Text size="2" weight="medium">Simulated Vehicle Settings</Text>
+      </div>
       {vehicles.map((v) => {
         const isExpanded = expanded.has(v.id);
         return (

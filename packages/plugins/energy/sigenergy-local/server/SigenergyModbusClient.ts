@@ -76,11 +76,12 @@ export class JsmodbusReader implements ModbusReader {
 
   connect(): Promise<void> {
     const socket = this.socketFactory();
+    // Attach the lifetime error handler before connecting — an unhandled 'error' would crash the process.
+    socket.on("error", (err: Error) => {
+      this.logger.warn(`Sigenergy socket error: ${err.message}`);
+    });
     this.socket = socket;
-    // Construct one jsmodbus client per unit id BEFORE connecting the socket.
-    // jsmodbus latches its "online" state from the socket's `connect` event, so
-    // a client created after the socket has already connected rejects every
-    // read with "no connection to modbus server".
+    // jsmodbus latches "online" from the socket's connect event, so build clients before connecting.
     this.clients = new Map(
       [...new Set(this.unitIds)].map(
         (
@@ -92,19 +93,21 @@ export class JsmodbusReader implements ModbusReader {
       ),
     );
     return new Promise<void>((resolve, reject) => {
+      // Clear the socket so clientFor() can't hand back a client bound to a dead one.
+      const failed = () => {
+        socket.destroy();
+        if (this.socket !== socket) return;
+        this.socket = null;
+        this.clients = new Map();
+      };
       const onConnect = () => {
         cleanup();
-        // Keep a persistent error handler for the socket's lifetime — an
-        // unhandled 'error' event (e.g. ECONNRESET when the inverter reboots)
-        // would otherwise crash the process.
-        socket.on("error", (err: Error) => {
-          this.logger.warn(`Sigenergy socket error: ${err.message}`);
-        });
         this.logger.info(`Connected to Sigenergy at ${this.host}:${this.port}`);
         resolve();
       };
       const onError = (err: Error) => {
         cleanup();
+        failed();
         reject(
           new SigenergyConnectionError(
             `Cannot reach Sigenergy at ${this.host}:${this.port}`,
@@ -114,7 +117,7 @@ export class JsmodbusReader implements ModbusReader {
       };
       const timer = setTimeout(() => {
         cleanup();
-        socket.destroy();
+        failed();
         reject(
           new SigenergyConnectionError(
             `Timed out connecting to Sigenergy at ${this.host}:${this.port}`,

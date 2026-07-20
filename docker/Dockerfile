@@ -32,13 +32,12 @@ RUN deno task build
 # --- Stage 3: Production runtime ---
 FROM denoland/deno:2.8.2
 
+# openssh-client powers the setup tunnel (Pinggy over ssh) for LAN users —
+# Tesla's developer portal rejects trycloudflare.com domains, so cloudflared
+# is no longer bundled.
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends openssl ca-certificates && \
+    apt-get install -y --no-install-recommends openssl ca-certificates openssh-client && \
     rm -rf /var/lib/apt/lists/*
-
-# Install cloudflared for Cloudflare Tunnel support (LAN users)
-ADD https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 /usr/local/bin/cloudflared
-RUN chmod +x /usr/local/bin/cloudflared
 
 WORKDIR /app
 

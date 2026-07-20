@@ -2,9 +2,9 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../../client/src/test-utils.tsx";
-import { PartnerRegistrationStep } from "./PartnerRegistrationStep.tsx";
+import { partnerRegistrationStep } from "./PartnerRegistrationStep.tsx";
 import { trpc } from "./trpc.ts";
-import { makeStepProps } from "./test-helpers/stepProps.ts";
+import { StepNextHarness } from "../../../../client/src/components/Wizard/steps/test-helpers/StepNextHarness.tsx";
 
 const mocks = vi.hoisted(() => {
   const registerMutate = vi.fn();
@@ -23,9 +23,13 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("./trpc.ts", () => ({
   trpc: {
-    tesla: {
-      registerPartner: {
-        useMutation: vi.fn(() => mocks.defaultResult),
+    plugin: {
+      vehicle: {
+        tesla: {
+          registerPartner: {
+            useMutation: vi.fn(() => mocks.defaultResult),
+          },
+        },
       },
     },
   },
@@ -37,11 +41,12 @@ describe("PartnerRegistrationStep", () => {
   function setRegisterPartnerState(
     overrides: Partial<typeof mocks.defaultResult>,
   ): void {
-    vi.mocked(trpc.tesla.registerPartner.useMutation).mockReturnValue({
-      ...mocks.defaultResult,
-      mutate: mocks.registerMutate,
-      ...overrides,
-    } as never);
+    vi.mocked(trpc.plugin.vehicle.tesla.registerPartner.useMutation)
+      .mockReturnValue({
+        ...mocks.defaultResult,
+        mutate: mocks.registerMutate,
+        ...overrides,
+      } as never);
   }
 
   beforeEach(() => {
@@ -55,7 +60,7 @@ describe("PartnerRegistrationStep", () => {
   // ---- API calls ----
 
   it("calls registerPartner mutation on mount", async () => {
-    renderWithProviders(<PartnerRegistrationStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={partnerRegistrationStep} />);
 
     await waitFor(() => {
       expect(mocks.registerMutate).toHaveBeenCalledTimes(1);
@@ -91,7 +96,7 @@ describe("PartnerRegistrationStep", () => {
     async (_label, overrides, expected) => {
       setRegisterPartnerState(overrides);
 
-      renderWithProviders(<PartnerRegistrationStep {...makeStepProps()} />);
+      renderWithProviders(<StepNextHarness def={partnerRegistrationStep} />);
 
       await waitFor(() => {
         expect(screen.getByText(expected)).toBeInTheDocument();
@@ -107,7 +112,7 @@ describe("PartnerRegistrationStep", () => {
       error: { message: "Failed to obtain partner token" },
     });
 
-    renderWithProviders(<PartnerRegistrationStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={partnerRegistrationStep} />);
 
     // Wait for error state
     await waitFor(() => {

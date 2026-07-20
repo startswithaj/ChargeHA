@@ -11,8 +11,7 @@ export interface EnergyData {
   // Set by EnergyPoller — true when the adapter poll threw and zeros were
   // substituted. Adapters never set this. Defaults to false when omitted.
   pollFailed?: boolean;
-  // Set by EnergyPoller alongside pollFailed — the thrown error's message,
-  // surfaced to the frontend so failures are diagnosable from the dashboard.
+  // Set by EnergyPoller alongside pollFailed — the error message shown on the dashboard.
   pollError?: string;
 }
 
@@ -331,6 +330,7 @@ export const NOTIFICATION_EVENTS: NotificationEventInfo[] = [
 export type SSEEvent =
   | { type: "energy_update"; data: EnergyData & CumulativeEnergyData }
   | { type: "vehicle_update"; data: VehicleChargeState }
+  | { type: "vehicles_changed"; data: Record<string, never> }
   | {
     type: "vehicle_error";
     data: { vehicleId: string; vehicleName: string; error: string | null };
@@ -430,4 +430,18 @@ export interface VehicleSocSnapshot {
   vehicleId: string;
   vehicleName: string;
   batteryLevel: number; // 0-100 percentage
+}
+
+// ---- Wizard Navigation State ----
+
+/** Where the setup wizard is, and the selections that decide which steps exist.
+ *  Read and written as one record so the step id can never name a step the
+ *  current selections haven't put in the list. */
+export interface WizardNavState {
+  /** Current step ID (e.g. "welcome", "tesla-credentials"). */
+  stepId: string;
+  /** Selected vehicle type (e.g. "tesla", "simulated"). */
+  vehicleType: string;
+  /** Selected energy type (e.g. "fronius_local", "fronius_cloud", ""). */
+  energyType: string;
 }

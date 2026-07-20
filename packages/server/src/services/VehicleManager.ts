@@ -123,6 +123,7 @@ export class VehicleManager {
       initialized: false,
     });
     this.logger.info(`Vehicle registered: ${row.name} (${row.id})`);
+    this.eventEmitter.emit("vehicles_changed", {});
 
     await this.seedFromRecentLog(row.id, row.name, middleware);
   }
@@ -195,6 +196,7 @@ export class VehicleManager {
     await this.removeVehicle(id);
     await this.db.deleteVehicle(id);
     await this.db.resequenceVehiclePriorities();
+    this.eventEmitter.emit("vehicles_changed", {});
   }
 
   // ── Data requests ─────────────────────────────────────────────────────
@@ -456,7 +458,9 @@ export class VehicleManager {
       this.getAllStates().then((allStates) => {
         if (abort.signal.aborted) return;
         allStates.forEach((state) => emit.next(state));
-      }).catch(() => {});
+      }).catch((err) => {
+        this.logger.error("Failed to emit initial states to subscriber:", err);
+      });
 
       const unsubscribe = this.eventEmitter.subscribe(
         "vehicle_update",

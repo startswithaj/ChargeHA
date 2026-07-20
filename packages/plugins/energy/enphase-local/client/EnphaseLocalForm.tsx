@@ -9,8 +9,8 @@ import {
 } from "@radix-ui/themes";
 import { Loader2, Search } from "lucide-react";
 import { trpc } from "./trpc.ts";
-import { Spinner } from "../../../../client/src/components/ui/Spinner.tsx";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import { Spinner } from "../../../hostUi.ts";
+import { stepStyles as styles } from "../../../hostUi.ts";
 import type { EnphaseDevice, TestStatus } from "../../InverterSetupShared.tsx";
 import { TestResultBadge } from "../../InverterSetupShared.tsx";
 
@@ -58,7 +58,7 @@ function SearchSection(
     subnet: string;
     setSubnet: (v: string) => void;
     searchMutation: ReturnType<
-      typeof trpc.energy.enphase_local.discover.useMutation
+      typeof trpc.plugin.energy.enphase_local.discover.useMutation
     >;
     searchResults: EnphaseDevice[];
     onSelectDevice: (device: EnphaseDevice) => void;
@@ -130,7 +130,7 @@ function SearchSection(
 
 function useTestStatus(
   testMutation: ReturnType<
-    typeof trpc.energy.enphase_local.testConnection.useMutation
+    typeof trpc.plugin.energy.enphase_local.testConnection.useMutation
   >,
 ): TestStatus {
   return useMemo(() => {
@@ -270,42 +270,40 @@ export function EnphaseLocalForm(
   );
   const [subnet, setSubnet] = useState("");
   const [searchResults, setSearchResults] = useState<EnphaseDevice[]>([]);
-  // Read from the device's /info by discovery or the connection test —
-  // shown for confirmation, never typed or stored.
+  // Read from the device's /info — shown for confirmation, never typed or stored.
   const [detectedSerial, setDetectedSerial] = useState("");
 
-  const searchMutation = trpc.energy.enphase_local.discover.useMutation({
+  const searchMutation = trpc.plugin.energy.enphase_local.discover.useMutation({
     onSuccess: (result: { found: EnphaseDevice[] }) =>
       setSearchResults(result.found),
     onError: () => setSearchResults([]),
   });
 
-  // Only the selected method's values are sent and saved, so a stale value
-  // from the other method can't shadow the active one.
+  // Only the selected method's values are sent, so the other method can't shadow it.
   const active = method === "credentials"
     ? { email, password, token: "" }
     : { email: "", password: "", token };
 
-  const testMutation = trpc.energy.enphase_local.testConnection.useMutation({
-    onSuccess: (
-      data: {
-        success: boolean;
-        serial?: string;
-        fetchedToken?: string | null;
+  const testMutation = trpc.plugin.energy.enphase_local.testConnection
+    .useMutation({
+      onSuccess: (
+        data: {
+          success: boolean;
+          serial?: string;
+          fetchedToken?: string | null;
+        },
+      ) => {
+        if (!data.success) return;
+        if (data.serial) setDetectedSerial(data.serial);
+        onTestSuccess({
+          host,
+          email: active.email,
+          password: active.password,
+          // Persist the token fetched during the test so the first poll skips a cloud round-trip.
+          token: active.token || data.fetchedToken || "",
+        });
       },
-    ) => {
-      if (!data.success) return;
-      if (data.serial) setDetectedSerial(data.serial);
-      onTestSuccess({
-        host,
-        email: active.email,
-        password: active.password,
-        // Persist the owner token fetched during the test so the first poll
-        // doesn't need another cloud round-trip.
-        token: active.token || data.fetchedToken || "",
-      });
-    },
-  });
+    });
 
   const testResult = useTestStatus(testMutation);
   const canTest = host &&

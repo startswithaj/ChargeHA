@@ -18,7 +18,7 @@ export const vehiclesRouter = router({
   commandStatus: publicProcedure
     .input(vehicleIdInput)
     .query(async ({ ctx, input }) => {
-      return await ctx.vehicleService.getCommandStatus(input.vehicleId, ctx);
+      return await ctx.vehicleService.getCommandStatus(input.vehicleId);
     }),
 
   // List all configured vehicles with latest state

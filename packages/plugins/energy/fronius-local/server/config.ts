@@ -6,16 +6,16 @@ import {
 } from "@chargeha/shared/configSections";
 
 // ── Fronius Local plugin config section ─────────────────────────────────────
-// All keys use dot-namespaced format: fronius_local.{key}
+// Keys are relative — PluginDependencies prefixes them with the plugin id.
 
 export const froniusLocalConfigDef = defineSection({
   froniusHost: {
-    key: "fronius_local.host",
+    key: "host",
     schema: z.string(),
     default: "",
   },
   froniusMeterDeviceId: {
-    key: "fronius_local.meter_device_id",
+    key: "meter_device_id",
     schema: z.string(),
     default: "0",
   },

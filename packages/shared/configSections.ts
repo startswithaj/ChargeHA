@@ -358,6 +358,7 @@ function deserializeValue<T extends z.ZodTypeAny>(
  */
 function serializeValue<T extends z.ZodTypeAny>(
   value: z.infer<T>,
+  // deno-lint-ignore custom-trailing-underscore-param/no-trailing-underscore-param -- carries the generic so T is inferred at call sites
   _schema: T,
 ): string {
   if (value === null || value === undefined) return "";

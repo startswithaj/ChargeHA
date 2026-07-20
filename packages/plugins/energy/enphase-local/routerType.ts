@@ -1,9 +1,9 @@
-import { createAppRouter } from "../../../server/src/trpc/root.ts";
-import { enphaseLocalRouter } from "./server/router.ts";
+import type { createAppRouter } from "../../../server/src/trpc/root.ts";
+import type { createEnphaseLocalRouter } from "./server/router.ts";
 
-const _typed = createAppRouter({
-  vehicle: {},
-  energy: { enphase_local: enphaseLocalRouter },
-});
-
-export type EnphaseLocalAppRouter = typeof _typed;
+export type EnphaseLocalAppRouter = ReturnType<
+  typeof createAppRouter<
+    Record<string, never>,
+    { enphase_local: ReturnType<typeof createEnphaseLocalRouter> }
+  >
+>;

@@ -53,6 +53,7 @@ describe("useRealtimeEvents", () => {
   const makeHandlers = () => ({
     onEnergyUpdate: vi.fn(),
     onVehicleUpdate: vi.fn(),
+    onVehiclesChanged: vi.fn(),
     onVehicleError: vi.fn(),
     onControllerStatus: vi.fn(),
   });

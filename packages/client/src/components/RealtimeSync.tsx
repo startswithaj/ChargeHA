@@ -47,6 +47,12 @@ export function RealtimeSync() {
         };
       });
     },
+    // Membership changed: refresh the vehicle list, plugin configured-state, and plugin vehicle lists.
+    onVehiclesChanged: () => {
+      utils.vehicle.list.invalidate();
+      utils.vehicle.getPlugins.invalidate();
+      utils.plugin.vehicle.invalidate();
+    },
     onVehicleError: (event) => {
       if (event.error === null) {
         vehicleErrorStore.clearError(event.vehicleId);

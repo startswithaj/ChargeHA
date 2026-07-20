@@ -7,9 +7,9 @@ import {
   TextField,
 } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
-import { SettingsRow } from "../../../../client/src/components/pages/Settings/SettingsLayout.tsx";
-import { useSaveStatus } from "../../../../client/src/hooks/useSectionConfig.ts";
-import { usePluginSettingsHost } from "../../../../client/src/components/pages/Settings/pluginSettingsHost.ts";
+import { SettingsRow } from "../../../hostUi.ts";
+import { useSaveStatus } from "../../../hostUi.ts";
+import { usePluginSettingsHost } from "../../../hostUi.ts";
 
 type AuthMethod = "credentials" | "token";
 
@@ -22,7 +22,7 @@ interface EnphaseLocalConfigValues {
 
 type ValueOf = (key: keyof EnphaseLocalConfigValues) => string;
 type TestMutation = ReturnType<
-  typeof trpc.energy.enphase_local.testConnection.useMutation
+  typeof trpc.plugin.energy.enphase_local.testConnection.useMutation
 >;
 
 /** Only the active method's values are saved; saving credentials leaves the
@@ -201,12 +201,16 @@ function TestConnectionRow(
  * via the host panel's Save button (like PluginConfigForm).
  */
 export function EnphaseLocalConfig(): JSX.Element | null {
-  const { data: config } = trpc.energy.enphase_local.getConfig.useQuery();
+  const { data: config } = trpc.plugin.energy.enphase_local.getConfig
+    .useQuery();
   const utils = trpc.useUtils();
-  const configMutation = trpc.energy.enphase_local.setConfig.useMutation({
-    onSuccess: () => utils.energy.enphase_local.getConfig.invalidate(),
-  });
-  const testMutation = trpc.energy.enphase_local.testConnection.useMutation();
+  const configMutation = trpc.plugin.energy.enphase_local.setConfig.useMutation(
+    {
+      onSuccess: () => utils.plugin.energy.enphase_local.getConfig.invalidate(),
+    },
+  );
+  const testMutation = trpc.plugin.energy.enphase_local.testConnection
+    .useMutation();
 
   const [draft, setDraft] = useState<Partial<EnphaseLocalConfigValues>>({});
   const [methodOverride, setMethodOverride] = useState<AuthMethod | null>(

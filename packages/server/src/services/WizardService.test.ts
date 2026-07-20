@@ -15,7 +15,6 @@ describe("WizardService", () => {
   type MockVehicleMgr = Record<string, unknown>;
   type MockAuth = Record<string, unknown>;
   type MockOidc = Record<string, unknown>;
-  type MockPlugins = Record<string, unknown>;
 
   function defaultDb(): MockDb {
     return {
@@ -52,15 +51,10 @@ describe("WizardService", () => {
     };
   }
 
-  function defaultPlugins(): MockPlugins {
-    return { getAll: () => [] };
-  }
-
   function makeService(overrides: {
     db?: MockDb;
     encryptionKey?: string | null;
     logger?: Record<string, unknown>;
-    vehiclePlugins?: MockPlugins;
     tunnelManager?: MockTunnel;
     vehicleManager?: MockVehicleMgr;
     authService?: MockAuth;
@@ -71,12 +65,10 @@ describe("WizardService", () => {
     const vehicleManager = overrides.vehicleManager ?? defaultVehicleMgr();
     const authService = overrides.authService ?? defaultAuth();
     const oidcService = overrides.oidcService ?? defaultOidc();
-    const vehiclePlugins = overrides.vehiclePlugins ?? defaultPlugins();
     return new WizardService(
       db as never,
       overrides.encryptionKey ?? null,
       (overrides.logger ?? mockLogger) as never,
-      vehiclePlugins as never,
       tunnelManager as never,
       vehicleManager as never,
       authService as never,
@@ -214,216 +206,99 @@ describe("WizardService", () => {
     });
   });
 
-  // ── Navigation state (getStep/setStep, etc.) ─────────────────────────
+  // ── Navigation state (getState/patchState) ───────────────────────────
 
-  describe("getStep", () => {
-    it("returns stored step value", async () => {
+  describe("getState", () => {
+    it("reads every field from its config key", async () => {
+      const stored: Record<string, string> = {
+        wizard_step: "tesla-credentials",
+        wizard_vehicle_type: "tesla",
+        wizard_energy_type: "fronius_local",
+      };
       const service = makeService({
         db: {
-          getConfig: () => Promise.resolve("auth-setup"),
+          getConfig: (key: string) => Promise.resolve(stored[key] ?? null),
         },
       });
-      expect(await service.getStep()).toBe("auth-setup");
-    });
 
-    it("returns empty string when db returns null", async () => {
-      const service = makeService({
-        db: {
-          getConfig: () => Promise.resolve(null),
-        },
+      expect(await service.getState()).toEqual({
+        stepId: "tesla-credentials",
+        vehicleType: "tesla",
+        energyType: "fronius_local",
       });
-      expect(await service.getStep()).toBe("");
-    });
-  });
-
-  describe("setStep", () => {
-    it("persists step to db", async () => {
-      let saved: string | null = null;
-      const service = makeService({
-        db: {
-          setConfig: (_key: string, value: string) => {
-            saved = value;
-            return Promise.resolve();
-          },
-        },
-      });
-      await service.setStep("vehicle-type");
-      expect(saved).toBe("vehicle-type");
-    });
-  });
-
-  describe("getVehicleType", () => {
-    it("returns stored vehicle type", async () => {
-      const service = makeService({
-        db: {
-          getConfig: () => Promise.resolve("tesla"),
-        },
-      });
-      expect(await service.getVehicleType()).toBe("tesla");
     });
 
-    it("returns empty string when db returns null", async () => {
+    it("defaults each field to empty string when db returns null", async () => {
       const service = makeService({
         db: {
           getConfig: () => Promise.resolve(null),
         },
       });
-      expect(await service.getVehicleType()).toBe("");
+
+      expect(await service.getState()).toEqual({
+        stepId: "",
+        vehicleType: "",
+        energyType: "",
+      });
     });
   });
 
-  describe("setVehicleType", () => {
-    it("persists vehicle type to db", async () => {
-      let saved: string | null = null;
+  describe("patchState", () => {
+    it("writes each provided field to its own config key", async () => {
+      const configSet: Record<string, string> = {};
       const service = makeService({
         db: {
-          setConfig: (_key: string, value: string) => {
-            saved = value;
+          setConfig: (key: string, value: string) => {
+            configSet[key] = value;
             return Promise.resolve();
           },
         },
       });
-      await service.setVehicleType("simulated");
-      expect(saved).toBe("simulated");
-    });
-  });
 
-  describe("getEnergyType", () => {
-    it("returns stored energy type", async () => {
-      const service = makeService({
-        db: {
-          getConfig: () => Promise.resolve("fronius-local"),
-        },
+      await service.patchState({
+        stepId: "tesla-key-generation",
+        vehicleType: "tesla",
+        energyType: "fronius_local",
       });
-      expect(await service.getEnergyType()).toBe("fronius-local");
-    });
 
-    it("returns empty string when db returns null", async () => {
-      const service = makeService({
-        db: {
-          getConfig: () => Promise.resolve(null),
-        },
+      expect(configSet).toEqual({
+        wizard_step: "tesla-key-generation",
+        wizard_vehicle_type: "tesla",
+        wizard_energy_type: "fronius_local",
       });
-      expect(await service.getEnergyType()).toBe("");
     });
-  });
 
-  describe("setEnergyType", () => {
-    it("persists energy type to db", async () => {
-      let saved: string | null = null;
+    it("leaves omitted fields untouched", async () => {
+      const configSet: Record<string, string> = {};
       const service = makeService({
         db: {
-          setConfig: (_key: string, value: string) => {
-            saved = value;
+          setConfig: (key: string, value: string) => {
+            configSet[key] = value;
             return Promise.resolve();
           },
         },
       });
-      await service.setEnergyType("fronius-cloud");
-      expect(saved).toBe("fronius-cloud");
-    });
-  });
 
-  // ── Tunnel management ─────────────────────────────────────────────────
+      await service.patchState({ stepId: "done" });
 
-  describe("startTunnel", () => {
-    it("starts tunnel and returns url", async () => {
-      const service = makeService({
-        tunnelManager: {
-          isRunning: false,
-          tunnelUrl: null,
-          start: () => Promise.resolve("https://abc.trycloudflare.com"),
-          stop: () => Promise.resolve(),
-        },
-      });
-      const result = await service.startTunnel();
-      expect(result).toEqual({ url: "https://abc.trycloudflare.com" });
+      expect(configSet).toEqual({ wizard_step: "done" });
     });
 
-    it("wraps Error in ServiceError on failure", async () => {
+    it("writes an empty string rather than skipping the field", async () => {
+      const configSet: Record<string, string> = {};
       const service = makeService({
-        tunnelManager: {
-          isRunning: false,
-          tunnelUrl: null,
-          start: () => Promise.reject(new Error("cloudflared not found")),
-          stop: () => Promise.resolve(),
-        },
-      });
-      try {
-        await service.startTunnel();
-        expect(true).toBe(false);
-      } catch (err) {
-        expect((err as Error).message).toBe("cloudflared not found");
-      }
-    });
-
-    it("uses fallback message for non-Error throws", async () => {
-      const service = makeService({
-        tunnelManager: {
-          isRunning: false,
-          tunnelUrl: null,
-          start: () => Promise.reject("string-error"),
-          stop: () => Promise.resolve(),
-        },
-      });
-      try {
-        await service.startTunnel();
-        expect(true).toBe(false);
-      } catch (err) {
-        expect((err as Error).message).toBe("Failed to start tunnel");
-      }
-    });
-  });
-
-  describe("stopTunnel", () => {
-    it("stops tunnel and returns stopped:true", async () => {
-      let stopped = false;
-      const service = makeService({
-        tunnelManager: {
-          isRunning: true,
-          tunnelUrl: "https://abc.trycloudflare.com",
-          start: () => Promise.resolve(""),
-          stop: () => {
-            stopped = true;
+        db: {
+          setConfig: (key: string, value: string) => {
+            configSet[key] = value;
             return Promise.resolve();
           },
         },
       });
-      const result = await service.stopTunnel();
-      expect(result).toEqual({ stopped: true });
-      expect(stopped).toBe(true);
-    });
-  });
 
-  describe("getTunnelStatus", () => {
-    it("returns active and url from tunnelManager", () => {
-      const service = makeService({
-        tunnelManager: {
-          isRunning: true,
-          tunnelUrl: "https://abc.trycloudflare.com",
-          start: () => Promise.resolve(""),
-          stop: () => Promise.resolve(),
-        },
-      });
-      expect(service.getTunnelStatus()).toEqual({
-        active: true,
-        url: "https://abc.trycloudflare.com",
-      });
-    });
+      // "" is a real selection (None/Skip); only undefined means don't touch the field.
+      await service.patchState({ energyType: "" });
 
-    it("returns inactive with null url when not running", () => {
-      const service = makeService({
-        tunnelManager: {
-          isRunning: false,
-          tunnelUrl: null,
-          start: () => Promise.resolve(""),
-          stop: () => Promise.resolve(),
-        },
-      });
-      expect(service.getTunnelStatus()).toEqual({
-        active: false,
-        url: null,
-      });
+      expect(configSet).toEqual({ wizard_energy_type: "" });
     });
   });
 
@@ -767,7 +642,8 @@ describe("WizardService", () => {
         config: JSON.stringify({ batteryCapacityKwh: 60 }),
         mode: "auto",
       });
-      expect(configSet["energy_adapter_type"]).toBe("simulated_energy");
+      // demoSetup must not pick the energy source — that's the user's choice.
+      expect(configSet["energy_adapter_type"]).toBeUndefined();
       expect(configSet["home_latitude"]).toBe("-33.8688");
       expect(configSet["home_longitude"]).toBe("151.2093");
       expect(configSet["timezone"]).toBe("Australia/Sydney");

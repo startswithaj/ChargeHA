@@ -2,6 +2,7 @@ import { afterEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { AppDatabase } from "../../db/AppDatabase.ts";
 import { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
+import { EnergyPluginRegistry } from "@chargeha/server/bootstrap/EnergyPluginRegistry";
 import { HealthService } from "../../services/HealthService.ts";
 import { appRouter } from "../root.ts";
 import { createCallerFactory } from "../trpc.ts";
@@ -32,6 +33,8 @@ describe("Health tRPC Router", () => {
     getRouter: () => null,
     getHttpRoutes: () => null,
     getHealthChecks: () => [],
+    getCommandStatus: () =>
+      Promise.resolve({ commandsDisabled: false, reason: null }),
     getTunnelRoutes: () => [],
     ...overrides,
   });
@@ -44,7 +47,11 @@ describe("Health tRPC Router", () => {
     await db.init();
     const vehiclePlugins = new VehiclePluginRegistry();
     if (plugin) vehiclePlugins.register(plugin);
-    const healthService = new HealthService(vehiclePlugins, encryptionKey);
+    const healthService = new HealthService(
+      vehiclePlugins,
+      new EnergyPluginRegistry(),
+      encryptionKey,
+    );
     return createCaller(throwingMock<TrpcContext>("TrpcContext", {
       healthService,
     }));

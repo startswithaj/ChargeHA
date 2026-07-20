@@ -3,23 +3,23 @@ import { assertExists } from "@std/assert";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../test-utils.tsx";
-import { InverterTypeStep } from "./InverterTypeStep.tsx";
-import type { StepProps } from "../WizardShell.tsx";
+import { inverterTypeStep } from "./InverterTypeStep.tsx";
+import { StepNextHarness } from "./test-helpers/StepNextHarness.tsx";
 
-const { mockMutate, mockSetStepId, mockSetEnergyType } = vi.hoisted(() => ({
+const { mockMutate, mockAdvance, mockEquipmentGet } = vi.hoisted(() => ({
   mockMutate: vi.fn(),
-  mockSetStepId: vi.fn(),
-  mockSetEnergyType: vi.fn(),
+  mockAdvance: vi.fn(),
+  mockEquipmentGet: vi.fn(() => ({
+    data: {} as { energyAdapterType?: string },
+    isLoading: false,
+    error: null,
+  })),
 }));
 
 vi.mock("../../../hooks/useWizardState.ts", () => ({
   useWizardState: vi.fn(() => ({
-    stepId: "inverter-type",
-    vehicleType: "",
-    energyType: "",
-    setStepId: mockSetStepId,
-    setVehicleType: vi.fn(),
-    setEnergyType: mockSetEnergyType,
+    state: { stepId: "inverter-type", vehicleType: "", energyType: "" },
+    patch: vi.fn(),
     isLoading: false,
   })),
 }));
@@ -40,7 +40,7 @@ vi.mock("../../../trpc.ts", () => ({
     config: {
       equipment: {
         get: {
-          useQuery: vi.fn(() => ({ data: {}, isLoading: false, error: null })),
+          useQuery: mockEquipmentGet,
         },
         set: {
           useMutation: vi.fn(() => ({
@@ -74,18 +74,14 @@ vi.mock("../../../lib/featureFlags.ts", async (orig) => {
 // ---- Tests ----
 
 describe("InverterTypeStep", () => {
-  const makeStepProps = (overrides: Partial<StepProps> = {}): StepProps => ({
-    onNext: vi.fn(),
-    onBack: vi.fn(),
-    onSkip: vi.fn(),
-    onSkipTo: vi.fn(),
-    onSkipToEnd: vi.fn(),
-    ...overrides,
-  });
-
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsDemoMode.mockReturnValue(false);
+    mockEquipmentGet.mockReturnValue({
+      data: {},
+      isLoading: false,
+      error: null,
+    });
     mockMutate.mockImplementation(
       (_input: unknown, opts?: { onSuccess?: () => void }) => {
         opts?.onSuccess?.();
@@ -101,7 +97,9 @@ describe("InverterTypeStep", () => {
 
   it("disables Fronius options in demo mode", () => {
     mockIsDemoMode.mockReturnValue(true);
-    renderWithProviders(<InverterTypeStep {...makeStepProps()} />);
+    renderWithProviders(
+      <StepNextHarness def={inverterTypeStep} onAdvance={mockAdvance} />,
+    );
 
     const local = screen.getByText("Fronius (Local)").closest(
       '[role="button"]',
@@ -114,7 +112,9 @@ describe("InverterTypeStep", () => {
   });
 
   it("renders three options: Fronius Local, Fronius Cloud, None/Skip", () => {
-    renderWithProviders(<InverterTypeStep {...makeStepProps()} />);
+    renderWithProviders(
+      <StepNextHarness def={inverterTypeStep} onAdvance={mockAdvance} />,
+    );
 
     expect(screen.getByText("Fronius (Local)")).toBeInTheDocument();
     expect(
@@ -125,8 +125,10 @@ describe("InverterTypeStep", () => {
 
   // ---- User interactions / API calls ----
 
-  it("selecting None calls the equipment config mutation with empty adapter type", async () => {
-    renderWithProviders(<InverterTypeStep {...makeStepProps()} />);
+  it("selecting None persists an empty adapter type and advances", async () => {
+    renderWithProviders(
+      <StepNextHarness def={inverterTypeStep} onAdvance={mockAdvance} />,
+    );
 
     fireEvent.click(screen.getByText("None / Skip"));
 
@@ -137,17 +139,19 @@ describe("InverterTypeStep", () => {
       );
     });
 
-    expect(mockSetEnergyType).toHaveBeenCalledWith("");
-    expect(mockSetStepId).toHaveBeenCalledWith("home-location");
+    // "" is a real selection, not an absent one — it advances like any other.
+    expect(mockAdvance).toHaveBeenCalledWith({ energyType: "" });
   });
 
-  it.each<[string, string, string]>([
-    ["Fronius (Local)", "fronius_local", "fronius-local-setup"],
-    ["Fronius (Cloud / Solar.web)", "fronius_cloud", "fronius-cloud-setup"],
+  it.each<[string, string]>([
+    ["Fronius (Local)", "fronius_local"],
+    ["Fronius (Cloud / Solar.web)", "fronius_cloud"],
   ])(
-    "selecting %s persists adapter %s and navigates to %s",
-    async (label, adapterType, nextStepId) => {
-      renderWithProviders(<InverterTypeStep {...makeStepProps()} />);
+    "selecting %s persists adapter %s and commits it without naming a next step",
+    async (label, adapterType) => {
+      renderWithProviders(
+        <StepNextHarness def={inverterTypeStep} onAdvance={mockAdvance} />,
+      );
 
       fireEvent.click(screen.getByText(label));
 
@@ -158,8 +162,39 @@ describe("InverterTypeStep", () => {
         );
       });
 
-      expect(mockSetEnergyType).toHaveBeenCalledWith(adapterType);
-      expect(mockSetStepId).toHaveBeenCalledWith(nextStepId);
+      // The step reports what was chosen; the flow decides where that leads.
+      expect(mockAdvance).toHaveBeenCalledWith({ energyType: adapterType });
     },
   );
+
+  it("Next commits the saved adapter type when the wizard state has none", async () => {
+    // Re-opened wizard: the saved source shows selected while state.energyType is still "", so Next must write it.
+    mockEquipmentGet.mockReturnValue({
+      data: { energyAdapterType: "fronius_local" },
+      isLoading: false,
+      error: null,
+    });
+    renderWithProviders(
+      <StepNextHarness def={inverterTypeStep} onAdvance={mockAdvance} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^Next/ }));
+
+    // The selection comes back from an async Next handler, so the move lands a microtask later.
+    await waitFor(() => {
+      expect(mockAdvance).toHaveBeenCalledWith({ energyType: "fronius_local" });
+    });
+  });
+
+  it("does not advance when persisting the adapter fails", () => {
+    mockMutate.mockImplementation(() => {});
+    renderWithProviders(
+      <StepNextHarness def={inverterTypeStep} onAdvance={mockAdvance} />,
+    );
+
+    fireEvent.click(screen.getByText("Fronius (Local)"));
+
+    expect(mockMutate).toHaveBeenCalled();
+    expect(mockAdvance).not.toHaveBeenCalled();
+  });
 });

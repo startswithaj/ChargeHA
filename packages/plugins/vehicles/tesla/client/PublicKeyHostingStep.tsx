@@ -3,9 +3,15 @@ import { Button, Callout, Text } from "@radix-ui/themes";
 import { CheckCircle, Globe, Loader2 } from "lucide-react";
 import { useTeslaConfig, useTeslaConfigMutation } from "./useTeslaConfig.ts";
 import { trpc } from "./trpc.ts";
-import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
+import {
+  advanceOnly,
+  type PluginStepDef,
+  type WizardNext,
+} from "../../../hostUi.ts";
+import { canTeslaFetchKeyFrom, isStableOrigin } from "./oauthOrigin.ts";
 import {
   AiPromptInstructions,
+  FleetKeyInstructions,
   GitHubPagesInstructions,
   SelfHostInstructions,
   WELL_KNOWN_PATH,
@@ -16,12 +22,17 @@ import {
   HostingMethodCards,
 } from "./HostingMethodCards.tsx";
 import { DirectHostingSection } from "./DirectHostingSection.tsx";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import { stepStyles as styles } from "../../../hostUi.ts";
 
 type HostingChoice = null | "yes" | "no";
 
 function TunnelActiveView(
-  { tunnelUrl, onNext }: { tunnelUrl: string; onNext: () => void },
+  { tunnelUrl, expiryMinutes, onStop, stopping }: {
+    tunnelUrl: string;
+    expiryMinutes: number | null;
+    onStop: () => void;
+    stopping: boolean;
+  },
 ) {
   return (
     <div className={styles.stepContainer}>
@@ -34,13 +45,30 @@ function TunnelActiveView(
           <CheckCircle size={16} />
         </Callout.Icon>
         <Callout.Text>
-          Your public key is being served via the Cloudflare Tunnel at{" "}
-          <strong>{tunnelUrl}/{WELL_KNOWN_PATH}</strong>. The domain has already
-          been saved — no additional hosting setup needed.
+          Your public key is being served via the tunnel at{" "}
+          <strong>{tunnelUrl}/{WELL_KNOWN_PATH}</strong>. No additional hosting
+          setup needed.
         </Callout.Text>
       </Callout.Root>
+      {expiryMinutes !== null && (
+        <Callout.Root color="amber">
+          <Callout.Text>
+            Free tunnels expire after {expiryMinutes}{" "}
+            minutes — finish partner registration, Tesla login, and key pairing
+            before then. If it expires mid-setup you'll need to start a new
+            tunnel and re-run partner registration.
+          </Callout.Text>
+        </Callout.Root>
+      )}
       <div className={styles.stepActions}>
-        <Button onClick={onNext}>Continue</Button>
+        <Button variant="soft" onClick={onStop} disabled={stopping}>
+          {stopping
+            ? <Loader2 size={14} className={styles.spinner} />
+            : <Globe size={14} />}
+          {stopping
+            ? "Stopping tunnel..."
+            : "Stop tunnel & choose another method"}
+        </Button>
       </div>
     </div>
   );
@@ -57,7 +85,10 @@ function ChoiceCards(
 ) {
   const selectYes = () => {
     setChoice("yes");
-    saveDomainMutation.mutate({ teslaPublicKeyDomain: browserOrigin });
+    saveDomainMutation.mutate({
+      teslaPublicKeyDomain: browserOrigin,
+      teslaPublicKeyHosting: "custom",
+    });
   };
   const selectNo = () => {
     setChoice("no");
@@ -109,14 +140,18 @@ function ChoiceCards(
 
 function TunnelHostingSection(
   { startTunnelMutation }: {
-    startTunnelMutation: ReturnType<typeof trpc.wizard.startTunnel.useMutation>;
+    startTunnelMutation: ReturnType<
+      typeof trpc.plugin.vehicle.tesla.startTunnel.useMutation
+    >;
   },
 ) {
   return (
     <div className={styles.instructionBox}>
       <Text as="p" size="2" color="gray">
-        Start a temporary Cloudflare Tunnel to serve your public key. No account
-        required — the tunnel is torn down when the wizard completes.
+        Start a temporary tunnel (via Pinggy) to serve your public key. No
+        account required — the tunnel is torn down when the wizard completes.
+        Free tunnels last 60 minutes and the URL includes your public IP
+        address.
       </Text>
       <div style={{ marginTop: "0.75rem" }}>
         <Button
@@ -142,11 +177,22 @@ function TunnelHostingSection(
 }
 
 function HostingMethodSection(
-  { hostingMethod, setHostingMethod, publicKey, startTunnelMutation }: {
+  {
+    hostingMethod,
+    setHostingMethod,
+    publicKey,
+    staticDisabled,
+    browserOrigin,
+    startTunnelMutation,
+  }: {
     hostingMethod: HostingMethod;
     setHostingMethod: (m: HostingMethod) => void;
     publicKey: string;
-    startTunnelMutation: ReturnType<typeof trpc.wizard.startTunnel.useMutation>;
+    staticDisabled: boolean;
+    browserOrigin: string;
+    startTunnelMutation: ReturnType<
+      typeof trpc.plugin.vehicle.tesla.startTunnel.useMutation
+    >;
   },
 ) {
   return (
@@ -157,6 +203,8 @@ function HostingMethodSection(
       <HostingMethodCards
         hostingMethod={hostingMethod}
         onSelect={setHostingMethod}
+        staticDisabled={staticDisabled}
+        browserOrigin={browserOrigin}
       />
       {hostingMethod === "self" && (
         <>
@@ -170,6 +218,15 @@ function HostingMethodSection(
       {hostingMethod === "github" && (
         <>
           <GitHubPagesInstructions publicKey={publicKey} />
+          <DomainVerifyForm
+            publicKey={publicKey}
+            wellKnownPath={WELL_KNOWN_PATH}
+          />
+        </>
+      )}
+      {hostingMethod === "fleetkey" && (
+        <>
+          <FleetKeyInstructions publicKey={publicKey} />
           <DomainVerifyForm
             publicKey={publicKey}
             wellKnownPath={WELL_KNOWN_PATH}
@@ -192,31 +249,152 @@ function HostingMethodSection(
   );
 }
 
-export function PublicKeyHostingStep({ onNext }: StepProps): JSX.Element {
-  const { data: teslaConfig } = useTeslaConfig();
-  const browserOrigin = globalThis.location?.origin || "";
-  const publicKey = teslaConfig?.ecPublicKeyPem || "";
+function useTunnelMutations() {
+  const tunnelStatus = trpc.plugin.vehicle.tesla.tunnelStatus.useQuery();
+  const onTunnelChanged = () => {
+    tunnelStatus.refetch();
+  };
+  return {
+    tunnelStatus,
+    startTunnelMutation: trpc.plugin.vehicle.tesla.startTunnel.useMutation({
+      onSuccess: onTunnelChanged,
+    }),
+    stopTunnelMutation: trpc.plugin.vehicle.tesla.stopTunnel.useMutation({
+      onSuccess: onTunnelChanged,
+    }),
+  };
+}
 
-  const tunnelStatus = trpc.wizard.tunnelStatus.useQuery();
-  const tunnelActive = tunnelStatus.data?.active ?? false;
-  const tunnelUrl = tunnelStatus.data?.url;
+function hostingHint(configured: boolean, tunnelChosen: boolean): string {
+  if (configured) return "Public key hosting is configured — Next continues";
+  if (tunnelChosen) return "Start the tunnel to continue";
+  return "Configure public key hosting to continue";
+}
 
-  const startTunnelMutation = trpc.wizard.startTunnel.useMutation({
-    onSuccess: () => tunnelStatus.refetch(),
-  });
+/** A completed Tesla setup (authenticated + key paired) doesn't need the
+ *  tunnel anymore — it was only required during registration and pairing. */
+function useTeslaWorking(): boolean {
+  const status = trpc.plugin.vehicle.tesla.teslaStatus.useQuery();
+  return status.data?.authenticated === true &&
+    status.data?.keyPaired === true;
+}
 
-  const [choice, setChoice] = useState<HostingChoice>(null);
-  const [hostingMethod, setHostingMethod] = useState<HostingMethod>(null);
+function CustomConfiguredCallout({ domain }: { domain: string }) {
+  return (
+    <Callout.Root color="green">
+      <Callout.Icon>
+        <CheckCircle size={16} />
+      </Callout.Icon>
+      <Callout.Text>
+        Public key domain is already configured as{" "}
+        <strong>{domain}</strong>. Continue to keep it, or pick a hosting method
+        below to change it.
+      </Callout.Text>
+    </Callout.Root>
+  );
+}
 
-  // "Yes" flow uses the browser origin (server is internet-accessible)
-  const publicKeyUrl = `${browserOrigin}/${WELL_KNOWN_PATH}`;
+function TunnelTornDownCallout() {
+  return (
+    <Callout.Root color="green">
+      <Callout.Icon>
+        <CheckCircle size={16} />
+      </Callout.Icon>
+      <Callout.Text>
+        Tesla is set up and working — the tunnel was torn down after pairing and
+        is only needed again if you re-pair (which also requires re-running
+        partner registration with the new tunnel URL).
+      </Callout.Text>
+    </Callout.Root>
+  );
+}
 
-  const saveDomainMutation = useTeslaConfigMutation();
+function UnreachableOriginCallout(
+  { browserOrigin }: { browserOrigin: string },
+) {
+  return (
+    <Callout.Root color="amber">
+      <Callout.Text>
+        You're accessing ChargeHA at <strong>{browserOrigin}</strong>{" "}
+        — Tesla's servers likely can't fetch the key from this address, so "No"
+        with a hosting method (the tunnel is the quickest) is the usual choice
+        here.
+      </Callout.Text>
+    </Callout.Root>
+  );
+}
 
-  if (tunnelActive && tunnelUrl) {
-    return <TunnelActiveView tunnelUrl={tunnelUrl} onNext={onNext} />;
+function hostingNext(
+  loading: boolean,
+  domainConfigured: boolean,
+  tunnelChosen: boolean,
+): WizardNext {
+  if (domainConfigured) {
+    return {
+      kind: "ready",
+      hint: hostingHint(true, tunnelChosen),
+      onNext: advanceOnly,
+    };
   }
+  if (loading) return { kind: "loading" };
+  return { kind: "blocked", reason: hostingHint(false, tunnelChosen) };
+}
 
+/** Whether the public key is reachable, and by which route. In tunnel mode
+ *  only a live tunnel counts; a custom domain counts once saved. */
+function resolveHosting(
+  { hosting, savedDomain, choice, hostingMethod, tunnelRunning, teslaWorking }:
+    {
+      hosting: string;
+      savedDomain: string | null;
+      choice: HostingChoice;
+      hostingMethod: HostingMethod;
+      tunnelRunning: boolean;
+      teslaWorking: boolean;
+    },
+) {
+  const customConfigured = hosting === "custom" && !!savedDomain;
+  const tunnelChosen = (choice === "no" && hostingMethod === "tunnel") ||
+    (choice === null && hosting === "tunnel");
+  const domainConfigured = tunnelChosen
+    ? tunnelRunning || teslaWorking
+    : tunnelRunning || customConfigured;
+  return { customConfigured, tunnelChosen, domainConfigured };
+}
+
+function HostingChoiceView(
+  {
+    browserOrigin,
+    publicKey,
+    publicKeyUrl,
+    customConfigured,
+    customDomain,
+    tunnelTornDown,
+    choice,
+    setChoice,
+    hostingMethod,
+    selectMethod,
+    setHostingMethod,
+    saveDomainMutation,
+    startTunnelMutation,
+  }: {
+    browserOrigin: string;
+    publicKey: string;
+    publicKeyUrl: string;
+    customConfigured: boolean;
+    customDomain: string;
+    tunnelTornDown: boolean;
+    choice: HostingChoice;
+    setChoice: (c: HostingChoice) => void;
+    hostingMethod: HostingMethod;
+    selectMethod: (m: HostingMethod) => void;
+    setHostingMethod: (m: HostingMethod) => void;
+    saveDomainMutation: ReturnType<typeof useTeslaConfigMutation>;
+    startTunnelMutation: ReturnType<
+      typeof trpc.plugin.vehicle.tesla.startTunnel.useMutation
+    >;
+  },
+) {
   return (
     <div className={styles.stepContainer}>
       <Text as="p" size="3" color="gray">
@@ -224,22 +402,12 @@ export function PublicKeyHostingStep({ onNext }: StepProps): JSX.Element {
         during the pairing process. It only needs to be reachable during setup.
       </Text>
 
-      {teslaConfig?.teslaPublicKeyDomain && (
-        <>
-          <Callout.Root color="green">
-            <Callout.Icon>
-              <CheckCircle size={16} />
-            </Callout.Icon>
-            <Callout.Text>
-              Public key domain is already configured as{" "}
-              <strong>{teslaConfig.teslaPublicKeyDomain}</strong>.
-            </Callout.Text>
-          </Callout.Root>
+      {customConfigured && <CustomConfiguredCallout domain={customDomain} />}
 
-          <div className={styles.stepActions}>
-            <Button onClick={onNext}>Continue</Button>
-          </div>
-        </>
+      {tunnelTornDown && <TunnelTornDownCallout />}
+
+      {!canTeslaFetchKeyFrom(browserOrigin) && (
+        <UnreachableOriginCallout browserOrigin={browserOrigin} />
       )}
 
       <ChoiceCards
@@ -261,11 +429,100 @@ export function PublicKeyHostingStep({ onNext }: StepProps): JSX.Element {
       {choice === "no" && (
         <HostingMethodSection
           hostingMethod={hostingMethod}
-          setHostingMethod={setHostingMethod}
+          setHostingMethod={selectMethod}
           publicKey={publicKey}
+          staticDisabled={!isStableOrigin(browserOrigin)}
+          browserOrigin={browserOrigin}
           startTunnelMutation={startTunnelMutation}
         />
       )}
     </div>
   );
 }
+
+export const publicKeyHostingStep: PluginStepDef = {
+  id: "tesla-public-key-hosting",
+  label: "Public Key Hosting",
+  useStep: () => {
+    const { data: teslaConfig } = useTeslaConfig();
+    const browserOrigin = globalThis.location?.origin || "";
+    const publicKey = teslaConfig?.ecPublicKeyPem || "";
+
+    const { tunnelStatus, startTunnelMutation, stopTunnelMutation } =
+      useTunnelMutations();
+    const tunnelActive = tunnelStatus.data?.active ?? false;
+    const tunnelUrl = tunnelStatus.data?.url;
+
+    const [choice, setChoice] = useState<HostingChoice>(null);
+    const [hostingMethod, setHostingMethod] = useState<HostingMethod>(null);
+
+    // "Yes" flow uses the browser origin (server is internet-accessible)
+    const publicKeyUrl = `${browserOrigin}/${WELL_KNOWN_PATH}`;
+
+    const saveDomainMutation = useTeslaConfigMutation();
+
+    // Only the hosting choice is durable — the tunnel URL is live state.
+    const selectMethod = (method: HostingMethod) => {
+      setHostingMethod(method);
+      if (method === "tunnel") {
+        saveDomainMutation.mutate({ teslaPublicKeyHosting: "tunnel" });
+      }
+    };
+
+    const tunnelRunning = tunnelActive && !!tunnelUrl;
+    const hosting = teslaConfig?.teslaPublicKeyHosting ?? "";
+    // In tunnel mode a live tunnel is required, unless setup already completed.
+    const teslaWorking = useTeslaWorking();
+    const { customConfigured, tunnelChosen, domainConfigured } = resolveHosting(
+      {
+        hosting,
+        savedDomain: teslaConfig?.teslaPublicKeyDomain ?? null,
+        choice,
+        hostingMethod,
+        tunnelRunning,
+        teslaWorking,
+      },
+    );
+    const next = hostingNext(
+      teslaConfig === undefined || tunnelStatus.isLoading,
+      domainConfigured,
+      tunnelChosen,
+    );
+
+    if (tunnelActive && tunnelUrl) {
+      return {
+        next,
+        view: (
+          <TunnelActiveView
+            tunnelUrl={tunnelUrl}
+            expiryMinutes={tunnelStatus.data?.expiryMinutes ?? null}
+            onStop={() => stopTunnelMutation.mutate()}
+            stopping={stopTunnelMutation.isPending}
+          />
+        ),
+      };
+    }
+
+    return {
+      next,
+      view: (
+        <HostingChoiceView
+          browserOrigin={browserOrigin}
+          publicKey={publicKey}
+          publicKeyUrl={publicKeyUrl}
+          customConfigured={customConfigured}
+          customDomain={teslaConfig?.teslaPublicKeyDomain ?? ""}
+          tunnelTornDown={hosting === "tunnel" && !tunnelRunning &&
+            teslaWorking}
+          choice={choice}
+          setChoice={setChoice}
+          hostingMethod={hostingMethod}
+          selectMethod={selectMethod}
+          setHostingMethod={setHostingMethod}
+          saveDomainMutation={saveDomainMutation}
+          startTunnelMutation={startTunnelMutation}
+        />
+      ),
+    };
+  },
+};

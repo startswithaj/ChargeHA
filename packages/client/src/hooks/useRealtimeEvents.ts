@@ -34,6 +34,7 @@ type EventData<T extends SSEEvent["type"]> = Extract<
 export function useRealtimeEvents(handlers: {
   onEnergyUpdate: (data: EventData<"energy_update">) => void;
   onVehicleUpdate: (data: EventData<"vehicle_update">) => void;
+  onVehiclesChanged: () => void;
   onVehicleError: (data: EventData<"vehicle_error">) => void;
   onControllerStatus: (data: EventData<"controller_status">) => void;
 }) {
@@ -50,6 +51,9 @@ export function useRealtimeEvents(handlers: {
           break;
         case "vehicle_update":
           handlersRef.current.onVehicleUpdate(event.data);
+          break;
+        case "vehicles_changed":
+          handlersRef.current.onVehiclesChanged();
           break;
         case "vehicle_error":
           handlersRef.current.onVehicleError(event.data);

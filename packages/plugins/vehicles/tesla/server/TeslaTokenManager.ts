@@ -7,7 +7,6 @@ export interface TeslaAuthStatus {
   vin: string | null;
   vehicleName: string | null;
   keyPaired: boolean | null; // null = unknown/not checked yet
-  domain: string | null; // TESLA_DOMAIN for key pairing link
 }
 
 export interface TeslaTokenConfig {
@@ -44,6 +43,12 @@ export class TeslaTokenManager {
   private readonly logger: Logger;
   private readonly fetch: FetchFn;
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  private refreshInFlight: Promise<void> | null = null;
+  /** Per-attempt OAuth handshake state: the redirect origin sent at authorize
+   *  time, keyed by the state param, so the callback's token exchange can send
+   *  the byte-identical redirect_uri. In-memory on purpose — a restart
+   *  mid-handshake just means clicking Authorize again. */
+  private readonly authOrigins = new Map<string, string>();
 
   constructor(
     deps: PluginDependencies,
@@ -58,7 +63,7 @@ export class TeslaTokenManager {
   /** Read credentials fresh from DB on every call. No stale cache. */
   private async getConfig(): Promise<TeslaTokenConfig> {
     const clientId = await this.deps.getConfig("client_id");
-    const clientSecret = await this.deps.getConfig("client_secret");
+    const clientSecret = await this.deps.getSecret("client_secret");
     const region = await this.deps.getConfig("region");
 
     return {
@@ -80,8 +85,7 @@ export class TeslaTokenManager {
     state: string,
     requestOrigin: string,
   ): Promise<string> {
-    // Persist the origin so the OAuth callback can reconstruct the same redirect_uri
-    await this.deps.setConfig("oauth_origin", requestOrigin);
+    this.authOrigins.set(state, requestOrigin);
     const config = await this.getConfig();
     const params = new URLSearchParams({
       response_type: "code",
@@ -91,6 +95,14 @@ export class TeslaTokenManager {
       state,
     });
     return `${AUTH_BASE_URL}/oauth2/v3/authorize?${params.toString()}`;
+  }
+
+  /** The origin recorded for this auth attempt's state param, consumed on
+   *  read. Null when unknown (e.g. server restarted mid-handshake). */
+  takeAuthOrigin(state: string): string | null {
+    const origin = this.authOrigins.get(state) ?? null;
+    this.authOrigins.delete(state);
+    return origin;
   }
 
   async handleCallback(code: string, requestOrigin: string): Promise<void> {
@@ -177,7 +189,6 @@ export class TeslaTokenManager {
       vin: teslaVehicle?.id ?? null,
       vehicleName: teslaVehicle?.name ?? null,
       keyPaired,
-      domain: null,
     };
   }
 
@@ -208,7 +219,20 @@ export class TeslaTokenManager {
     return FLEET_API_URLS[c.region] ?? FLEET_API_URLS.na;
   }
 
-  private async refreshTokens(): Promise<void> {
+  /**
+   * Tesla rotates refresh tokens — each refresh consumes the old one. Two
+   * concurrent refreshes would POST the same token, and last-writer-wins could
+   * persist the superseded value, breaking auth until the user re-authorizes.
+   * Concurrent callers share one in-flight request.
+   */
+  private refreshTokens(): Promise<void> {
+    this.refreshInFlight ??= this.performRefresh().finally(() => {
+      this.refreshInFlight = null;
+    });
+    return this.refreshInFlight;
+  }
+
+  private async performRefresh(): Promise<void> {
     const tokens = await this.getTokens();
     if (!tokens) throw new Error("No tokens to refresh");
 
@@ -242,8 +266,8 @@ export class TeslaTokenManager {
   }
 
   private async getTokens(): Promise<TokenSet | null> {
-    const accessToken = await this.deps.getConfig("access_token");
-    const refreshToken = await this.deps.getConfig("refresh_token");
+    const accessToken = await this.deps.getSecret("access_token");
+    const refreshToken = await this.deps.getSecret("refresh_token");
     const expiresAt = await this.deps.getConfig("token_expires_at");
     if (!accessToken || !refreshToken || !expiresAt) return null;
     return { accessToken, refreshToken, expiresAt };
@@ -254,14 +278,14 @@ export class TeslaTokenManager {
     refreshToken: string,
     expiresAt: string,
   ): Promise<void> {
-    await this.deps.setConfig("access_token", accessToken);
-    await this.deps.setConfig("refresh_token", refreshToken);
+    await this.deps.setSecret("access_token", accessToken);
+    await this.deps.setSecret("refresh_token", refreshToken);
     await this.deps.setConfig("token_expires_at", expiresAt);
   }
 
   async deleteTokens(): Promise<void> {
-    await this.deps.setConfig("access_token", "");
-    await this.deps.setConfig("refresh_token", "");
+    await this.deps.setSecret("access_token", "");
+    await this.deps.setSecret("refresh_token", "");
     await this.deps.setConfig("token_expires_at", "");
   }
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button, Text, TextArea } from "@radix-ui/themes";
 import { Key, Loader2 } from "lucide-react";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import { stepStyles as styles } from "../../../hostUi.ts";
 
 interface KeyImportFormProps {
   isPending: boolean;

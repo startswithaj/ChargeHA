@@ -1,9 +1,9 @@
-import { createAppRouter } from "../../../server/src/trpc/root.ts";
-import { froniusLocalRouter } from "./server/router.ts";
+import type { createAppRouter } from "../../../server/src/trpc/root.ts";
+import type { createFroniusLocalRouter } from "./server/router.ts";
 
-const _typed = createAppRouter({
-  vehicle: {},
-  energy: { fronius_local: froniusLocalRouter },
-});
-
-export type FroniusLocalAppRouter = typeof _typed;
+export type FroniusLocalAppRouter = ReturnType<
+  typeof createAppRouter<
+    Record<string, never>,
+    { fronius_local: ReturnType<typeof createFroniusLocalRouter> }
+  >
+>;

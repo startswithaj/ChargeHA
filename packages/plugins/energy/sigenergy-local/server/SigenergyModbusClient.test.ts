@@ -39,8 +39,7 @@ describe("JsmodbusReader", () => {
     await makeReader(socket).connect();
 
     expect(socket.listenerCount("error")).toBeGreaterThan(0);
-    // Would throw ERR_UNHANDLED_ERROR (crashing the process in production)
-    // if connect() had removed the last 'error' listener.
+    // Would throw ERR_UNHANDLED_ERROR if connect() had removed the last 'error' listener.
     socket.emit("error", new Error("read ECONNRESET"));
   });
 
@@ -54,6 +53,37 @@ describe("JsmodbusReader", () => {
     await expect(makeReader(socket).connect()).rejects.toThrow(
       "Cannot reach Sigenergy at 10.0.0.5:502",
     );
+  });
+
+  it("reports not-connected on reads after a failed connect", async () => {
+    const socket = new FakeSocket();
+    socket.connect = function () {
+      queueMicrotask(() => this.emit("error", new Error("ECONNREFUSED")));
+      return this;
+    };
+    const reader = makeReader(socket);
+
+    await expect(reader.connect()).rejects.toThrow("Cannot reach Sigenergy");
+    // A retained socket would hand back a client bound to a dead socket.
+    await expect(reader.readInputRegisters(247, 30000, 2)).rejects.toThrow(
+      "Modbus socket is not connected",
+    );
+    expect(socket.destroyed).toBe(true);
+  });
+
+  it("keeps an error handler attached when connect fails", async () => {
+    const socket = new FakeSocket();
+    socket.connect = function () {
+      queueMicrotask(() => this.emit("error", new Error("ECONNREFUSED")));
+      return this;
+    };
+
+    await expect(makeReader(socket).connect()).rejects.toThrow(
+      "Cannot reach Sigenergy",
+    );
+    expect(socket.listenerCount("error")).toBeGreaterThan(0);
+    // Would throw ERR_UNHANDLED_ERROR if the failure path left the socket bare.
+    socket.emit("error", new Error("late ECONNRESET"));
   });
 
   it("destroys the socket on disconnect", async () => {

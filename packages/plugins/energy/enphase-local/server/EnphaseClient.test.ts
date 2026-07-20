@@ -137,6 +137,22 @@ describe("EnphaseClient", () => {
     expect(cloud.calls).toHaveLength(2); // no further cloud logins
   });
 
+  it("pauses cloud refreshes after the cloud login itself fails", async () => {
+    // Non-401 lockout path: cached token rejected, refresh attempted, Enlighten refuses the login.
+    http.setRaw("/data", "denied", 401);
+    const cloud = makeFakeCloud({ token: "unused", loginOk: false });
+    const client = makeClient(
+      { email: "a@b.c", password: "pw", cachedToken: makeJwt(NOW, YEAR_MS) },
+      cloud.fetchFn,
+    );
+
+    await expect(client.getJson("/data")).rejects.toThrow(EnphaseAuthError);
+    expect(cloud.calls).toHaveLength(1); // the failed login
+
+    await expect(client.getJson("/data")).rejects.toThrow(EnphaseAuthError);
+    expect(cloud.calls).toHaveLength(1); // no further cloud logins
+  });
+
   it("throws EnphaseAuthError on bad credentials", async () => {
     const cloud = makeFakeCloud({ token: "x", loginOk: false });
     const client = makeClient(
@@ -144,12 +160,14 @@ describe("EnphaseClient", () => {
       cloud.fetchFn,
     );
 
+    const err: unknown = await client.getJson("/production").catch((e) => e);
+    expect(err).toBeInstanceOf(EnphaseAuthError);
+    expect((err as Error).message).toContain("check email/password");
+    // A retry is refused by the cooldown rather than hitting Enlighten again.
     await expect(client.getJson("/production")).rejects.toThrow(
-      EnphaseAuthError,
+      "Pausing Enphase cloud token refresh",
     );
-    await expect(client.getJson("/production")).rejects.toThrow(
-      "check email/password",
-    );
+    expect(cloud.calls).toHaveLength(1);
   });
 
   it("throws EnphaseAuthError when a manual token is rejected", async () => {

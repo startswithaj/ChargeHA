@@ -64,6 +64,12 @@ export const queryClient = new QueryClient({
   }),
 });
 
+// vehicle.list is cheap and read by both main and plugin UIs, so keep it always-fresh.
+queryClient.setQueryDefaults([["vehicle", "list"]], {
+  staleTime: 0,
+  refetchOnMount: "always",
+});
+
 const createLinks = (): TRPCLink<AppRouter>[] => {
   if (isDemoBuild) return [demoLink()];
   return [

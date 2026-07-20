@@ -1,8 +1,7 @@
-import { Key, Wand2, Zap } from "lucide-react";
-import { Button, Card, Link, Switch, Text } from "@radix-ui/themes";
+import { Key, Zap } from "lucide-react";
+import { Card, Link, Switch, Text } from "@radix-ui/themes";
 import { trpc } from "../../../trpc.ts";
 import { version } from "../../../lib/version.ts";
-import { useRouter } from "../../../hooks/useRouter.ts";
 import {
   useChargingConfig,
   useChargingConfigMutation,
@@ -56,7 +55,6 @@ function VersionFooter() {
 // ── Main Settings Component ──
 
 export function Settings() {
-  const { navigate } = useRouter();
   const { data: charging, isLoading: chargingLoading } = useChargingConfig();
   const chargingMutation = useChargingConfigMutation();
   const {
@@ -67,7 +65,6 @@ export function Settings() {
     saveStatus: chargingSaveStatus,
   } = useDraftConfig(charging, chargingMutation);
 
-  const { data: wizardStatus = null } = trpc.wizard.status.useQuery();
   const { data: encryptionHealth } = trpc.health.encryption.useQuery();
   const encryptionMissing = encryptionHealth
     ? !encryptionHealth.configured
@@ -95,20 +92,6 @@ export function Settings() {
       </div>
 
       {encryptionMissing && <EncryptionWarning />}
-
-      {/* ═══ Setup Wizard ═══ */}
-      {wizardStatus !== null && (
-        <Button
-          size="2"
-          variant="soft"
-          onClick={() => {
-            navigate({ type: "wizard" });
-          }}
-        >
-          <Wand2 size={14} />
-          {wizardStatus.completed ? "Re-run Setup Wizard" : "Run Setup Wizard"}
-        </Button>
-      )}
 
       {/* ═══ Charging Control ═══ */}
       <SettingsSection

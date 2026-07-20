@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button, Text } from "@radix-ui/themes";
 import { Check, Copy } from "lucide-react";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import { stepStyles as styles } from "../../../hostUi.ts";
 
 export const WELL_KNOWN_PATH =
   ".well-known/appspecific/com.tesla.3p.public-key.pem";
@@ -32,6 +32,17 @@ export function CopyButton({ text, label }: { text: string; label?: string }) {
       {copied ? <Check size={14} /> : <Copy size={14} />}
       {copied ? "Copied" : (label ?? "Copy")}
     </Button>
+  );
+}
+
+function PublicKeyBlock({ publicKey }: { publicKey: string }) {
+  return (
+    <>
+      <pre className={styles.codeBlock}>{publicKey}</pre>
+      <div className={styles.copyRow}>
+        <CopyButton text={publicKey} label="Copy public key" />
+      </div>
+    </>
   );
 }
 
@@ -79,9 +90,7 @@ export function SelfHostInstructions({ publicKey }: HostingInstructionsProps) {
           <Text as="span" size="2">
             Copy your public key into the PEM file:
           </Text>
-          <div className={styles.copyRow}>
-            <CopyButton text={publicKey} label="Copy public key" />
-          </div>
+          <PublicKeyBlock publicKey={publicKey} />
         </li>
         <li>
           <Text as="span" size="2">
@@ -120,9 +129,7 @@ export function GitHubPagesInstructions(
           <Text as="span" size="2">
             Copy your public key into the PEM file:
           </Text>
-          <div className={styles.copyRow}>
-            <CopyButton text={publicKey} label="Copy public key" />
-          </div>
+          <PublicKeyBlock publicKey={publicKey} />
         </li>
         <li>
           <Text as="span" size="2">
@@ -136,6 +143,46 @@ export function GitHubPagesInstructions(
           <Text as="span" size="2">
             Enable GitHub Pages in repository Settings → Pages → Source: main
             branch
+          </Text>
+        </li>
+      </ol>
+    </div>
+  );
+}
+
+export function FleetKeyInstructions(
+  { publicKey }: HostingInstructionsProps,
+) {
+  return (
+    <div className={styles.instructionBox}>
+      <Text as="p" size="2" weight="medium">
+        Host your public key on FleetKey.net (free, by Teslemetry):
+      </Text>
+      <ol className={styles.instructionList}>
+        <li>
+          <Text as="span" size="2">
+            Copy your public key:
+          </Text>
+          <div className={styles.copyRow}>
+            <CopyButton text={publicKey} label="Copy public key" />
+          </div>
+        </li>
+        <li>
+          <Text as="span" size="2">
+            Go to{" "}
+            <a
+              href="https://fleetkey.net"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              fleetkey.net
+            </a>, paste the key, and click Create.
+          </Text>
+        </li>
+        <li>
+          <Text as="span" size="2">
+            You'll get a domain like <code>abc12.fleetkey.net</code>{" "}
+            — verify it below.
           </Text>
         </li>
       </ol>

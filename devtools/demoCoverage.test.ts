@@ -6,11 +6,14 @@
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createAppRouter } from "../packages/server/src/trpc/root.ts";
-import { teslaRouter } from "../packages/plugins/vehicles/tesla/server/router.ts";
-import { simulatedRouter } from "../packages/plugins/vehicles/simulated/server/router.ts";
-import { froniusLocalRouter } from "../packages/plugins/energy/fronius-local/server/router.ts";
-import { froniusCloudRouter } from "../packages/plugins/energy/fronius-cloud/server/router.ts";
-import { simulatedEnergyRouter } from "../packages/plugins/energy/simulated/server/router.ts";
+import { createTeslaRouter } from "../packages/plugins/vehicles/tesla/server/router.ts";
+import type { TeslaVehiclePlugin } from "../packages/plugins/vehicles/tesla/server/index.ts";
+import { createSimulatedRouter } from "../packages/plugins/vehicles/simulated/server/router.ts";
+import type { SimulatedVehiclePlugin } from "../packages/plugins/vehicles/simulated/server/index.ts";
+import { createFroniusLocalRouter } from "../packages/plugins/energy/fronius-local/server/router.ts";
+import { createFroniusCloudRouter } from "../packages/plugins/energy/fronius-cloud/server/router.ts";
+import { createSimulatedEnergyRouter } from "../packages/plugins/energy/simulated/server/router.ts";
+import type { PluginDependencies } from "../packages/server/src/bootstrap/PluginDependencies.ts";
 import {
   GATED_MUTATIONS,
   GATED_QUERIES,
@@ -23,13 +26,28 @@ interface ProcedureDef {
   _def: { type: "query" | "mutation" | "subscription" };
 }
 
+// Procedures are never invoked here — only their _def shape is inspected.
+const stubDeps = (pluginId: string): PluginDependencies =>
+  ({ pluginId }) as unknown as PluginDependencies;
+
 const realPaths = (type: "query" | "mutation"): string[] => {
   const merged = createAppRouter({
-    vehicle: { tesla: teslaRouter, simulated: simulatedRouter },
+    vehicle: {
+      tesla: createTeslaRouter(
+        {} as unknown as TeslaVehiclePlugin,
+        stubDeps("tesla"),
+      ),
+      simulated: createSimulatedRouter(
+        {} as unknown as SimulatedVehiclePlugin,
+        stubDeps("simulated"),
+      ),
+    },
     energy: {
-      fronius_local: froniusLocalRouter,
-      fronius_cloud: froniusCloudRouter,
-      simulated_energy: simulatedEnergyRouter,
+      fronius_local: createFroniusLocalRouter(stubDeps("fronius_local")),
+      fronius_cloud: createFroniusCloudRouter(stubDeps("fronius_cloud")),
+      simulated_energy: createSimulatedEnergyRouter(
+        stubDeps("simulated_energy"),
+      ),
     },
   });
   const procedures = (merged as unknown as {

@@ -10,14 +10,18 @@ import {
 } from "lucide-react";
 import { useTeslaConfig } from "./useTeslaConfig.ts";
 import { trpc } from "./trpc.ts";
-import type { StepProps } from "../../../../client/src/components/Wizard/WizardShell.tsx";
 import { KeyImportForm } from "./KeyImportForm.tsx";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import {
+  advanceOnly,
+  type PluginStepDef,
+  stepStyles as styles,
+  type WizardNext,
+} from "../../../hostUi.ts";
 
 type Mode = "choose" | "generate" | "import";
 
 function SuccessView(
-  { mode, onNext }: { mode: Mode; onNext: () => void },
+  { mode }: { mode: Mode },
 ) {
   return (
     <div className={styles.stepContainer}>
@@ -34,11 +38,14 @@ function SuccessView(
           and stored successfully.
         </Callout.Text>
       </Callout.Root>
-      <div className={styles.stepActions}>
-        <Button onClick={onNext}>Continue</Button>
-      </div>
     </div>
   );
+}
+
+function keyGenHint(isSuccess: boolean, hasExistingKeys: boolean): string {
+  if (isSuccess) return "Key pair stored — Next continues";
+  if (hasExistingKeys) return "Next continues with the existing key pair";
+  return "Generate or import a key pair to continue";
 }
 
 function ChooseModeCards(
@@ -104,11 +111,61 @@ function ErrorCallout(
   );
 }
 
-export function KeyGenerationStep({ onNext }: StepProps): JSX.Element {
+/** Key generation writes the key pair server-side — invalidate the config
+ *  cache so later steps (hosting instructions, AI prompt) see the new key. */
+function useKeyMutations() {
+  const utils = trpc.useUtils();
+  const onKeysChanged = () => utils.plugin.vehicle.tesla.getConfig.invalidate();
+  return {
+    generateMutation: trpc.plugin.vehicle.tesla.generateKeys.useMutation({
+      onSuccess: onKeysChanged,
+    }),
+    importMutation: trpc.plugin.vehicle.tesla.importKeys.useMutation({
+      onSuccess: onKeysChanged,
+    }),
+  };
+}
+
+export const keyGenerationStep: PluginStepDef = {
+  id: "tesla-key-generation",
+  label: "Key Generation",
+  useStep: () => {
+    const keys = useKeyGeneration();
+    return {
+      next: keyGenNext(
+        keys.configLoading,
+        keys.isSuccess,
+        keys.hasExistingKeys,
+      ),
+      view: keys.isSuccess
+        ? <SuccessView mode={keys.mode} />
+        : <KeyGenerationView {...keys} />,
+    };
+  },
+};
+
+function keyGenNext(
+  loading: boolean,
+  isSuccess: boolean,
+  hasExistingKeys: boolean,
+): WizardNext {
+  if (isSuccess || hasExistingKeys) {
+    return {
+      kind: "ready",
+      hint: keyGenHint(isSuccess, hasExistingKeys),
+      onNext: advanceOnly,
+    };
+  }
+  if (loading) return { kind: "loading" };
+  return { kind: "blocked", reason: keyGenHint(isSuccess, hasExistingKeys) };
+}
+
+function useKeyGeneration() {
   const [mode, setMode] = useState<Mode>("choose");
   const { data: teslaConfig } = useTeslaConfig();
   const hasExistingKeys = !!teslaConfig?.ecPublicKeyPem;
-  const encryptionQuery = trpc.health.encryption.useQuery();
+  const encryptionQuery = trpc.plugin.vehicle.tesla.encryptionStatus
+    .useQuery();
   const hasEncryptionKey = encryptionQuery.data?.configured ?? true;
 
   const resetToChoose = () => {
@@ -117,23 +174,42 @@ export function KeyGenerationStep({ onNext }: StepProps): JSX.Element {
     importMutation.reset();
   };
 
-  const generateMutation = trpc.tesla.generateKeys.useMutation();
-
-  const importMutation = trpc.tesla.importKeys.useMutation();
+  const { generateMutation, importMutation } = useKeyMutations();
 
   const handleGenerate = () => {
     setMode("generate");
     generateMutation.mutate();
   };
 
-  const isSuccess = generateMutation.isSuccess || importMutation.isSuccess;
-  const isPending = generateMutation.isPending || importMutation.isPending;
-  const error = generateMutation.error ?? importMutation.error;
+  return {
+    mode,
+    setImport: () => setMode("import"),
+    resetToChoose,
+    handleGenerate,
+    handleImport: (publicKeyPem: string, privateKeyPem: string) =>
+      importMutation.mutate({ publicKeyPem, privateKeyPem }),
+    hasExistingKeys,
+    hasEncryptionKey,
+    configLoading: teslaConfig === undefined,
+    isSuccess: generateMutation.isSuccess || importMutation.isSuccess,
+    isPending: generateMutation.isPending || importMutation.isPending,
+    error: generateMutation.error ?? importMutation.error,
+  };
+}
 
-  if (isSuccess) {
-    return <SuccessView mode={mode} onNext={onNext} />;
-  }
-
+function KeyGenerationView(
+  {
+    mode,
+    setImport,
+    resetToChoose,
+    handleGenerate,
+    handleImport,
+    hasExistingKeys,
+    hasEncryptionKey,
+    isPending,
+    error,
+  }: ReturnType<typeof useKeyGeneration>,
+) {
   return (
     <div className={styles.stepContainer}>
       <Text as="p" size="3" color="gray">
@@ -167,16 +243,10 @@ export function KeyGenerationStep({ onNext }: StepProps): JSX.Element {
         </Callout.Root>
       )}
 
-      {hasExistingKeys && mode === "choose" && (
-        <div className={styles.stepActions}>
-          <Button onClick={onNext}>Continue with existing keys</Button>
-        </div>
-      )}
-
       {mode === "choose" && (
         <ChooseModeCards
           handleGenerate={handleGenerate}
-          setImport={() => setMode("import")}
+          setImport={setImport}
         />
       )}
 
@@ -192,11 +262,7 @@ export function KeyGenerationStep({ onNext }: StepProps): JSX.Element {
       {mode === "import" && (
         <KeyImportForm
           isPending={isPending}
-          onImport={(pub, priv) =>
-            importMutation.mutate({
-              publicKeyPem: pub,
-              privateKeyPem: priv,
-            })}
+          onImport={handleImport}
           onBack={resetToChoose}
         />
       )}

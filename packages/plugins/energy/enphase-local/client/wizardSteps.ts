@@ -1,16 +1,9 @@
-import type {
-  EnergyPluginOption,
-  PluginWizardStep,
-} from "../../../componentRegistry.ts";
+import type { PluginStepDef } from "../../../hostUi.ts";
+import type { EnergyPluginOption } from "../../../componentRegistry.ts";
+import { enphaseLocalSetupStep } from "./EnphaseLocalSetupStep.tsx";
 
-/** Enphase wizard step definitions for the setup wizard. */
-export const enphaseLocalWizardSteps: PluginWizardStep[] = [
-  {
-    id: "enphase-local-setup",
-    label: "Enphase Setup",
-    componentKey: "enphase-local-setup",
-  },
-];
+/** Enphase wizard steps, in order. */
+export const enphaseLocalWizardSteps: PluginStepDef[] = [enphaseLocalSetupStep];
 
 /** Enphase option metadata for the inverter type selection step. */
 export const enphaseLocalOption: EnergyPluginOption = {

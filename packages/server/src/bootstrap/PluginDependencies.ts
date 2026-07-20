@@ -1,9 +1,38 @@
+import type { GeocodeResult } from "@chargeha/shared/geocode";
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { UpsertVehicleInput, VehicleRow } from "../db/types.ts";
 import type { VehicleManager } from "../services/VehicleManager.ts";
+import type { VehicleChargeState } from "@chargeha/shared";
+import type { VehicleRequestContext } from "@chargeha/plugins/types";
 import type { EnergyAdapterManager } from "../services/EnergyAdapterManager.ts";
+import {
+  enrichVehicleRows,
+  type VehicleWithLiveState,
+} from "../services/VehicleService.ts";
 import { createLogger, Logger } from "../lib/Logger.ts";
 import { PluginDbLogger } from "@chargeha/plugins/PluginDbLogger";
+
+/** Tunnel lifecycle exposed to plugins. URLs are live state, never persisted
+ *  — quick-tunnel URLs change on every start. */
+export interface PluginTunnelApi {
+  getUrl(): string | null;
+  start(): Promise<{ url: string }>;
+  stop(): Promise<void>;
+  /** Free-tier session limit of the tunnel provider, if any. */
+  getExpiryMinutes(): number | null;
+}
+
+/** Everything a PluginDependencies instance is built from. */
+export interface PluginDependenciesInit {
+  db: AppDatabase;
+  vehicleManager: VehicleManager;
+  energyManager: EnergyAdapterManager;
+  tunnel: PluginTunnelApi;
+  geocode: (query: string) => Promise<GeocodeResult>;
+  /** Whether ENCRYPTION_KEY is configured — secrets are stored encrypted. */
+  encryptionConfigured: () => boolean;
+  pluginId: string;
+}
 
 /**
  * Scoped dependencies injected into a plugin at construction time.
@@ -22,37 +51,40 @@ export class PluginDependencies<K extends string = string> {
   readonly pluginId: string;
   readonly log: Logger;
   readonly dbLog: PluginDbLogger;
+  readonly tunnel: PluginTunnelApi;
+  readonly geocode: (query: string) => Promise<GeocodeResult>;
+  /** Whether ENCRYPTION_KEY is configured — secrets are stored encrypted. */
+  readonly encryptionConfigured: () => boolean;
+  private readonly db: AppDatabase;
+  private readonly vehicleManager: VehicleManager;
+  private readonly energyManager: EnergyAdapterManager;
   private readonly prefix: string;
 
-  static create(
-    db: AppDatabase,
-    vehicleManager: VehicleManager,
-    energyManager: EnergyAdapterManager,
-    pluginId: string,
-  ): PluginDependencies {
-    return new PluginDependencies(db, vehicleManager, energyManager, pluginId);
+  static create(init: PluginDependenciesInit): PluginDependencies {
+    return new PluginDependencies(init);
   }
 
-  private constructor(
-    private readonly db: AppDatabase,
-    private readonly vehicleManager: VehicleManager,
-    private readonly energyManager: EnergyAdapterManager,
-    pluginId: string,
-  ) {
-    this.pluginId = pluginId;
-    this.prefix = `${pluginId}.`;
-    this.log = createLogger(`plugin:${pluginId}`);
+  private constructor(init: PluginDependenciesInit) {
+    this.db = init.db;
+    this.vehicleManager = init.vehicleManager;
+    this.energyManager = init.energyManager;
+    this.tunnel = init.tunnel;
+    this.geocode = init.geocode;
+    this.encryptionConfigured = init.encryptionConfigured;
+    this.pluginId = init.pluginId;
+    this.prefix = `${init.pluginId}.`;
+    this.log = createLogger(`plugin:${init.pluginId}`);
     this.dbLog = new PluginDbLogger(
       (entry) =>
         this.db.insertPluginLog({
-          pluginId,
+          pluginId: init.pluginId,
           level: entry.level,
           message: entry.message,
           payload: entry.payload,
           origin: entry.origin,
           traceId: entry.traceId,
         }),
-      createLogger(`plugin:${pluginId}:dblog`),
+      createLogger(`plugin:${init.pluginId}:dblog`),
     );
   }
 
@@ -81,24 +113,68 @@ export class PluginDependencies<K extends string = string> {
     return all.filter((v) => v.adapterType === this.pluginId);
   }
 
-  getVehicleRow(id: string): Promise<VehicleRow | null> {
-    return this.db.getVehicle(id);
+  /** This plugin's vehicles enriched with live state, location, and last
+   *  error — the same shape the main app's vehicle list uses. */
+  async getVehiclesWithState(): Promise<VehicleWithLiveState[]> {
+    return await enrichVehicleRows(
+      await this.getVehicleRows(),
+      this.vehicleManager,
+    );
   }
 
-  upsertVehicleRow(input: UpsertVehicleInput): Promise<void> {
-    return this.db.upsertVehicle(input);
+  /** Request fresh state for one of this plugin's vehicles. Rejects ids
+   *  belonging to other plugins. */
+  async requestVehicleState(
+    vehicleId: string,
+    context: VehicleRequestContext,
+  ): Promise<VehicleChargeState | null> {
+    const row = await this.db.getVehicle(vehicleId);
+    if (!row || row.adapterType !== this.pluginId) {
+      throw new Error(
+        `Vehicle ${vehicleId} does not belong to plugin ${this.pluginId}`,
+      );
+    }
+    return await this.vehicleManager.requestState(vehicleId, context);
+  }
+
+  /** One of this plugin's vehicle rows, or null when the id doesn't exist
+   *  or belongs to another plugin. */
+  async getVehicleRow(id: string): Promise<VehicleRow | null> {
+    const row = await this.db.getVehicle(id);
+    return row?.adapterType === this.pluginId ? row : null;
+  }
+
+  /** Upsert a vehicle for this plugin. The adapter type is stamped with the
+   *  plugin's own id — a plugin cannot write another plugin's vehicles. */
+  upsertVehicleRow(
+    input: Omit<UpsertVehicleInput, "adapterType">,
+  ): Promise<void> {
+    return this.db.upsertVehicle({ ...input, adapterType: this.pluginId });
   }
 
   // ── Vehicle lifecycle (notify VehicleManager) ────────────────────────
 
-  addVehicle(row: VehicleRow): Promise<void> {
-    return this.vehicleManager.addVehicle(row);
+  /** Register one of this plugin's vehicles with VehicleManager. The adapter
+   *  type is stamped with the plugin's own id — a plugin cannot register
+   *  another plugin's vehicles. */
+  addVehicle(row: Omit<VehicleRow, "adapterType">): Promise<void> {
+    return this.vehicleManager.addVehicle({
+      ...row,
+      adapterType: this.pluginId,
+    });
   }
 
-  /** Permanently delete a vehicle: drops live state, deletes the row
-   *  (cascading its schedules), and renumbers remaining priorities. */
-  deleteVehicle(id: string): Promise<void> {
-    return this.vehicleManager.deleteVehicle(id);
+  /** Permanently delete one of this plugin's vehicles: drops live state,
+   *  deletes the row (cascading its schedules), and renumbers remaining
+   *  priorities. Rejects ids belonging to other plugins. */
+  async deleteVehicle(id: string): Promise<void> {
+    const row = await this.db.getVehicle(id);
+    if (!row || row.adapterType !== this.pluginId) {
+      throw new Error(
+        `Vehicle ${id} does not belong to plugin ${this.pluginId}`,
+      );
+    }
+    await this.vehicleManager.deleteVehicle(id);
   }
 
   // ── Simulated load (Simulated plugin only) ───────────────────────────

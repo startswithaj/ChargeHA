@@ -2,10 +2,13 @@ import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { HealthService } from "./HealthService.ts";
 import type { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
+import { EnergyPluginRegistry } from "@chargeha/server/bootstrap/EnergyPluginRegistry";
 import type { PluginHealthCheck } from "@chargeha/plugins/types";
 import { throwingMock } from "../test-helpers/throwingMock.ts";
 
 describe("HealthService", () => {
+  const emptyEnergyRegistry = new EnergyPluginRegistry();
+
   const createMockRegistry = (
     checks: PluginHealthCheck[] = [],
   ): VehiclePluginRegistry =>
@@ -15,19 +18,31 @@ describe("HealthService", () => {
 
   describe("checkEncryption", () => {
     it("returns configured: false when encryptionKey is null", () => {
-      const service = new HealthService(createMockRegistry(), null);
+      const service = new HealthService(
+        createMockRegistry(),
+        emptyEnergyRegistry,
+        null,
+      );
       expect(service.checkEncryption()).toEqual({ configured: false });
     });
 
     it("returns configured: true when encryptionKey is set", () => {
-      const service = new HealthService(createMockRegistry(), "test-key");
+      const service = new HealthService(
+        createMockRegistry(),
+        emptyEnergyRegistry,
+        "test-key",
+      );
       expect(service.checkEncryption()).toEqual({ configured: true });
     });
   });
 
   describe("getPluginWarnings", () => {
     it("returns empty array when no health checks", async () => {
-      const service = new HealthService(createMockRegistry([]), null);
+      const service = new HealthService(
+        createMockRegistry([]),
+        emptyEnergyRegistry,
+        null,
+      );
       const result = await service.getPluginWarnings();
       expect(result).toEqual([]);
     });
@@ -39,7 +54,11 @@ describe("HealthService", () => {
         warningMessage: "Something broke",
         run: () => Promise.resolve({ status: "ok" }),
       }];
-      const service = new HealthService(createMockRegistry(checks), null);
+      const service = new HealthService(
+        createMockRegistry(checks),
+        emptyEnergyRegistry,
+        null,
+      );
       const result = await service.getPluginWarnings();
       expect(result).toEqual([]);
     });
@@ -52,7 +71,11 @@ describe("HealthService", () => {
         run: () =>
           Promise.resolve({ status: "error", message: "not reachable" }),
       }];
-      const service = new HealthService(createMockRegistry(checks), null);
+      const service = new HealthService(
+        createMockRegistry(checks),
+        emptyEnergyRegistry,
+        null,
+      );
       const result = await service.getPluginWarnings();
       expect(result).toEqual([
         { title: "Proxy Down", message: "Cannot reach proxy" },
@@ -67,7 +90,11 @@ describe("HealthService", () => {
         warningMessage: "Service timed out",
         run: () => new Promise(() => {}), // Never resolves
       }];
-      const service = new HealthService(createMockRegistry(checks), null);
+      const service = new HealthService(
+        createMockRegistry(checks),
+        emptyEnergyRegistry,
+        null,
+      );
       const result = await service.getPluginWarnings();
       expect(result).toEqual([
         { title: "Slow Service", message: "Service timed out" },
@@ -81,7 +108,11 @@ describe("HealthService", () => {
         warningMessage: "Cannot connect",
         run: () => Promise.reject(new Error("connection refused")),
       }];
-      const service = new HealthService(createMockRegistry(checks), null);
+      const service = new HealthService(
+        createMockRegistry(checks),
+        emptyEnergyRegistry,
+        null,
+      );
       const result = await service.getPluginWarnings();
       expect(result).toEqual([
         { title: "Connection Error", message: "Cannot connect" },
@@ -94,7 +125,11 @@ describe("HealthService", () => {
         run: () =>
           Promise.resolve({ status: "error", message: "not reachable" }),
       }];
-      const service = new HealthService(createMockRegistry(checks), null);
+      const service = new HealthService(
+        createMockRegistry(checks),
+        emptyEnergyRegistry,
+        null,
+      );
       const result = await service.getPluginWarnings();
       expect(result).toEqual([]);
     });
@@ -114,7 +149,11 @@ describe("HealthService", () => {
           run: () => Promise.resolve({ status: "error", message: "down" }),
         },
       ];
-      const service = new HealthService(createMockRegistry(checks), null);
+      const service = new HealthService(
+        createMockRegistry(checks),
+        emptyEnergyRegistry,
+        null,
+      );
       const result = await service.getPluginWarnings();
       expect(result).toEqual([
         { title: "Fail Warning", message: "This should appear" },

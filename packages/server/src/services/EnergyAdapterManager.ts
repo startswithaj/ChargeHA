@@ -198,9 +198,7 @@ export class EnergyAdapterManager implements EnergySourceAdapter {
       this.logger.warn(
         `Energy plugin "${adapterType}" failed to create adapter: ${err} — falling back to none`,
       );
-      // The user's selection stands — only its config is incomplete. Keeping
-      // the type active means later writes to its keys retry the build
-      // (fresh wizard runs select the source before saving its host).
+      // Keep the selected type active so later writes to its keys retry the build.
       this.activeType = adapterType;
       return new NullEnergyAdapter(new Logger("NullEnergy"));
     }

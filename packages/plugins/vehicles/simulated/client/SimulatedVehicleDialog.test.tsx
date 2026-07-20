@@ -26,8 +26,12 @@ vi.mock("./trpc.ts", () => ({
   trpc: {
     useUtils: () => ({
       client: {
-        config: {
-          geocode: { query: mockGeocodeQuery },
+        plugin: {
+          vehicle: {
+            simulated: {
+              geocode: { query: mockGeocodeQuery },
+            },
+          },
         },
       },
     }),

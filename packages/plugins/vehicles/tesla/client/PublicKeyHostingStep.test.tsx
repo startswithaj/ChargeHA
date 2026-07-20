@@ -2,9 +2,9 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../../client/src/test-utils.tsx";
-import { PublicKeyHostingStep } from "./PublicKeyHostingStep.tsx";
+import { publicKeyHostingStep } from "./PublicKeyHostingStep.tsx";
 import { trpc } from "./trpc.ts";
-import { makeStepProps } from "./test-helpers/stepProps.ts";
+import { StepNextHarness } from "../../../../client/src/components/Wizard/steps/test-helpers/StepNextHarness.tsx";
 
 const mocks = vi.hoisted(() => ({
   teslaSetConfigMutateAsync: vi.fn(),
@@ -12,47 +12,66 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("./trpc.ts", () => ({
   trpc: {
-    tesla: {
-      getConfig: {
-        useQuery: vi.fn(() => ({
-          data: { ecPublicKeyPem: "", teslaPublicKeyDomain: "" },
-          isLoading: false,
-          error: null,
-        })),
-      },
-      setConfig: {
-        useMutation: vi.fn(() => ({
-          mutate: vi.fn(),
-          mutateAsync: mocks.teslaSetConfigMutateAsync,
-          isPending: false,
-          isSuccess: false,
-          isError: false,
-          error: null,
-          data: undefined,
-          reset: vi.fn(),
-        })),
-      },
-    },
-    wizard: {
-      tunnelStatus: {
-        useQuery: vi.fn(() => ({
-          data: { active: false, url: null },
-          isLoading: false,
-          refetch: vi.fn(),
-        })),
-      },
-      startTunnel: {
-        useMutation: vi.fn(() => ({
-          mutate: vi.fn(),
-          isPending: false,
-          error: null,
-        })),
+    plugin: {
+      vehicle: {
+        tesla: {
+          getConfig: {
+            useQuery: vi.fn(() => ({
+              data: { ecPublicKeyPem: "", teslaPublicKeyDomain: "" },
+              isLoading: false,
+              error: null,
+            })),
+          },
+          teslaStatus: {
+            useQuery: vi.fn(() => ({
+              data: { authenticated: false, keyPaired: null },
+              isLoading: false,
+            })),
+          },
+          setConfig: {
+            useMutation: vi.fn(() => ({
+              mutate: vi.fn(),
+              mutateAsync: mocks.teslaSetConfigMutateAsync,
+              isPending: false,
+              isSuccess: false,
+              isError: false,
+              error: null,
+              data: undefined,
+              reset: vi.fn(),
+            })),
+          },
+          tunnelStatus: {
+            useQuery: vi.fn(() => ({
+              data: { active: false, url: null },
+              isLoading: false,
+              refetch: vi.fn(),
+            })),
+          },
+          startTunnel: {
+            useMutation: vi.fn(() => ({
+              mutate: vi.fn(),
+              isPending: false,
+              error: null,
+            })),
+          },
+          stopTunnel: {
+            useMutation: vi.fn(() => ({
+              mutate: vi.fn(),
+              isPending: false,
+              error: null,
+            })),
+          },
+        },
       },
     },
     useUtils: vi.fn(() => ({
-      tesla: {
-        getConfig: {
-          invalidate: vi.fn(),
+      plugin: {
+        vehicle: {
+          tesla: {
+            getConfig: {
+              invalidate: vi.fn(),
+            },
+          },
         },
       },
     })),
@@ -72,7 +91,7 @@ describe("PublicKeyHostingStep", () => {
   let originalFetch: typeof globalThis.fetch;
 
   function setTunnel(active: boolean, url: string | null): void {
-    vi.mocked(trpc.wizard.tunnelStatus.useQuery).mockReturnValue({
+    vi.mocked(trpc.plugin.vehicle.tesla.tunnelStatus.useQuery).mockReturnValue({
       data: { active, url },
       isLoading: false,
       refetch: vi.fn(),
@@ -83,9 +102,10 @@ describe("PublicKeyHostingStep", () => {
     vi.clearAllMocks();
     originalFetch = globalThis.fetch;
 
-    vi.mocked(trpc.tesla.getConfig.useQuery).mockReturnValue({
+    vi.mocked(trpc.plugin.vehicle.tesla.getConfig.useQuery).mockReturnValue({
       data: {
         teslaPublicKeyDomain: "https://chargeha.example.com",
+        teslaPublicKeyHosting: "custom",
         ecPublicKeyPem: TEST_PUBLIC_KEY,
       },
       isLoading: false,
@@ -99,13 +119,14 @@ describe("PublicKeyHostingStep", () => {
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
+    vi.unstubAllGlobals();
     cleanup();
   });
 
   // ---- Initial render ----
 
   it("renders internet-accessible yes/no question", async () => {
-    renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={publicKeyHostingStep} />);
 
     await waitFor(() => {
       expect(
@@ -119,8 +140,27 @@ describe("PublicKeyHostingStep", () => {
 
   // ---- User interactions ----
 
+  /** The Yes flow needs an origin Tesla could reach — jsdom's localhost
+   *  origin correctly disables it, so stub a public https origin. */
+  const stubPublicOrigin = () =>
+    vi.stubGlobal("location", {
+      origin: "https://chargeha.example.com",
+    } as Location);
+
+  it("hints that Tesla likely can't reach an unreachable browser origin", () => {
+    // jsdom origin is http://localhost:3000 — unreachable from Tesla.
+    renderWithProviders(<StepNextHarness def={publicKeyHostingStep} />);
+
+    expect(screen.getByText(/likely can't fetch the key from this address/))
+      .toBeInTheDocument();
+    // Yes stays clickable — the hint advises, it doesn't block.
+    expect(screen.getByLabelText("Yes, internet accessible"))
+      .not.toHaveAttribute("aria-disabled", "true");
+  });
+
   it("selecting Yes shows public key URL using browser origin", async () => {
-    renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
+    stubPublicOrigin();
+    renderWithProviders(<StepNextHarness def={publicKeyHostingStep} />);
 
     fireEvent.click(
       screen.getByLabelText("Yes, internet accessible"),
@@ -137,7 +177,7 @@ describe("PublicKeyHostingStep", () => {
   });
 
   it("selecting No shows 3 hosting method options", async () => {
-    renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={publicKeyHostingStep} />);
 
     fireEvent.click(
       screen.getByLabelText("No, not internet accessible"),
@@ -155,7 +195,7 @@ describe("PublicKeyHostingStep", () => {
     ["Host on GitHub Pages", /Host your public key on GitHub Pages/],
     ["Set it up with AI", /Copy this prompt and paste it into/],
   ])("%s shows method-specific instructions", async (label, expected) => {
-    renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={publicKeyHostingStep} />);
 
     fireEvent.click(screen.getByLabelText("No, not internet accessible"));
 
@@ -178,8 +218,9 @@ describe("PublicKeyHostingStep", () => {
       text: () => Promise.resolve(TEST_PUBLIC_KEY),
     });
     globalThis.fetch = mockFetch;
+    stubPublicOrigin();
 
-    renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={publicKeyHostingStep} />);
 
     fireEvent.click(
       screen.getByLabelText("Yes, internet accessible"),
@@ -196,6 +237,7 @@ describe("PublicKeyHostingStep", () => {
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
         `${expectedOrigin}/.well-known/appspecific/com.tesla.3p.public-key.pem`,
+        { cache: "no-store" },
       );
     });
 
@@ -211,12 +253,12 @@ describe("PublicKeyHostingStep", () => {
   it("shows tunnel auto-display when tunnel is active", async () => {
     setTunnel(true, "https://test-tunnel.trycloudflare.com");
 
-    renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={publicKeyHostingStep} />);
 
     await waitFor(() => {
       expect(
         screen.getByText(
-          /Your public key is being served via the Cloudflare Tunnel/,
+          /Your public key is being served via the tunnel/,
         ),
       ).toBeInTheDocument();
     });
@@ -230,14 +272,15 @@ describe("PublicKeyHostingStep", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("shows 'Use Cloudflare Tunnel' as a hosting option in No flow", async () => {
-    renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
+  it("shows the tunnel as a hosting option in No flow", async () => {
+    renderWithProviders(<StepNextHarness def={publicKeyHostingStep} />);
 
     fireEvent.click(screen.getByLabelText("No, not internet accessible"));
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Use Cloudflare Tunnel"))
+      expect(screen.getByLabelText("Use a temporary tunnel"))
         .toBeInTheDocument();
+      expect(screen.getByLabelText("Host on FleetKey.net")).toBeInTheDocument();
       expect(screen.getByLabelText("Host it myself")).toBeInTheDocument();
       expect(screen.getByLabelText("Host on GitHub Pages")).toBeInTheDocument();
       expect(screen.getByLabelText("Set it up with AI")).toBeInTheDocument();
@@ -245,16 +288,16 @@ describe("PublicKeyHostingStep", () => {
   });
 
   it("selecting tunnel option shows Start Tunnel button", async () => {
-    renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={publicKeyHostingStep} />);
 
     fireEvent.click(screen.getByLabelText("No, not internet accessible"));
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Use Cloudflare Tunnel"))
+      expect(screen.getByLabelText("Use a temporary tunnel"))
         .toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByLabelText("Use Cloudflare Tunnel"));
+    fireEvent.click(screen.getByLabelText("Use a temporary tunnel"));
 
     await waitFor(() => {
       expect(
@@ -272,7 +315,7 @@ describe("PublicKeyHostingStep", () => {
     });
     globalThis.fetch = mockFetch;
 
-    renderWithProviders(<PublicKeyHostingStep {...makeStepProps()} />);
+    renderWithProviders(<StepNextHarness def={publicKeyHostingStep} />);
 
     // Select No → Host it myself
     fireEvent.click(screen.getByLabelText("No, not internet accessible"));
@@ -294,12 +337,14 @@ describe("PublicKeyHostingStep", () => {
     await waitFor(() => {
       expect(mocks.teslaSetConfigMutateAsync).toHaveBeenCalledWith({
         teslaPublicKeyDomain: "https://myhost.example.com",
+        teslaPublicKeyHosting: "custom",
       });
     });
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
         "https://myhost.example.com/.well-known/appspecific/com.tesla.3p.public-key.pem",
+        { cache: "no-store" },
       );
     });
   });

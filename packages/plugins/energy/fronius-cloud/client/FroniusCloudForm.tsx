@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Button, Text, TextField } from "@radix-ui/themes";
 import { Loader2 } from "lucide-react";
 import { trpc } from "./trpc.ts";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import { stepStyles as styles } from "../../../hostUi.ts";
 import type { TestStatus } from "../../InverterSetupShared.tsx";
 import { TestResultBadge } from "../../InverterSetupShared.tsx";
 
@@ -85,13 +85,14 @@ export function FroniusCloudForm({
   const [cloudPassword, setCloudPassword] = useState("");
   const [pvSystemId, setPvSystemId] = useState(initialPvSystemId);
 
-  const testMutation = trpc.energy.fronius_cloud.testConnection.useMutation({
-    onSuccess: (data: { success: boolean }) => {
-      if (data.success) {
-        onTestSuccess(cloudEmail, cloudPassword, pvSystemId);
-      }
-    },
-  });
+  const testMutation = trpc.plugin.energy.fronius_cloud.testConnection
+    .useMutation({
+      onSuccess: (data: { success: boolean }) => {
+        if (data.success) {
+          onTestSuccess(cloudEmail, cloudPassword, pvSystemId);
+        }
+      },
+    });
 
   const testResult: TestStatus = useMemo(() => {
     if (testMutation.isPending) return { status: "testing" };

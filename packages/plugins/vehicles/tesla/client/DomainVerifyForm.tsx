@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Button, Callout, Text } from "@radix-ui/themes";
 import { AlertCircle, CheckCircle } from "lucide-react";
 import { useTeslaConfigMutation } from "./useTeslaConfig.ts";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import { stepStyles as styles } from "../../../hostUi.ts";
 
 interface DomainVerifyFormProps {
   publicKey: string;
@@ -61,10 +61,11 @@ export function DomainVerifyForm({
         : stripped;
       await teslaMutation.mutateAsync({
         teslaPublicKeyDomain: cleanDomain,
+        teslaPublicKeyHosting: "custom",
       });
       setExternalDomain(cleanDomain);
 
-      const res = await fetch(publicKeyUrl);
+      const res = await fetch(publicKeyUrl, { cache: "no-store" });
       if (!res.ok) {
         throw new Error(`Failed to fetch public key: HTTP ${res.status}`);
       }
@@ -110,25 +111,6 @@ export function DomainVerifyForm({
           </Text>
         )}
       </div>
-
-      <Callout.Root color="amber" size="1">
-        <Callout.Icon>
-          <AlertCircle size={14} />
-        </Callout.Icon>
-        <Callout.Text>
-          This domain must be set as the <strong>Allowed Origin</strong> in your
-          {" "}
-          <a
-            href="https://developer.tesla.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Tesla Developer Portal
-          </a>{" "}
-          app settings. If you originally set it to your ChargeHA server
-          address, update it to this external domain instead.
-        </Callout.Text>
-      </Callout.Root>
 
       <div className={styles.verifyRow}>
         <Button

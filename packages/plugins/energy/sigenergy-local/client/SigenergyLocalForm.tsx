@@ -2,8 +2,8 @@ import { useMemo, useState } from "react";
 import { Button, Code, Text, TextField } from "@radix-ui/themes";
 import { Loader2, Search } from "lucide-react";
 import { trpc } from "./trpc.ts";
-import { Spinner } from "../../../../client/src/components/ui/Spinner.tsx";
-import styles from "../../../../client/src/components/Wizard/steps/steps.module.css";
+import { Spinner } from "../../../hostUi.ts";
+import { stepStyles as styles } from "../../../hostUi.ts";
 import type {
   SigenergyDevice,
   TestStatus,
@@ -92,7 +92,7 @@ function SearchSection(
     subnet: string;
     setSubnet: (v: string) => void;
     searchMutation: ReturnType<
-      typeof trpc.energy.sigenergy_local.discover.useMutation
+      typeof trpc.plugin.energy.sigenergy_local.discover.useMutation
     >;
     searchResults: SigenergyDevice[];
     onSelectDevice: (host: string) => void;
@@ -170,7 +170,7 @@ function SearchSection(
 
 function useTestStatus(
   testMutation: ReturnType<
-    typeof trpc.energy.sigenergy_local.testConnection.useMutation
+    typeof trpc.plugin.energy.sigenergy_local.testConnection.useMutation
   >,
 ): TestStatus {
   return useMemo(() => {
@@ -264,15 +264,17 @@ export function SigenergyLocalForm(
   });
   const [searchResults, setSearchResults] = useState<SigenergyDevice[]>([]);
 
-  const searchMutation = trpc.energy.sigenergy_local.discover.useMutation({
-    onSuccess: (result: { found: SigenergyDevice[] }) =>
-      setSearchResults(result.found),
-    onError: () => setSearchResults([]),
-  });
+  const searchMutation = trpc.plugin.energy.sigenergy_local.discover
+    .useMutation({
+      onSuccess: (result: { found: SigenergyDevice[] }) =>
+        setSearchResults(result.found),
+      onError: () => setSearchResults([]),
+    });
 
-  const testMutation = trpc.energy.sigenergy_local.testConnection.useMutation({
-    onSuccess: onTestSuccessHandler(onTestSuccess),
-  });
+  const testMutation = trpc.plugin.energy.sigenergy_local.testConnection
+    .useMutation({
+      onSuccess: onTestSuccessHandler(onTestSuccess),
+    });
 
   const testResult = useTestStatus(testMutation);
 

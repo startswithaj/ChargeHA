@@ -6,9 +6,7 @@ type WizardMutations = Pick<
   | "wizard.complete"
   | "wizard.demoSetup"
   | "wizard.setAuthMode"
-  | "wizard.setStep"
-  | "wizard.setVehicleType"
-  | "wizard.setEnergyType"
+  | "wizard.patchState"
 >;
 
 export const wizardMutations: WizardMutations = {
@@ -72,24 +70,19 @@ export const wizardMutations: WizardMutations = {
     return { success: true as const };
   },
 
-  "wizard.setStep": (input) => {
+  "wizard.patchState": (input) => {
     updateDemoState((m) => ({
       ...m,
-      config: { ...m.config, wizard_step: input.stepId },
-    }));
-  },
-
-  "wizard.setVehicleType": (input) => {
-    updateDemoState((m) => ({
-      ...m,
-      config: { ...m.config, wizard_vehicle_type: input.type },
-    }));
-  },
-
-  "wizard.setEnergyType": (input) => {
-    updateDemoState((m) => ({
-      ...m,
-      config: { ...m.config, wizard_energy_type: input.type },
+      config: {
+        ...m.config,
+        ...(input.stepId !== undefined ? { wizard_step: input.stepId } : {}),
+        ...(input.vehicleType !== undefined
+          ? { wizard_vehicle_type: input.vehicleType }
+          : {}),
+        ...(input.energyType !== undefined
+          ? { wizard_energy_type: input.energyType }
+          : {}),
+      },
     }));
   },
 };

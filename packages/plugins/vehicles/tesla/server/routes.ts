@@ -15,14 +15,20 @@ export function createTeslaHttpRoutes(
   // GET /callback — OAuth callback, exchanges code for tokens
   app.get("/callback", async (c) => {
     const code = c.req.query("code");
+    const state = c.req.query("state");
     if (!code) {
       return c.json({ error: "Missing authorization code" }, 400);
     }
+    if (!state) {
+      return c.json({ error: "Missing state parameter" }, 400);
+    }
 
     try {
-      // Use the same origin that was used to build the authorize URL
-      const origin = await deps.getConfig("oauth_origin") ||
-        new URL(c.req.url).origin;
+      // The exchange needs the exact redirect_uri from authorize time, so an unknown state can't proceed.
+      const origin = tokenManager.takeAuthOrigin(state);
+      if (origin === null) {
+        return c.json({ error: "Unrecognised or expired state" }, 400);
+      }
       await tokenManager.handleCallback(code, origin);
       // Return a page that closes itself — the original tab is polling for auth status
       return c.html(`<!DOCTYPE html>
@@ -36,7 +42,7 @@ export function createTeslaHttpRoutes(
         `<!DOCTYPE html>
 <html><body>
 <p>Authorization failed: ${
-          error instanceof Error ? error.message : String(error)
+          escapeHtml(error instanceof Error ? error.message : String(error))
         }</p>
 <p>You can close this tab and try again.</p>
 </body></html>`,
@@ -60,4 +66,13 @@ export function createTeslaHttpRoutes(
   });
 
   return app;
+}
+
+/** Escape for HTML text content — the callback renders Tesla's error bodies. */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
