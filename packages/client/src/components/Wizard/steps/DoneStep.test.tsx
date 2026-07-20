@@ -95,7 +95,7 @@ vi.mock("../../../trpc.ts", () => ({
 
 describe("DoneStep", () => {
   const makeStepProps = (overrides: Partial<StepProps> = {}): StepProps => ({
-    onNext: vi.fn(),
+    onAdvance: vi.fn(),
     onBack: vi.fn(),
     onSkipTo: vi.fn(),
     onSkipToEnd: vi.fn(),

@@ -206,7 +206,7 @@ function useAuthEffects(
   sessionRefetch: () => Promise<
     { data?: { authenticated: boolean; authMode: string } | undefined }
   >,
-  onNext: () => void,
+  advance: () => void,
   setSessionChecked: (v: boolean) => void,
 ) {
   useEffect(() => {
@@ -229,7 +229,7 @@ function useAuthEffects(
     sessionRefetch().then((result) => {
       const authMode = result.data?.authMode;
       if (result.data?.authenticated && authMode === "oidc") {
-        onNext();
+        advance();
         return;
       }
       // Pre-select only an explicitly configured mode. "none" is the server
@@ -243,7 +243,7 @@ function useAuthEffects(
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
-function useAuthStepState(onNext: () => void) {
+function useAuthStepState(advance: () => void) {
   const [selectedMode, setSelectedMode] = useState<AuthMode | null>(null);
   const [localForm, setLocalForm] = useState<LocalForm>({
     username: "",
@@ -261,8 +261,8 @@ function useAuthStepState(onNext: () => void) {
   const setAuthMode = trpc.wizard.setAuthMode.useMutation();
   const saveOidcConfig = trpc.wizard.saveOidcConfig.useMutation();
   // Depend on the stable mutate fns, not the mutation objects: react-query
-  // returns a fresh object each render, which would give handleBeforeNext a new
-  // identity every render and drive useWizardNextControl's effect into a loop.
+  // returns a fresh object each render, which would give the Next handler a new
+  // identity on every render and defeat its useCallback.
   const { mutateAsync: setAuthModeMutate } = setAuthMode;
   const { mutateAsync: saveOidcMutate } = saveOidcConfig;
   const sessionQuery = trpc.auth.session.useQuery(undefined, {
@@ -273,7 +273,7 @@ function useAuthStepState(onNext: () => void) {
     setSelectedMode,
     setValidationError,
     sessionQuery.refetch,
-    onNext,
+    advance,
     setSessionChecked,
   );
 
@@ -364,7 +364,7 @@ export const authStep: StepDef = {
   id: "authentication",
   label: "Authentication",
   useStep: (props) => {
-    const auth = useAuthStepState(props.onNext);
+    const auth = useAuthStepState(props.onAdvance);
     return {
       next: authNext(auth),
       view: <AuthModes {...auth} />,

@@ -1,10 +1,21 @@
 import type { ReactNode } from "react";
 import type { WizardNavState } from "@chargeha/shared";
 
+/** The wizard's single "move forward" operation. One mover, not two: when the
+ *  step and the shell both moved, the second recomputed the next step from
+ *  state that predated the first and silently overwrote it. */
+export type WizardAdvance = (selection?: Partial<WizardNavState>) => void;
+
 /** Navigation handed to every step by the wizard shell. Skip is not here: the
  *  shell owns that button and no step drives it. */
 export interface StepProps {
-  onNext: () => void;
+  /** Apply a selection (if any) and move to whatever step it leads to.
+   *
+   *  A selection can change which steps exist (picking Tesla adds Tesla's setup
+   *  steps), so the destination is a fact about the flow under the *new*
+   *  selection. Taking the change rather than a destination is why steps never
+   *  name their successor. Called with no argument, this is plain "next". */
+  onAdvance: WizardAdvance;
   onBack: () => void;
   /** Jump to a step by id. Steps are addressed by id everywhere — a position
    *  means something different depending on which plugins are selected. */
@@ -14,8 +25,12 @@ export interface StepProps {
 
 /** Runs when Next is clicked. Resolve to advance; throw to stay on the step —
  *  the thrown message is shown to the user as the reason, so it must read as
- *  one ("Could not reach the inverter"), not as an internal error. */
-export type WizardNextHandler = () => Promise<void>;
+ *  one ("Could not reach the inverter"), not as an internal error.
+ *
+ *  A selection step resolves with its selection instead of applying it itself.
+ *  The shell then applies selection and step id in one move: two movers meant
+ *  the second recomputed the next step from state that predated the first. */
+export type WizardNextHandler = () => Promise<Partial<WizardNavState> | void>;
 
 /** What a step's Next button is. */
 export type WizardNext =

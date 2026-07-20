@@ -18,7 +18,7 @@ export const welcomeStep: StepDef = {
   }),
 };
 
-function WelcomeContent({ onNext, onSkipToEnd }: StepProps) {
+function WelcomeContent({ onAdvance, onSkipToEnd }: StepProps) {
   const utils = trpc.useUtils();
 
   const demoSetupMutation = trpc.wizard.demoSetup.useMutation();
@@ -56,7 +56,7 @@ function WelcomeContent({ onNext, onSkipToEnd }: StepProps) {
       </Text>
 
       <div className={styles.welcomeButtons}>
-        <Button size="3" onClick={onNext}>
+        <Button size="3" onClick={() => onAdvance()}>
           <Zap size={18} />
           Full Setup
         </Button>

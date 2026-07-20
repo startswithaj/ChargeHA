@@ -1,5 +1,5 @@
 import { StepHost } from "../../StepHost.tsx";
-import type { StepDef, StepProps } from "../../flow.ts";
+import type { StepDef, StepProps, WizardAdvance } from "../../flow.ts";
 
 /**
  * Mounts one step the way the shell does — through the real StepHost, so the
@@ -9,7 +9,7 @@ import type { StepDef, StepProps } from "../../flow.ts";
 export function StepNextHarness(
   { def, onAdvance = () => {}, stepProps, isLastStep = false }: {
     def: StepDef;
-    onAdvance?: () => void;
+    onAdvance?: WizardAdvance;
     stepProps?: Partial<StepProps>;
     isLastStep?: boolean;
   },
@@ -18,7 +18,7 @@ export function StepNextHarness(
     <StepHost
       def={def}
       stepProps={{
-        onNext: () => {},
+        onAdvance,
         onBack: () => {},
         onSkipTo: () => {},
         onSkipToEnd: () => {},
@@ -33,7 +33,7 @@ export function StepNextHarness(
         onBack: () => {},
         onSkip: () => {},
       }}
-      advance={onAdvance}
+      onAdvance={onAdvance}
     />
   );
 }

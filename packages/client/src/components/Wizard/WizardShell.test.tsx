@@ -9,7 +9,6 @@ import {
   type WizardNext,
   type WizardStore,
 } from "./flow.ts";
-import { useWizardAdvance } from "./wizardAdvance.ts";
 
 describe("WizardShell", () => {
   const mockPatch = vi.fn();
@@ -592,25 +591,21 @@ describe("WizardShell", () => {
 
   describe("advance", () => {
     it("writes the selection and the step it leads to in one patch", () => {
-      const AdvancingStep = () => {
-        const advance = useWizardAdvance();
-        return (
-          <button
-            type="button"
-            onClick={() => advance({ vehicleType: "tesla" })}
-          >
-            pick tesla
-          </button>
-        );
-      };
       // Tesla's steps are in the list only while tesla is selected.
       const flow: StepDef[] = [
         {
           id: "vehicle-type",
           label: "Vehicle Type",
-          useStep: () => ({
+          useStep: ({ onAdvance }) => ({
             next: { kind: "ready", hint: null, onNext: advanceOnly },
-            view: <AdvancingStep />,
+            view: (
+              <button
+                type="button"
+                onClick={() => onAdvance({ vehicleType: "tesla" })}
+              >
+                pick
+              </button>
+            ),
           }),
         },
         {
@@ -631,7 +626,7 @@ describe("WizardShell", () => {
         <WizardShell flow={flow} store={makeStore()} basePath="/wizard" />,
       );
 
-      fireEvent.click(screen.getByRole("button", { name: "pick tesla" }));
+      fireEvent.click(screen.getByRole("button", { name: "pick" }));
 
       // The next step is read from the flow the new selection produces, so the
       // step id and the type that puts it in the list land together.
@@ -642,24 +637,20 @@ describe("WizardShell", () => {
     });
 
     it("skips a plugin's steps when the selection does not enable them", () => {
-      const AdvancingStep = () => {
-        const advance = useWizardAdvance();
-        return (
-          <button
-            type="button"
-            onClick={() => advance({ vehicleType: "simulated" })}
-          >
-            pick simulated
-          </button>
-        );
-      };
       const flow: StepDef[] = [
         {
           id: "vehicle-type",
           label: "Vehicle Type",
-          useStep: () => ({
+          useStep: ({ onAdvance }) => ({
             next: { kind: "ready", hint: null, onNext: advanceOnly },
-            view: <AdvancingStep />,
+            view: (
+              <button
+                type="button"
+                onClick={() => onAdvance({ vehicleType: "simulated" })}
+              >
+                pick
+              </button>
+            ),
           }),
         },
         {
@@ -680,7 +671,7 @@ describe("WizardShell", () => {
         <WizardShell flow={flow} store={makeStore()} basePath="/wizard" />,
       );
 
-      fireEvent.click(screen.getByRole("button", { name: "pick simulated" }));
+      fireEvent.click(screen.getByRole("button", { name: "pick" }));
 
       expect(mockPatch).toHaveBeenCalledWith({
         vehicleType: "simulated",

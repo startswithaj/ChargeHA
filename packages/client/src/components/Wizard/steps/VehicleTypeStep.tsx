@@ -6,7 +6,6 @@ import { vehiclePluginOptions } from "@chargeha/plugins/componentRegistry";
 import { trpc } from "../../../trpc.ts";
 import { demoMode } from "../../../lib/featureFlags.ts";
 import type { StepDef, WizardNext } from "../flow.ts";
-import { useWizardAdvance, type WizardAdvance } from "../wizardAdvance.ts";
 import { OptionCard } from "./OptionCard.tsx";
 import styles from "./steps.module.css";
 
@@ -18,9 +17,8 @@ const icons = {
 export const vehicleTypeStep: StepDef = {
   id: "vehicle-type",
   label: "Vehicle Type",
-  useStep: () => {
+  useStep: ({ onAdvance }) => {
     const { state, isLoading } = useWizardState();
-    const advance = useWizardAdvance();
     const utils = trpc.useUtils();
     const pendingIdRef = useRef<string | null>(null);
 
@@ -36,7 +34,7 @@ export const vehicleTypeStep: StepDef = {
         pendingIdRef.current = null;
         // Throwing here would surface as an unhandled rejection rather than
         // anything an error boundary catches — the selection just won't advance.
-        if (id) advance({ vehicleType: id });
+        if (id) onAdvance({ vehicleType: id });
       },
     });
 
@@ -48,14 +46,13 @@ export const vehicleTypeStep: StepDef = {
         demoSetupMutation.mutate({ adapterType: id });
         return;
       }
-      advance({ vehicleType: id });
+      onAdvance({ vehicleType: id });
     };
 
     return {
       next: vehicleTypeNext(
         vehiclesData === undefined || isLoading,
         selectedType,
-        advance,
       ),
       view: (
         <VehicleTypeCards
@@ -72,20 +69,18 @@ export const vehicleTypeStep: StepDef = {
 function vehicleTypeNext(
   loading: boolean,
   selectedType: string,
-  advance: WizardAdvance,
 ): WizardNext {
   if (selectedType) {
     return {
       kind: "ready",
       hint: "Next continues with the selected vehicle type",
-      // Not advanceOnly: selectedType can come from an existing vehicle while
-      // state.vehicleType is still "" (a re-opened wizard clears the type but
-      // keeps the vehicle). Step membership keys off state.vehicleType, so
-      // writing it here is what stops Next skipping the whole plugin block.
-      onNext: () => {
-        advance({ vehicleType: selectedType });
-        return Promise.resolve();
-      },
+      // Hand the chosen type back rather than just moving on. The card can
+      // already look selected because a vehicle exists from a previous setup,
+      // while the wizard itself has no type recorded. Returning it lets the
+      // shell save the choice and work out the next step in one go — if it
+      // works out the next step first, it doesn't know Tesla was chosen and
+      // jumps straight past Tesla's setup screens.
+      onNext: () => Promise.resolve({ vehicleType: selectedType }),
     };
   }
   if (loading) return { kind: "loading" };

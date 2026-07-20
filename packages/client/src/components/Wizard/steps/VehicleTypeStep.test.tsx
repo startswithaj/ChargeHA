@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../test-utils.tsx";
 import { vehicleTypeStep } from "./VehicleTypeStep.tsx";
 import { StepNextHarness } from "./test-helpers/StepNextHarness.tsx";
@@ -21,10 +21,6 @@ vi.mock("../../../hooks/useWizardState.ts", () => ({
     patch: vi.fn(),
     isLoading: false,
   })),
-}));
-
-vi.mock("../wizardAdvance.ts", () => ({
-  useWizardAdvance: vi.fn(() => mockAdvance),
 }));
 
 vi.mock("../../../trpc.ts", () => ({
@@ -89,7 +85,9 @@ describe("VehicleTypeStep", () => {
   // ---- Initial render ----
 
   it("renders the vehicle-type chooser with both options and descriptions", () => {
-    renderWithProviders(<StepNextHarness def={vehicleTypeStep} />);
+    renderWithProviders(
+      <StepNextHarness def={vehicleTypeStep} onAdvance={mockAdvance} />,
+    );
 
     expect(screen.getByRole("button", { name: /Tesla/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Simulated/ }))
@@ -101,7 +99,9 @@ describe("VehicleTypeStep", () => {
 
   it("disables Tesla but not Simulated in demo mode", () => {
     mockIsDemoMode.mockReturnValue(true);
-    renderWithProviders(<StepNextHarness def={vehicleTypeStep} />);
+    renderWithProviders(
+      <StepNextHarness def={vehicleTypeStep} onAdvance={mockAdvance} />,
+    );
 
     expect(screen.getByRole("button", { name: /Tesla/ }))
       .toHaveAttribute("aria-disabled", "true");
@@ -112,7 +112,9 @@ describe("VehicleTypeStep", () => {
   // ---- User interactions ----
 
   it("selecting Tesla commits the selection without naming a next step", () => {
-    renderWithProviders(<StepNextHarness def={vehicleTypeStep} />);
+    renderWithProviders(
+      <StepNextHarness def={vehicleTypeStep} onAdvance={mockAdvance} />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /Tesla/ }));
 
@@ -121,7 +123,9 @@ describe("VehicleTypeStep", () => {
   });
 
   it("selecting Simulated creates the demo vehicle before advancing", () => {
-    renderWithProviders(<StepNextHarness def={vehicleTypeStep} />);
+    renderWithProviders(
+      <StepNextHarness def={vehicleTypeStep} onAdvance={mockAdvance} />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /Simulated/ }));
 
@@ -131,7 +135,9 @@ describe("VehicleTypeStep", () => {
 
   it("does not advance when demo vehicle creation has not succeeded", () => {
     mockDemoMutate.mockImplementation(() => {});
-    renderWithProviders(<StepNextHarness def={vehicleTypeStep} />);
+    renderWithProviders(
+      <StepNextHarness def={vehicleTypeStep} onAdvance={mockAdvance} />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /Simulated/ }));
 
@@ -139,7 +145,7 @@ describe("VehicleTypeStep", () => {
     expect(mockAdvance).not.toHaveBeenCalled();
   });
 
-  it("Next commits the existing vehicle type when the wizard state has none", () => {
+  it("Next commits the existing vehicle type when the wizard state has none", async () => {
     // A re-opened wizard clears wizard_vehicle_type but keeps the vehicle row,
     // so the card renders selected off the existing vehicle. Step membership
     // keys off state.vehicleType, so Next must write it — otherwise the flow
@@ -147,18 +153,26 @@ describe("VehicleTypeStep", () => {
     mockVehicleList.mockReturnValue({
       data: { vehicles: [{ adapterType: "tesla" }] },
     });
-    renderWithProviders(<StepNextHarness def={vehicleTypeStep} />);
+    renderWithProviders(
+      <StepNextHarness def={vehicleTypeStep} onAdvance={mockAdvance} />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /^Next/ }));
 
-    expect(mockAdvance).toHaveBeenCalledWith({ vehicleType: "tesla" });
+    // The step returns its selection from an async Next handler, so the move
+    // lands a microtask later.
+    await waitFor(() => {
+      expect(mockAdvance).toHaveBeenCalledWith({ vehicleType: "tesla" });
+    });
   });
 
   it("reselecting the already-configured vehicle type proceeds without recreating it", () => {
     mockVehicleList.mockReturnValue({
       data: { vehicles: [{ adapterType: "simulated" }] },
     });
-    renderWithProviders(<StepNextHarness def={vehicleTypeStep} />);
+    renderWithProviders(
+      <StepNextHarness def={vehicleTypeStep} onAdvance={mockAdvance} />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /Simulated/ }));
 

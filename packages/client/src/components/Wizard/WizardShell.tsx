@@ -12,9 +12,9 @@ import {
   skipTargetId,
   type StepDef,
   type StepProps,
+  type WizardAdvance,
   type WizardStore,
 } from "./flow.ts";
-import { type WizardAdvance, WizardAdvanceProvider } from "./wizardAdvance.ts";
 import styles from "./WizardShell.module.css";
 
 interface WizardShellProps {
@@ -57,12 +57,6 @@ function useWizardCallbacks(
     [flow, state, patch],
   );
 
-  const handleNext = useCallback(() => {
-    const next = nextStepId(flow, state);
-    if (next) patch({ stepId: next });
-    else onComplete?.();
-  }, [flow, state, patch, onComplete]);
-
   const handleBack = useCallback(() => {
     const target = backTargetId(flow, state);
     if (target) patch({ stepId: target });
@@ -82,23 +76,27 @@ function useWizardCallbacks(
     if (last) patch({ stepId: last.id });
   }, [flow, state, patch]);
 
-  // The selection and the step it leads to are written together: the next step
-  // is read from the flow the new selection produces, so the id can never name
-  // a step that selection hasn't put in the list.
+  // The one way the wizard moves forward. The selection and the step it leads
+  // to are written together: the next step is read from the flow the new
+  // selection produces, so the id can never name a step that selection hasn't
+  // put in the list. At the end of the flow this completes rather than
+  // re-writing the current step onto itself, which would silently do nothing.
   const advance = useCallback<WizardAdvance>(
-    (selection) => {
+    (selection = {}) => {
       const nextState = { ...state, ...selection };
-      patch({
-        ...selection,
-        stepId: nextStepId(flow, nextState) ?? nextState.stepId,
-      });
+      const next = nextStepId(flow, nextState);
+      if (next) {
+        patch({ ...selection, stepId: next });
+        return;
+      }
+      if (Object.keys(selection).length > 0) patch(selection);
+      onComplete?.();
     },
-    [flow, state, patch],
+    [flow, state, patch, onComplete],
   );
 
   return {
     goToStep,
-    handleNext,
     handleBack,
     handleSkip,
     handleSkipToEnd,
@@ -132,7 +130,6 @@ export function WizardShell(
 
   const {
     goToStep,
-    handleNext,
     handleBack,
     handleSkip,
     handleSkipToEnd,
@@ -164,7 +161,7 @@ export function WizardShell(
   }
 
   const stepProps: StepProps = {
-    onNext: handleNext,
+    onAdvance: advance,
     onBack: handleBack,
     onSkipTo: goToStep,
     onSkipToEnd: handleSkipToEnd,
@@ -192,21 +189,19 @@ export function WizardShell(
         </Text>
       </div>
 
-      <WizardAdvanceProvider value={advance}>
-        <StepHost
-          key={stepConfig.id}
-          def={stepConfig}
-          stepProps={stepProps}
-          nav={{
-            isFirstStep,
-            isLastStep,
-            canBack: !isFirstStep || !!onBackOut,
-            onBack: handleBack,
-            onSkip: handleSkip,
-          }}
-          advance={handleNext}
-        />
-      </WizardAdvanceProvider>
+      <StepHost
+        key={stepConfig.id}
+        def={stepConfig}
+        stepProps={stepProps}
+        nav={{
+          isFirstStep,
+          isLastStep,
+          canBack: !isFirstStep || !!onBackOut,
+          onBack: handleBack,
+          onSkip: handleSkip,
+        }}
+        onAdvance={advance}
+      />
     </div>
   );
 }

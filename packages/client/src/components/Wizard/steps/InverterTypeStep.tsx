@@ -8,7 +8,6 @@ import {
 } from "../../../hooks/useSectionConfig.ts";
 import { demoMode } from "../../../lib/featureFlags.ts";
 import type { StepDef, WizardNext } from "../flow.ts";
-import { useWizardAdvance, type WizardAdvance } from "../wizardAdvance.ts";
 import { OptionCard } from "./OptionCard.tsx";
 import styles from "./steps.module.css";
 
@@ -21,11 +20,10 @@ const icons = {
 export const inverterTypeStep: StepDef = {
   id: "inverter-type",
   label: "Inverter Type",
-  useStep: () => {
+  useStep: ({ onAdvance }) => {
     const { data: equipmentConfig } = useEquipmentConfig();
     const currentAdapter = equipmentConfig?.energyAdapterType ?? "";
     const { state } = useWizardState();
-    const advance = useWizardAdvance();
     const mutation = useEquipmentConfigMutation();
 
     // "" (None / Skip) is a valid selection but indistinguishable from "not
@@ -36,7 +34,7 @@ export const inverterTypeStep: StepDef = {
     const selectAdapter = (adapterType: string) => {
       mutation.mutate(
         { energyAdapterType: adapterType },
-        { onSuccess: () => advance({ energyType: adapterType }) },
+        { onSuccess: () => onAdvance({ energyType: adapterType }) },
       );
     };
 
@@ -45,7 +43,6 @@ export const inverterTypeStep: StepDef = {
         equipmentConfig === undefined,
         hasSelection,
         selectedType,
-        advance,
       ),
       view: (
         <InverterTypeCards
@@ -61,19 +58,15 @@ function inverterTypeNext(
   loading: boolean,
   hasSelection: boolean,
   selectedType: string,
-  advance: WizardAdvance,
 ): WizardNext {
   if (hasSelection) {
     return {
       kind: "ready",
       hint: "Next continues with the selected energy source",
-      // Not advanceOnly: the selection can come from saved config while
-      // state.energyType is still "". Step membership keys off state.energyType,
-      // so writing it here is what stops Next skipping the plugin's steps.
-      onNext: () => {
-        advance({ energyType: selectedType });
-        return Promise.resolve();
-      },
+      // Hand the chosen source back rather than just moving on — the card can
+      // already look selected from saved config while the wizard has nothing
+      // recorded. See the note in VehicleTypeStep for why this matters.
+      onNext: () => Promise.resolve({ energyType: selectedType }),
     };
   }
   if (loading) return { kind: "loading" };

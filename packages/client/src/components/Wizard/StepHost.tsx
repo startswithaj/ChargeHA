@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Text } from "@radix-ui/themes";
 import { ArrowLeft, ArrowRight, SkipForward } from "lucide-react";
-import type { StepDef, StepProps, WizardNext } from "./flow.ts";
+import type { StepDef, StepProps, WizardAdvance, WizardNext } from "./flow.ts";
 import styles from "./WizardShell.module.css";
 
 /** The label shown on Next while its handler runs. Every step that did any
@@ -21,8 +21,8 @@ interface StepHostProps {
   def: StepDef;
   stepProps: StepProps;
   nav: StepNav;
-  /** Called when the step's Next handler resolves. */
-  advance: () => void;
+  /** Applies the selection the step returned (if any) and moves on. */
+  onAdvance: WizardAdvance;
 }
 
 /** The reason text shown beside the nav: why Next is disabled, what it will
@@ -101,7 +101,7 @@ function WizardNav(
  * `useStep` with different hooks inside, so the host has to remount rather
  * than change hook order mid-render.
  */
-export function StepHost({ def, stepProps, nav, advance }: StepHostProps) {
+export function StepHost({ def, stepProps, nav, onAdvance }: StepHostProps) {
   const { next, view } = def.useStep(stepProps);
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
@@ -119,8 +119,12 @@ export function StepHost({ def, stepProps, nav, advance }: StepHostProps) {
     setPending(true);
     setFailure(null);
     try {
-      await next.onNext();
-      advance();
+      // One move, not two: the step reports its selection and the shell applies
+      // it together with the step id. When the step moved itself and the shell
+      // moved again, the second recomputed the destination from state that
+      // predated the selection and silently overwrote the first.
+      const selection = await next.onNext();
+      onAdvance(selection ?? undefined);
     } catch (err) {
       // The step said stay, and said why. Show it beside the button that
       // failed rather than leaving each step to render its own error.

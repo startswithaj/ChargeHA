@@ -58,7 +58,7 @@ vi.mock("../../../trpc.ts", () => ({
 
 describe("WelcomeStep", () => {
   const makeStepProps = (overrides: Partial<StepProps> = {}): StepProps => ({
-    onNext: vi.fn(),
+    onAdvance: vi.fn(),
     onBack: vi.fn(),
     onSkipTo: vi.fn(),
     onSkipToEnd: vi.fn(),
@@ -105,18 +105,18 @@ describe("WelcomeStep", () => {
 
   // ---- User interactions ----
 
-  it("clicking 'Full Setup' calls onNext callback", () => {
-    const onNext = vi.fn();
+  it("clicking 'Full Setup' calls onAdvance callback", () => {
+    const onAdvance = vi.fn();
     renderWithProviders(
       <StepNextHarness
         def={welcomeStep}
-        stepProps={makeStepProps({ onNext })}
+        stepProps={makeStepProps({ onAdvance })}
       />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: /Full Setup/ }));
 
-    expect(onNext).toHaveBeenCalledTimes(1);
+    expect(onAdvance).toHaveBeenCalledTimes(1);
   });
 
   // ---- API calls ----

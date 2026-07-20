@@ -24,10 +24,6 @@ vi.mock("../../../hooks/useWizardState.ts", () => ({
   })),
 }));
 
-vi.mock("../wizardAdvance.ts", () => ({
-  useWizardAdvance: vi.fn(() => mockAdvance),
-}));
-
 vi.mock("../../../trpc.ts", () => ({
   widenTrpc: vi.fn(),
   trpc: {
@@ -101,7 +97,9 @@ describe("InverterTypeStep", () => {
 
   it("disables Fronius options in demo mode", () => {
     mockIsDemoMode.mockReturnValue(true);
-    renderWithProviders(<StepNextHarness def={inverterTypeStep} />);
+    renderWithProviders(
+      <StepNextHarness def={inverterTypeStep} onAdvance={mockAdvance} />,
+    );
 
     const local = screen.getByText("Fronius (Local)").closest(
       '[role="button"]',
@@ -114,7 +112,9 @@ describe("InverterTypeStep", () => {
   });
 
   it("renders three options: Fronius Local, Fronius Cloud, None/Skip", () => {
-    renderWithProviders(<StepNextHarness def={inverterTypeStep} />);
+    renderWithProviders(
+      <StepNextHarness def={inverterTypeStep} onAdvance={mockAdvance} />,
+    );
 
     expect(screen.getByText("Fronius (Local)")).toBeInTheDocument();
     expect(
@@ -126,7 +126,9 @@ describe("InverterTypeStep", () => {
   // ---- User interactions / API calls ----
 
   it("selecting None persists an empty adapter type and advances", async () => {
-    renderWithProviders(<StepNextHarness def={inverterTypeStep} />);
+    renderWithProviders(
+      <StepNextHarness def={inverterTypeStep} onAdvance={mockAdvance} />,
+    );
 
     fireEvent.click(screen.getByText("None / Skip"));
 
@@ -147,7 +149,9 @@ describe("InverterTypeStep", () => {
   ])(
     "selecting %s persists adapter %s and commits it without naming a next step",
     async (label, adapterType) => {
-      renderWithProviders(<StepNextHarness def={inverterTypeStep} />);
+      renderWithProviders(
+        <StepNextHarness def={inverterTypeStep} onAdvance={mockAdvance} />,
+      );
 
       fireEvent.click(screen.getByText(label));
 
@@ -163,7 +167,7 @@ describe("InverterTypeStep", () => {
     },
   );
 
-  it("Next commits the saved adapter type when the wizard state has none", () => {
+  it("Next commits the saved adapter type when the wizard state has none", async () => {
     // energy_adapter_type survives wizard completion, so a re-opened wizard
     // shows the saved source as selected while state.energyType is still "".
     // Step membership keys off state.energyType, so Next must write it —
@@ -173,16 +177,24 @@ describe("InverterTypeStep", () => {
       isLoading: false,
       error: null,
     });
-    renderWithProviders(<StepNextHarness def={inverterTypeStep} />);
+    renderWithProviders(
+      <StepNextHarness def={inverterTypeStep} onAdvance={mockAdvance} />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /^Next/ }));
 
-    expect(mockAdvance).toHaveBeenCalledWith({ energyType: "fronius_local" });
+    // The step returns its selection from an async Next handler, so the move
+    // lands a microtask later.
+    await waitFor(() => {
+      expect(mockAdvance).toHaveBeenCalledWith({ energyType: "fronius_local" });
+    });
   });
 
   it("does not advance when persisting the adapter fails", () => {
     mockMutate.mockImplementation(() => {});
-    renderWithProviders(<StepNextHarness def={inverterTypeStep} />);
+    renderWithProviders(
+      <StepNextHarness def={inverterTypeStep} onAdvance={mockAdvance} />,
+    );
 
     fireEvent.click(screen.getByText("Fronius (Local)"));
 
