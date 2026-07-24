@@ -33,7 +33,8 @@
     "db:cli": "deno run -A --unstable-ffi devtools/db/db-cli.ts",
     "db:generate": "deno -A --node-modules-dir npm:drizzle-kit generate --config drizzle/drizzle.config.ts",
     "check:unused": "bash devtools/quality/check-unused-files.sh",
-    "check:all": "deno fmt && deno fmt --check && deno lint && deno check && deno task check:unused && deno task test:server && deno task test:client"
+    "check:packument": "bash devtools/quality/check-packument-bloat.sh",
+    "check:all": "deno fmt && deno fmt --check && deno lint && deno check && deno task check:unused && deno task check:packument && deno task test:server && deno task test:client"
   },
   "imports": {
     "@db/sqlite": "jsr:@db/sqlite@^0.12",
