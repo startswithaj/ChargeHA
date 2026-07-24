@@ -17,7 +17,7 @@ ARG TARGETOS TARGETARCH
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /tesla-http-proxy ./cmd/tesla-http-proxy
 
 # --- Stage 2: Build the client (static assets) ---
-FROM denoland/deno:2.8.2 AS client-builder
+FROM denoland/deno:2.9.4 AS client-builder
 ARG GIT_SHA
 ENV VITE_GIT_SHA=$GIT_SHA
 WORKDIR /app
@@ -30,7 +30,7 @@ RUN deno install
 RUN deno task build
 
 # --- Stage 3: Production runtime ---
-FROM denoland/deno:2.8.2
+FROM denoland/deno:2.9.4
 
 # openssh-client powers the setup tunnel (Pinggy over ssh) for LAN users —
 # Tesla's developer portal rejects trycloudflare.com domains, so cloudflared
@@ -57,10 +57,6 @@ COPY --from=client-builder /app/packages/server/dist packages/server/dist/
 
 # Install deps and cache compilation
 RUN deno install
-# See stage 2: drop the age check + purge packuments so runtime `deno run` stays
-# lean (~800MB->~70MB RAM). deno.lock keeps versions pinned/vetted.
-RUN sed -i '/minimumDependencyAge/d' deno.json
-RUN find "${DENO_DIR}/npm/registry.npmjs.org" -name registry.json -delete
 RUN deno cache packages/server/src/main.ts
 
 # Create data directory
