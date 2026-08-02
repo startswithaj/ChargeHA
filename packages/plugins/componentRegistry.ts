@@ -20,6 +20,9 @@ import { SigenergyLocalConfig } from "./energy/sigenergy-local/client/SigenergyL
 // Enphase settings component
 import { EnphaseLocalConfig } from "./energy/enphase-local/client/EnphaseLocalConfig.tsx";
 
+// Tapo settings component
+import { TapoSettings } from "./chargers/tapo/client/TapoSettings.tsx";
+
 // Plugin wizard step definitions — imported from each plugin's client folder
 import {
   froniusCloudOption,
@@ -46,6 +49,10 @@ import {
   teslaVehicleOption,
   teslaWizardSteps,
 } from "./vehicles/tesla/client/wizardSteps.ts";
+import {
+  tapoChargerOption,
+  tapoWizardSteps,
+} from "./chargers/tapo/client/wizardSteps.ts";
 
 /** Metadata for an energy plugin option shown on the inverter type selection step. */
 export interface EnergyPluginOption {
@@ -125,6 +132,27 @@ export const energyPluginSteps: Record<string, PluginStepDef[]> = {
   simulated_energy: simulatedEnergyWizardSteps,
 };
 
+/** Metadata for a charger plugin option on the charger type step.
+ *  iconKey is a union like the vehicle/energy option types — "plug" for
+ *  Tapo, "server" for OCPP. */
+export interface ChargerPluginOption {
+  id: string;
+  label: string;
+  description: string;
+  iconKey: "server" | "plug";
+  demoAvailable?: boolean;
+}
+
+/** Charger plugin options for the charger type selection step. Filled by
+ *  plugin change sets (tapoChargerOption, ocppChargerOption). */
+export const chargerPluginOptions: ChargerPluginOption[] = [tapoChargerOption];
+
+/** Charger plugin wizard steps, keyed by charger adapter type. Filled by
+ *  plugin change sets (tapo: tapoWizardSteps, ocpp: ocppWizardSteps). */
+export const chargerPluginSteps: Record<string, PluginStepDef[]> = {
+  tapo: tapoWizardSteps,
+};
+
 /**
  * Maps settingsComponentKey strings (from EnergyPlugin) to React components.
  * Used by the settings page to render plugin-provided config forms dynamically.
@@ -137,4 +165,5 @@ export const pluginSettingsComponents: Record<string, ComponentType> = {
   "sigenergy-local-config": SigenergyLocalConfig,
   "enphase-local-config": EnphaseLocalConfig,
   "simulated-energy-config": SimulatedEnergyConfig,
+  "tapo-settings": TapoSettings,
 };

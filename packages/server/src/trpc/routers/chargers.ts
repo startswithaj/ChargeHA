@@ -14,6 +14,7 @@ const createInput = z.object({
   name: z.string(),
   chargerAdapterType: z.string(),
 });
+const ensureInput = z.object({ chargerAdapterType: z.string() });
 
 export const chargersRouter = router({
   list: publicProcedure.query(async ({ ctx }) => {
@@ -23,6 +24,12 @@ export const chargersRouter = router({
   create: publicProcedure.input(createInput).mutation(
     async ({ ctx, input }) => {
       return await ctx.chargingPointManager.createCharger(input);
+    },
+  ),
+
+  ensure: publicProcedure.input(ensureInput).mutation(
+    async ({ ctx, input }) => {
+      await ctx.chargingPointManager.ensureCharger(input.chargerAdapterType);
     },
   ),
 

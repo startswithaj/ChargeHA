@@ -292,6 +292,21 @@ export class ChargingPointManager {
     return row;
   }
 
+  /** Create the charger row for a plugin type if none exists — the host
+   *  calls this when a charger plugin's setup completes (wizard or
+   *  Settings); plugin code never creates core rows itself. */
+  async ensureCharger(chargerAdapterType: string): Promise<void> {
+    const rows = await this.db.getChargers();
+    if (rows.some((row) => row.chargerAdapterType === chargerAdapterType)) {
+      return;
+    }
+    const plugin = this.chargerPlugins.get(chargerAdapterType);
+    await this.createCharger({
+      name: plugin?.displayName ?? chargerAdapterType,
+      chargerAdapterType,
+    });
+  }
+
   async getChargersWithState() {
     const rows = await this.db.getChargers();
     return rows.map((row) => ({

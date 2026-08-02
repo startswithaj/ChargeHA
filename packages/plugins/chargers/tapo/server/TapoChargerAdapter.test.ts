@@ -1,0 +1,226 @@
+// Regressions an e2e suite can't catch deterministically: the sequential
+// request-ordering guarantee (one in-flight KLAP request per plug) and the
+// session/staleness state machine. A spy KlapClient stands in for the real
+// one — only the `request()` surface the adapter actually calls.
+import { describe, it } from "@std/testing/bdd";
+import { expect } from "@std/expect";
+import { FakeTime } from "@std/testing/time";
+import { Logger } from "@chargeha/server/lib/Logger";
+import type { CallContext } from "@chargeha/shared";
+import { KlapClient } from "./KlapClient.ts";
+import {
+  type TapoAdapterConfig,
+  TapoChargerAdapter,
+  type TapoDeviceInfo,
+  type TapoEnergyUsage,
+} from "./TapoChargerAdapter.ts";
+
+interface Handlers {
+  get_device_info: (callIndex: number) => Promise<TapoDeviceInfo>;
+  get_energy_usage: (callIndex: number) => Promise<TapoEnergyUsage>;
+  set_device_info: (params?: Record<string, unknown>) => Promise<void>;
+}
+
+/** Minimal spy over the KlapClient surface TapoChargerAdapter calls: only
+ *  `request()`. Records call order and hands each call its own index within
+ *  that method (so a test can vary the response poll-by-poll). */
+class SpyKlapClient extends KlapClient {
+  readonly calls: string[] = [];
+
+  constructor(
+    private readonly handlers: Partial<Handlers>,
+    logger: Logger,
+  ) {
+    super("192.0.2.10", "user@example.com", "example-password", logger);
+  }
+
+  private static notStubbed(name: string): () => never {
+    return () => {
+      throw new Error(`SpyKlapClient: ${name} not stubbed for this test`);
+    };
+  }
+
+  override request<T>(
+    method: string,
+    params?: Record<string, unknown>,
+  ): Promise<T> {
+    this.calls.push(method);
+    const callIndex = this.calls.filter((m) => m === method).length - 1;
+    if (method === "get_device_info") {
+      return (this.handlers.get_device_info ??
+        SpyKlapClient.notStubbed(method))(
+          callIndex,
+        ) as Promise<T>;
+    }
+    if (method === "get_energy_usage") {
+      return (this.handlers.get_energy_usage ??
+        SpyKlapClient.notStubbed(method))(
+          callIndex,
+        ) as Promise<T>;
+    }
+    if (method === "set_device_info") {
+      return (this.handlers.set_device_info ??
+        SpyKlapClient.notStubbed(method))(
+          params,
+        ) as Promise<T>;
+    }
+    throw new Error(`SpyKlapClient: unexpected method ${method}`);
+  }
+}
+
+describe("TapoChargerAdapter", () => {
+  const ctx: CallContext = { origin: "test", traceId: "test-trace" };
+  const logger = new Logger("TapoTest", "error");
+
+  const CONFIG: TapoAdapterConfig = {
+    chargerId: "charger-1",
+    fixedDrawAmps: 10,
+    detectionThresholdW: 100,
+    pollSeconds: 10,
+    staleTimeoutSeconds: 60,
+  };
+
+  const buildDeviceInfo = (
+    overrides: Partial<TapoDeviceInfo> = {},
+  ): TapoDeviceInfo => ({
+    device_on: true,
+    model: "P110",
+    fw_ver: "1.3.0 Build 240523",
+    mac: "AA-BB-CC-00-11-22",
+    nickname: btoa("Test Plug"),
+    overheated: false,
+    ...overrides,
+  });
+
+  const buildEnergyUsage = (
+    overrides: Partial<TapoEnergyUsage> = {},
+  ): TapoEnergyUsage => ({
+    current_power: 0,
+    today_energy: 0,
+    month_energy: 0,
+    ...overrides,
+  });
+
+  describe("getChargerState request ordering", () => {
+    it("fully resolves get_device_info before sending get_energy_usage", async () => {
+      const deviceInfoGate = Promise.withResolvers<TapoDeviceInfo>();
+      const client = new SpyKlapClient({
+        get_device_info: () => deviceInfoGate.promise,
+        get_energy_usage: () => Promise.resolve(buildEnergyUsage()),
+      }, logger);
+      const adapter = new TapoChargerAdapter(CONFIG, client, logger);
+
+      const statePromise = adapter.getChargerState(ctx);
+
+      // get_device_info hasn't resolved yet — get_energy_usage must not have
+      // been sent, proving the requests are sequential, not concurrent.
+      await Promise.resolve();
+      expect(client.calls).toEqual(["get_device_info"]);
+
+      deviceInfoGate.resolve(buildDeviceInfo());
+      const state = await statePromise;
+
+      expect(client.calls).toEqual(["get_device_info", "get_energy_usage"]);
+      expect(state.chargerId).toBe(CONFIG.chargerId);
+    });
+  });
+
+  describe("device_on gating", () => {
+    it("isCharging is false when device_on is false, even above the power threshold", async () => {
+      const client = new SpyKlapClient({
+        get_device_info: () =>
+          Promise.resolve(buildDeviceInfo({ device_on: false })),
+        get_energy_usage: () =>
+          Promise.resolve(buildEnergyUsage({ current_power: 500_000 })), // 500 W, well above threshold
+      }, logger);
+      const adapter = new TapoChargerAdapter(CONFIG, client, logger);
+
+      const state = await adapter.getChargerState(ctx);
+
+      expect(state.isCharging).toBe(false);
+      expect(state.status).toBe("available");
+    });
+
+    it("ends an active session immediately when device_on flips false", async () => {
+      const deviceOnByPoll = [true, false];
+      const client = new SpyKlapClient({
+        get_device_info: (i) =>
+          Promise.resolve(buildDeviceInfo({ device_on: deviceOnByPoll[i] })),
+        get_energy_usage: () =>
+          Promise.resolve(
+            buildEnergyUsage({ current_power: 2_000_000, today_energy: 500 }),
+          ),
+      }, logger);
+      const adapter = new TapoChargerAdapter(CONFIG, client, logger);
+
+      const charging = await adapter.getChargerState(ctx);
+      expect(charging.isCharging).toBe(true);
+
+      // Device switched off — session ends on this single poll, not after
+      // the 2-poll below-threshold grace period.
+      const stopped = await adapter.getChargerState(ctx);
+      expect(stopped.isCharging).toBe(false);
+      expect(stopped.status).toBe("available");
+    });
+  });
+
+  describe("session end grace period", () => {
+    it("stays charging through the first below-threshold poll, ends on the second", async () => {
+      const powerByPollW = [2000, 50, 50]; // threshold is 100 W
+      const client = new SpyKlapClient({
+        get_device_info: () =>
+          Promise.resolve(buildDeviceInfo({ device_on: true })),
+        get_energy_usage: (i) =>
+          Promise.resolve(
+            buildEnergyUsage({
+              current_power: powerByPollW[i] * 1000,
+              today_energy: 100 * (i + 1),
+            }),
+          ),
+      }, logger);
+      const adapter = new TapoChargerAdapter(CONFIG, client, logger);
+
+      const above = await adapter.getChargerState(ctx);
+      expect(above.isCharging).toBe(true);
+
+      const firstBelow = await adapter.getChargerState(ctx);
+      expect(firstBelow.isCharging).toBe(true); // grace poll 1 — session still active
+
+      const secondBelow = await adapter.getChargerState(ctx);
+      expect(secondBelow.isCharging).toBe(false); // grace poll 2 — session ends
+      expect(secondBelow.status).toBe("no_draw");
+    });
+  });
+
+  describe("poll failure", () => {
+    it("serves stale state on failure, then flips to faulted after the stale timeout", async () => {
+      using fakeTime = new FakeTime();
+      const goodInfo = buildDeviceInfo({ device_on: true });
+      const goodEnergy = buildEnergyUsage({
+        current_power: 2_000_000,
+        today_energy: 100,
+      });
+      const client = new SpyKlapClient({
+        get_device_info: (i) =>
+          i === 0
+            ? Promise.resolve(goodInfo)
+            : Promise.reject(new Error("device offline")),
+        get_energy_usage: () => Promise.resolve(goodEnergy),
+      }, logger);
+      const adapter = new TapoChargerAdapter(CONFIG, client, logger);
+
+      const good = await adapter.getChargerState(ctx);
+      expect(good.status).toBe("charging");
+
+      const staleButFresh = await adapter.getChargerState(ctx);
+      expect(staleButFresh.status).toBe("charging"); // still serving the last good state
+      expect(staleButFresh.isCharging).toBe(true);
+
+      await fakeTime.tickAsync(CONFIG.staleTimeoutSeconds * 1000);
+
+      const faulted = await adapter.getChargerState(ctx);
+      expect(faulted.status).toBe("faulted");
+      expect(faulted.statusDetail).toBe("unreachable");
+    });
+  });
+});

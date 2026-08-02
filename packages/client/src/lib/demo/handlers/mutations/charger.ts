@@ -5,6 +5,7 @@ import { getDemoState, updateDemoState } from "../../demoState.ts";
 type ChargerMutations = Pick<
   MutationHandlers,
   | "charger.create"
+  | "charger.ensure"
   | "charger.setMode"
   | "charger.reorder"
   | "charger.remove"
@@ -25,6 +26,22 @@ const patchCharger = (
   }));
 
 export const chargerMutations: ChargerMutations = {
+  "charger.ensure": (input) => {
+    const exists = getDemoState().chargers.some(
+      (c) => c.chargerAdapterType === input.chargerAdapterType,
+    );
+    if (exists) return;
+    const charger: DemoCharger = {
+      id: crypto.randomUUID(),
+      name: input.chargerAdapterType,
+      chargerAdapterType: input.chargerAdapterType,
+      mode: "auto",
+      priority: nextPriority(getDemoState().chargers),
+      vehicleId: null,
+    };
+    updateDemoState((m) => ({ ...m, chargers: [...m.chargers, charger] }));
+  },
+
   "charger.create": (input) => {
     const charger: DemoCharger = {
       id: crypto.randomUUID(),

@@ -47,7 +47,7 @@ export function PluginSetupRouter(
   const store = usePluginOnboardingState(pluginId, flow[0]?.id ?? "", kind);
   const { clear } = store;
 
-  const handleComplete = useCallback(() => {
+  const handleComplete = useCallback(async () => {
     clear();
     if (kind === "vehicle") {
       utils.vehicle.list.invalidate();
@@ -55,10 +55,14 @@ export function PluginSetupRouter(
     } else if (kind === "energy") {
       utils.energy.getPlugins.invalidate();
     } else {
+      // The host owns charger-row creation on setup completion.
+      await utils.client.charger.ensure.mutate({
+        chargerAdapterType: pluginId,
+      });
       utils.charger.list.invalidate();
     }
     navigate({ type: "app", page: "settings" });
-  }, [clear, kind, utils, navigate]);
+  }, [clear, kind, utils, navigate, pluginId]);
 
   const handleCancel = useCallback(() => {
     navigate({ type: "app", page: "settings" });
