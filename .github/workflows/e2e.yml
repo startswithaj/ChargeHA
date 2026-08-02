@@ -1,0 +1,18 @@
+name: e2e
+
+on: pull_request
+
+# Cancel superseded runs on rapid pushes — same policy as ci.yml's group.
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest # docker + compose preinstalled
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: 2.9.4 # exact pin, matching test.yml and docker/Dockerfile
+      - run: deno task test:e2e

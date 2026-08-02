@@ -34,9 +34,14 @@
     "db:generate": "deno -A --node-modules-dir npm:drizzle-kit generate --config drizzle/drizzle.config.ts",
     "check:unused": "bash devtools/quality/check-unused-files.sh",
     "check:packument": "bash devtools/quality/check-packument-bloat.sh",
-    "check:all": "deno fmt && deno fmt --check && deno lint && deno check && deno task check:unused && deno task check:packument && deno task test:server && deno task test:client"
+    "check:all": "deno fmt && deno fmt --check && deno lint && deno check && deno task check:unused && deno task check:packument && deno task test:server && deno task test:client",
+    "test:e2e": "deno task test:e2e:tapo",
+    "test:e2e:tapo": "deno run -A e2e/run.ts tapo",
+    "e2e:up": "docker compose -f docker/docker-compose.e2e.yml up -d --build --wait",
+    "e2e:down": "docker compose -f docker/docker-compose.e2e.yml down -v"
   },
   "imports": {
+    "@trpc/client": "npm:@trpc/client@^11",
     "@db/sqlite": "jsr:@db/sqlite@^0.12",
     "@std/assert": "jsr:@std/assert@^1",
     "@std/expect": "jsr:@std/expect@^1.0.18",

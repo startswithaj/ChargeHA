@@ -1,0 +1,48 @@
+# E2E stack: real app + fake devices on a fixed subnet so discovery tests
+# can scan deterministically.
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    environment:
+      - PORT=8000
+      - DB_PATH=/tmp/e2e-chargeha.db # inside the container, discarded on exit
+      - RESET_AUTH=true # exact string — the code checks === "true", not truthiness
+      - LOG_LEVEL=debug
+    # The image's HEALTHCHECK polls every 30s — too slow for test startup.
+    # Same probe, fast cadence; `up --wait` blocks until healthy.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "deno",
+          "run",
+          "--allow-net",
+          "packages/server/src/healthcheck.ts",
+        ]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+    ports:
+      - "18000:8000"
+    networks:
+      e2e:
+        ipv4_address: 172.28.0.10
+
+  tapo-simulator:
+    build:
+      context: ..
+      dockerfile: devtools/tapo-simulator/Dockerfile
+    ports:
+      - "18081:8081" # control API for the test runner
+    networks:
+      e2e:
+        ipv4_address: 172.28.0.50
+
+networks:
+  e2e:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24

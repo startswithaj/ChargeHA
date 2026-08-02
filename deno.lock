@@ -3851,6 +3851,7 @@
       "jsr:@std/expect@^1.0.18",
       "jsr:@std/testing@^1.0.17",
       "jsr:@ts-rex/argon2@^1.0.3",
+      "npm:@trpc/client@11",
       "npm:drizzle-kit@~0.31.1",
       "npm:drizzle-orm@~0.45.1",
       "npm:jsmodbus@4",
