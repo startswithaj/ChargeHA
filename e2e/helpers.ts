@@ -10,12 +10,12 @@ export const trpc = createTRPCClient<TapoAppRouter>({
 });
 
 /** Poll until the predicate resolves truthy. The only place a retry loop
- *  lives — assertions in tests stay deterministic. Default timeout is 45 s:
- *  the controller loop defaults to 30 s (systemConfigDef), so a 30 s
- *  timeout would race the very loop tick most assertions wait on. */
+ *  lives — assertions in tests stay deterministic. Default timeout is 90 s:
+ *  the controller loop defaults to 30 s (systemConfigDef), and chained
+ *  effects (command → device → next poll) can span two ticks. */
 export async function waitFor<T>(
   fn: () => Promise<T | null | false | undefined>,
-  { timeoutMs = 45_000, intervalMs = 1_000, label = "condition" } = {},
+  { timeoutMs = 90_000, intervalMs = 1_000, label = "condition" } = {},
 ): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   const attempt = async (): Promise<T> => {

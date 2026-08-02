@@ -25,6 +25,7 @@ import type { DecisionCheck } from "@chargeha/shared/engine";
 import type { VehicleRow } from "../db/types.ts";
 import { AppDatabase } from "../db/AppDatabase.ts";
 import { VehicleManager } from "../services/VehicleManager.ts";
+import type { ChargingPointManager } from "../services/ChargingPointManager.ts";
 import type { EnergyPoller } from "../services/EnergyPoller.ts";
 import { ChargeController } from "../services/ChargeController.ts";
 import { ConfigService } from "../services/ConfigService.ts";
@@ -233,6 +234,7 @@ async function buildControllerStack(
 
   const controller = new ChargeController(
     manager,
+    throwingMock<ChargingPointManager>("ChargingPointManager"),
     poller as unknown as EnergyPoller,
     db,
     configService,

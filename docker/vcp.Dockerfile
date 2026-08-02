@@ -11,6 +11,12 @@ RUN git clone --no-checkout --depth 1 \
   && git fetch --depth 1 origin "${VCP_REF}" \
   && git checkout FETCH_HEAD
 WORKDIR /vcp
-RUN npm ci
+# npm install, not ci: the vcp repo's lockfile is out of sync with its
+# package.json upstream; ci refuses to run. The VCP_REF pin still bounds
+# the source tree.
+RUN npm install --no-audit --no-fund
 EXPOSE 9999
-CMD ["npx", "tsx", "index_16.ts"]
+# Constant 2s retry: vcp exits on any failed connect, and Docker's
+# on-failure backoff grows into minutes — the charger id only gets
+# configured after the stack is up, so steady retries are required.
+CMD ["sh", "-c", "while true; do npx tsx index_16.ts; sleep 2; done"]

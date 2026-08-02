@@ -5,6 +5,8 @@ const files = [
   "-f",
   "docker/docker-compose.e2e.yml",
   ...overrides.flatMap((f) => ["-f", f]),
+  // ocpp suites additionally start the profiled vcp charger simulator.
+  ...(suite.startsWith("ocpp") ? ["--profile", "ocpp"] : []),
 ];
 
 const compose = (...args: string[]) =>
@@ -14,7 +16,7 @@ const compose = (...args: string[]) =>
     stderr: "inherit",
   }).output();
 
-const up = await compose("up", "-d", "--build", "--force-recreate", "--wait");
+const up = await compose("up", "-d", "--build", "--wait");
 if (!up.success) {
   await compose("logs");
   await compose("down", "-v");

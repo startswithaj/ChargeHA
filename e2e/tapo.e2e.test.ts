@@ -9,6 +9,9 @@ describe("Tapo e2e", () => {
   const CREDS = { email: "user@example.com", password: "example-password" };
 
   beforeAll(async () => {
+    // 5s loop: the suites otherwise idle on the 30s default for most
+    // of their runtime. Config is per-stack (fresh DB every run).
+    await trpc.config.system.set.mutate({ controllerLoopSeconds: 5 });
     await tapoControl({ deviceOn: false, drawWhenOnW: 0, unreachable: false });
     await trpc.plugin.charger.tapo.setConfig.mutate({
       tapoHost: SIM_HOST,
@@ -77,14 +80,25 @@ describe("Tapo e2e", () => {
   });
 
   it("no-draw shows no_draw and records no charge power", async () => {
-    await tapoControl({ drawWhenOnW: 0, deviceOn: true });
+    // The CONTROLLER must switch the plug on (charge_now) while the "car"
+    // draws nothing — flipping the plug on externally in stop mode just
+    // gets it correctly switched off again. Spans two controller loops
+    // (start command, then the below-threshold poll), hence the timeout.
+    await tapoControl({ drawWhenOnW: 0 });
+    const chargers = await trpc.charger.list.query();
+    const charger = chargers.find((c) => c.chargerAdapterType === "tapo");
+    await trpc.charger.setMode.mutate({
+      id: charger?.id ?? "",
+      mode: "charge_now",
+    });
     const state = await waitFor(async () => {
       const list = await trpc.charger.list.query();
       const s = list.find((c) => c.chargerAdapterType === "tapo")?.state;
       return s?.status === "no_draw" ? s : null;
-    }, { label: "no_draw status" });
+    }, { label: "no_draw status", timeoutMs: 120_000 });
     expect(state.isCharging).toBe(false);
     expect(state.chargePowerKw).toBe(0);
+    await trpc.charger.setMode.mutate({ id: charger?.id ?? "", mode: "stop" });
   });
 
   it("rejects a meterless model (P100/P105) with a clear error", async () => {

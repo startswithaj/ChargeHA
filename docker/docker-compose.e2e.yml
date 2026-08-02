@@ -42,6 +42,9 @@ services:
         ipv4_address: 172.30.99.50
 
   ocpp-vcp:
+    # Only the ocpp suites start the charger simulator — a tapo run must
+    # never build or crash-loop it.
+    profiles: ["ocpp"]
     build:
       context: ..
       dockerfile: docker/vcp.Dockerfile

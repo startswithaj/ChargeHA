@@ -279,6 +279,7 @@ function buildServices(
 
   new ChargeController(
     vehicleManager,
+    chargingPointManager,
     poller,
     db,
     configService,
@@ -342,6 +343,15 @@ function buildHttpApp(
   ];
 
   const app = new Hono();
+  // Public device-facing routes mount BEFORE the browser-security and auth
+  // middleware: devices don't speak cookies or CSP, and header middleware
+  // touching a WebSocket upgrade response breaks Deno's upgrade contract
+  // ("Upgrade response was not returned from callback"), killing the serve
+  // loop. Private plugin routes mount after auth as before.
+  allRoutes
+    .filter((r) => r.public)
+    .forEach(({ fullPath, routes }) => app.route(fullPath, routes));
+
   app.use(secureHeaders({ strictTransportSecurity: false }));
   app.use(hstsMiddleware());
 
@@ -363,7 +373,9 @@ function buildHttpApp(
     }),
   );
 
-  allRoutes.forEach(({ fullPath, routes }) => app.route(fullPath, routes));
+  allRoutes
+    .filter((r) => !r.public)
+    .forEach(({ fullPath, routes }) => app.route(fullPath, routes));
 
   const trpcLogger = new Logger("tRPC", logLevel);
   setupTrpcEndpoint(app, appRouter, {

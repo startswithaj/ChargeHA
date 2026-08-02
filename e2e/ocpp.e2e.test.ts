@@ -7,6 +7,9 @@ describe("OCPP e2e", () => {
   const CP_ID = "vcp-test";
 
   beforeAll(async () => {
+    // 5s loop: the suites otherwise idle on the 30s default for most
+    // of their runtime. Config is per-stack (fresh DB every run).
+    await trpc.config.system.set.mutate({ controllerLoopSeconds: 5 });
     await ocppTrpc.plugin.charger.ocpp.setConfig.mutate({
       ocppChargerId: CP_ID,
     });
@@ -39,6 +42,13 @@ describe("OCPP e2e", () => {
       name: "E2E OCPP",
       chargerAdapterType: "ocpp",
     });
+    // Plug the cable in first: the vcp boots to Available (no cable) and
+    // the engine rightly refuses to start charging an empty connector.
+    await vcpSend("StatusNotification", {
+      connectorId: 1,
+      errorCode: "NoError",
+      status: "Preparing",
+    });
     await trpc.charger.setMode.mutate({ id: charger.id, mode: "charge_now" });
 
     // vcp auto-sends StartTransaction + StatusNotification(Charging)
@@ -53,8 +63,11 @@ describe("OCPP e2e", () => {
   });
 
   it("MeterValues flow into charger state", async () => {
-    await vcpSend("MeterValues", meterValuesPayload(7200, 1500));
+    // Re-inject each attempt: the vcp's own periodic MeterValues race a
+    // one-shot injection, so the value must be refreshed until a poll
+    // lands on it.
     const state = await waitFor(async () => {
+      await vcpSend("MeterValues", meterValuesPayload(7200, 1500));
       const list = await trpc.charger.list.query();
       const s = list.find((c) => c.state?.chargePowerKw === 7.2)?.state;
       return s ?? null;
@@ -108,10 +121,12 @@ describe("OCPP e2e", () => {
       errorCode: "NoError",
       status: "Finishing",
     });
+    // Wait for Finishing itself — !isCharging is already true from the
+    // earlier status-injection tests and would return a stale state.
     const state = await waitFor(async () => {
       const s = (await trpc.charger.list.query())
         .find((c) => c.id === charger?.id)?.state;
-      return s && !s.isCharging ? s : null;
+      return s?.status === "finishing" ? s : null;
     }, { label: "stopped" });
     expect(state.status).toBe("finishing");
   });
