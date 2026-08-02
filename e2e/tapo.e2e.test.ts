@@ -4,8 +4,8 @@ import { trpc, waitFor } from "./helpers.ts";
 import { tapoControl, tapoState } from "./tapoHelpers.ts";
 
 describe("Tapo e2e", () => {
-  const SIM_HOST = "172.28.0.50";
-  const SIM_SUBNET = "172.28.0";
+  const SIM_HOST = "172.30.99.50";
+  const SIM_SUBNET = "172.30.99";
   const CREDS = { email: "user@example.com", password: "example-password" };
 
   beforeAll(async () => {
@@ -152,8 +152,6 @@ describe("Tapo e2e", () => {
 
   it("unreachable device surfaces the health warning", async () => {
     await tapoControl({ unreachable: true });
-    // health.pluginWarnings is the real procedure (routers/health.ts:10) —
-    // collects user-facing warnings from failed plugin health checks.
     const health = await waitFor(async () => {
       const warnings = await trpc.health.pluginWarnings.query();
       return warnings.find((w) => w.title.includes("Tapo")) ?? null;

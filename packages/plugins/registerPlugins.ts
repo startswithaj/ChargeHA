@@ -14,6 +14,7 @@ import { SigenergyLocalPlugin } from "./energy/sigenergy-local/server/index.ts";
 import { EnphaseLocalPlugin } from "./energy/enphase-local/server/index.ts";
 import { SimulatedEnergyPlugin } from "./energy/simulated/server/index.ts";
 import { TapoChargerPlugin } from "./chargers/tapo/server/index.ts";
+import { OcppChargerPlugin } from "./chargers/ocpp/server/index.ts";
 
 /**
  * Instantiate every plugin the app supports and register each with its
@@ -48,4 +49,5 @@ export function registerPlugins(
     new SimulatedEnergyPlugin(make("simulated_energy")),
   );
   chargerRegistry.register(new TapoChargerPlugin(make("tapo")));
+  chargerRegistry.register(new OcppChargerPlugin(make("ocpp")));
 }

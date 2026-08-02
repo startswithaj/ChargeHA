@@ -1,4 +1,4 @@
-// e2e/run.ts — one suite: fresh stack → wait healthy → tests → teardown.
+// One suite per run: fresh stack → wait healthy → tests → teardown.
 // Usage: deno run -A e2e/run.ts <suite> [extra-compose-file...]
 const [suite, ...overrides] = Deno.args;
 const files = [

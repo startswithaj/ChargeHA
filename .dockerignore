@@ -14,3 +14,5 @@ coverage_*
 docs/
 prds/
 devtools/
+# Except the e2e device simulator — its image builds from the repo root
+!devtools/tapo-simulator/

@@ -29,7 +29,7 @@ services:
       - "18000:8000"
     networks:
       e2e:
-        ipv4_address: 172.28.0.10
+        ipv4_address: 172.30.99.10
 
   tapo-simulator:
     build:
@@ -39,10 +39,31 @@ services:
       - "18081:8081" # control API for the test runner
     networks:
       e2e:
-        ipv4_address: 172.28.0.50
+        ipv4_address: 172.30.99.50
+
+  ocpp-vcp:
+    build:
+      context: ..
+      dockerfile: docker/vcp.Dockerfile
+    environment:
+      - WS_URL=ws://app:8000/api/charger/ocpp
+      - CP_ID=vcp-test
+      - ADMIN_PORT=9999
+      # PASSWORD intentionally unset for the default suite; the Basic Auth
+      # test sets the AuthorizationKey mid-suite and restarts this service
+      # with PASSWORD via a dedicated compose override (see review note 1).
+    ports:
+      - "19999:9999" # admin API for the test runner
+    depends_on:
+      app:
+        condition: service_healthy # start only once the app probe passes
+    restart: on-failure # belt-and-braces if the first connect still races
+    networks:
+      e2e:
+        ipv4_address: 172.30.99.60
 
 networks:
   e2e:
     ipam:
       config:
-        - subnet: 172.28.0.0/24
+        - subnet: 172.30.99.0/24

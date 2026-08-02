@@ -1,0 +1,66 @@
+import { z } from "zod";
+import {
+  defineSection,
+  type SectionKeys,
+  type SectionType,
+} from "@chargeha/shared/configSections";
+
+export const ocppConfigDef = defineSection({
+  ocppChargerId: {
+    key: "charger_id",
+    // URL path component + Basic Auth (btoa) — keep it ASCII-safe.
+    schema: z.string().regex(
+      /^[A-Za-z0-9._~-]*$/,
+      "Letters, numbers, dots, dashes and underscores only",
+    ),
+    default: "",
+  },
+  // Clearable → nullable, default null (homeLatitude pattern). null clears
+  // the stored secret via the data-layer null boundary.
+  ocppAuthorizationKey: {
+    key: "authorization_key",
+    schema: z.string().nullable(),
+    default: null,
+  },
+  ocppMeterTimeoutSeconds: {
+    key: "meter_timeout_seconds",
+    schema: z.string(),
+    default: "300",
+  },
+  // Charger amp range — defaults follow the HA integration's convention
+  // (32A max) and the J1772 pilot floor (6A). User-adjustable in settings.
+  ocppMaxAmps: {
+    key: "max_amps",
+    schema: z.string(),
+    default: "32",
+  },
+  ocppMinAmps: {
+    key: "min_amps",
+    schema: z.string(),
+    default: "6",
+  },
+  // Per-charger phase count (a plug is 1; a 3-phase wall charger is 3).
+  // Used for the watts → amps derivation; the charger cannot report it.
+  ocppPhases: {
+    key: "phases",
+    schema: z.enum(["1", "3"]),
+    default: "1",
+  },
+  // Internal — active transaction {transactionId, meterStartWh} as JSON,
+  // persisted so a mid-charge restart keeps stop-control. Never shown in
+  // settings UI; cleared (setConfig null) on StopTransaction.
+  ocppActiveTransaction: {
+    key: "active_transaction",
+    schema: z.string().nullable(),
+    default: null,
+  },
+});
+
+export type OcppConfig = SectionType<typeof ocppConfigDef>;
+export type OcppConfigKey = SectionKeys<typeof ocppConfigDef>;
+
+// Typed against the config keys so a rename is a compile error, not a
+// silently unencrypted secret (fronius-cloud pattern).
+export const OCPP_SECRET_KEYS = [
+  "authorization_key",
+] as const satisfies readonly OcppConfigKey[];

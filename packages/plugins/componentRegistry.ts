@@ -23,6 +23,9 @@ import { EnphaseLocalConfig } from "./energy/enphase-local/client/EnphaseLocalCo
 // Tapo settings component
 import { TapoSettings } from "./chargers/tapo/client/TapoSettings.tsx";
 
+// OCPP settings component
+import { OcppSettings } from "./chargers/ocpp/client/OcppSettings.tsx";
+
 // Plugin wizard step definitions — imported from each plugin's client folder
 import {
   froniusCloudOption,
@@ -53,6 +56,10 @@ import {
   tapoChargerOption,
   tapoWizardSteps,
 } from "./chargers/tapo/client/wizardSteps.ts";
+import {
+  ocppChargerOption,
+  ocppWizardSteps,
+} from "./chargers/ocpp/client/wizardSteps.ts";
 
 /** Metadata for an energy plugin option shown on the inverter type selection step. */
 export interface EnergyPluginOption {
@@ -145,12 +152,16 @@ export interface ChargerPluginOption {
 
 /** Charger plugin options for the charger type selection step. Filled by
  *  plugin change sets (tapoChargerOption, ocppChargerOption). */
-export const chargerPluginOptions: ChargerPluginOption[] = [tapoChargerOption];
+export const chargerPluginOptions: ChargerPluginOption[] = [
+  tapoChargerOption,
+  ocppChargerOption,
+];
 
 /** Charger plugin wizard steps, keyed by charger adapter type. Filled by
  *  plugin change sets (tapo: tapoWizardSteps, ocpp: ocppWizardSteps). */
 export const chargerPluginSteps: Record<string, PluginStepDef[]> = {
   tapo: tapoWizardSteps,
+  ocpp: ocppWizardSteps,
 };
 
 /**
@@ -166,4 +177,5 @@ export const pluginSettingsComponents: Record<string, ComponentType> = {
   "enphase-local-config": EnphaseLocalConfig,
   "simulated-energy-config": SimulatedEnergyConfig,
   "tapo-settings": TapoSettings,
+  "ocpp-settings": OcppSettings,
 };
