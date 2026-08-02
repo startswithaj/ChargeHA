@@ -65,7 +65,7 @@ describe("Vehicles tRPC Router", () => {
       get: () =>
         ({
           id: "tesla",
-          createMiddleware: (row: VehicleRow) => {
+          createVehicleMiddleware: (row: VehicleRow) => {
             const adapter = new MockVehicleAdapter(row.id, MOCK_STATE);
             createdAdapters.push(adapter);
             return Promise.resolve(

@@ -1,4 +1,5 @@
 import type {
+  ChargerState,
   CumulativeEnergyData,
   EnergyData,
   VehicleChargeState,
@@ -11,6 +12,8 @@ export interface EventMap {
   energy_poll_success: Record<string, never>;
   energy_poll_failure: { error: string };
   config_changed: { key: string };
+  charger_update: ChargerState & { chargerName: string };
+  chargers_changed: Record<string, never>;
   vehicle_update: VehicleChargeState;
   /** Vehicle membership changed (added/removed) — an invalidation signal so
    *  clients refetch their vehicle lists. */

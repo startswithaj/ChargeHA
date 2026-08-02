@@ -25,6 +25,15 @@ export interface DemoVehicle {
   chargeAmps: number;
 }
 
+export interface DemoCharger {
+  id: string;
+  name: string;
+  chargerAdapterType: string;
+  mode: DemoVehicleMode;
+  priority: number;
+  vehicleId: string | null;
+}
+
 export interface DemoSchedule {
   id: string;
   vehicleId: string | null;
@@ -53,6 +62,7 @@ export interface DemoTariff {
 export interface DemoMutable {
   config: Record<string, string>;
   vehicles: DemoVehicle[];
+  chargers: DemoCharger[];
   schedules: DemoSchedule[];
   tariffs: DemoTariff[];
   authenticated: boolean;
@@ -122,6 +132,7 @@ const defaultTariffs = (): DemoTariff[] => [
 const defaultMutable = (): DemoMutable => ({
   config: defaultConfig(),
   vehicles: [],
+  chargers: [],
   schedules: [],
   tariffs: defaultTariffs(),
   authenticated: false,
@@ -150,6 +161,7 @@ export const getDemoState = (): DemoState => {
 const toMutable = (s: DemoState): DemoMutable => ({
   config: s.config,
   vehicles: s.vehicles,
+  chargers: s.chargers,
   schedules: s.schedules,
   tariffs: s.tariffs,
   authenticated: s.authenticated,

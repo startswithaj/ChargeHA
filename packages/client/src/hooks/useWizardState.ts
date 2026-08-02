@@ -4,9 +4,11 @@ import type { WizardStore } from "../components/Wizard/flow.ts";
 import type { WizardNavState } from "@chargeha/shared";
 
 const EMPTY_STATE: WizardNavState = {
-  stepId: "",
-  vehicleType: "",
-  energyType: "",
+  stepId: null,
+  vehicleType: null,
+  energyType: null,
+  chargerType: null,
+  controlPath: null,
 };
 
 /**
@@ -39,13 +41,17 @@ export function useWizardState(): WizardStore {
   );
 
   const state = useMemo(() => ({
-    stepId: stateQuery.data?.stepId || "welcome",
-    vehicleType: stateQuery.data?.vehicleType ?? "",
-    energyType: stateQuery.data?.energyType ?? "",
+    stepId: stateQuery.data?.stepId ?? null,
+    vehicleType: stateQuery.data?.vehicleType ?? null,
+    energyType: stateQuery.data?.energyType ?? null,
+    chargerType: stateQuery.data?.chargerType ?? null,
+    controlPath: stateQuery.data?.controlPath ?? null,
   }), [
     stateQuery.data?.stepId,
     stateQuery.data?.vehicleType,
     stateQuery.data?.energyType,
+    stateQuery.data?.chargerType,
+    stateQuery.data?.controlPath,
   ]);
 
   return { state, patch, isLoading: stateQuery.isLoading };

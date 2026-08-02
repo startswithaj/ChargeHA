@@ -71,18 +71,27 @@ export const wizardMutations: WizardMutations = {
   },
 
   "wizard.patchState": (input) => {
-    updateDemoState((m) => ({
-      ...m,
-      config: {
-        ...m.config,
-        ...(input.stepId !== undefined ? { wizard_step: input.stepId } : {}),
-        ...(input.vehicleType !== undefined
-          ? { wizard_vehicle_type: input.vehicleType }
-          : {}),
-        ...(input.energyType !== undefined
-          ? { wizard_energy_type: input.energyType }
-          : {}),
-      },
-    }));
+    const patch: Record<string, string | null> = {
+      ...(input.stepId !== undefined ? { wizard_step: input.stepId } : {}),
+      ...(input.vehicleType !== undefined
+        ? { wizard_vehicle_type: input.vehicleType }
+        : {}),
+      ...(input.energyType !== undefined
+        ? { wizard_energy_type: input.energyType }
+        : {}),
+      ...(input.chargerType !== undefined
+        ? { wizard_charger_type: input.chargerType }
+        : {}),
+      ...(input.controlPath !== undefined
+        ? { wizard_control_path: input.controlPath }
+        : {}),
+    };
+    updateDemoState((m) => {
+      const merged = { ...m.config, ...patch };
+      const config = Object.fromEntries(
+        Object.entries(merged).filter(([, v]) => v !== null),
+      ) as Record<string, string>;
+      return { ...m, config };
+    });
   },
 };

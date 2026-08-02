@@ -255,23 +255,35 @@ export const internalConfigDef = defineSection({
   },
   wizardStep: {
     key: "wizard_step",
-    schema: z.string(),
-    default: "",
+    schema: z.string().nullable(),
+    default: null,
   },
   wizardVehicleType: {
     key: "wizard_vehicle_type",
-    schema: z.string(),
-    default: "",
+    schema: z.string().nullable(),
+    default: null,
   },
   wizardEnergyType: {
     key: "wizard_energy_type",
-    schema: z.string(),
-    default: "",
+    schema: z.string().nullable(),
+    default: null,
   },
   wizardOidcPending: {
     key: "wizard_oidc_pending",
     schema: z.string(),
     default: "",
+  },
+  wizardChargerType: {
+    key: "wizard_charger_type",
+    schema: z.string().nullable(),
+    default: null,
+  },
+  wizardControlPath: {
+    key: "wizard_control_path",
+    // null = the charger question has not been answered — the wizard blocks
+    // on it. Migrated installs get "vehicle" written once by the migration.
+    schema: z.enum(["charger", "vehicle"]).nullable(),
+    default: null,
   },
 });
 export type InternalConfig = SectionType<typeof internalConfigDef>;

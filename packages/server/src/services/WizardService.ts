@@ -18,7 +18,16 @@ const NAV_CONFIG_KEYS: Record<keyof WizardNavState, CoreConfigKey> = {
   stepId: "wizard_step",
   vehicleType: "wizard_vehicle_type",
   energyType: "wizard_energy_type",
+  chargerType: "wizard_charger_type",
+  controlPath: "wizard_control_path",
 };
+
+/** Narrow the stored string to the union; anything else reads as
+ *  unanswered rather than guessing. */
+function parseControlPath(raw: string | null): "charger" | "vehicle" | null {
+  if (raw === "charger" || raw === "vehicle") return raw;
+  return null;
+}
 
 export class WizardService {
   constructor(
@@ -55,7 +64,13 @@ export class WizardService {
     }
 
     // Clear wizard navigation state from DB
-    await this.patchState({ stepId: "", vehicleType: "", energyType: "" });
+    await this.patchState({
+      stepId: null,
+      vehicleType: null,
+      energyType: null,
+      chargerType: null,
+      controlPath: null,
+    });
 
     // Clear OIDC pending flag if set
     await this.db.setConfig("wizard_oidc_pending", "");
@@ -68,15 +83,20 @@ export class WizardService {
   // ── Wizard navigation state (persisted to DB config keys) ────────────────
 
   async getState(): Promise<WizardNavState> {
-    const [stepId, vehicleType, energyType] = await Promise.all([
-      this.db.getConfig(NAV_CONFIG_KEYS.stepId),
-      this.db.getConfig(NAV_CONFIG_KEYS.vehicleType),
-      this.db.getConfig(NAV_CONFIG_KEYS.energyType),
-    ]);
+    const [stepId, vehicleType, energyType, chargerType, controlPath] =
+      await Promise.all([
+        this.db.getConfig(NAV_CONFIG_KEYS.stepId),
+        this.db.getConfig(NAV_CONFIG_KEYS.vehicleType),
+        this.db.getConfig(NAV_CONFIG_KEYS.energyType),
+        this.db.getConfig(NAV_CONFIG_KEYS.chargerType),
+        this.db.getConfig(NAV_CONFIG_KEYS.controlPath),
+      ]);
     return {
-      stepId: stepId ?? "",
-      vehicleType: vehicleType ?? "",
-      energyType: energyType ?? "",
+      stepId,
+      vehicleType,
+      energyType,
+      chargerType,
+      controlPath: parseControlPath(controlPath),
     };
   }
 

@@ -172,7 +172,7 @@ export function makeMockRegistry(
 ): VehiclePluginRegistry {
   const plugin = throwingMock<VehiclePlugin>("VehiclePlugin[tesla]", {
     id: "tesla",
-    createMiddleware: (row: VehicleRow) =>
+    createVehicleMiddleware: (row: VehicleRow) =>
       Promise.resolve(
         new TeslaVehicleMiddleware(
           resolveAdapter(row) as unknown as VehicleAdapter,

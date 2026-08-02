@@ -91,6 +91,7 @@ vi.mock("@chargeha/plugins/componentRegistry", () => ({
       },
     ],
   },
+  chargerPluginSteps: {},
 }));
 vi.mock("./hooks/useWizardState.ts", () => ({
   useWizardState: vi.fn(() => ({

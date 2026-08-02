@@ -33,22 +33,26 @@ export function clearPluginOnboarding(pluginId: string): void {
 export function usePluginOnboardingState(
   pluginId: string,
   defaultStepId: string,
-  kind: "vehicle" | "energy",
+  kind: "vehicle" | "energy" | "charger",
 ): PluginOnboardingStore {
   const key = onboardingKey(pluginId);
   const [stepId, setStepId, clear] = useStoredState(key, defaultStepId);
 
   const state = useMemo(() => ({
     stepId,
-    vehicleType: kind === "vehicle" ? pluginId : "",
-    energyType: kind === "energy" ? pluginId : "",
+    vehicleType: kind === "vehicle" ? pluginId : null,
+    energyType: kind === "energy" ? pluginId : null,
+    chargerType: kind === "charger" ? pluginId : null,
+    controlPath: null,
   }), [stepId, pluginId, kind]);
 
   const patch = useCallback(
     (next: Partial<WizardNavState>) => {
-      if (next.stepId !== undefined) setStepId(next.stepId);
+      if (next.stepId !== undefined) {
+        next.stepId === null ? clear() : setStepId(next.stepId);
+      }
     },
-    [setStepId],
+    [setStepId, clear],
   );
 
   return { state, patch, isLoading: false, clear };

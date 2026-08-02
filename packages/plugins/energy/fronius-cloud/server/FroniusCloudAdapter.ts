@@ -33,10 +33,6 @@ export class FroniusCloudParseError extends Error {
 }
 
 export class FroniusCloudAdapter implements EnergySourceAdapter {
-  pollIntervalSeconds(): number {
-    return 30;
-  }
-
   private loginEmail: string;
   private loginPassword: string;
   private pvSystemId: string;
@@ -45,6 +41,10 @@ export class FroniusCloudAdapter implements EnergySourceAdapter {
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
   private tokenExpiresAt: number = 0; // Unix timestamp in ms
+
+  pollIntervalSeconds(): number {
+    return 30;
+  }
 
   constructor(
     loginEmail: string,

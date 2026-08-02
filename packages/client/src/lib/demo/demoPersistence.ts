@@ -11,7 +11,8 @@ const isDemoMutable = (v: unknown): v is DemoMutable => {
   if (typeof v !== "object" || v === null) return false;
   const m = v as Record<string, unknown>;
   return typeof m.config === "object" && m.config !== null &&
-    Array.isArray(m.vehicles) && Array.isArray(m.schedules) &&
+    Array.isArray(m.vehicles) && Array.isArray(m.chargers) &&
+    Array.isArray(m.schedules) &&
     Array.isArray(m.tariffs) && typeof m.authenticated === "boolean";
 };
 

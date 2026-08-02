@@ -1,6 +1,5 @@
 /// <reference lib="deno.ns" />
 import { TRPCError } from "@trpc/server";
-import type { Hono } from "hono";
 import type { VehicleRow } from "@chargeha/server/db/types";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import { generateEcKeyPair } from "@chargeha/server/lib/Encryption";
@@ -8,6 +7,7 @@ import type {
   CommandStatus,
   HealthCheckResult,
   PluginHealthCheck,
+  PluginHttpRoutes,
   PluginTunnelRoute,
   VehicleMiddleware,
   VehiclePlugin,
@@ -107,7 +107,7 @@ export class TeslaVehiclePlugin implements VehiclePlugin {
     await Promise.all(rows.map((row) => this.deps.addVehicle(row)));
   }
 
-  async createMiddleware(row: VehicleRow): Promise<VehicleMiddleware> {
+  async createVehicleMiddleware(row: VehicleRow): Promise<VehicleMiddleware> {
     const proxyUrl = (await this.deps.getConfig("proxy_url")) ??
       DEFAULT_PROXY_URL;
     const adapter = new TeslaAdapter(
@@ -210,8 +210,8 @@ export class TeslaVehiclePlugin implements VehiclePlugin {
     return { commandsDisabled: false, reason: null };
   }
 
-  getHttpRoutes(): Hono | null {
-    return createTeslaHttpRoutes(this.teslaTokenManager, this.deps);
+  getVehicleHttpRoutes(): PluginHttpRoutes | null {
+    return { routes: createTeslaHttpRoutes(this.teslaTokenManager, this.deps) };
   }
 
   getTunnelRoutes(): PluginTunnelRoute[] {

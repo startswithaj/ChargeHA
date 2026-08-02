@@ -17,7 +17,13 @@ const { mockAdvance, mockDemoMutate, captured, mockVehicleList } = vi
 
 vi.mock("../../../hooks/useWizardState.ts", () => ({
   useWizardState: vi.fn(() => ({
-    state: { stepId: "vehicle-type", vehicleType: "", energyType: "" },
+    state: {
+      stepId: "vehicle-type",
+      vehicleType: null,
+      energyType: null,
+      chargerType: null,
+      controlPath: null,
+    },
     patch: vi.fn(),
     isLoading: false,
   })),
@@ -146,7 +152,7 @@ describe("VehicleTypeStep", () => {
   });
 
   it("Next commits the existing vehicle type when the wizard state has none", async () => {
-    // Re-opened wizard: the card shows selected off the existing vehicle while state.vehicleType is "", so Next must write it.
+    // Re-opened wizard: the card shows selected off the existing vehicle while state.vehicleType is null, so Next must write it.
     mockVehicleList.mockReturnValue({
       data: { vehicles: [{ adapterType: "tesla" }] },
     });

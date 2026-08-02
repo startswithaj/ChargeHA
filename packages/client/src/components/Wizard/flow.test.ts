@@ -29,8 +29,10 @@ describe("flow", () => {
 
   const state = (overrides: Partial<WizardNavState> = {}): WizardNavState => ({
     stepId: "welcome",
-    vehicleType: "",
-    energyType: "",
+    vehicleType: null,
+    energyType: null,
+    chargerType: null,
+    controlPath: null,
     ...overrides,
   });
 

@@ -163,6 +163,69 @@ export interface SimulationControls {
   setLocation(lat: number, lng: number): void;
 }
 
+// ---- Charger Types ----
+
+export type ChargerControlMode = "amps" | "switch";
+
+export type ChargerStatus =
+  | "available"
+  | "preparing"
+  | "charging"
+  | "suspended"
+  | "faulted"
+  | "finishing"
+  | "no_draw";
+
+export interface ChargerState {
+  chargerId: string;
+  isCharging: boolean;
+  /** null = this charger type cannot observe cable state (smart plugs). */
+  isPluggedIn: boolean | null;
+  /** Measured fields: null = not measured, never zero. Core derives amps
+   *  from measured watts when null (see ChargingPointManager). */
+  chargeAmps: number | null;
+  chargeAmpsMax: number;
+  chargeAmpsMin: number;
+  chargePowerKw: number | null;
+  chargerVoltage: number | null;
+  chargerPhases: number;
+  energyAddedKwh: number;
+  status: ChargerStatus;
+  /** The adapter's native status, as close to the device as possible. */
+  statusDetail: string | null;
+  lastUpdated: string;
+}
+
+export interface ChargerInfo {
+  id: string;
+  name: string;
+  vendor: string;
+  model: string;
+  firmwareVersion: string;
+  maxAmps: number;
+  minAmps: number;
+  phases: number;
+  connectorCount: number;
+  controlMode: ChargerControlMode;
+}
+
+export interface ChargerAdapter {
+  // No connect(): adapters reach their device lazily on first use — an
+  // offline device can never block startup. Setup-time validation lives in
+  // each plugin's testConnection procedure.
+  disconnect(): Promise<void>;
+  startCharging(ctx: CallContext): Promise<boolean>;
+  stopCharging(ctx: CallContext): Promise<boolean>;
+  setChargeAmps(amps: number, ctx: CallContext): Promise<boolean>;
+  getChargerState(ctx: CallContext): Promise<ChargerState>;
+  getChargerInfo(ctx: CallContext): Promise<ChargerInfo>;
+  /** null = push-based (no polling); a number = min seconds between fetches. */
+  pollIntervalSeconds(): number | null;
+}
+
+/** Charging point mode reuses the existing values ("auto"|"charge_now"|"stop"). */
+export type ChargingPointMode = VehicleMode;
+
 // ---- Schedule Types ----
 
 export type DayOfWeek = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
@@ -345,7 +408,9 @@ export type SSEEvent =
       targetAmps: number | null;
       checksJson: string;
     };
-  };
+  }
+  | { type: "charger_update"; data: ChargerState & { chargerName: string } }
+  | { type: "chargers_changed"; data: Record<string, never> };
 
 // ---- Timestamped wrapper for API responses ----
 
@@ -438,10 +503,16 @@ export interface VehicleSocSnapshot {
  *  Read and written as one record so the step id can never name a step the
  *  current selections haven't put in the list. */
 export interface WizardNavState {
-  /** Current step ID (e.g. "welcome", "tesla-credentials"). */
-  stepId: string;
-  /** Selected vehicle type (e.g. "tesla", "simulated"). */
-  vehicleType: string;
-  /** Selected energy type (e.g. "fronius_local", "fronius_cloud", ""). */
-  energyType: string;
+  /** null = wizard not started (the old "" sentinel, retired). */
+  stepId: string | null;
+  /** null = not selected. The existing "" sentinels migrate to null; the
+   *  WizardService data layer maps null ↔ absent config key (code.md: no
+   *  empty-string sentinels). */
+  vehicleType: string | null;
+  energyType: string | null;
+  chargerType: string | null;
+  /** The installation's control-path decision. null = the
+   *  question has not been answered — the wizard blocks until it is.
+   *  Migration writes "vehicle" once for existing installs. */
+  controlPath: "charger" | "vehicle" | null;
 }

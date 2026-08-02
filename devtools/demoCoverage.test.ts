@@ -49,6 +49,7 @@ const realPaths = (type: "query" | "mutation"): string[] => {
         stubDeps("simulated_energy"),
       ),
     },
+    charger: {},
   });
   const procedures = (merged as unknown as {
     _def: { procedures: Record<string, ProcedureDef> };

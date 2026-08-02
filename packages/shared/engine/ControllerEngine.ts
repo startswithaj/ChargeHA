@@ -137,7 +137,8 @@ export class ControllerEngine {
     }
 
     checks.push(DecisionChecks.pluggedIn(state.isPluggedIn));
-    if (!state.isPluggedIn) {
+    // null (unknown) is treated as plugged in — only a definite false blocks.
+    if (state.isPluggedIn === false) {
       return {
         decision: {
           action: "none",
@@ -498,7 +499,11 @@ export class ControllerEngine {
       return { decision: minExcess.decision, checks };
     }
 
-    const voltage = SolarAllocator.resolveVoltage(state, energy, config);
+    const voltage = SolarAllocator.resolveVoltage(
+      state.chargerVoltage,
+      energy,
+      config.gridVoltage,
+    );
     const phases = SolarAllocator.resolvePhases(state, config);
 
     const availableW = SolarAllocator.calculateAvailableSolar(
@@ -856,7 +861,11 @@ export class ControllerEngine {
     if (config.consumptionExcludesCharging || !state.isCharging) {
       return -energy.gridPowerW / 1000;
     }
-    const voltage = SolarAllocator.resolveVoltage(state, energy, config);
+    const voltage = SolarAllocator.resolveVoltage(
+      state.chargerVoltage,
+      energy,
+      config.gridVoltage,
+    );
     const phases = SolarAllocator.resolvePhases(state, config);
     const currentChargingW = state.chargeAmps * voltage * phases;
     return (-energy.gridPowerW + currentChargingW) / 1000;

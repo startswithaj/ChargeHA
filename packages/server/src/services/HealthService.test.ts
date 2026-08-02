@@ -3,11 +3,13 @@ import { expect } from "@std/expect";
 import { HealthService } from "./HealthService.ts";
 import type { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
 import { EnergyPluginRegistry } from "@chargeha/server/bootstrap/EnergyPluginRegistry";
+import { ChargerPluginRegistry } from "@chargeha/server/bootstrap/ChargerPluginRegistry";
 import type { PluginHealthCheck } from "@chargeha/plugins/types";
 import { throwingMock } from "../test-helpers/throwingMock.ts";
 
 describe("HealthService", () => {
   const emptyEnergyRegistry = new EnergyPluginRegistry();
+  const emptyChargerRegistry = new ChargerPluginRegistry();
 
   const createMockRegistry = (
     checks: PluginHealthCheck[] = [],
@@ -21,6 +23,7 @@ describe("HealthService", () => {
       const service = new HealthService(
         createMockRegistry(),
         emptyEnergyRegistry,
+        emptyChargerRegistry,
         null,
       );
       expect(service.checkEncryption()).toEqual({ configured: false });
@@ -30,6 +33,7 @@ describe("HealthService", () => {
       const service = new HealthService(
         createMockRegistry(),
         emptyEnergyRegistry,
+        emptyChargerRegistry,
         "test-key",
       );
       expect(service.checkEncryption()).toEqual({ configured: true });
@@ -41,6 +45,7 @@ describe("HealthService", () => {
       const service = new HealthService(
         createMockRegistry([]),
         emptyEnergyRegistry,
+        emptyChargerRegistry,
         null,
       );
       const result = await service.getPluginWarnings();
@@ -57,6 +62,7 @@ describe("HealthService", () => {
       const service = new HealthService(
         createMockRegistry(checks),
         emptyEnergyRegistry,
+        emptyChargerRegistry,
         null,
       );
       const result = await service.getPluginWarnings();
@@ -74,6 +80,7 @@ describe("HealthService", () => {
       const service = new HealthService(
         createMockRegistry(checks),
         emptyEnergyRegistry,
+        emptyChargerRegistry,
         null,
       );
       const result = await service.getPluginWarnings();
@@ -93,6 +100,7 @@ describe("HealthService", () => {
       const service = new HealthService(
         createMockRegistry(checks),
         emptyEnergyRegistry,
+        emptyChargerRegistry,
         null,
       );
       const result = await service.getPluginWarnings();
@@ -111,6 +119,7 @@ describe("HealthService", () => {
       const service = new HealthService(
         createMockRegistry(checks),
         emptyEnergyRegistry,
+        emptyChargerRegistry,
         null,
       );
       const result = await service.getPluginWarnings();
@@ -128,6 +137,7 @@ describe("HealthService", () => {
       const service = new HealthService(
         createMockRegistry(checks),
         emptyEnergyRegistry,
+        emptyChargerRegistry,
         null,
       );
       const result = await service.getPluginWarnings();
@@ -152,6 +162,7 @@ describe("HealthService", () => {
       const service = new HealthService(
         createMockRegistry(checks),
         emptyEnergyRegistry,
+        emptyChargerRegistry,
         null,
       );
       const result = await service.getPluginWarnings();

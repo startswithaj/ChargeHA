@@ -4,9 +4,11 @@ import type { SectionDef } from "@chargeha/shared/configSections";
 import type {
   AdapterVehicleChargeState,
   CallContext,
+  ChargerInfo,
+  ChargerState,
   EnergySourceAdapter,
 } from "@chargeha/shared";
-import type { VehicleRow } from "@chargeha/server/db/types";
+import type { ChargerRow, VehicleRow } from "@chargeha/server/db/types";
 
 // ── Health Check Types ──────────────────────────────────────────────────────
 
@@ -35,6 +37,30 @@ export interface PluginTunnelRoute {
   /** If true, proxy the request to the main ChargeHA server at the same path. */
   proxy?: boolean;
 }
+
+// ── HTTP Route Types ────────────────────────────────────────────────────────
+
+/** HTTP routes a plugin contributes. Core owns the URL — vehicles mount at
+ *  /api/vehicle/<id>, chargers at /api/charger/<id>; plugins only supply
+ *  the router. public marks device-facing endpoints that cannot do session
+ *  auth; they apply their own device-appropriate auth in the handler. */
+export interface PluginHttpRoutes {
+  routes: Hono;
+  public?: boolean;
+}
+
+/** The single place URL policy is applied, used by both registries. */
+export const resolveHttpRoutes = (
+  prefix: string,
+  entries: Array<[string, PluginHttpRoutes | null]>,
+): Array<{ fullPath: string; routes: Hono; public: boolean }> =>
+  entries
+    .filter((entry): entry is [string, PluginHttpRoutes] => entry[1] !== null)
+    .map(([id, httpRoutes]) => ({
+      fullPath: `${prefix}/${id}`,
+      routes: httpRoutes.routes,
+      public: httpRoutes.public ?? false,
+    }));
 
 // ── Base Plugin Interface ───────────────────────────────────────────────────
 
@@ -67,8 +93,8 @@ export interface CommandStatus {
 
 export interface VehiclePlugin extends BasePlugin {
   readonly settingsComponentKey: string | null;
-  createMiddleware(row: VehicleRow): Promise<VehicleMiddleware>;
-  getHttpRoutes(): Hono | null;
+  createVehicleMiddleware(row: VehicleRow): Promise<VehicleMiddleware>;
+  getVehicleHttpRoutes(): PluginHttpRoutes | null;
   getTunnelRoutes(): PluginTunnelRoute[];
   /** Whether this plugin's vehicles can accept commands right now, with a
    *  user-facing reason when they can't. */
@@ -137,4 +163,36 @@ export interface EnergyPlugin extends BasePlugin {
   /** Build the energy adapter from current config. Called by
    *  EnergyAdapterManager during initial setup and on reconfigure. */
   createAdapter(): Promise<EnergySourceAdapter>;
+}
+
+// ── Charger Middleware ──────────────────────────────────────────────────────
+
+/** Same layering as vehicles: the manager never touches an adapter
+ *  directly — everything flows through the middleware, which owns caching
+ *  and fetch-cost decisions. */
+export interface ChargerMiddleware {
+  /** Request charger state. The middleware decides cache vs fresh fetch
+   *  based on its polling/push model. */
+  requestState(ctx: CallContext): Promise<ChargerState | null>;
+  /** Last cached state, no device calls triggered. */
+  getCachedState(): ChargerState | null;
+  // No `online` flag: nothing consumes it, and it would lie for push
+  // adapters (a cached read never fails). Connectivity surfaces through
+  // status: "faulted" + statusDetail, which the UI already renders.
+  getChargerInfo(ctx: CallContext): Promise<ChargerInfo>;
+  startCharging(ctx: CallContext): Promise<boolean>;
+  stopCharging(ctx: CallContext): Promise<boolean>;
+  setChargeAmps(amps: number, ctx: CallContext): Promise<boolean>;
+  /** Release device connections/timers on shutdown or rebuild. */
+  shutdown(): Promise<void>;
+}
+
+// ── Charger Plugin ──────────────────────────────────────────────────────────
+
+export interface ChargerPlugin extends BasePlugin {
+  readonly vendor: string;
+  readonly settingsComponentKey: string | null;
+  /** row carries the charger's config — plugins never query the DB. */
+  createChargerMiddleware(row: ChargerRow): Promise<ChargerMiddleware>;
+  getChargerHttpRoutes(): PluginHttpRoutes | null;
 }

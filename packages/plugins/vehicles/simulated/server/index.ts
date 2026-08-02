@@ -55,7 +55,7 @@ export class SimulatedVehiclePlugin implements VehiclePlugin {
   }
 
   // deno-lint-ignore require-await
-  async createMiddleware(row: VehicleRow): Promise<VehicleMiddleware> {
+  async createVehicleMiddleware(row: VehicleRow): Promise<VehicleMiddleware> {
     const userConfig = row.config ? parseVehicleConfig(row.config) : {};
     const sim = new SimulatedVehicleAdapter(
       row.id,
@@ -101,7 +101,7 @@ export class SimulatedVehiclePlugin implements VehiclePlugin {
     return Promise.resolve({ commandsDisabled: false, reason: null });
   }
 
-  getHttpRoutes(): null {
+  getVehicleHttpRoutes(): null {
     return null;
   }
 

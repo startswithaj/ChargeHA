@@ -29,7 +29,8 @@ type FullAppRouter = ReturnType<
       fronius_local: ReturnType<typeof createFroniusLocalRouter>;
       fronius_cloud: ReturnType<typeof createFroniusCloudRouter>;
       simulated_energy: ReturnType<typeof createSimulatedEnergyRouter>;
-    }
+    },
+    Record<never, never>
   >
 >;
 

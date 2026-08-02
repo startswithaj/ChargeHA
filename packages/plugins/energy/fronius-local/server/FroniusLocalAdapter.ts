@@ -20,14 +20,14 @@ export class FroniusParseError extends Error {
 }
 
 export class FroniusLocalAdapter implements EnergySourceAdapter {
-  pollIntervalSeconds(): number {
-    return 10;
-  }
-
   private host: string;
   private meterDeviceId: number;
   private baseUrl: string;
   private logger: Logger;
+
+  pollIntervalSeconds(): number {
+    return 10;
+  }
 
   constructor(host: string, meterDeviceId = 0, logger: Logger) {
     this.host = host;

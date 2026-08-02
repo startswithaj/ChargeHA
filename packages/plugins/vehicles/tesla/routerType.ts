@@ -4,6 +4,7 @@ import type { createTeslaRouter } from "./server/router.ts";
 export type TeslaAppRouter = ReturnType<
   typeof createAppRouter<
     { tesla: ReturnType<typeof createTeslaRouter> },
+    Record<string, never>,
     Record<string, never>
   >
 >;

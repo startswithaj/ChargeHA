@@ -1,7 +1,7 @@
 /// <reference lib="deno.ns" />
 import { Buffer } from "node:buffer";
 import type { Logger } from "@chargeha/server/lib/Logger";
-import { NetworkDiscovery } from "../../NetworkDiscovery.ts";
+import { NetworkDiscovery } from "../../../discovery/NetworkDiscovery.ts";
 import {
   JsmodbusReader,
   type ModbusReader,

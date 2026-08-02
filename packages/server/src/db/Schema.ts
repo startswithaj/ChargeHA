@@ -183,6 +183,20 @@ export const sessions = sqliteTable("sessions", {
   index("idx_sessions_expires_at").on(table.expiresAt),
 ]);
 
+// ---- Chargers ----
+
+export const chargers = sqliteTable("chargers", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  chargerAdapterType: text("charger_adapter_type").notNull(),
+  chargerConfig: text("charger_config").notNull().default("{}"),
+  mode: text("mode").notNull().default("auto"),
+  priority: integer("priority").notNull().default(1),
+  vehicleId: text("vehicle_id"),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
+});
+
 // ---- Tariff Periods ----
 
 export const tariffPeriods = sqliteTable("tariff_periods", {

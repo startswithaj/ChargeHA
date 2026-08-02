@@ -149,6 +149,11 @@ vi.mock("../../../trpc.ts", () => ({
           fetch: mockLocationFetch,
         },
       },
+      charger: {
+        list: {
+          invalidate: vi.fn(),
+        },
+      },
     })),
     vehicle: {
       list: {
@@ -156,6 +161,39 @@ vi.mock("../../../trpc.ts", () => ({
           data: { vehicles: [] },
           isLoading: false,
           error: null,
+        })),
+      },
+    },
+    charger: {
+      list: {
+        useQuery: vi.fn(() => ({
+          data: [],
+          isLoading: false,
+          error: null,
+        })),
+      },
+      remove: {
+        useMutation: vi.fn((_opts?: { onSuccess?: () => void }) => ({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn(),
+          isPending: false,
+          isSuccess: false,
+          isError: false,
+          error: null,
+          data: undefined,
+          reset: vi.fn(),
+        })),
+      },
+      reorder: {
+        useMutation: vi.fn((_opts?: { onSuccess?: () => void }) => ({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn(),
+          isPending: false,
+          isSuccess: false,
+          isError: false,
+          error: null,
+          data: undefined,
+          reset: vi.fn(),
         })),
       },
     },

@@ -4,12 +4,17 @@ import {
 } from "drizzle-orm/better-sqlite3";
 import type { DatabaseDriver } from "@chargeha/shared/database-driver";
 import { CompatDatabase } from "./SqliteCompat.ts";
-import type { EnergyData, VehicleMode } from "@chargeha/shared";
+import type {
+  ChargingPointMode,
+  EnergyData,
+  VehicleMode,
+} from "@chargeha/shared";
 import type { CoreConfigKey } from "@chargeha/shared/configSections";
 import { Logger } from "../lib/Logger.ts";
 import { readSecret, storeSecret } from "../lib/Encryption.ts";
 import type { TypedEventEmitter } from "../services/TypedEventEmitter.ts";
 import { runMigrations } from "./MigrationRunner.ts";
+import { ChargerRepository } from "./repositories/ChargerRepository.ts";
 import { ConfigRepository } from "./repositories/ConfigRepository.ts";
 import { EnergyRepository } from "./repositories/EnergyRepository.ts";
 import { LogRepository } from "./repositories/LogRepository.ts";
@@ -20,6 +25,7 @@ import { StatsRepository } from "./repositories/StatsRepository.ts";
 import { VehicleRepository } from "./repositories/VehicleRepository.ts";
 
 import type {
+  ChargerRow,
   ControllerLogInput,
   ControllerLogRow,
   CreateLocalUserInput,
@@ -34,6 +40,7 @@ import type {
   ScheduleRow,
   SessionRow,
   TariffPeriodRow,
+  UpsertChargerInput,
   UpsertOidcConfigInput,
   UpsertVehicleInput,
   VehicleChargeReadingInput,
@@ -43,17 +50,11 @@ import type {
 
 export class AppDatabase {
   private sqlite: DatabaseDriver;
-
-  /** Low-level driver access for seed scripts and migrations.
-   *  Not for runtime use — services should go through the repositories. */
-  getDriver(): DatabaseDriver {
-    return this.sqlite;
-  }
-
   private logger: Logger;
   private readonly encryptionKey: string | null;
   private readonly eventEmitter: TypedEventEmitter | null;
   db: BetterSQLite3Database;
+  chargers: ChargerRepository;
   config: ConfigRepository;
   energy: EnergyRepository;
   logs: LogRepository;
@@ -62,6 +63,12 @@ export class AppDatabase {
   stats: StatsRepository;
   tariffs: TariffRepository;
   vehicles: VehicleRepository;
+
+  /** Low-level driver access for seed scripts and migrations.
+   *  Not for runtime use — services should go through the repositories. */
+  getDriver(): DatabaseDriver {
+    return this.sqlite;
+  }
 
   constructor(
     pathOrDb: string | DatabaseDriver,
@@ -80,6 +87,7 @@ export class AppDatabase {
     this.sqlite.exec("PRAGMA journal_mode = WAL");
     this.sqlite.exec("PRAGMA busy_timeout = 5000");
     this.db = drizzle(this.sqlite as unknown as Parameters<typeof drizzle>[0]);
+    this.chargers = new ChargerRepository(this.db);
     this.config = new ConfigRepository(this.db);
     this.energy = new EnergyRepository(this.db);
     this.logs = new LogRepository(this.db);
@@ -125,7 +133,7 @@ export class AppDatabase {
   async getConfig(key: CoreConfigKey): Promise<string | null> {
     return await this.config.getConfig(key);
   }
-  async setConfig(key: CoreConfigKey, value: string): Promise<void> {
+  async setConfig(key: CoreConfigKey, value: string | null): Promise<void> {
     await this.config.setConfig(key, value);
     this.eventEmitter?.emit("config_changed", { key });
   }
@@ -135,7 +143,7 @@ export class AppDatabase {
   async getPluginConfig(key: string): Promise<string | null> {
     return await this.config.getConfig(key);
   }
-  async setPluginConfig(key: string, value: string): Promise<void> {
+  async setPluginConfig(key: string, value: string | null): Promise<void> {
     await this.config.setConfig(key, value);
     this.eventEmitter?.emit("config_changed", { key });
   }
@@ -159,8 +167,13 @@ export class AppDatabase {
    * is set. Wraps the low-level `setSecret` so callers don't need to know
    * about encryption.
    */
-  async storeSecret(key: string, plaintext: string): Promise<void> {
-    await storeSecret(this, key, plaintext, this.encryptionKey);
+  async storeSecret(key: string, plaintext: string | null): Promise<void> {
+    // null deletes the row
+    if (plaintext === null) {
+      await this.config.setConfig(key, null);
+    } else {
+      await storeSecret(this, key, plaintext, this.encryptionKey);
+    }
     this.eventEmitter?.emit("config_changed", { key });
   }
   /**
@@ -204,6 +217,28 @@ export class AppDatabase {
   }
   async pruneVehicleChargeReadings(retentionDays: number): Promise<void> {
     return await this.vehicles.pruneVehicleChargeReadings(retentionDays);
+  }
+  // ---- Chargers ----
+  async getChargers(): Promise<ChargerRow[]> {
+    return await this.chargers.getChargers();
+  }
+  async getCharger(id: string): Promise<ChargerRow | null> {
+    return await this.chargers.getCharger(id);
+  }
+  async upsertCharger(input: UpsertChargerInput): Promise<void> {
+    await this.chargers.upsertCharger(input);
+  }
+  async updateChargerMode(id: string, mode: ChargingPointMode): Promise<void> {
+    await this.chargers.updateChargerMode(id, mode);
+  }
+  async updateChargerPriority(id: string, priority: number): Promise<void> {
+    await this.chargers.updateChargerPriority(id, priority);
+  }
+  async deleteCharger(id: string): Promise<void> {
+    await this.chargers.deleteCharger(id);
+  }
+  async resequenceChargerPriorities(): Promise<void> {
+    await this.chargers.resequencePriorities();
   }
   // ---- Schedules ----
   async getSchedules(): Promise<ScheduleRow[]> {

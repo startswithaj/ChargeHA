@@ -64,7 +64,13 @@ describe("WizardShell", () => {
     off ? { ...step, owner: "unpicked" } : step;
 
   const makeStore = (overrides: Partial<WizardStore> = {}): WizardStore => ({
-    state: { stepId: currentStepId, vehicleType: "", energyType: "" },
+    state: {
+      stepId: currentStepId,
+      vehicleType: "",
+      energyType: "",
+      chargerType: null,
+      controlPath: null,
+    },
     patch: mockPatch,
     isLoading: false,
     ...overrides,
@@ -219,6 +225,8 @@ describe("WizardShell", () => {
             stepId: "inverter-type",
             vehicleType: "tesla",
             energyType: "",
+            chargerType: null,
+            controlPath: null,
           },
         })}
         basePath="/wizard"
@@ -245,6 +253,8 @@ describe("WizardShell", () => {
             stepId: "tesla-credentials",
             vehicleType: "tesla",
             energyType: "",
+            chargerType: null,
+            controlPath: null,
           },
         })}
         basePath="/wizard"
@@ -272,6 +282,8 @@ describe("WizardShell", () => {
             stepId: "tesla-credentials",
             vehicleType: "tesla",
             energyType: "",
+            chargerType: null,
+            controlPath: null,
           },
         })}
         basePath="/wizard"

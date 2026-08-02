@@ -175,8 +175,8 @@ A demo shortcut creates a simulated vehicle and skips plugin-specific config.
 
 - **No empty-string sentinels** — absence is `null` (or `undefined`), never
   `""`. If a storage layer cannot hold null, the data layer converts at the
-  boundary (e.g. absent config key ↔ `null`); application code never checks
-  `""` to mean "not set".
+  boundary (e.g. absent config key ↔ `null`); application code never checks `""`
+  to mean "not set".
 
 ### Server
 

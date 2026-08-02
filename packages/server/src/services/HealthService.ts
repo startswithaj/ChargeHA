@@ -1,5 +1,6 @@
 import type { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
 import type { EnergyPluginRegistry } from "@chargeha/server/bootstrap/EnergyPluginRegistry";
+import type { ChargerPluginRegistry } from "@chargeha/server/bootstrap/ChargerPluginRegistry";
 import type {
   HealthCheckResult,
   PluginHealthCheck,
@@ -31,6 +32,7 @@ export class HealthService {
   constructor(
     private readonly vehiclePlugins: VehiclePluginRegistry,
     private readonly energyPlugins: EnergyPluginRegistry,
+    private readonly chargerPlugins: ChargerPluginRegistry,
     private readonly encryptionKey: string | null,
   ) {}
 
@@ -46,6 +48,7 @@ export class HealthService {
     const checks = [
       ...this.vehiclePlugins.getHealthChecks(),
       ...this.energyPlugins.getHealthChecks(),
+      ...this.chargerPlugins.getHealthChecks(),
     ];
     if (checks.length === 0) return [];
 

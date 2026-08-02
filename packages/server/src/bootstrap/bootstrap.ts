@@ -35,9 +35,11 @@ import { NotificationListener } from "../services/NotificationListener.ts";
 import { ChargeController } from "../services/ChargeController.ts";
 import { Overseer } from "../services/Overseer.ts";
 import { HealthService } from "../services/HealthService.ts";
+import { ChargingPointManager } from "../services/ChargingPointManager.ts";
 
 import { VehiclePluginRegistry } from "./VehiclePluginRegistry.ts";
 import { EnergyPluginRegistry } from "./EnergyPluginRegistry.ts";
+import { ChargerPluginRegistry } from "./ChargerPluginRegistry.ts";
 import { registerPlugins } from "@chargeha/plugins/registerPlugins";
 
 import {
@@ -187,6 +189,7 @@ function buildServices(
     encryptionKey,
     vehicleRegistry,
     energyRegistry,
+    chargerRegistry,
     logLevel,
     port,
   }: {
@@ -195,6 +198,7 @@ function buildServices(
     encryptionKey: string | null;
     vehicleRegistry: VehiclePluginRegistry;
     energyRegistry: EnergyPluginRegistry;
+    chargerRegistry: ChargerPluginRegistry;
     logLevel: "debug" | "info" | "warn" | "error";
     port: number;
   },
@@ -256,9 +260,20 @@ function buildServices(
     logLevel,
   });
 
+  const chargingPointManager = new ChargingPointManager(
+    db,
+    chargerRegistry,
+    vehicleManager,
+    poller,
+    configService,
+    eventEmitter,
+    new Logger("ChargingPointManager", logLevel),
+  );
+
   const healthService = new HealthService(
     vehicleRegistry,
     energyRegistry,
+    chargerRegistry,
     encryptionKey,
   );
 
@@ -275,6 +290,7 @@ function buildServices(
   return {
     notificationService,
     vehicleManager,
+    chargingPointManager,
     energyManager,
     vehicleService,
     tariffService,
@@ -299,6 +315,7 @@ function buildHttpApp(
     services,
     vehicleRegistry,
     energyRegistry,
+    chargerRegistry,
     eventEmitter,
     encryptionKey,
     logLevel,
@@ -307,6 +324,7 @@ function buildHttpApp(
     services: ReturnType<typeof buildServices>;
     vehicleRegistry: VehiclePluginRegistry;
     energyRegistry: EnergyPluginRegistry;
+    chargerRegistry: ChargerPluginRegistry;
     eventEmitter: TypedEventEmitter;
     encryptionKey: string | null;
     logLevel: "debug" | "info" | "warn" | "error";
@@ -315,7 +333,13 @@ function buildHttpApp(
   const appRouter = createAppRouter({
     vehicle: vehicleRegistry.getPluginRouters(),
     energy: energyRegistry.getPluginRouters(),
+    charger: chargerRegistry.getPluginRouters(),
   });
+
+  const allRoutes = [
+    ...vehicleRegistry.getHttpRoutes(),
+    ...chargerRegistry.getHttpRoutes(),
+  ];
 
   const app = new Hono();
   app.use(secureHeaders({ strictTransportSecurity: false }));
@@ -327,6 +351,7 @@ function buildHttpApp(
       authService: services.authService,
       configService: services.configService,
       logger: authLogger,
+      publicPrefixes: allRoutes.filter((r) => r.public).map((r) => r.fullPath),
     }),
   );
   app.route(
@@ -338,15 +363,13 @@ function buildHttpApp(
     }),
   );
 
-  vehicleRegistry.getAll().forEach((plugin) => {
-    const httpRoutes = plugin.getHttpRoutes();
-    if (httpRoutes) app.route(`/api/vehicle/${plugin.id}`, httpRoutes);
-  });
+  allRoutes.forEach(({ fullPath, routes }) => app.route(fullPath, routes));
 
   const trpcLogger = new Logger("tRPC", logLevel);
   setupTrpcEndpoint(app, appRouter, {
     db,
     vehicleManager: services.vehicleManager,
+    chargingPointManager: services.chargingPointManager,
     vehicleService: services.vehicleService,
     vehicleRegistry,
     energyRegistry,
@@ -384,6 +407,7 @@ function setupTrpcEndpoint(
   ctx: {
     db: AppDatabase;
     vehicleManager: VehicleManager;
+    chargingPointManager: ChargingPointManager;
     vehicleService: VehicleService;
     vehicleRegistry: VehiclePluginRegistry;
     energyRegistry: EnergyPluginRegistry;
@@ -415,6 +439,7 @@ function setupTrpcEndpoint(
       createContext: (): TrpcContext => ({
         db: ctx.db,
         vehicleManager: ctx.vehicleManager,
+        chargingPointManager: ctx.chargingPointManager,
         vehicleService: ctx.vehicleService,
         vehiclePlugins: ctx.vehicleRegistry,
         energyPlugins: ctx.energyRegistry,
@@ -485,6 +510,7 @@ export async function bootstrap(): Promise<
   // ── Empty plugin registries (populated by registerPlugins below) ──────
   const vehicleRegistry = new VehiclePluginRegistry();
   const energyRegistry = new EnergyPluginRegistry();
+  const chargerRegistry = new ChargerPluginRegistry();
 
   const services = buildServices({
     db,
@@ -492,6 +518,7 @@ export async function bootstrap(): Promise<
     encryptionKey,
     vehicleRegistry,
     energyRegistry,
+    chargerRegistry,
     logLevel,
     port,
   });
@@ -513,13 +540,17 @@ export async function bootstrap(): Promise<
     },
     vehicleRegistry,
     energyRegistry,
+    chargerRegistry,
   );
+
+  await services.chargingPointManager.init();
 
   const app = buildHttpApp({
     db,
     services,
     vehicleRegistry,
     energyRegistry,
+    chargerRegistry,
     eventEmitter,
     encryptionKey,
     logLevel,
@@ -537,6 +568,7 @@ export async function bootstrap(): Promise<
       // Tesla plugin's shutdown() reaps the tesla-http-proxy subprocess
       await vehicleRegistry.shutdownAll();
       await energyRegistry.shutdownAll();
+      await chargerRegistry.shutdownAll();
 
       await services.tunnelManager.stop();
       db.close();

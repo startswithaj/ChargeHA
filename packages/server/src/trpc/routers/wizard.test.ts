@@ -411,9 +411,15 @@ describe("Wizard tRPC Router", () => {
   });
 
   describe("wizard.state / wizard.patchState", () => {
-    it("returns empty fields on fresh DB", async () => {
+    it("returns null fields on fresh DB", async () => {
       const state = await caller.wizard.state();
-      expect(state).toEqual({ stepId: "", vehicleType: "", energyType: "" });
+      expect(state).toEqual({
+        stepId: null,
+        vehicleType: null,
+        energyType: null,
+        chargerType: null,
+        controlPath: null,
+      });
     });
 
     it("persists and retrieves a step ID", async () => {
@@ -441,6 +447,8 @@ describe("Wizard tRPC Router", () => {
         stepId: "done",
         vehicleType: "tesla",
         energyType: "fronius_local",
+        chargerType: null,
+        controlPath: null,
       });
     });
 
@@ -454,7 +462,9 @@ describe("Wizard tRPC Router", () => {
       expect(await caller.wizard.state()).toEqual({
         stepId: "tesla-key-generation",
         vehicleType: "tesla",
-        energyType: "",
+        energyType: null,
+        chargerType: null,
+        controlPath: null,
       });
     });
   });
@@ -473,9 +483,11 @@ describe("Wizard tRPC Router", () => {
 
       // All wizard state should be cleared
       expect(await caller.wizard.state()).toEqual({
-        stepId: "",
-        vehicleType: "",
-        energyType: "",
+        stepId: null,
+        vehicleType: null,
+        energyType: null,
+        chargerType: null,
+        controlPath: null,
       });
     });
   });

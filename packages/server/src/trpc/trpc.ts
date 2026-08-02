@@ -2,6 +2,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { EnergyPoller } from "../services/EnergyPoller.ts";
 import type { VehicleManager } from "../services/VehicleManager.ts";
+import type { ChargingPointManager } from "../services/ChargingPointManager.ts";
 import type { NotificationService } from "../services/NotificationService.ts";
 import type { EnergyAdapterManager } from "../services/EnergyAdapterManager.ts";
 import type { TypedEventEmitter } from "../services/TypedEventEmitter.ts";
@@ -27,6 +28,7 @@ import { ServiceError } from "../lib/ServiceError.ts";
 export interface TrpcContext {
   db: AppDatabase;
   vehicleManager: VehicleManager;
+  chargingPointManager: ChargingPointManager;
   vehicleService: VehicleService;
   vehiclePlugins: VehiclePluginRegistry;
   energyPlugins: EnergyPluginRegistry;

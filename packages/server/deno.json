@@ -12,7 +12,8 @@
     "./services/EnergyAdapterManager": "./src/services/EnergyAdapterManager.ts",
     "./bootstrap/PluginDependencies": "./src/bootstrap/PluginDependencies.ts",
     "./bootstrap/VehiclePluginRegistry": "./src/bootstrap/VehiclePluginRegistry.ts",
-    "./bootstrap/EnergyPluginRegistry": "./src/bootstrap/EnergyPluginRegistry.ts"
+    "./bootstrap/EnergyPluginRegistry": "./src/bootstrap/EnergyPluginRegistry.ts",
+    "./bootstrap/ChargerPluginRegistry": "./src/bootstrap/ChargerPluginRegistry.ts"
   },
   "imports": {
     "hono": "jsr:@hono/hono@^4",

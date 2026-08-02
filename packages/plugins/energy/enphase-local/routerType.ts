@@ -4,6 +4,7 @@ import type { createEnphaseLocalRouter } from "./server/router.ts";
 export type EnphaseLocalAppRouter = ReturnType<
   typeof createAppRouter<
     Record<string, never>,
-    { enphase_local: ReturnType<typeof createEnphaseLocalRouter> }
+    { enphase_local: ReturnType<typeof createEnphaseLocalRouter> },
+    Record<string, never>
   >
 >;

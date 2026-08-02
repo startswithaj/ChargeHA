@@ -102,6 +102,7 @@ describe("Tesla Plugin Router", () => {
     const appRouter = createAppRouter({
       vehicle: { tesla: createTeslaRouter(plugin, deps) },
       energy: {},
+      charger: {},
     });
     const createCaller = createCallerFactory(appRouter);
 

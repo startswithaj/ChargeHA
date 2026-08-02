@@ -8,6 +8,8 @@ export interface AuthMiddlewareDeps {
   authService: AuthService;
   configService: ConfigService;
   logger: Logger;
+  /** Plugin-declared device endpoints that bypass session auth. */
+  publicPrefixes?: string[];
 }
 
 /** Paths that bypass auth checks entirely. */
@@ -115,7 +117,7 @@ export function hstsMiddleware(): MiddlewareHandler {
 export function createAuthMiddleware(
   deps: AuthMiddlewareDeps,
 ): MiddlewareHandler {
-  const { authService, configService, logger } = deps;
+  const { authService, configService, logger, publicPrefixes = [] } = deps;
 
   return async function authMiddleware(c, next) {
     // 1. Check auth_mode
@@ -137,7 +139,10 @@ export function createAuthMiddleware(
     // 3. Check exempt paths
     const method = c.req.method;
     const path = new URL(c.req.url).pathname;
-    if (isExemptPath(method, path)) {
+    if (
+      isExemptPath(method, path) ||
+      publicPrefixes.some((prefix) => path.startsWith(prefix))
+    ) {
       return next();
     }
 

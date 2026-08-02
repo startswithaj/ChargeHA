@@ -82,7 +82,13 @@ describe("SolarAllocator", () => {
   describe("resolveVoltage", () => {
     it("uses vehicle voltage when >= 100V", () => {
       const state = { ...BASE_STATE, chargerVoltage: 240 };
-      expect(SolarAllocator.resolveVoltage(state, BASE_ENERGY, BASE_CONFIG))
+      expect(
+        SolarAllocator.resolveVoltage(
+          state.chargerVoltage,
+          BASE_ENERGY,
+          BASE_CONFIG.gridVoltage,
+        ),
+      )
         .toBe(
           240,
         );
@@ -91,7 +97,13 @@ describe("SolarAllocator", () => {
     it("falls back to grid voltage from energy when vehicle voltage < 100", () => {
       const state = { ...BASE_STATE, chargerVoltage: 0 };
       const energy = { ...BASE_ENERGY, gridVoltageV: 235 };
-      expect(SolarAllocator.resolveVoltage(state, energy, BASE_CONFIG)).toBe(
+      expect(
+        SolarAllocator.resolveVoltage(
+          state.chargerVoltage,
+          energy,
+          BASE_CONFIG.gridVoltage,
+        ),
+      ).toBe(
         235,
       );
     });
@@ -99,7 +111,13 @@ describe("SolarAllocator", () => {
     it("falls back to config grid voltage when no energy grid voltage", () => {
       const state = { ...BASE_STATE, chargerVoltage: 0 };
       const config = { ...BASE_CONFIG, gridVoltage: 220 };
-      expect(SolarAllocator.resolveVoltage(state, BASE_ENERGY, config)).toBe(
+      expect(
+        SolarAllocator.resolveVoltage(
+          state.chargerVoltage,
+          BASE_ENERGY,
+          config.gridVoltage,
+        ),
+      ).toBe(
         220,
       );
     });
@@ -107,7 +125,13 @@ describe("SolarAllocator", () => {
     it("falls back to config when energy is null", () => {
       const state = { ...BASE_STATE, chargerVoltage: 0 };
       const config = { ...BASE_CONFIG, gridVoltage: 220 };
-      expect(SolarAllocator.resolveVoltage(state, null, config)).toBe(220);
+      expect(
+        SolarAllocator.resolveVoltage(
+          state.chargerVoltage,
+          null,
+          config.gridVoltage,
+        ),
+      ).toBe(220);
     });
   });
 

@@ -59,7 +59,7 @@ describe("VehicleManager", () => {
     return {
       get: () => ({
         id: "tesla",
-        createMiddleware: (row: VehicleRow) => {
+        createVehicleMiddleware: (row: VehicleRow) => {
           const mw = new MockMiddleware(MOCK_STATE);
           mw.nextState = { ...MOCK_STATE, vehicleId: row.id };
           middlewares.set(row.id, mw);

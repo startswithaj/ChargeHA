@@ -19,15 +19,16 @@ interface AllocationContext {
 
 /** Solar calculation and multi-vehicle amp allocation. */
 export class SolarAllocator {
-  /** Resolve charger voltage: trust the vehicle if >= 100V, otherwise fall
-   *  back to the inverter grid reading, then the user's configured value. */
+  /** Resolve charger voltage: trust the reading if present and >= 100V,
+   *  otherwise fall back to the inverter grid reading, then the user's
+   *  configured value. */
   static resolveVoltage(
-    state: VehicleChargeState,
+    chargerVoltage: number | null,
     energy: EnergyData | null,
-    config: ControllerConfig,
+    gridVoltage: number,
   ): number {
-    if (state.chargerVoltage >= 100) return state.chargerVoltage;
-    return energy?.gridVoltageV ?? config.gridVoltage;
+    if (chargerVoltage !== null && chargerVoltage >= 100) return chargerVoltage;
+    return energy?.gridVoltageV ?? gridVoltage;
   }
 
   /** Resolve charger phases: a live single-phase reading while charging
@@ -183,7 +184,11 @@ export class SolarAllocator {
       )
       .map((v) => {
         const state = v.state;
-        const voltage = SolarAllocator.resolveVoltage(state, energy, config);
+        const voltage = SolarAllocator.resolveVoltage(
+          state.chargerVoltage,
+          energy,
+          config.gridVoltage,
+        );
         const phases = SolarAllocator.resolvePhases(state, config);
         return {
           id: v.id,

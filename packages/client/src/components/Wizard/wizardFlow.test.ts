@@ -29,6 +29,8 @@ vi.mock("@chargeha/plugins/componentRegistry", () => ({
   },
   vehiclePluginOptions: [],
   energyPluginOptions: [],
+  chargerPluginSteps: {},
+  chargerPluginOptions: [],
 }));
 
 import { activeSteps } from "./flow.ts";
@@ -37,8 +39,10 @@ import { wizardFlow } from "./wizardFlow.ts";
 describe("wizardFlow", () => {
   const state = (overrides: Partial<WizardNavState> = {}): WizardNavState => ({
     stepId: "welcome",
-    vehicleType: "",
-    energyType: "",
+    vehicleType: null,
+    energyType: null,
+    chargerType: null,
+    controlPath: null,
     ...overrides,
   });
 
@@ -50,6 +54,7 @@ describe("wizardFlow", () => {
       "welcome",
       "authentication",
       "timezone",
+      "smart-charger",
       "vehicle-type",
       "inverter-type",
       "home-location",
@@ -75,6 +80,7 @@ describe("wizardFlow", () => {
         "welcome",
         "authentication",
         "timezone",
+        "smart-charger",
         "vehicle-type",
         "tesla-key-gen",
         "tesla-auth",

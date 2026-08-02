@@ -1,6 +1,6 @@
 /// <reference lib="deno.ns" />
 import type { Logger } from "@chargeha/server/lib/Logger";
-import { NetworkDiscovery } from "../../NetworkDiscovery.ts";
+import { NetworkDiscovery } from "../../../discovery/NetworkDiscovery.ts";
 
 type Inverter = { host: string; name: string; model: string };
 

@@ -7,9 +7,7 @@ import type { WizardNavState } from "@chargeha/shared";
 
 const hoisted = vi.hoisted(() => ({
   state: {
-    data: undefined as
-      | { stepId: string; vehicleType: string; energyType: string }
-      | undefined,
+    data: undefined as WizardNavState | undefined,
     isLoading: false,
   },
   mutate: vi.fn(),
@@ -72,13 +70,15 @@ describe("useWizardState", () => {
     hoisted.setData.mockClear();
   });
 
-  it("starts at welcome when the query has no data", () => {
+  it("returns all-null fields when the query has no data", () => {
     const { result } = setup();
 
     expect(result.current.state).toEqual({
-      stepId: "welcome",
-      vehicleType: "",
-      energyType: "",
+      stepId: null,
+      vehicleType: null,
+      energyType: null,
+      chargerType: null,
+      controlPath: null,
     });
     expect(result.current.isLoading).toBe(false);
   });
@@ -88,6 +88,8 @@ describe("useWizardState", () => {
       stepId: "tesla-credentials",
       vehicleType: "tesla",
       energyType: "fronius_local",
+      chargerType: null,
+      controlPath: null,
     };
 
     const { result } = setup();
@@ -96,6 +98,8 @@ describe("useWizardState", () => {
       stepId: "tesla-credentials",
       vehicleType: "tesla",
       energyType: "fronius_local",
+      chargerType: null,
+      controlPath: null,
     });
   });
 
@@ -123,12 +127,16 @@ describe("useWizardState", () => {
       applyOptimisticWrite({
         stepId: "welcome",
         vehicleType: "tesla",
-        energyType: "",
+        energyType: null,
+        chargerType: null,
+        controlPath: null,
       }),
     ).toEqual({
       stepId: "authentication",
       vehicleType: "tesla",
-      energyType: "",
+      energyType: null,
+      chargerType: null,
+      controlPath: null,
     });
   });
 
@@ -182,13 +190,17 @@ describe("useWizardState", () => {
     expect(
       applyOptimisticWrite({
         stepId: "vehicle-type",
-        vehicleType: "",
+        vehicleType: null,
         energyType: "fronius_local",
+        chargerType: null,
+        controlPath: null,
       }),
     ).toEqual({
       stepId: "tesla-key-generation",
       vehicleType: "tesla",
       energyType: "fronius_local",
+      chargerType: null,
+      controlPath: null,
     });
   });
 
@@ -201,8 +213,10 @@ describe("useWizardState", () => {
 
     expect(applyOptimisticWrite(undefined)).toEqual({
       stepId: "welcome",
-      vehicleType: "",
-      energyType: "",
+      vehicleType: null,
+      energyType: null,
+      chargerType: null,
+      controlPath: null,
     });
   });
 });

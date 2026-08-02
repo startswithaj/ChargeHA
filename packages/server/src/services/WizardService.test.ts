@@ -177,9 +177,9 @@ describe("WizardService", () => {
 
       expect(tunnelStopped).toBe(true);
       expect(result).toEqual({ completed: true });
-      expect(configSet["wizard_step"]).toBe("");
-      expect(configSet["wizard_vehicle_type"]).toBe("");
-      expect(configSet["wizard_energy_type"]).toBe("");
+      expect(configSet["wizard_step"]).toBe(null);
+      expect(configSet["wizard_vehicle_type"]).toBe(null);
+      expect(configSet["wizard_energy_type"]).toBe(null);
       expect(configSet["wizard_oidc_pending"]).toBe("");
       expect(configSet["wizard_completed"]).toBe("true");
     });
@@ -225,10 +225,12 @@ describe("WizardService", () => {
         stepId: "tesla-credentials",
         vehicleType: "tesla",
         energyType: "fronius_local",
+        chargerType: null,
+        controlPath: null,
       });
     });
 
-    it("defaults each field to empty string when db returns null", async () => {
+    it("defaults each field to null when db returns null", async () => {
       const service = makeService({
         db: {
           getConfig: () => Promise.resolve(null),
@@ -236,9 +238,11 @@ describe("WizardService", () => {
       });
 
       expect(await service.getState()).toEqual({
-        stepId: "",
-        vehicleType: "",
-        energyType: "",
+        stepId: null,
+        vehicleType: null,
+        energyType: null,
+        chargerType: null,
+        controlPath: null,
       });
     });
   });

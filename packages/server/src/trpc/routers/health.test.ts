@@ -3,6 +3,7 @@ import { expect } from "@std/expect";
 import { AppDatabase } from "../../db/AppDatabase.ts";
 import { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
 import { EnergyPluginRegistry } from "@chargeha/server/bootstrap/EnergyPluginRegistry";
+import { ChargerPluginRegistry } from "@chargeha/server/bootstrap/ChargerPluginRegistry";
 import { HealthService } from "../../services/HealthService.ts";
 import { appRouter } from "../root.ts";
 import { createCallerFactory } from "../trpc.ts";
@@ -23,15 +24,15 @@ describe("Health tRPC Router", () => {
     configDef: {},
     secretKeys: [],
     settingsComponentKey: null,
-    createMiddleware: () =>
+    createVehicleMiddleware: () =>
       Promise.resolve(
-        throwingMock<ReturnType<VehiclePlugin["createMiddleware"]>>(
+        throwingMock<ReturnType<VehiclePlugin["createVehicleMiddleware"]>>(
           "VehicleMiddleware",
         ),
       ),
     shutdown: () => Promise.resolve(),
     getRouter: () => null,
-    getHttpRoutes: () => null,
+    getVehicleHttpRoutes: () => null,
     getHealthChecks: () => [],
     getCommandStatus: () =>
       Promise.resolve({ commandsDisabled: false, reason: null }),
@@ -50,6 +51,7 @@ describe("Health tRPC Router", () => {
     const healthService = new HealthService(
       vehiclePlugins,
       new EnergyPluginRegistry(),
+      new ChargerPluginRegistry(),
       encryptionKey,
     );
     return createCaller(throwingMock<TrpcContext>("TrpcContext", {

@@ -32,9 +32,8 @@ describe("Logs tRPC Router", () => {
     traceId: "test",
   };
 
-  // R1 (audit-flagged): back-dating a controller_logs row needs a sqlite reach-in.
-  // Skipped pending public `db.insertControllerLogEntryWithTimestamp` API — see
-  // progress.txt US-047 notes.
+  // Back-dating a controller_logs row needs a sqlite reach-in, pending a
+  // public `db.insertControllerLogEntryWithTimestamp` API.
   const insertLogWithTimestamp = (
     database: AppDatabase,
     entry: typeof sampleEntry,

@@ -1,4 +1,5 @@
 import type {
+  ChargingPointMode,
   ControllerAction,
   DayOfWeek,
   ScheduleType,
@@ -32,6 +33,28 @@ export interface UpsertVehicleInput {
   priority: number;
   config: string;
   mode: VehicleMode;
+}
+
+export interface ChargerRow {
+  id: string;
+  name: string;
+  chargerAdapterType: string;
+  chargerConfig: string;
+  mode: ChargingPointMode;
+  priority: number;
+  vehicleId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpsertChargerInput {
+  id: string;
+  name: string;
+  chargerAdapterType: string;
+  chargerConfig?: string;
+  mode?: ChargingPointMode;
+  priority?: number;
+  vehicleId?: string | null;
 }
 
 export interface ScheduleRow {

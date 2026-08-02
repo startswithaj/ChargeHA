@@ -1,12 +1,6 @@
 /// <reference lib="deno.ns" />
 import type { Logger } from "@chargeha/server/lib/Logger";
-import {
-  chunk,
-  expandArpToSubnets,
-  extractSubnets,
-  generateSubnetIps,
-  parseArpOutput,
-} from "./networkScan.ts";
+import { NetworkScan } from "./networkScan.ts";
 
 const BATCH_SIZE = 30;
 
@@ -44,7 +38,10 @@ export abstract class NetworkDiscovery<TDevice extends { host: string }> {
     this.logger.info(
       `${this.label}: probing ${candidates.length} IPs in batches of ${BATCH_SIZE}`,
     );
-    const found = await this.probeBatchesFrom(chunk(candidates, BATCH_SIZE), 0);
+    const found = await this.probeBatchesFrom(
+      NetworkScan.chunk(candidates, BATCH_SIZE),
+      0,
+    );
     this.logger.info(
       `${this.label}: complete — ${found.length} device(s) found`,
     );
@@ -55,7 +52,7 @@ export abstract class NetworkDiscovery<TDevice extends { host: string }> {
     if (this.subnet) {
       const cleanSubnet = this.subnet.replace(/\.$/, "");
       this.logger.info(`${this.label}: scanning subnet ${cleanSubnet}.*`);
-      return generateSubnetIps(cleanSubnet);
+      return NetworkScan.generateSubnetIps(cleanSubnet);
     }
 
     const arpIps = await this.getArpIps();
@@ -65,10 +62,10 @@ export abstract class NetworkDiscovery<TDevice extends { host: string }> {
           arpIps.join(", ")
         }`,
       );
-      const candidates = expandArpToSubnets(arpIps);
+      const candidates = NetworkScan.expandArpToSubnets(arpIps);
       this.logger.info(
         `${this.label}: expanded ARP subnets [${
-          extractSubnets(arpIps).join(", ")
+          NetworkScan.extractSubnets(arpIps).join(", ")
         }] to ${candidates.length} total candidates`,
       );
       return candidates;
@@ -89,7 +86,7 @@ export abstract class NetworkDiscovery<TDevice extends { host: string }> {
         stderr: "piped",
       });
       const { stdout } = await proc.output();
-      return parseArpOutput(new TextDecoder().decode(stdout));
+      return NetworkScan.parseArpOutput(new TextDecoder().decode(stdout));
     } catch (err) {
       this.logger.info(
         `${this.label}: arp unavailable (${err}), falling back to interface detection`,
@@ -101,19 +98,19 @@ export abstract class NetworkDiscovery<TDevice extends { host: string }> {
   /** Detect subnets from network interfaces, or fall back to 192.168.1.*. */
   private candidatesFromInterfaces(): string[] {
     try {
-      const subnets = extractSubnets(
+      const subnets = NetworkScan.extractSubnets(
         this.networkInterfaces()
           .filter((iface) =>
             iface.family === "IPv4" && !iface.address.startsWith("127.")
           )
           .map((iface) => iface.address),
       );
-      return subnets.flatMap(generateSubnetIps);
+      return subnets.flatMap(NetworkScan.generateSubnetIps);
     } catch (err) {
       this.logger.info(
         `${this.label}: interface detection failed (${err}), falling back to 192.168.1.*`,
       );
-      return generateSubnetIps("192.168.1");
+      return NetworkScan.generateSubnetIps("192.168.1");
     }
   }
 

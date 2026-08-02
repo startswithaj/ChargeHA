@@ -92,6 +92,16 @@ interface TeslaCommandResponse {
 }
 
 export class TeslaAdapter implements VehicleAdapter {
+  // Tesla Fleet API cost schedule (effective Jan 2025)
+  // https://developer.tesla.com/docs/fleet-api/billing-and-limits
+  private static readonly API_COSTS: Array<{ pattern: RegExp; cost: number }> =
+    [
+      { pattern: /\/wake_up$/, cost: 0.02 },
+      { pattern: /\/vehicle_data/, cost: 0.002 },
+      { pattern: /\/command\//, cost: 0.001 },
+      { pattern: /\/api\/1\/vehicles$/, cost: 0 },
+    ];
+
   private vin: string;
   private tokenManager: TeslaTokenManager;
   private proxyUrl: string;
@@ -302,16 +312,6 @@ export class TeslaAdapter implements VehicleAdapter {
   }
 
   // ---- Private helpers ----
-
-  // Tesla Fleet API cost schedule (effective Jan 2025)
-  // https://developer.tesla.com/docs/fleet-api/billing-and-limits
-  private static readonly API_COSTS: Array<{ pattern: RegExp; cost: number }> =
-    [
-      { pattern: /\/wake_up$/, cost: 0.02 },
-      { pattern: /\/vehicle_data/, cost: 0.002 },
-      { pattern: /\/command\//, cost: 0.001 },
-      { pattern: /\/api\/1\/vehicles$/, cost: 0 },
-    ];
 
   /** Look up the per-call cost for an endpoint. */
   private static endpointCost(endpoint: string): number {

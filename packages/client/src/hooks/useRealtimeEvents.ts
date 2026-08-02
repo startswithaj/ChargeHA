@@ -37,6 +37,8 @@ export function useRealtimeEvents(handlers: {
   onVehiclesChanged: () => void;
   onVehicleError: (data: EventData<"vehicle_error">) => void;
   onControllerStatus: (data: EventData<"controller_status">) => void;
+  onChargerUpdate: (data: EventData<"charger_update">) => void;
+  onChargersChanged: () => void;
 }) {
   // Use refs so the subscription doesn't re-establish when handlers change
   const handlersRef = useRef(handlers);
@@ -60,6 +62,12 @@ export function useRealtimeEvents(handlers: {
           break;
         case "controller_status":
           handlersRef.current.onControllerStatus(event.data);
+          break;
+        case "charger_update":
+          handlersRef.current.onChargerUpdate(event.data);
+          break;
+        case "chargers_changed":
+          handlersRef.current.onChargersChanged();
           break;
       }
     },

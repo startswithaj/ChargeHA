@@ -19,6 +19,14 @@ interface State {
 export class ErrorBoundary extends Component<Props, State> {
   override state: State = { error: null, errorInfo: null };
 
+  private handleDismiss = () => {
+    this.setState({ error: null, errorInfo: null });
+  };
+
+  private handleRetry = () => {
+    this.setState({ error: null, errorInfo: null });
+  };
+
   static getDerivedStateFromError(error: Error): Partial<State> {
     return { error };
   }
@@ -31,14 +39,6 @@ export class ErrorBoundary extends Component<Props, State> {
       errorInfo,
     );
   }
-
-  private handleDismiss = () => {
-    this.setState({ error: null, errorInfo: null });
-  };
-
-  private handleRetry = () => {
-    this.setState({ error: null, errorInfo: null });
-  };
 
   override render() {
     const { error, errorInfo } = this.state;

@@ -4,6 +4,7 @@ import type { createSimulatedEnergyRouter } from "./server/router.ts";
 export type SimulatedEnergyAppRouter = ReturnType<
   typeof createAppRouter<
     Record<string, never>,
-    { simulated_energy: ReturnType<typeof createSimulatedEnergyRouter> }
+    { simulated_energy: ReturnType<typeof createSimulatedEnergyRouter> },
+    Record<string, never>
   >
 >;

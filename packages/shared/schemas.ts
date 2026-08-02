@@ -403,13 +403,17 @@ export type WizardSaveOidcConfigInput = z.infer<
 >;
 
 export const wizardPatchStateInput: z.ZodType<{
-  stepId?: string;
-  vehicleType?: string;
-  energyType?: string;
+  stepId?: string | null;
+  vehicleType?: string | null;
+  energyType?: string | null;
+  chargerType?: string | null;
+  controlPath?: "charger" | "vehicle" | null;
 }> = z.object({
-  stepId: z.string().optional(),
-  vehicleType: z.string().optional(),
-  energyType: z.string().optional(),
+  stepId: z.string().nullable().optional(),
+  vehicleType: z.string().nullable().optional(),
+  energyType: z.string().nullable().optional(),
+  chargerType: z.string().nullable().optional(),
+  controlPath: z.enum(["charger", "vehicle"]).nullable().optional(),
 });
 export type WizardPatchStateInput = z.infer<typeof wizardPatchStateInput>;
 

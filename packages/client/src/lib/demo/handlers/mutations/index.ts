@@ -3,6 +3,7 @@ import { wizardMutations } from "./wizard.ts";
 import { configMutations } from "./config.ts";
 import { authMutations } from "./auth.ts";
 import { vehicleMutations } from "./vehicle.ts";
+import { chargerMutations } from "./charger.ts";
 import { scheduleMutations } from "./schedule.ts";
 import { tariffMutations } from "./tariff.ts";
 import { energyMutations } from "./energy.ts";
@@ -15,6 +16,7 @@ export const mutationHandlers: MutationHandlers = {
   ...configMutations,
   ...authMutations,
   ...vehicleMutations,
+  ...chargerMutations,
   ...scheduleMutations,
   ...tariffMutations,
   ...energyMutations,

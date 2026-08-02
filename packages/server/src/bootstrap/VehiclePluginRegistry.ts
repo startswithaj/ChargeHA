@@ -1,5 +1,6 @@
 import type { AnyRouter } from "@trpc/server";
 import type { PluginHealthCheck, VehiclePlugin } from "@chargeha/plugins/types";
+import { resolveHttpRoutes } from "@chargeha/plugins/types";
 
 /**
  * Thin container for vehicle plugins. Starts empty; plugins are constructed
@@ -31,6 +32,13 @@ export class VehiclePluginRegistry {
       [...this.plugins]
         .map(([id, plugin]) => [id, plugin.getRouter()] as const)
         .filter((entry): entry is [string, AnyRouter] => entry[1] != null),
+    );
+  }
+
+  getHttpRoutes() {
+    return resolveHttpRoutes(
+      "/api/vehicle",
+      [...this.plugins].map(([id, p]) => [id, p.getVehicleHttpRoutes()]),
     );
   }
 

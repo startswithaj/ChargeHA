@@ -70,6 +70,17 @@ export function RealtimeSync() {
         event.checksJson,
       );
     },
+    onChargerUpdate: (update) => {
+      utils.charger.list.setData(undefined, (old) => {
+        if (!old) return old;
+        return old.map((c) =>
+          c.id === update.chargerId ? { ...c, state: update } : c
+        );
+      });
+    },
+    onChargersChanged: () => {
+      utils.charger.list.invalidate();
+    },
   });
 
   return null;

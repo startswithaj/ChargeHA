@@ -89,17 +89,22 @@ export interface StepDef extends PluginStepDef {
    *  selected type, and Skip abandons every step sharing an owner as a block
    *  rather than stepping through a plugin's setup one screen at a time. */
   owner?: string;
+  /** Core steps only: present when this returns true (default: always). */
+  presentWhen?: (state: WizardNavState) => boolean;
 }
 
 /** Whether a plugin's steps are in play, i.e. its type is the selected one. */
 function isOwnerSelected(owner: string, state: WizardNavState): boolean {
-  return state.vehicleType === owner || state.energyType === owner;
+  return state.vehicleType === owner ||
+    state.energyType === owner ||
+    state.chargerType === owner;
 }
 
 /** The steps the given selections put in the list, in flow order. */
 export function activeSteps(flow: StepDef[], state: WizardNavState): StepDef[] {
   return flow.filter((step) =>
-    !step.owner || isOwnerSelected(step.owner, state)
+    (!step.owner || isOwnerSelected(step.owner, state)) &&
+    (step.presentWhen?.(state) ?? true)
   );
 }
 

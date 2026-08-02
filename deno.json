@@ -64,7 +64,8 @@
       "./devtools/lint-plugins/no-trailing-underscore-param.ts",
       "./devtools/lint-plugins/no-server-trpc-caller.ts",
       "./devtools/lint-plugins/no-test-globals.ts",
-      "./devtools/lint-plugins/test-file-length.ts"
+      "./devtools/lint-plugins/test-file-length.ts",
+      "./devtools/lint-plugins/member-ordering.ts"
     ],
     "rules": {
       "tags": ["recommended"],

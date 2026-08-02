@@ -1,9 +1,12 @@
 import {
+  chargerPluginSteps,
   energyPluginSteps,
   vehiclePluginSteps,
 } from "@chargeha/plugins/componentRegistry";
 import { welcomeStep } from "./steps/WelcomeStep.tsx";
 import { timezoneStep } from "./steps/TimezoneStep.tsx";
+import { smartChargerStep } from "./steps/SmartChargerStep.tsx";
+import { chargerTypeStep } from "./steps/ChargerTypeStep.tsx";
 import { vehicleTypeStep } from "./steps/VehicleTypeStep.tsx";
 import { inverterTypeStep } from "./steps/InverterTypeStep.tsx";
 import { authStep } from "./steps/AuthStep.tsx";
@@ -32,6 +35,9 @@ export const wizardFlow: StepDef[] = [
   welcomeStep,
   authStep,
   timezoneStep,
+  smartChargerStep,
+  chargerTypeStep,
+  ...ownedSteps(chargerPluginSteps),
   vehicleTypeStep,
   ...ownedSteps(vehiclePluginSteps),
   inverterTypeStep,

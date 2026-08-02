@@ -114,7 +114,7 @@ export class VehicleManager {
       );
       return;
     }
-    const middleware = await plugin.createMiddleware(row);
+    const middleware = await plugin.createVehicleMiddleware(row);
 
     this.vehicles.set(row.id, { middleware });
     this.plugTrackers.set(row.id, {

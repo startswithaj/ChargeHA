@@ -94,7 +94,7 @@ export class PluginDependencies<K extends string = string> {
     return this.db.getPluginConfig(`${this.prefix}${key}`);
   }
 
-  setConfig(key: K, value: string): Promise<void> {
+  setConfig(key: K, value: string | null): Promise<void> {
     return this.db.setPluginConfig(`${this.prefix}${key}`, value);
   }
 
@@ -102,7 +102,7 @@ export class PluginDependencies<K extends string = string> {
     return this.db.readSecret(`${this.prefix}${key}`);
   }
 
-  setSecret(key: K, value: string): Promise<void> {
+  setSecret(key: K, value: string | null): Promise<void> {
     return this.db.storeSecret(`${this.prefix}${key}`, value);
   }
 
