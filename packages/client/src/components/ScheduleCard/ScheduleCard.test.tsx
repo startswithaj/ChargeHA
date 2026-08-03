@@ -13,6 +13,7 @@ describe("ScheduleCard", () => {
   const chargeSchedule: ChargeSchedule = {
     id: "sched-1",
     vehicleId: "v1",
+    chargerId: null,
     scheduleType: "charge",
     startTime: "22:00",
     endTime: "06:00",
@@ -25,6 +26,7 @@ describe("ScheduleCard", () => {
   const blockoutSchedule: BlockoutSchedule = {
     id: "sched-2",
     vehicleId: null,
+    chargerId: null,
     scheduleType: "blockout",
     startTime: "14:00",
     endTime: "18:00",

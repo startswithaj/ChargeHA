@@ -1,13 +1,10 @@
-import type {
-  AdapterVehicleChargeState,
-  CallContext,
-  VehicleAdapter,
-} from "@chargeha/shared";
+import type { AdapterVehicleChargeState, CallContext } from "@chargeha/shared";
 import type {
   VehicleMiddleware,
   VehicleRequestContext,
 } from "../../../types.ts";
 import type { Logger } from "@chargeha/server/lib/Logger";
+import type { TeslaAdapter } from "./TeslaAdapter.ts";
 import { TeslaApiStrategy } from "./TeslaApiStrategy.ts";
 
 // Rate-limit floor for the free /vehicles probe in the polling path.
@@ -22,7 +19,7 @@ const ONLINE_CHECK_DEBOUNCE_MS = 60_000;
  * to TeslaApiStrategy — this class only handles I/O execution.
  */
 export class TeslaVehicleMiddleware implements VehicleMiddleware {
-  private readonly adapter: VehicleAdapter;
+  private readonly adapter: TeslaAdapter;
   private readonly logger: Logger;
   private readonly strategy: TeslaApiStrategy;
 
@@ -36,7 +33,7 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
   private lastWakeAtMs = 0;
   private lastOnlineCheckAtMs = 0;
 
-  constructor(adapter: VehicleAdapter, logger: Logger) {
+  constructor(adapter: TeslaAdapter, logger: Logger) {
     this.adapter = adapter;
     this.logger = logger;
     this.strategy = new TeslaApiStrategy();

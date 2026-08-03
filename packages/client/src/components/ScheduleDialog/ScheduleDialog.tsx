@@ -15,6 +15,7 @@ interface ScheduleFormProps {
   editingSchedule: Schedule | null;
   scheduleType: ScheduleType;
   vehicleId: string | null;
+  chargerId?: string | null;
   maxAmps?: number; // Vehicle's max amps capability, defaults to 32
   defaultStartTime?: string; // Suggested start for new schedules (HH:MM)
   defaultEndTime?: string; // Suggested end for new schedules (HH:MM)
@@ -25,6 +26,7 @@ interface ScheduleFormProps {
 const DEFAULT_FORM: ScheduleFormData = {
   scheduleType: "charge",
   vehicleId: null,
+  chargerId: null,
   startTime: "00:00",
   endTime: "06:00",
   days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
@@ -36,6 +38,7 @@ function useInitForm(
   editingSchedule: Schedule | null,
   scheduleType: ScheduleType,
   vehicleId: string | null,
+  chargerId: string | null,
   defaultStartTime: string | undefined,
   defaultEndTime: string | undefined,
   setForm: (f: ScheduleFormData) => void,
@@ -47,6 +50,7 @@ function useInitForm(
       setForm({
         scheduleType: editingSchedule.scheduleType,
         vehicleId: editingSchedule.vehicleId,
+        chargerId: editingSchedule.chargerId,
         startTime: editingSchedule.startTime,
         endTime: editingSchedule.endTime,
         days: [...editingSchedule.days],
@@ -62,6 +66,9 @@ function useInitForm(
         ...DEFAULT_FORM,
         scheduleType,
         vehicleId,
+        chargerId,
+        // Charger-keyed schedules have no battery visibility — no limit.
+        chargeLimitPct: chargerId !== null ? null : DEFAULT_FORM.chargeLimitPct,
         ...(defaultStartTime && { startTime: defaultStartTime }),
         ...(defaultEndTime && { endTime: defaultEndTime }),
       });
@@ -70,6 +77,7 @@ function useInitForm(
     editingSchedule,
     scheduleType,
     vehicleId,
+    chargerId,
     defaultStartTime,
     defaultEndTime,
   ]);
@@ -79,6 +87,7 @@ export function ScheduleForm({
   editingSchedule,
   scheduleType,
   vehicleId,
+  chargerId = null,
   maxAmps = 32,
   defaultStartTime,
   defaultEndTime,
@@ -93,6 +102,7 @@ export function ScheduleForm({
     editingSchedule,
     scheduleType,
     vehicleId,
+    chargerId,
     defaultStartTime,
     defaultEndTime,
     setForm,

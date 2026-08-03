@@ -23,7 +23,7 @@ describe("ChargeController — notifications", () => {
       await ctx.runOneLoop();
       expect(ctx.trackingEmitter.controllerEvents()).toHaveLength(0);
 
-      await ctx.db.updateVehicleMode(VIN, "charge_now");
+      await ctx.setMode("charge_now");
       await ctx.runOneLoop();
 
       const startEvents = ctx.trackingEmitter.controllerEvents().filter(
@@ -39,7 +39,7 @@ describe("ChargeController — notifications", () => {
       ctx = await setupController({}, "charge_now");
       await ctx.runOneLoop();
 
-      await ctx.db.updateVehicleMode(VIN, "stop");
+      await ctx.setMode("stop");
       await ctx.runOneLoop();
 
       const stopEvents = ctx.trackingEmitter.controllerEvents().filter(
@@ -109,6 +109,7 @@ describe("ChargeController — notifications", () => {
       await ctx.db.createSchedule({
         id: "sched-notif-1",
         vehicleId: VIN,
+        chargerId: null,
         scheduleType: "charge",
         startTime,
         endTime,
@@ -140,6 +141,7 @@ describe("ChargeController — notifications", () => {
       await ctx.db.createSchedule({
         id: "blockout-notif-1",
         vehicleId: null,
+        chargerId: null,
         scheduleType: "blockout",
         startTime,
         endTime,
@@ -167,6 +169,7 @@ describe("ChargeController — notifications", () => {
       await ctx.db.createSchedule({
         id: "sched-already-active",
         vehicleId: VIN,
+        chargerId: null,
         scheduleType: "charge",
         startTime,
         endTime,
@@ -218,6 +221,7 @@ describe("ChargeController — notifications", () => {
       await ctx.db.createSchedule({
         id: "global-charge-notif",
         vehicleId: null,
+        chargerId: null,
         scheduleType: "charge",
         startTime,
         endTime,

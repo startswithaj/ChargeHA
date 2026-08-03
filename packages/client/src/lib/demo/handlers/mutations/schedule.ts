@@ -14,6 +14,7 @@ export const scheduleMutations: ScheduleMutations = {
     const created: DemoSchedule = {
       id: crypto.randomUUID(),
       vehicleId: isCharge ? (input.vehicleId ?? null) : null,
+      chargerId: isCharge ? (input.chargerId ?? null) : null,
       scheduleType: input.scheduleType,
       startTime: input.startTime,
       endTime: input.endTime,
@@ -31,6 +32,7 @@ export const scheduleMutations: ScheduleMutations = {
     const merge = (s: DemoSchedule): DemoSchedule => ({
       ...s,
       vehicleId: input.vehicleId !== undefined ? input.vehicleId : s.vehicleId,
+      chargerId: input.chargerId !== undefined ? input.chargerId : s.chargerId,
       scheduleType: input.scheduleType ?? s.scheduleType,
       startTime: input.startTime ?? s.startTime,
       endTime: input.endTime ?? s.endTime,

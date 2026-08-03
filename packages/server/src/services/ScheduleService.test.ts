@@ -32,6 +32,7 @@ describe("ScheduleService", () => {
       await db.createSchedule({
         id: "s1",
         vehicleId: "v1",
+        chargerId: null,
         scheduleType: "charge",
         startTime: "08:00",
         endTime: "12:00",
@@ -56,6 +57,7 @@ describe("ScheduleService", () => {
       await db.createSchedule({
         id: "s2",
         vehicleId: null,
+        chargerId: null,
         scheduleType: "blockout",
         startTime: "22:00",
         endTime: "06:00",
@@ -77,6 +79,7 @@ describe("ScheduleService", () => {
       await db.createSchedule({
         id: "s1",
         vehicleId: "v1",
+        chargerId: null,
         scheduleType: "charge",
         startTime: "08:00",
         endTime: "12:00",
@@ -87,6 +90,7 @@ describe("ScheduleService", () => {
       await db.createSchedule({
         id: "s2",
         vehicleId: null,
+        chargerId: null,
         scheduleType: "blockout",
         startTime: "22:00",
         endTime: "06:00",
@@ -109,6 +113,7 @@ describe("ScheduleService", () => {
       const result = await service.create({
         scheduleType: "charge",
         vehicleId: "v1",
+        chargerId: null,
         startTime: "06:00",
         endTime: "09:00",
         days: ["mon", "wed", "fri"],
@@ -159,6 +164,7 @@ describe("ScheduleService", () => {
         await service.create({
           scheduleType: "charge",
           vehicleId: null,
+          chargerId: null,
           startTime: "06:00",
           endTime: "09:00",
           days: ["mon"],
@@ -178,6 +184,7 @@ describe("ScheduleService", () => {
         await service.create({
           scheduleType: "charge",
           vehicleId: "v1",
+          chargerId: null,
           startTime: "06:00",
           endTime: "09:00",
           days: ["mon"],
@@ -196,6 +203,7 @@ describe("ScheduleService", () => {
         await service.create({
           scheduleType: "charge",
           vehicleId: "v1",
+          chargerId: null,
           startTime: "06:00",
           endTime: "09:00",
           days: ["mon"],
@@ -215,6 +223,7 @@ describe("ScheduleService", () => {
         await service.create({
           scheduleType: "charge",
           vehicleId: "v1",
+          chargerId: null,
           startTime: "06:00",
           endTime: "09:00",
           days: ["mon"],
@@ -234,6 +243,7 @@ describe("ScheduleService", () => {
         await service.create({
           scheduleType: "charge",
           vehicleId: "v1",
+          chargerId: null,
           startTime: "06:00",
           endTime: "09:00",
           days: ["mon"],
@@ -252,6 +262,7 @@ describe("ScheduleService", () => {
         await service.create({
           scheduleType: "charge",
           vehicleId: "v1",
+          chargerId: null,
           startTime: "06:00",
           endTime: "09:00",
           days: ["mon"],
@@ -271,6 +282,7 @@ describe("ScheduleService", () => {
         await service.create({
           scheduleType: "charge",
           vehicleId: "v1",
+          chargerId: null,
           startTime: "06:00",
           endTime: "09:00",
           days: ["mon"],
@@ -310,6 +322,7 @@ describe("ScheduleService", () => {
       const r1 = await service.create({
         scheduleType: "charge",
         vehicleId: "v1",
+        chargerId: null,
         startTime: "06:00",
         endTime: "09:00",
         days: ["mon"],
@@ -321,6 +334,7 @@ describe("ScheduleService", () => {
       const r2 = await service.create({
         scheduleType: "charge",
         vehicleId: "v1",
+        chargerId: null,
         startTime: "10:00",
         endTime: "12:00",
         days: ["tue"],
@@ -338,6 +352,7 @@ describe("ScheduleService", () => {
       await db.createSchedule({
         id: "s1",
         vehicleId: "v1",
+        chargerId: null,
         scheduleType: "charge",
         startTime: "06:00",
         endTime: "09:00",
@@ -372,6 +387,7 @@ describe("ScheduleService", () => {
       await db.createSchedule({
         id: "s1",
         vehicleId: null,
+        chargerId: null,
         scheduleType: "blockout",
         startTime: "22:00",
         endTime: "06:00",
@@ -405,6 +421,7 @@ describe("ScheduleService", () => {
       await db.createSchedule({
         id: "s1",
         vehicleId: null,
+        chargerId: null,
         scheduleType: "blockout",
         startTime: "22:00",
         endTime: "06:00",
@@ -425,6 +442,7 @@ describe("ScheduleService", () => {
       await db.createSchedule({
         id: "s1",
         vehicleId: null,
+        chargerId: null,
         scheduleType: "blockout",
         startTime: "22:00",
         endTime: "06:00",

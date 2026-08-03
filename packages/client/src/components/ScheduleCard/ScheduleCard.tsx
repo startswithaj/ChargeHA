@@ -44,8 +44,12 @@ export function ScheduleCard({
 
   const daysText = formatDays(schedule.days);
 
+  const limitSuffix =
+    schedule.scheduleType === "charge" && schedule.chargeLimitPct !== null
+      ? ` to ${schedule.chargeLimitPct}%`
+      : "";
   const detailText = isCharge
-    ? `Charge at ${schedule.chargeAmps}A to ${schedule.chargeLimitPct}%`
+    ? `Charge at ${schedule.chargeAmps}A${limitSuffix}`
     : "Stop all charging";
 
   return (

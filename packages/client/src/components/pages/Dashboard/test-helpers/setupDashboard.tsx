@@ -125,12 +125,7 @@ export function makeVehiclesReturn(
     vehicles,
     loading: false,
     error: null,
-    commandPending: {},
     vehicleErrors: {},
-    startCharging: vi.fn(),
-    stopCharging: vi.fn(),
-    setAmps: vi.fn(),
-    changeMode: vi.fn(),
     refreshVehicles: vi.fn(),
   } as unknown as ReturnType<typeof useVehicles>;
 }

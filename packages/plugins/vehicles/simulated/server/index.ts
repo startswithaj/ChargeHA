@@ -1,10 +1,13 @@
 import type { AnyRouter } from "@trpc/server";
 import { defineSection } from "@chargeha/shared/configSections";
-import type { VehicleRow } from "@chargeha/server/db/types";
+import type { ChargerRow, VehicleRow } from "@chargeha/server/db/types";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import type {
+  ChargerMiddleware,
+  ChargerPlugin,
   CommandStatus,
   PluginHealthCheck,
+  PluginHttpRoutes,
   PluginTunnelRoute,
   VehicleMiddleware,
   VehiclePlugin,
@@ -14,6 +17,7 @@ import {
   type SimulatedVehicleConfig,
 } from "./SimulatedVehicleAdapter.ts";
 import { SimulatedVehicleMiddleware } from "./SimulatedVehicleMiddleware.ts";
+import { SimulatedChargerMiddleware } from "./SimulatedChargerMiddleware.ts";
 import { createSimulatedRouter } from "./router.ts";
 
 /** Parse a JSON string into SimulatedVehicleConfig, returning {} on failure. */
@@ -35,14 +39,16 @@ export const simulatedConfigDef = defineSection({});
  * testing and demo use. Pushes aggregated simulated charging load into
  * EnergyAdapterManager via `deps.setSimulatedLoad`.
  */
-export class SimulatedVehiclePlugin implements VehiclePlugin {
+export class SimulatedVehiclePlugin implements VehiclePlugin, ChargerPlugin {
   readonly id = "simulated";
   readonly displayName = "Simulated";
+  readonly vendor = "ChargeHA";
   readonly configDef = simulatedConfigDef;
   readonly secretKeys: readonly string[] = [];
   readonly settingsComponentKey = "simulated-settings";
 
   private readonly adapters = new Map<string, SimulatedVehicleAdapter>();
+  private readonly middlewares = new Map<string, SimulatedVehicleMiddleware>();
   private readonly startupPromise: Promise<void>;
 
   constructor(private readonly deps: PluginDependencies) {
@@ -56,6 +62,12 @@ export class SimulatedVehiclePlugin implements VehiclePlugin {
 
   // deno-lint-ignore require-await
   async createVehicleMiddleware(row: VehicleRow): Promise<VehicleMiddleware> {
+    return this.sharedMiddleware(row);
+  }
+
+  private sharedMiddleware(row: VehicleRow): SimulatedVehicleMiddleware {
+    const existing = this.middlewares.get(row.id);
+    if (existing) return existing;
     const userConfig = row.config ? parseVehicleConfig(row.config) : {};
     const sim = new SimulatedVehicleAdapter(
       row.id,
@@ -65,7 +77,29 @@ export class SimulatedVehiclePlugin implements VehiclePlugin {
     );
     sim.onPowerChange = () => this.recalculate();
     this.adapters.set(row.id, sim);
-    return new SimulatedVehicleMiddleware(sim);
+    const middleware = new SimulatedVehicleMiddleware(sim);
+    this.middlewares.set(row.id, middleware);
+    return middleware;
+  }
+
+  // The charger role. The migration guarantees vehicleId is set on
+  // simulated charger rows.
+  async createChargerMiddleware(row: ChargerRow): Promise<ChargerMiddleware> {
+    if (row.vehicleId === null) {
+      throw new Error(`Simulated charger row ${row.id} has no vehicleId`);
+    }
+    const vehicles = await this.deps.getVehicleRows();
+    const vehicle = vehicles.find((v) => v.id === row.vehicleId);
+    if (!vehicle) {
+      throw new Error(
+        `No Simulated vehicle ${row.vehicleId} for charger ${row.id}`,
+      );
+    }
+    return new SimulatedChargerMiddleware(row, this.sharedMiddleware(vehicle));
+  }
+
+  getChargerHttpRoutes(): PluginHttpRoutes | null {
+    return null;
   }
 
   async shutdown(): Promise<void> {
@@ -73,6 +107,7 @@ export class SimulatedVehiclePlugin implements VehiclePlugin {
       this.deps.log.error("Startup had failed before shutdown:", err);
     });
     this.adapters.clear();
+    this.middlewares.clear();
   }
 
   /** Total simulated power draw across all adapters. Router helper. */

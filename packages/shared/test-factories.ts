@@ -58,6 +58,7 @@ export function buildChargeSchedule(
   return {
     id: "sched-charge-1",
     vehicleId: "VIN-TEST",
+    chargerId: null,
     scheduleType: "charge",
     startTime: "08:00",
     endTime: "16:00",
@@ -75,6 +76,7 @@ export function buildBlockoutSchedule(
   return {
     id: "sched-blockout-1",
     vehicleId: null,
+    chargerId: null,
     scheduleType: "blockout",
     startTime: "18:00",
     endTime: "21:00",

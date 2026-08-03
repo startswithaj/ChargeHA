@@ -127,13 +127,53 @@ describe("Tapo e2e", () => {
   });
 
   it("session energy accumulates while drawing", async () => {
-    await tapoControl({ deviceOn: true, drawWhenOnW: 2400 });
+    // Accumulation needs a controller-sanctioned charge: setMode("stop")
+    // switches the plug off immediately, and an externally switched-on
+    // plug in stop mode gets switched off again — so charge via
+    // charge_now and let the poll-to-poll energy deltas build up.
+    await tapoControl({ drawWhenOnW: 2400 });
+    const chargers = await trpc.charger.list.query();
+    const charger = chargers.find((c) => c.chargerAdapterType === "tapo");
+    await trpc.charger.setMode.mutate({
+      id: charger?.id ?? "",
+      mode: "charge_now",
+    });
     const state = await waitFor(async () => {
       const s = (await trpc.charger.list.query())
         .find((c) => c.chargerAdapterType === "tapo")?.state;
       return s && s.energyAddedKwh > 0 ? s : null;
     }, { label: "session energy accumulating" });
     expect(state.energyAddedKwh).toBeGreaterThan(0);
+    await trpc.charger.setMode.mutate({ id: charger?.id ?? "", mode: "stop" });
+    await tapoControl({ deviceOn: false, drawWhenOnW: 0 });
+  });
+
+  it("charger-keyed schedule switches the plug on", async () => {
+    await tapoControl({ deviceOn: false, drawWhenOnW: 2400 });
+    const charger = (await trpc.charger.list.query())
+      .find((c) => c.chargerAdapterType === "tapo");
+    await trpc.charger.setMode.mutate({ id: charger?.id ?? "", mode: "auto" });
+
+    const now = new Date();
+    const day = (["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const)[
+      now.getUTCDay()
+    ];
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const { schedule } = await trpc.schedule.create.mutate({
+      scheduleType: "charge",
+      chargerId: charger?.id ?? "",
+      startTime: `${pad(now.getUTCHours())}:00`,
+      endTime: `${pad((now.getUTCHours() + 2) % 24)}:00`,
+      days: [day],
+      chargeAmps: 10,
+    });
+
+    await waitFor(async () => (await tapoState()).deviceOn === true, {
+      label: "plug switched on by schedule",
+    });
+
+    await trpc.schedule.delete.mutate({ id: schedule.id });
+    await trpc.charger.setMode.mutate({ id: charger?.id ?? "", mode: "stop" });
     await tapoControl({ deviceOn: false, drawWhenOnW: 0 });
   });
 

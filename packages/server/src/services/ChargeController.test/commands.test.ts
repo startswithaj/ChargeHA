@@ -21,7 +21,7 @@ describe("ChargeController — commands + backoff", () => {
       ctx = await setupController({ isCharging: false }, "charge_now");
       ctx.adapter.startChargingResult = false;
       await ctx.runOneLoop();
-      expect(ctx.manager.isBackedOff(VIN).backedOff).toBe(true);
+      expect((await ctx.getBackoff()).backedOff).toBe(true);
 
       ctx.adapter.startChargingResult = true;
       ctx.adapter.commands = [];
@@ -53,7 +53,7 @@ describe("ChargeController — commands + backoff", () => {
       ctx.adapter.stopChargingResult = false;
       await ctx.runOneLoop();
 
-      expect(ctx.manager.isBackedOff(VIN).backedOff).toBe(true);
+      expect((await ctx.getBackoff()).backedOff).toBe(true);
       ctx.adapter.commands = [];
 
       ctx.adapter.state.isCharging = true;
@@ -89,8 +89,8 @@ describe("ChargeController — commands + backoff", () => {
 
       await ctx.runOneLoop();
 
-      expect(ctx.manager.isBackedOff(VIN).backedOff).toBe(true);
-      expect(ctx.manager.isBackedOff(VIN).remainingMs).toBeGreaterThan(0);
+      expect((await ctx.getBackoff()).backedOff).toBe(true);
+      expect((await ctx.getBackoff()).remainingMs).toBeGreaterThan(0);
     });
 
     it("handles non-Error thrown objects", async () => {
@@ -102,7 +102,7 @@ describe("ChargeController — commands + backoff", () => {
 
       await ctx.runOneLoop();
 
-      expect(ctx.manager.isBackedOff(VIN).backedOff).toBe(true);
+      expect((await ctx.getBackoff()).backedOff).toBe(true);
     });
   });
 });

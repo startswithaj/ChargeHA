@@ -4,7 +4,7 @@ import styles from "./ScheduleDialog.module.css";
 
 interface ChargeSettingsProps {
   chargeAmps: number;
-  chargeLimitPct: number;
+  chargeLimitPct: number | null;
   maxAmps: number;
   updateField: <K extends keyof ScheduleFormData>(
     key: K,
@@ -65,40 +65,43 @@ export function ChargeSettings({
         </div>
       </div>
 
-      <div className={styles.field}>
-        <Text size="2" weight="medium">Charge Limit</Text>
-        <div className={styles.stepperRow}>
-          <Button
-            type="button"
-            variant="ghost"
-            size="1"
-            disabled={chargeLimitPct <= 50}
-            onClick={() =>
-              updateField(
-                "chargeLimitPct",
-                Math.max(50, chargeLimitPct - 5),
-              )}
-          >
-            −
-          </Button>
-          <Text size="3" weight="bold" className={styles.stepperValue}>
-            {chargeLimitPct}%
-          </Text>
-          <Button
-            type="button"
-            variant="ghost"
-            size="1"
-            disabled={chargeLimitPct >= 100}
-            onClick={() =>
-              updateField(
-                "chargeLimitPct",
-                Math.min(100, chargeLimitPct + 5),
-              )}
-          >
-            +
-          </Button>
+      {/* Charger-keyed schedules have no battery visibility — no limit. */}
+      {chargeLimitPct !== null && (
+        <div className={styles.field}>
+          <Text size="2" weight="medium">Charge Limit</Text>
+          <div className={styles.stepperRow}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="1"
+              disabled={chargeLimitPct <= 50}
+              onClick={() =>
+                updateField(
+                  "chargeLimitPct",
+                  Math.max(50, chargeLimitPct - 5),
+                )}
+            >
+              −
+            </Button>
+            <Text size="3" weight="bold" className={styles.stepperValue}>
+              {chargeLimitPct}%
+            </Text>
+            <Button
+              type="button"
+              variant="ghost"
+              size="1"
+              disabled={chargeLimitPct >= 100}
+              onClick={() =>
+                updateField(
+                  "chargeLimitPct",
+                  Math.min(100, chargeLimitPct + 5),
+                )}
+            >
+              +
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }

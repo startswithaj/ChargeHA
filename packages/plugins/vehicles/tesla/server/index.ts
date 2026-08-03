@@ -1,9 +1,11 @@
 /// <reference lib="deno.ns" />
 import { TRPCError } from "@trpc/server";
-import type { VehicleRow } from "@chargeha/server/db/types";
+import type { ChargerRow, VehicleRow } from "@chargeha/server/db/types";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import { generateEcKeyPair } from "@chargeha/server/lib/Encryption";
 import type {
+  ChargerMiddleware,
+  ChargerPlugin,
   CommandStatus,
   HealthCheckResult,
   PluginHealthCheck,
@@ -13,6 +15,7 @@ import type {
   VehiclePlugin,
 } from "../../../types.ts";
 import { TeslaAdapter } from "./TeslaAdapter.ts";
+import { TeslaChargerMiddleware } from "./TeslaChargerMiddleware.ts";
 import { TeslaVehicleMiddleware } from "./TeslaVehicleMiddleware.ts";
 import { TeslaProxyManager } from "./TeslaProxyManager.ts";
 import { TeslaService, type TeslaServiceIo } from "./TeslaService.ts";
@@ -58,9 +61,12 @@ export async function checkTeslaProxyHealth(
  * auto-refresh, DB vehicle load) saved as `startupPromise`. Methods that
  * depend on startup awaited it internally; `shutdown()` awaits it too.
  */
-export class TeslaVehiclePlugin implements VehiclePlugin {
+export class TeslaVehiclePlugin implements VehiclePlugin, ChargerPlugin {
+  private readonly middlewares = new Map<string, TeslaVehicleMiddleware>();
+
   readonly id = "tesla";
   readonly displayName = "Tesla";
+  readonly vendor = "Tesla";
   readonly configDef = teslaConfigDef;
   readonly secretKeys = TESLA_SECRET_KEYS;
   readonly settingsComponentKey = "tesla-settings";
@@ -108,6 +114,14 @@ export class TeslaVehiclePlugin implements VehiclePlugin {
   }
 
   async createVehicleMiddleware(row: VehicleRow): Promise<VehicleMiddleware> {
+    return await this.sharedMiddleware(row);
+  }
+
+  private async sharedMiddleware(
+    row: VehicleRow,
+  ): Promise<TeslaVehicleMiddleware> {
+    const existing = this.middlewares.get(row.id);
+    if (existing) return existing;
     const proxyUrl = (await this.deps.getConfig("proxy_url")) ??
       DEFAULT_PROXY_URL;
     const adapter = new TeslaAdapter(
@@ -117,7 +131,26 @@ export class TeslaVehiclePlugin implements VehiclePlugin {
       this.deps.log,
       this.deps.dbLog,
     );
-    return new TeslaVehicleMiddleware(adapter, this.deps.log);
+    const middleware = new TeslaVehicleMiddleware(adapter, this.deps.log);
+    this.middlewares.set(row.id, middleware);
+    return middleware;
+  }
+
+  async createChargerMiddleware(row: ChargerRow): Promise<ChargerMiddleware> {
+    if (row.vehicleId === null) {
+      throw new Error(`Tesla charger row ${row.id} has no vehicleId`);
+    }
+    const vehicles = await this.deps.getVehicleRows();
+    const vehicle = vehicles.find((v) => v.id === row.vehicleId);
+    if (!vehicle) {
+      throw new Error(
+        `No Tesla vehicle ${row.vehicleId} for charger ${row.id}`,
+      );
+    }
+    return new TeslaChargerMiddleware(
+      row,
+      await this.sharedMiddleware(vehicle),
+    );
   }
 
   async shutdown(): Promise<void> {
@@ -212,6 +245,10 @@ export class TeslaVehiclePlugin implements VehiclePlugin {
 
   getVehicleHttpRoutes(): PluginHttpRoutes | null {
     return { routes: createTeslaHttpRoutes(this.teslaTokenManager, this.deps) };
+  }
+
+  getChargerHttpRoutes(): PluginHttpRoutes | null {
+    return null;
   }
 
   getTunnelRoutes(): PluginTunnelRoute[] {

@@ -11,28 +11,62 @@ import { useEnergyData } from "../../../hooks/useEnergyData.ts";
 import { useVehicles } from "../../../hooks/useVehicles.ts";
 import { useToast } from "../../../hooks/useToast.tsx";
 import { useControllerStatuses } from "../../../hooks/controllerStatusStore.ts";
+import {
+  useChargerCommands,
+  useChargingPointForVehicle,
+} from "../../../hooks/useChargers.ts";
 import { VehicleCard } from "../../VehicleCard/VehicleCard.tsx";
 import { trpc } from "../../../trpc.ts";
 import { useVehicleSolarGrid } from "./energyHelpers.ts";
 
 type VehicleCardProps = ComponentProps<typeof VehicleCard>;
 
-/** Wraps VehicleCard with a per-vehicle commandStatus query. */
+/** Wraps VehicleCard with a per-vehicle commandStatus query and the linked
+ *  charging point's mode/amps/start/stop controls — charge commands are
+ *  addressed by charging-point id, not vehicle id, so the lookup and
+ *  mutations live here rather than in the vehicles list above. */
 function ConnectedVehicleCard(
-  { vehicleId, ...props }:
-    & { vehicleId: string }
-    & Omit<VehicleCardProps, "commandsDisabled" | "commandsDisabledReason">,
+  { vehicleId, vehicleMode, ...props }:
+    & { vehicleId: string; vehicleMode: VehicleMode }
+    & Omit<
+      VehicleCardProps,
+      | "commandsDisabled"
+      | "commandsDisabledReason"
+      | "mode"
+      | "commandPending"
+      | "onStartCharging"
+      | "onStopCharging"
+      | "onSetAmps"
+      | "onChangeMode"
+    >,
 ) {
   const { data: cmdStatus } = trpc.vehicle.commandStatus.useQuery(
     { vehicleId },
     { refetchInterval: 30_000 },
   );
+  const chargingPoint = useChargingPointForVehicle(vehicleId);
+  const { commandPending, startCharging, stopCharging, setAmps, changeMode } =
+    useChargerCommands(chargingPoint?.id ?? null);
+
+  // Should not happen post-migration (every driveable vehicle gets a
+  // charging point), but never crash — disable controls with a reason.
+  const commandsDisabled = !chargingPoint ||
+    (cmdStatus?.commandsDisabled ?? false);
+  const commandsDisabledReason = !chargingPoint
+    ? "No charging point linked to this vehicle"
+    : cmdStatus?.reason ?? undefined;
 
   return (
     <VehicleCard
       {...props}
-      commandsDisabled={cmdStatus?.commandsDisabled ?? false}
-      commandsDisabledReason={cmdStatus?.reason ?? undefined}
+      mode={chargingPoint?.mode ?? vehicleMode}
+      commandPending={commandPending}
+      onStartCharging={startCharging}
+      onStopCharging={stopCharging}
+      onSetAmps={setAmps}
+      onChangeMode={changeMode}
+      commandsDisabled={commandsDisabled}
+      commandsDisabledReason={commandsDisabledReason}
     />
   );
 }
@@ -163,33 +197,23 @@ function VehicleCards(
     vehicles,
     home,
     vehiclesLoading,
-    commandPending,
     vehicleErrors,
     vehicleSolarGrid,
     allocationStatus,
     controllerStatuses,
     wakeMutation,
     refreshMutation,
-    startCharging,
-    stopCharging,
-    setAmps,
-    changeMode,
     onNavigateSettings,
   }: {
     vehicles: ReturnType<typeof useVehicles>["vehicles"];
     home: { lat: number; lng: number } | null;
     vehiclesLoading: boolean;
-    commandPending: Record<string, string | false>;
     vehicleErrors: Record<string, string | undefined>;
     vehicleSolarGrid: Record<string, { solarW: number; gridW: number }>;
     allocationStatus: Record<string, string>;
     controllerStatuses: ReturnType<typeof useControllerStatuses>;
     wakeMutation: ReturnType<typeof trpc.vehicle.command.useMutation>;
     refreshMutation: ReturnType<typeof trpc.vehicle.refreshState.useMutation>;
-    startCharging: (id: string) => void;
-    stopCharging: (id: string) => void;
-    setAmps: (id: string, amps: number) => void;
-    changeMode: (id: string, mode: VehicleMode) => void;
     onNavigateSettings?: () => void;
   },
 ) {
@@ -201,15 +225,10 @@ function VehicleCards(
             <ConnectedVehicleCard
               key={v.id}
               vehicleId={v.id}
+              vehicleMode={v.mode as VehicleMode}
               name={v.name || v.state.vehicleName}
               state={v.state}
               priority={v.priority}
-              mode={v.mode as VehicleMode}
-              commandPending={commandPending[v.id] ?? false}
-              onStartCharging={() => startCharging(v.id)}
-              onStopCharging={() => stopCharging(v.id)}
-              onSetAmps={(amps) => setAmps(v.id, amps)}
-              onChangeMode={(mode) => changeMode(v.id, mode)}
               solarPowerW={vehicleSolarGrid[v.id]?.solarW ?? 0}
               gridPowerW={vehicleSolarGrid[v.id]?.gridW ?? 0}
               loading={vehiclesLoading}
@@ -259,12 +278,7 @@ export function VehicleList(
     vehicles,
     loading: vehiclesLoading,
     error: vehiclesError,
-    commandPending,
     vehicleErrors,
-    startCharging,
-    stopCharging,
-    setAmps,
-    changeMode,
     refreshVehicles,
   } = useVehicles();
 
@@ -303,17 +317,12 @@ export function VehicleList(
         vehicles={vehicles}
         home={home}
         vehiclesLoading={vehiclesLoading}
-        commandPending={commandPending}
         vehicleErrors={vehicleErrors}
         vehicleSolarGrid={vehicleSolarGrid}
         allocationStatus={allocationStatus}
         controllerStatuses={controllerStatuses}
         wakeMutation={wakeMutation}
         refreshMutation={refreshMutation}
-        startCharging={startCharging}
-        stopCharging={stopCharging}
-        setAmps={setAmps}
-        changeMode={changeMode}
         onNavigateSettings={onNavigateSettings}
       />
 

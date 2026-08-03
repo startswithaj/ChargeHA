@@ -79,13 +79,37 @@ describe("Schedules tRPC Router", () => {
       expect(data.schedule.vehicleId).toBeNull();
     });
 
-    it("rejects charge schedule without vehicleId", async () => {
+    it("rejects charge schedule without a target", async () => {
       await expect(
         caller.schedule.create({
           ...VALID_CHARGE_SCHEDULE,
           vehicleId: undefined,
         }),
-      ).rejects.toThrow("vehicleId is required");
+      ).rejects.toThrow("exactly one target");
+    });
+
+    it("rejects charge schedule with both targets", async () => {
+      await expect(
+        caller.schedule.create({
+          ...VALID_CHARGE_SCHEDULE,
+          chargerId: "charger-1",
+        }),
+      ).rejects.toThrow("not both");
+    });
+
+    it("creates a charger-keyed charge schedule without a limit", async () => {
+      const { schedule } = await caller.schedule.create({
+        ...VALID_CHARGE_SCHEDULE,
+        vehicleId: undefined,
+        chargerId: "charger-1",
+        chargeLimitPct: undefined,
+      });
+      expect(schedule.scheduleType).toBe("charge");
+      expect(schedule.vehicleId).toBe(null);
+      expect(schedule.chargerId).toBe("charger-1");
+      expect(
+        schedule.scheduleType === "charge" ? schedule.chargeLimitPct : -1,
+      ).toBe(null);
     });
   });
 

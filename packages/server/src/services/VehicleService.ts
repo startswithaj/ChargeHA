@@ -164,34 +164,6 @@ export class VehicleService {
     return { success: true };
   }
 
-  /** Set vehicle mode (auto/charge_now/stop). */
-  async setMode(vehicleId: string, mode: VehicleMode) {
-    const vehicle = await this.getVehicleOrThrow(vehicleId);
-    await this.db.updateVehicleMode(vehicleId, mode);
-
-    this.eventEmitter.emit("vehicle_mode_changed", {
-      vehicleId,
-      vehicleName: vehicle.name,
-      mode,
-    });
-
-    // For charge_now, start charging at max amps immediately rather than
-    // waiting for the next controller loop (up to 30s delay).
-    if (mode === "charge_now") {
-      const state = await this.vehicleManager.getState(vehicleId);
-      if (state) {
-        await this.vehicleManager.startChargingAt(
-          vehicleId,
-          state.chargeAmpsMax,
-          { origin: "user:charge-now", traceId: createTraceId() },
-          state,
-        );
-      }
-    }
-
-    return { success: true, mode };
-  }
-
   /** Set vehicle priority. */
   async setPriority(vehicleId: string, priority: number) {
     await this.getVehicleOrThrow(vehicleId);
@@ -199,44 +171,12 @@ export class VehicleService {
     return { success: true, priority };
   }
 
-  /** Execute a vehicle command (start/stop/wake). */
-  async executeCommand(vehicleId: string, command: "start" | "stop" | "wake") {
+  /** Wake the vehicle for fresh data (charge commands live on chargers). */
+  async executeCommand(vehicleId: string, command: "wake") {
     await this.getVehicleOrThrow(vehicleId);
 
     try {
       switch (command) {
-        case "start": {
-          const state = await this.vehicleManager.getState(vehicleId);
-          if (!state) {
-            return { success: false, state: null };
-          }
-          const result = await this.vehicleManager.startChargingAt(
-            vehicleId,
-            state.chargeAmpsMax,
-            { origin: "user:command:start", traceId: createTraceId() },
-            state,
-            { force: true },
-          );
-          // Set mode to auto so the controller continues managing charging.
-          await this.db.updateVehicleMode(vehicleId, "auto");
-          return { success: result.success, state: result.state ?? null };
-        }
-        case "stop": {
-          const state = await this.vehicleManager.getState(vehicleId);
-          if (!state) {
-            return { success: false, state: null };
-          }
-          const result = await this.vehicleManager.stopCharging(
-            vehicleId,
-            { origin: "user:command:stop", traceId: createTraceId() },
-            state,
-            { force: true },
-          );
-          // Set mode to stop so the controller doesn't restart charging next cycle.
-          // Mode resets to auto on unplug.
-          await this.db.updateVehicleMode(vehicleId, "stop");
-          return { success: result.success, state: result.state ?? null };
-        }
         case "wake": {
           const state = await this.vehicleManager.requestState(
             vehicleId,
@@ -252,32 +192,6 @@ export class VehicleService {
           return { success: !!state, state };
         }
       }
-    } catch (error) {
-      throw new ServiceError(
-        error instanceof Error ? error.message : "Command failed",
-        "INTERNAL_SERVER_ERROR",
-        { cause: error },
-      );
-    }
-  }
-
-  /** Set charging amps. */
-  async setAmps(vehicleId: string, amps: number) {
-    await this.getVehicleOrThrow(vehicleId);
-
-    try {
-      const state = await this.vehicleManager.getState(vehicleId);
-      if (!state) {
-        return { success: false, state: null };
-      }
-      const result = await this.vehicleManager.startChargingAt(
-        vehicleId,
-        amps,
-        { origin: "user:set-amps", traceId: createTraceId() },
-        state,
-        { force: true },
-      );
-      return { success: result.success, state: result.state ?? null };
     } catch (error) {
       throw new ServiceError(
         error instanceof Error ? error.message : "Command failed",

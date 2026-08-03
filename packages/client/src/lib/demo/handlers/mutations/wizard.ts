@@ -49,6 +49,7 @@ export const wizardMutations: WizardMutations = {
       schedules: [{
         id: "demo-overnight-charge",
         vehicleId: "DEMO-001",
+        chargerId: null,
         scheduleType: "charge",
         startTime: "00:00",
         endTime: "06:00",

@@ -38,6 +38,7 @@ export const makeChargeSchedule = (
 ): ChargeSchedule => ({
   id: "sched-1",
   vehicleId: "VIN001",
+  chargerId: null,
   scheduleType: "charge",
   startTime: "22:00",
   endTime: "06:00",
@@ -53,6 +54,7 @@ export const makeBlockoutSchedule = (
 ): BlockoutSchedule => ({
   id: "block-1",
   vehicleId: null,
+  chargerId: null,
   scheduleType: "blockout",
   startTime: "15:00",
   endTime: "21:00",

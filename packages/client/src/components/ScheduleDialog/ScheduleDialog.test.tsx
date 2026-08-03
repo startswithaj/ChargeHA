@@ -51,6 +51,7 @@ describe("ScheduleForm", () => {
     editingSchedule: null,
     scheduleType: "charge" as const,
     vehicleId: "vin-123",
+    chargerId: null,
     onSave: vi.fn().mockResolvedValue(null),
     onCancel: vi.fn(),
   };
@@ -64,6 +65,7 @@ describe("ScheduleForm", () => {
   ): EditingSchedule => ({
     id: "s1",
     vehicleId: "vin-123",
+    chargerId: null,
     scheduleType: "charge",
     startTime: "00:00",
     endTime: "06:00",
@@ -364,6 +366,7 @@ describe("ScheduleForm", () => {
         editingSchedule={{
           id: "s2",
           vehicleId: null,
+          chargerId: null,
           scheduleType: "blockout",
           startTime: "17:00",
           endTime: "21:00",

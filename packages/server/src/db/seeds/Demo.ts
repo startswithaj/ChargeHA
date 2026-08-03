@@ -108,6 +108,7 @@ async function seedConfigAndVehicles(db: AppDatabase): Promise<void> {
   await db.createSchedule({
     id: "sched-demo-charge",
     vehicleId: VEHICLE_1_ID,
+    chargerId: null,
     scheduleType: "charge",
     startTime: "06:00",
     endTime: "18:00",
@@ -120,6 +121,7 @@ async function seedConfigAndVehicles(db: AppDatabase): Promise<void> {
   await db.createSchedule({
     id: "sched-demo-blockout",
     vehicleId: null,
+    chargerId: null,
     scheduleType: "blockout",
     startTime: "17:00",
     endTime: "21:00",

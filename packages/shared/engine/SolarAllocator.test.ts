@@ -66,6 +66,7 @@ describe("SolarAllocator", () => {
     overrides?: Partial<VehicleChargeState>,
   ): EngineVehicleInput => ({
     id,
+    vehicleId: id,
     name: `EV ${id}`,
     mode: "auto",
     priority,

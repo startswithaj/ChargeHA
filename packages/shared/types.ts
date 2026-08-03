@@ -135,15 +135,6 @@ export interface VehicleAdapter {
   /** Returns current charging state. */
   getChargeState(ctx: CallContext): Promise<AdapterVehicleChargeState>;
 
-  /** Start charging. Returns true on success. */
-  startCharging(ctx: CallContext): Promise<boolean>;
-
-  /** Stop charging. Returns true on success. */
-  stopCharging(ctx: CallContext): Promise<boolean>;
-
-  /** Set charging amperage. Returns true on success. */
-  setChargeAmps(amps: number, ctx: CallContext): Promise<boolean>;
-
   /** Set charge limit percentage. Returns true on success. */
   setChargeLimit(percent: number, ctx: CallContext): Promise<boolean>;
 
@@ -233,19 +224,22 @@ export type ScheduleType = "charge" | "blockout";
 
 export interface ChargeSchedule {
   id: string;
-  vehicleId: string;
+  vehicleId: string | null;
+  chargerId: string | null;
   scheduleType: "charge";
   startTime: string; // HH:MM 24h format
   endTime: string; // HH:MM 24h format
   days: DayOfWeek[];
   chargeAmps: number;
-  chargeLimitPct: number;
+  /** Null for charger-keyed schedules — no battery visibility. */
+  chargeLimitPct: number | null;
   enabled: boolean;
 }
 
 export interface BlockoutSchedule {
   id: string;
   vehicleId: null;
+  chargerId: null;
   scheduleType: "blockout";
   startTime: string; // HH:MM 24h format
   endTime: string; // HH:MM 24h format
@@ -258,11 +252,12 @@ export type Schedule = ChargeSchedule | BlockoutSchedule;
 export interface ScheduleFormData {
   scheduleType: ScheduleType;
   vehicleId: string | null;
+  chargerId: string | null;
   startTime: string;
   endTime: string;
   days: DayOfWeek[];
   chargeAmps: number;
-  chargeLimitPct: number;
+  chargeLimitPct: number | null;
 }
 
 // ---- Notification Types ----

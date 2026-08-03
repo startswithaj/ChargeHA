@@ -13,9 +13,9 @@
 
 import { assertExists } from "@std/assert";
 import type {
+  ChargingPointMode,
   CumulativeEnergyData,
   EnergyData,
-  VehicleAdapter,
   VehicleChargeState,
   VehicleMode,
 } from "@chargeha/shared";
@@ -25,7 +25,7 @@ import type { DecisionCheck } from "@chargeha/shared/engine";
 import type { VehicleRow } from "../db/types.ts";
 import { AppDatabase } from "../db/AppDatabase.ts";
 import { VehicleManager } from "../services/VehicleManager.ts";
-import type { ChargingPointManager } from "../services/ChargingPointManager.ts";
+import { ChargingPointManager } from "../services/ChargingPointManager.ts";
 import type { EnergyPoller } from "../services/EnergyPoller.ts";
 import { ChargeController } from "../services/ChargeController.ts";
 import { ConfigService } from "../services/ConfigService.ts";
@@ -38,8 +38,12 @@ import {
   TrackingEventEmitter,
 } from "./ChargeControllerMocks.ts";
 import { TeslaVehicleMiddleware } from "@chargeha/plugins/vehicles/tesla/server/TeslaVehicleMiddleware";
+import { TeslaChargerMiddleware } from "@chargeha/plugins/vehicles/tesla/server/TeslaChargerMiddleware";
+import type { TeslaAdapter } from "@chargeha/plugins/vehicles/tesla/server/TeslaAdapter";
 import type { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
-import type { VehiclePlugin } from "@chargeha/plugins/types";
+import type { ChargerPluginRegistry } from "@chargeha/server/bootstrap/ChargerPluginRegistry";
+import type { ChargerPlugin, VehiclePlugin } from "@chargeha/plugins/types";
+import type { ChargerRow } from "../db/types.ts";
 import { throwingMock } from "./throwingMock.ts";
 
 export const VIN = "TEST_VIN_001";
@@ -156,39 +160,86 @@ export interface ControllerCtx {
   db: AppDatabase;
   adapter: MockAdapter;
   manager: VehicleManager;
+  chargingPointManager: ChargingPointManager;
   poller: MockEnergyPoller;
   controller: ChargeController;
   trackingEmitter: TrackingEventEmitter;
   /** Run one controller loop iteration. Cancels the next-timer afterwards
    *  so FakeTime.tick can't fire a concurrent loop later in the test. */
   runOneLoop(): Promise<void>;
+  /** Set the mode on the charging point migrated for the given vehicle.
+   *  DB-only, like the old updateVehicleMode calls — the next loop picks
+   *  it up; no immediate command side effects. */
+  setMode(mode: ChargingPointMode, vehicleId?: string): Promise<void>;
+  /** Command-backoff state of the charging point migrated for the vehicle. */
+  getBackoff(
+    vehicleId?: string,
+  ): Promise<{ backedOff: boolean; remainingMs: number }>;
   getLastLog(): Promise<ControllerLogRow | null>;
   getLastLogParsed(): Promise<ParsedControllerLog | null>;
 }
 
-/** Build a mock VehiclePluginRegistry that creates a TeslaVehicleMiddleware
- *  wrapping the adapter returned by the given resolver. */
-export function makeMockRegistry(
+async function chargerIdFor(
+  db: AppDatabase,
+  vehicleId: string,
+): Promise<string> {
+  const charger = (await db.getChargers()).find((c) =>
+    c.vehicleId === vehicleId
+  );
+  assertExists(charger);
+  return charger.id;
+}
+
+async function setChargerMode(
+  db: AppDatabase,
+  vehicleId: string,
+  mode: ChargingPointMode,
+): Promise<void> {
+  await db.updateChargerMode(await chargerIdFor(db, vehicleId), mode);
+}
+
+/** Mock registries for the dual-role "tesla" plugin. Both roles share one
+ *  TeslaVehicleMiddleware per vehicle: the vehicle registry creates it, the
+ *  charger registry wraps that same instance in a real TeslaChargerMiddleware
+ *  — mirroring production wiring. */
+export function makeMockRegistries(
   resolveAdapter: (row: VehicleRow) => MockAdapter,
-): VehiclePluginRegistry {
-  const plugin = throwingMock<VehiclePlugin>("VehiclePlugin[tesla]", {
+): { vehicles: VehiclePluginRegistry; chargers: ChargerPluginRegistry } {
+  const middlewares = new Map<string, TeslaVehicleMiddleware>();
+  const vehiclePlugin = throwingMock<VehiclePlugin>("VehiclePlugin[tesla]", {
     id: "tesla",
-    createVehicleMiddleware: (row: VehicleRow) =>
-      Promise.resolve(
-        new TeslaVehicleMiddleware(
-          resolveAdapter(row) as unknown as VehicleAdapter,
-          testVehicleManagerLogger,
-        ),
-      ),
+    createVehicleMiddleware: (row: VehicleRow) => {
+      const middleware = new TeslaVehicleMiddleware(
+        resolveAdapter(row) as unknown as TeslaAdapter,
+        testVehicleManagerLogger,
+      );
+      middlewares.set(row.id, middleware);
+      return Promise.resolve(middleware);
+    },
   });
-  return throwingMock<VehiclePluginRegistry>("VehiclePluginRegistry", {
-    get: () => plugin,
+  const chargerPlugin = throwingMock<ChargerPlugin>("ChargerPlugin[tesla]", {
+    id: "tesla",
+    createChargerMiddleware: (row: ChargerRow) => {
+      assertExists(row.vehicleId);
+      const shared = middlewares.get(row.vehicleId);
+      assertExists(shared);
+      return Promise.resolve(new TeslaChargerMiddleware(row, shared));
+    },
   });
+  return {
+    vehicles: throwingMock<VehiclePluginRegistry>("VehiclePluginRegistry", {
+      get: () => vehiclePlugin,
+    }),
+    chargers: throwingMock<ChargerPluginRegistry>("ChargerPluginRegistry", {
+      get: () => chargerPlugin,
+    }),
+  };
 }
 
 interface ControllerStack {
   db: AppDatabase;
   manager: VehicleManager;
+  chargingPointManager: ChargingPointManager;
   poller: MockEnergyPoller;
   controller: ChargeController;
   trackingEmitter: TrackingEventEmitter;
@@ -206,11 +257,12 @@ async function buildControllerStack(
   await db.init();
 
   const trackingEmitter = new TrackingEventEmitter();
+  const registries = makeMockRegistries(resolveAdapter);
   const manager = new VehicleManager(
     db,
     trackingEmitter,
     testVehicleManagerLogger,
-    makeMockRegistry(resolveAdapter),
+    registries.vehicles,
   );
 
   const poller = new MockEnergyPoller();
@@ -232,9 +284,19 @@ async function buildControllerStack(
     new Logger("ConfigService", "error"),
   );
 
+  const chargingPointManager = new ChargingPointManager(
+    db,
+    registries.chargers,
+    manager,
+    poller as unknown as EnergyPoller,
+    configService,
+    trackingEmitter,
+    new Logger("ChargingPointManager", "error"),
+  );
+
   const controller = new ChargeController(
     manager,
-    throwingMock<ChargingPointManager>("ChargingPointManager"),
+    chargingPointManager,
     poller as unknown as EnergyPoller,
     db,
     configService,
@@ -246,7 +308,14 @@ async function buildControllerStack(
   // and FakeTime users don't fire it unexpectedly.
   controller.stop();
 
-  return { db, manager, poller, controller, trackingEmitter };
+  return {
+    db,
+    manager,
+    chargingPointManager,
+    poller,
+    controller,
+    trackingEmitter,
+  };
 }
 
 export async function setupController(
@@ -262,7 +331,14 @@ export async function setupController(
     energy,
     configOverrides,
   );
-  const { db, manager, poller, controller, trackingEmitter } = stack;
+  const {
+    db,
+    manager,
+    chargingPointManager,
+    poller,
+    controller,
+    trackingEmitter,
+  } = stack;
 
   await db.upsertVehicle({
     id: VIN,
@@ -278,14 +354,19 @@ export async function setupController(
   if (!options.skipInitialState) {
     await manager.requestState(VIN, SETUP_REQUEST_CONTEXT);
   }
+  await chargingPointManager.init();
 
   return {
     db,
     adapter,
     manager,
+    chargingPointManager,
     poller,
     controller,
     trackingEmitter,
+    setMode: (mode, vehicleId = VIN) => setChargerMode(db, vehicleId, mode),
+    getBackoff: async (vehicleId = VIN) =>
+      chargingPointManager.isBackedOff(await chargerIdFor(db, vehicleId)),
     async runOneLoop() {
       // Drop the next-timer scheduled by loop() so FakeTime.tick can't fire
       // a concurrent loop call while later test assertions run.
@@ -315,10 +396,12 @@ export interface MultiControllerCtx {
   db: AppDatabase;
   adapters: Map<string, MockAdapter>;
   manager: VehicleManager;
+  chargingPointManager: ChargingPointManager;
   poller: MockEnergyPoller;
   controller: ChargeController;
   trackingEmitter: TrackingEventEmitter;
   runOneLoop(): Promise<void>;
+  setMode(vehicleId: string, mode: ChargingPointMode): Promise<void>;
   getLogForVehicle(vehicleId: string): Promise<ParsedControllerLog | null>;
 }
 
@@ -351,7 +434,14 @@ export async function setupMultiVehicleController(
     energy,
     configOverrides,
   );
-  const { db, manager, poller, controller, trackingEmitter } = stack;
+  const {
+    db,
+    manager,
+    chargingPointManager,
+    poller,
+    controller,
+    trackingEmitter,
+  } = stack;
 
   await vehicles.reduce(async (prev, v) => {
     await prev;
@@ -368,14 +458,17 @@ export async function setupMultiVehicleController(
     await manager.addVehicle(row);
     await manager.requestState(v.vin, SETUP_REQUEST_CONTEXT);
   }, Promise.resolve());
+  await chargingPointManager.init();
 
   return {
     db,
     adapters,
     manager,
+    chargingPointManager,
     poller,
     controller,
     trackingEmitter,
+    setMode: (vehicleId, mode) => setChargerMode(db, vehicleId, mode),
     async runOneLoop() {
       await testable(controller).loop();
       controller.stop();
@@ -384,7 +477,7 @@ export async function setupMultiVehicleController(
       const { rows } = await db.logs.getControllerLogs({
         limit: 1,
         offset: 0,
-        vehicleId,
+        vehicleId: await chargerIdFor(db, vehicleId),
       });
       return rows[0] ? parseLog(rows[0]) : null;
     },

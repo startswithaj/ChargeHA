@@ -77,8 +77,6 @@ describe("VehicleManager", () => {
     hasBlockout: false,
   };
 
-  const CMD_CTX = { origin: "test", traceId: "test" };
-
   beforeEach(async () => {
     db = new AppDatabase(":memory:");
     await db.init();
@@ -144,6 +142,7 @@ describe("VehicleManager", () => {
       await db.createSchedule({
         id: "sched-1",
         vehicleId: "VIN1",
+        chargerId: null,
         scheduleType: "charge",
         startTime: "22:00",
         endTime: "06:00",
@@ -390,153 +389,6 @@ describe("VehicleManager", () => {
 
     it("isVehicleAwake returns false for unknown vehicle", () => {
       expect(manager.isVehicleAwake("UNKNOWN")).toBe(false);
-    });
-  });
-
-  describe("startChargingAt", () => {
-    it("returns error for unknown vehicle", async () => {
-      const result = await manager.startChargingAt(
-        "UNKNOWN",
-        20,
-        CMD_CTX,
-        MOCK_STATE,
-      );
-      expect(result.success).toBe(false);
-      expect(result.error).toBe("Vehicle not registered");
-    });
-
-    it("clamps amps to [min, max]", async () => {
-      await manager.addVehicle(VEHICLE_ROW);
-      await manager.requestState("VIN1", REQUEST_CONTEXT);
-      const mw = middlewares.get("VIN1");
-      assertExists(mw);
-
-      await manager.startChargingAt(
-        "VIN1",
-        100,
-        CMD_CTX,
-        { ...MOCK_STATE, chargeAmps: 0, isCharging: false },
-      );
-      expect(mw.setAmpsCalls.at(-1)?.amps).toBe(32);
-    });
-
-    it("sends start when not charging", async () => {
-      await manager.addVehicle(VEHICLE_ROW);
-      await manager.requestState("VIN1", REQUEST_CONTEXT);
-      const mw = middlewares.get("VIN1");
-      assertExists(mw);
-
-      const result = await manager.startChargingAt(
-        "VIN1",
-        16,
-        CMD_CTX,
-        { ...MOCK_STATE, isCharging: false },
-      );
-      expect(result.success).toBe(true);
-      expect(mw.startCalls).toHaveLength(1);
-    });
-
-    it("skips start when already charging at target amps", async () => {
-      await manager.addVehicle(VEHICLE_ROW);
-      await manager.requestState("VIN1", REQUEST_CONTEXT);
-      const mw = middlewares.get("VIN1");
-      assertExists(mw);
-
-      await manager.startChargingAt(
-        "VIN1",
-        16,
-        CMD_CTX,
-        { ...MOCK_STATE, isCharging: true, chargeAmps: 16 },
-      );
-      expect(mw.startCalls).toHaveLength(0);
-      expect(mw.setAmpsCalls).toHaveLength(0);
-    });
-
-    it("honours command backoff", async () => {
-      await manager.addVehicle(VEHICLE_ROW);
-      await manager.requestState("VIN1", REQUEST_CONTEXT);
-      const mw = middlewares.get("VIN1");
-      assertExists(mw);
-
-      // Trigger failure to produce backoff — state has chargeAmps=0 so
-      // setChargeAmps will be called, and it's set to fail.
-      const startState = { ...MOCK_STATE, chargeAmps: 0, isCharging: false };
-      mw.setAmpsResult = false;
-      await manager.startChargingAt("VIN1", 16, CMD_CTX, startState);
-
-      // Second call with non-force should be blocked
-      mw.setAmpsResult = true;
-      mw.startCalls = [];
-      const result = await manager.startChargingAt(
-        "VIN1",
-        16,
-        CMD_CTX,
-        startState,
-      );
-      expect(result.success).toBe(false);
-      expect(result.error).toBe("Command backoff active");
-    });
-
-    it("bypasses backoff when force=true", async () => {
-      await manager.addVehicle(VEHICLE_ROW);
-      await manager.requestState("VIN1", REQUEST_CONTEXT);
-      const mw = middlewares.get("VIN1");
-      assertExists(mw);
-
-      const startState = { ...MOCK_STATE, chargeAmps: 0, isCharging: false };
-      mw.setAmpsResult = false;
-      await manager.startChargingAt("VIN1", 16, CMD_CTX, startState);
-
-      mw.setAmpsResult = true;
-      const result = await manager.startChargingAt(
-        "VIN1",
-        16,
-        CMD_CTX,
-        startState,
-        { force: true },
-      );
-      expect(result.success).toBe(true);
-    });
-  });
-
-  describe("stopCharging", () => {
-    it("returns error for unknown vehicle", async () => {
-      const result = await manager.stopCharging(
-        "UNKNOWN",
-        CMD_CTX,
-        MOCK_STATE,
-      );
-      expect(result.success).toBe(false);
-    });
-
-    it("is idempotent when not charging", async () => {
-      await manager.addVehicle(VEHICLE_ROW);
-      await manager.requestState("VIN1", REQUEST_CONTEXT);
-      const mw = middlewares.get("VIN1");
-      assertExists(mw);
-
-      const result = await manager.stopCharging(
-        "VIN1",
-        CMD_CTX,
-        { ...MOCK_STATE, isCharging: false },
-      );
-      expect(result.success).toBe(true);
-      expect(mw.stopCalls).toHaveLength(0);
-    });
-
-    it("sends stop when charging", async () => {
-      await manager.addVehicle(VEHICLE_ROW);
-      await manager.requestState("VIN1", REQUEST_CONTEXT);
-      const mw = middlewares.get("VIN1");
-      assertExists(mw);
-
-      const result = await manager.stopCharging(
-        "VIN1",
-        CMD_CTX,
-        { ...MOCK_STATE, isCharging: true },
-      );
-      expect(result.success).toBe(true);
-      expect(mw.stopCalls).toHaveLength(1);
     });
   });
 

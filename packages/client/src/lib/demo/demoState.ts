@@ -37,6 +37,7 @@ export interface DemoCharger {
 export interface DemoSchedule {
   id: string;
   vehicleId: string | null;
+  chargerId: string | null;
   scheduleType: string;
   startTime: string;
   endTime: string;

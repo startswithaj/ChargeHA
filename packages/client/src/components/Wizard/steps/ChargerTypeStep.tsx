@@ -1,12 +1,12 @@
 import { Text } from "@radix-ui/themes";
-import { Plug, Server } from "lucide-react";
+import { Monitor, Plug, Server } from "lucide-react";
 import { useWizardState } from "../../../hooks/useWizardState.ts";
 import { chargerPluginOptions } from "@chargeha/plugins/componentRegistry";
 import type { StepDef, WizardNext } from "../flow.ts";
 import { OptionCard } from "./OptionCard.tsx";
 import styles from "./steps.module.css";
 
-const icons = { server: Server, plug: Plug } as const;
+const icons = { server: Server, plug: Plug, monitor: Monitor } as const;
 
 function chargerTypeNext(
   loading: boolean,

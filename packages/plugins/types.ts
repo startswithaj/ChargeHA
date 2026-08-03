@@ -139,15 +139,6 @@ export interface VehicleMiddleware {
 
   /** Whether the vehicle responded as online on the last request. */
   readonly online: boolean;
-
-  /** Start charging. Wakes the vehicle internally if asleep. */
-  startCharging(ctx: CallContext): Promise<boolean>;
-
-  /** Stop charging. */
-  stopCharging(ctx: CallContext): Promise<boolean>;
-
-  /** Set charging amperage. Wakes the vehicle internally if asleep. */
-  setChargeAmps(amps: number, ctx: CallContext): Promise<boolean>;
 }
 
 // ── Energy Plugin ───────────────────────────────────────────────────────────

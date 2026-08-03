@@ -17,6 +17,7 @@ describe("scheduleGapUtils", () => {
   ): Schedule => ({
     id: crypto.randomUUID(),
     vehicleId,
+    chargerId: null,
     scheduleType: "charge",
     startTime,
     endTime,
@@ -29,6 +30,7 @@ describe("scheduleGapUtils", () => {
   const makeBlockout = (startTime: string, endTime: string): Schedule => ({
     id: crypto.randomUUID(),
     vehicleId: null,
+    chargerId: null,
     scheduleType: "blockout",
     startTime,
     endTime,
@@ -82,12 +84,18 @@ describe("scheduleGapUtils", () => {
   describe("findNextGap", () => {
     describe("no existing schedules", () => {
       it("returns 00:00-06:00 default for charge type", () => {
-        const result = findNextGap([], "charge", "v1");
+        const result = findNextGap([], "charge", {
+          vehicleId: "v1",
+          chargerId: null,
+        });
         expect(result).toEqual({ startTime: "00:00", endTime: "06:00" });
       });
 
       it("returns 16:00-22:00 default for blockout type", () => {
-        const result = findNextGap([], "blockout", null);
+        const result = findNextGap([], "blockout", {
+          vehicleId: null,
+          chargerId: null,
+        });
         expect(result).toEqual({ startTime: "16:00", endTime: "22:00" });
       });
     });
@@ -95,7 +103,10 @@ describe("scheduleGapUtils", () => {
     describe("single schedule leaves a gap", () => {
       it("finds the gap when one charge schedule occupies early morning", () => {
         const schedules = [makeCharge("v1", "00:00", "06:00")];
-        const result = findNextGap(schedules, "charge", "v1");
+        const result = findNextGap(schedules, "charge", {
+          vehicleId: "v1",
+          chargerId: null,
+        });
         // Gap is 06:00-00:00 (18 hours = 72 slots), capped at 6 hours
         expect(result.startTime).toBe("06:00");
         expect(timeToSlot(result.endTime) - timeToSlot(result.startTime)).toBe(
@@ -105,7 +116,10 @@ describe("scheduleGapUtils", () => {
 
       it("finds the gap when one blockout occupies evening", () => {
         const schedules = [makeBlockout("18:00", "22:00")];
-        const result = findNextGap(schedules, "blockout", null);
+        const result = findNextGap(schedules, "blockout", {
+          vehicleId: null,
+          chargerId: null,
+        });
         // Largest gap is 22:00-18:00 (20 hours), capped at 6 hours
         expect(result.startTime).toBe("22:00");
       });
@@ -118,7 +132,10 @@ describe("scheduleGapUtils", () => {
           makeCharge("v1", "06:00", "08:00"),
           makeCharge("v1", "10:00", "20:00"),
         ];
-        const result = findNextGap(schedules, "charge", "v1");
+        const result = findNextGap(schedules, "charge", {
+          vehicleId: "v1",
+          chargerId: null,
+        });
         // Gaps: 04:00-06:00 (2h), 08:00-10:00 (2h), 20:00-00:00 (4h)
         // Largest is 20:00-00:00
         expect(result.startTime).toBe("20:00");
@@ -131,7 +148,10 @@ describe("scheduleGapUtils", () => {
           makeCharge("v2", "12:00", "18:00"),
         ];
         // Looking for v2 gaps — only the v2 schedule matters
-        const result = findNextGap(schedules, "charge", "v2");
+        const result = findNextGap(schedules, "charge", {
+          vehicleId: "v2",
+          chargerId: null,
+        });
         // v2 occupies 12:00-18:00, so gap is 18:00-12:00 (18 hours), capped
         expect(result.startTime).toBe("18:00");
       });
@@ -141,7 +161,10 @@ describe("scheduleGapUtils", () => {
           makeCharge("v1", "00:00", "12:00"),
           makeBlockout("12:00", "14:00"),
         ];
-        const result = findNextGap(schedules, "blockout", null);
+        const result = findNextGap(schedules, "blockout", {
+          vehicleId: null,
+          chargerId: null,
+        });
         // Only blockout 12:00-14:00 is relevant, gap is 14:00-12:00
         expect(result.startTime).toBe("14:00");
       });
@@ -150,7 +173,10 @@ describe("scheduleGapUtils", () => {
     describe("overnight schedules", () => {
       it("handles overnight schedule (end < start)", () => {
         const schedules = [makeCharge("v1", "22:00", "06:00")];
-        const result = findNextGap(schedules, "charge", "v1");
+        const result = findNextGap(schedules, "charge", {
+          vehicleId: "v1",
+          chargerId: null,
+        });
         // Occupied 22:00-06:00, free 06:00-22:00 (16h), capped at 6h
         expect(result.startTime).toBe("06:00");
         expect(result.endTime).toBe("12:00");
@@ -160,7 +186,10 @@ describe("scheduleGapUtils", () => {
     describe("wrap-around gap merge", () => {
       it("merges free slots at end and start of day into one gap", () => {
         const schedules = [makeCharge("v1", "06:00", "20:00")];
-        const result = findNextGap(schedules, "charge", "v1");
+        const result = findNextGap(schedules, "charge", {
+          vehicleId: "v1",
+          chargerId: null,
+        });
         // Free: 20:00-06:00 (10 hours), which wraps around midnight
         // Should be merged into one gap, capped at 6h
         expect(result.startTime).toBe("20:00");
@@ -174,7 +203,10 @@ describe("scheduleGapUtils", () => {
           makeCharge("v1", "00:00", "12:00"),
           makeCharge("v1", "12:00", "00:00"),
         ];
-        const result = findNextGap(schedules, "charge", "v1");
+        const result = findNextGap(schedules, "charge", {
+          vehicleId: "v1",
+          chargerId: null,
+        });
         expect(result).toEqual({ startTime: "00:00", endTime: "06:00" });
       });
     });
@@ -182,7 +214,10 @@ describe("scheduleGapUtils", () => {
     describe("gap capping", () => {
       it("caps the suggested gap at 6 hours", () => {
         const schedules = [makeCharge("v1", "10:00", "12:00")];
-        const result = findNextGap(schedules, "charge", "v1");
+        const result = findNextGap(schedules, "charge", {
+          vehicleId: "v1",
+          chargerId: null,
+        });
         // Largest gap is 12:00-10:00 (22 hours), should be capped at 6h
         const startSlot = timeToSlot(result.startTime);
         const endSlot = timeToSlot(result.endTime);

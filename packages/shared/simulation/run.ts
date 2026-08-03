@@ -217,6 +217,7 @@ export function runSimulation(
     // Build engine input
     const vehicles: EngineVehicleInput[] = vehicleConfigs.map((vc) => ({
       id: vc.id,
+      vehicleId: vc.id,
       name: vc.name,
       mode: "auto" as const,
       priority: vc.priority,

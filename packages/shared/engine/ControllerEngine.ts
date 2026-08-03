@@ -26,6 +26,17 @@ import { createControlState } from "./types.ts";
  *
  *  No I/O, no database, no adapters. The caller (ChargeController or the
  *  simulator) executes the returned decisions. */
+/** Global schedules (no target) apply everywhere; targeted ones match the
+ *  charging point directly or via its linked vehicle. */
+function scheduleTargets(
+  s: EngineSchedule,
+  target: { id: string; vehicleId: string | null },
+): boolean {
+  if (s.chargerId !== null) return s.chargerId === target.id;
+  if (s.vehicleId !== null) return s.vehicleId === target.vehicleId;
+  return true;
+}
+
 export class ControllerEngine {
   private controlStates = new Map<string, VehicleControlState>();
 
@@ -348,7 +359,7 @@ export class ControllerEngine {
     const checks: DecisionCheck[] = [];
     const activeCharge = schedules.find((s) =>
       s.scheduleType === "charge" && s.enabled &&
-      (s.vehicleId === vehicle.id || s.vehicleId === null) &&
+      scheduleTargets(s, vehicle) &&
       isScheduleActiveNow(s, now, config.timezone)
     );
     if (!activeCharge) {

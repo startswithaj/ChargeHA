@@ -60,6 +60,7 @@ export function makeSchedulesReturn(
 export const chargeSchedule: ChargeSchedule = {
   id: "sched-1",
   vehicleId: "VIN1",
+  chargerId: null,
   scheduleType: "charge",
   startTime: "00:00",
   endTime: "06:00",
@@ -72,6 +73,7 @@ export const chargeSchedule: ChargeSchedule = {
 export const blockoutSchedule: BlockoutSchedule = {
   id: "sched-blockout-1",
   vehicleId: null,
+  chargerId: null,
   scheduleType: "blockout",
   startTime: "17:00",
   endTime: "21:00",

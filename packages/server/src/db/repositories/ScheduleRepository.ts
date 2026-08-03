@@ -38,6 +38,7 @@ export class ScheduleRepository {
     await this.db.insert(schedulesTable).values({
       id: input.id,
       vehicleId: input.vehicleId,
+      chargerId: input.chargerId,
       scheduleType: input.scheduleType,
       startTime: input.startTime,
       endTime: input.endTime,
@@ -55,6 +56,7 @@ export class ScheduleRepository {
     const set: Record<string, unknown> = {};
 
     if (input.vehicleId !== undefined) set.vehicleId = input.vehicleId;
+    if (input.chargerId !== undefined) set.chargerId = input.chargerId;
     if (input.scheduleType !== undefined) set.scheduleType = input.scheduleType;
     if (input.startTime !== undefined) set.startTime = input.startTime;
     if (input.endTime !== undefined) set.endTime = input.endTime;
@@ -85,5 +87,11 @@ export class ScheduleRepository {
     await this.db
       .delete(schedulesTable)
       .where(eq(schedulesTable.vehicleId, vehicleId));
+  }
+
+  async deleteSchedulesByCharger(chargerId: string): Promise<void> {
+    await this.db
+      .delete(schedulesTable)
+      .where(eq(schedulesTable.chargerId, chargerId));
   }
 }

@@ -60,6 +60,7 @@ export interface UpsertChargerInput {
 export interface ScheduleRow {
   id: string;
   vehicleId: string | null;
+  chargerId: string | null;
   scheduleType: ScheduleType;
   startTime: string;
   endTime: string;
@@ -74,6 +75,7 @@ export interface ScheduleRow {
 export interface CreateScheduleInput {
   id: string;
   vehicleId: string | null;
+  chargerId: string | null;
   scheduleType: ScheduleType;
   startTime: string;
   endTime: string;

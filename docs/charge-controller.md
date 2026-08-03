@@ -26,7 +26,7 @@ Each cycle (`ChargeController.runOnce()`):
 
 1. Load config from DB via `ConfigService` (charging, solar, battery, system)
 2. If `chargingEnabled` is `false`, the engine returns `none` for all vehicles
-3. Load all vehicles and schedules from DB
+3. Load all charging points and schedules from DB
 4. Get the latest energy snapshot from the `EnergyPoller`
 5. For each vehicle, call `VehicleManager.requestState()` with context
    (`hasSolar`, `hasSchedule`, `hasBlockout`, optional schedule charge limit) so
@@ -81,12 +81,13 @@ overrides.
 This is where the main logic lives. The checks run in priority order:
 
 1. **Blockout schedule** — If an active blockout schedule covers the current
-   time, stop charging. Blockout schedules apply to all vehicles.
+   time, stop charging. Blockout schedules apply to all charging points.
 
-2. **Charge schedule** — If an active charge schedule applies (either targeting
-   this vehicle or all vehicles), charge at the schedule's configured amps (or
-   max if not specified). If the schedule has a charge limit and the battery has
-   reached it, fall through to solar tracking instead.
+2. **Charge schedule** — If an active charge schedule applies (targeting this
+   charging point directly, its linked vehicle, or everything when untargeted),
+   charge at the schedule's configured amps (or max if not specified). If the
+   schedule has a charge limit and the battery has reached it, fall through to
+   solar tracking instead.
 
 3. **Battery priority** — If enabled and the home battery SoC is below the
    configured threshold, stop charging to let the home battery charge first.

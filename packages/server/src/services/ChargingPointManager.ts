@@ -20,6 +20,7 @@ interface ChargerEntry {
   row: ChargerRow;
   middleware: ChargerMiddleware;
   lastEmittedAt: string | null;
+  lastPluggedIn: boolean | null;
 }
 
 interface CommandBackoffState {
@@ -57,7 +58,12 @@ export class ChargingPointManager {
       return;
     }
     const middleware = await plugin.createChargerMiddleware(row);
-    this.chargers.set(row.id, { row, middleware, lastEmittedAt: null });
+    this.chargers.set(row.id, {
+      row,
+      middleware,
+      lastEmittedAt: null,
+      lastPluggedIn: null,
+    });
     this.logger.info(`Charger registered: ${row.name} (${row.id})`);
     this.eventEmitter.emit("chargers_changed", {});
   }
@@ -82,15 +88,42 @@ export class ChargingPointManager {
   ): Promise<ChargerState | null> {
     const entry = this.chargers.get(id);
     if (!entry) return null;
-    const state = this.enrich(await entry.middleware.requestState(ctx));
-    if (state && state.lastUpdated !== entry.lastEmittedAt) {
-      entry.lastEmittedAt = state.lastUpdated;
-      this.eventEmitter.emit("charger_update", {
-        ...state,
-        chargerName: entry.row.name,
-      });
+    try {
+      const state = this.enrich(await entry.middleware.requestState(ctx));
+      if (state && state.lastUpdated !== entry.lastEmittedAt) {
+        entry.lastEmittedAt = state.lastUpdated;
+        this.eventEmitter.emit("charger_update", {
+          ...state,
+          chargerName: entry.row.name,
+        });
+      }
+      await this.resetModeOnUnplug(id, state, ctx);
+      return state;
+    } catch (error) {
+      this.logger.warn(
+        `State fetch failed for ${entry.row.name}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return this.enrich(entry.middleware.getCachedState() ?? null);
     }
-    return state;
+  }
+
+  /** charge_now/stop are session overrides — a cable pull ends the session,
+   *  so the mode returns to auto (same behaviour vehicles have today). */
+  private async resetModeOnUnplug(
+    id: string,
+    state: ChargerState | null,
+    ctx: CallContext,
+  ): Promise<void> {
+    const entry = this.chargers.get(id);
+    if (!entry) return;
+    const pluggedIn = state?.isPluggedIn ?? null;
+    const unplugged = entry.lastPluggedIn === true && pluggedIn === false;
+    entry.lastPluggedIn = pluggedIn ?? entry.lastPluggedIn;
+    if (!unplugged || entry.row.mode === "auto") return;
+    this.logger.info(`Unplugged: resetting ${entry.row.id} to auto`);
+    await this.setMode(entry.row.id, "auto", ctx);
   }
 
   getState(id: string): ChargerState | null {
@@ -118,6 +151,7 @@ export class ChargingPointManager {
   }
 
   async init(): Promise<void> {
+    await this.migrateVehiclesToChargers();
     const solar = await this.configService.getSolar();
     this.cachedGridVoltage = solar.gridVoltage;
     this.eventEmitter.subscribe("config_changed", async ({ key }) => {
@@ -132,6 +166,43 @@ export class ChargingPointManager {
     const rows = await this.db.getChargers();
     await rows.reduce(
       (chain, row) => chain.then(() => this.addCharger(row)),
+      Promise.resolve(),
+    );
+  }
+
+  /** Vehicle-API charging points exist only where they make sense: the
+   *  vehicle's plugin must ALSO have a charger role (a data-only vehicle
+   *  plugin cannot be driven), and only when no real smart charger owns
+   *  control — vehicleId is null on standalone smart chargers because
+   *  plugin setup never sets it; only this migration does. Idempotent,
+   *  runs each boot, creates only what's missing. */
+  private async migrateVehiclesToChargers(): Promise<void> {
+    const [vehicles, chargers] = await Promise.all([
+      this.db.getVehicles(),
+      this.db.getChargers(),
+    ]);
+    const hasSmartCharger = chargers.some((c) => c.vehicleId === null);
+    if (hasSmartCharger) return;
+    const covered = new Set(
+      chargers.map((c) => c.vehicleId).filter((id) => id !== null),
+    );
+    const missing = vehicles.filter((v) =>
+      !covered.has(v.id) &&
+      this.chargerPlugins.get(v.adapterType) !== undefined
+    );
+    await missing.reduce(
+      (chain, v) =>
+        chain.then(async () => {
+          await this.db.upsertCharger({
+            id: crypto.randomUUID(),
+            name: v.name,
+            chargerAdapterType: v.adapterType,
+            mode: v.mode,
+            priority: v.priority,
+            vehicleId: v.id,
+          });
+          this.logger.info(`Migrated vehicle ${v.name} to a charging point`);
+        }),
       Promise.resolve(),
     );
   }
@@ -163,7 +234,7 @@ export class ChargingPointManager {
   ): Promise<{ success: boolean; error?: string }> {
     const entry = this.chargers.get(id);
     if (!entry) return { success: false, error: "Charger not registered" };
-    if (this.isBackedOff(id) && !force) {
+    if (this.isBackedOff(id).backedOff && !force) {
       return { success: false, error: "Command backoff active" };
     }
 
@@ -209,7 +280,7 @@ export class ChargingPointManager {
     const entry = this.chargers.get(id);
     if (!entry) return { success: false, error: "Charger not registered" };
     if (!state.isCharging) return { success: true };
-    if (this.isBackedOff(id) && !force) {
+    if (this.isBackedOff(id).backedOff && !force) {
       return { success: false, error: "Command backoff active" };
     }
     try {
@@ -257,12 +328,24 @@ export class ChargingPointManager {
   async setMode(
     id: string,
     mode: ChargingPointMode,
-    _ctx: CallContext,
+    ctx: CallContext,
   ): Promise<void> {
     await this.db.updateChargerMode(id, mode);
     const entry = this.chargers.get(id);
     if (entry) entry.row = { ...entry.row, mode };
     this.eventEmitter.emit("chargers_changed", {});
+
+    // Act immediately instead of waiting up to a controller loop.
+    const state = this.getState(id);
+    if (!state) return;
+    if (mode === "charge_now") {
+      await this.startChargingAt(id, state.chargeAmpsMax, ctx, state, {
+        force: true,
+      });
+    }
+    if (mode === "stop") {
+      await this.stopCharging(id, ctx, state, { force: true });
+    }
   }
 
   async reorder(order: string[]): Promise<void> {
@@ -315,16 +398,17 @@ export class ChargingPointManager {
     }));
   }
 
-  // ── Backoff (same pattern as VehicleManager) ─────────────────────────
+  // ── Backoff ──────────────────────────────────────────────────────────
 
-  private isBackedOff(id: string): boolean {
+  isBackedOff(id: string): { backedOff: boolean; remainingMs: number } {
     const bs = this.commandBackoff.get(id);
-    if (!bs?.backoffUntil) return false;
-    if (bs.backoffUntil <= Date.now()) {
+    if (!bs?.backoffUntil) return { backedOff: false, remainingMs: 0 };
+    const remainingMs = bs.backoffUntil - Date.now();
+    if (remainingMs <= 0) {
       bs.backoffUntil = null;
-      return false;
+      return { backedOff: false, remainingMs: 0 };
     }
-    return true;
+    return { backedOff: true, remainingMs };
   }
 
   private applyCommandBackoff(id: string, error: unknown): void {

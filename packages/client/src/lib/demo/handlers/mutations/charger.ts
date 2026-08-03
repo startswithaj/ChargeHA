@@ -7,6 +7,7 @@ type ChargerMutations = Pick<
   | "charger.create"
   | "charger.ensure"
   | "charger.setMode"
+  | "charger.setAmps"
   | "charger.reorder"
   | "charger.remove"
 >;
@@ -68,6 +69,8 @@ export const chargerMutations: ChargerMutations = {
   "charger.setMode": (input) => {
     patchCharger(input.id, (c) => ({ ...c, mode: input.mode }));
   },
+
+  "charger.setAmps": () => ({ success: true as const }),
 
   "charger.reorder": (input) => {
     updateDemoState((m) => ({

@@ -98,6 +98,7 @@ export const vehicles = sqliteTable("vehicles", {
 export const schedules = sqliteTable("schedules", {
   id: text("id").primaryKey(),
   vehicleId: text("vehicle_id"),
+  chargerId: text("charger_id"),
   scheduleType: text("schedule_type").notNull(),
   startTime: text("start_time").notNull(),
   endTime: text("end_time").notNull(),

@@ -29,6 +29,10 @@ vi.mock("../../../hooks/useSchedules.ts", () => ({
   })),
 }));
 
+vi.mock("../../../hooks/useChargers.ts", () => ({
+  useChargers: () => ({ chargers: [], isLoading: false }),
+}));
+
 vi.mock("../../../hooks/useVehicles.ts", () => ({
   useVehicles: vi.fn(() => ({
     vehicles: [

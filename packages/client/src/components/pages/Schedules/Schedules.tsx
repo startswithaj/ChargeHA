@@ -9,17 +9,21 @@ import type {
 import { vehicleScheduleNotes } from "@chargeha/plugins/componentRegistry";
 import { useSchedules } from "../../../hooks/useSchedules.ts";
 import { useVehicles } from "../../../hooks/useVehicles.ts";
+import { useChargers } from "../../../hooks/useChargers.ts";
 import { useSystemConfig } from "../../../hooks/useSectionConfig.ts";
 import { ScheduleCard } from "../../ScheduleCard/ScheduleCard.tsx";
 import { ScheduleForm } from "../../ScheduleDialog/ScheduleDialog.tsx";
 import { EmptyState } from "../../ui/EmptyState.tsx";
 import { findNextGap } from "./scheduleGapUtils.ts";
-import { VehicleScheduleSection } from "./VehicleScheduleSection.tsx";
+import {
+  type ScheduleTarget,
+  TargetScheduleSection,
+} from "./VehicleScheduleSection.tsx";
 import styles from "./Schedules.module.css";
 
-// Tracks which inline form is open: creating for a vehicle/blockout, or editing a schedule
+// Tracks which inline form is open: creating for a target/blockout, or editing a schedule
 type FormTarget =
-  | { action: "create-charge"; vehicleId: string }
+  | { action: "create-charge"; target: ScheduleTarget }
   | { action: "create-blockout" }
   | { action: "edit"; schedule: Schedule };
 
@@ -58,13 +62,16 @@ function useFormHelpers(
     setFormTarget({ action: "edit", schedule });
   };
 
-  const isFormForVehicle = (vehicleId: string) =>
+  const isFormForTarget = (target: ScheduleTarget) =>
     formTarget !== null &&
     ((formTarget.action === "create-charge" &&
-      formTarget.vehicleId === vehicleId) ||
+      formTarget.target.kind === target.kind &&
+      formTarget.target.id === target.id) ||
       (formTarget.action === "edit" &&
         formTarget.schedule.scheduleType === "charge" &&
-        formTarget.schedule.vehicleId === vehicleId));
+        (target.kind === "vehicle"
+          ? formTarget.schedule.vehicleId === target.id
+          : formTarget.schedule.chargerId === target.id)));
 
   const isFormForBlockout = isBlockoutTarget(formTarget);
 
@@ -76,20 +83,20 @@ function useFormHelpers(
     closeForm,
     handleSave,
     openEdit,
-    isFormForVehicle,
+    isFormForTarget,
     isFormForBlockout,
     editingScheduleId,
   };
 }
 
-function VehicleSections(
+function TargetSections(
   {
-    vehicles,
+    targets,
     chargeSchedules,
     schedules,
     formTarget,
     editingScheduleId,
-    isFormForVehicle,
+    isFormForTarget,
     setFormTarget,
     handleSave,
     closeForm,
@@ -97,12 +104,12 @@ function VehicleSections(
     openEdit,
     removeSchedule,
   }: {
-    vehicles: ReturnType<typeof useVehicles>["vehicles"];
+    targets: ScheduleTarget[];
     chargeSchedules: ChargeSchedule[];
     schedules: Schedule[];
     formTarget: FormTarget | null;
     editingScheduleId: string | null;
-    isFormForVehicle: (vehicleId: string) => boolean;
+    isFormForTarget: (target: ScheduleTarget) => boolean;
     setFormTarget: (t: FormTarget | null) => void;
     handleSave: (data: ScheduleFormData) => Promise<string | null>;
     closeForm: () => void;
@@ -111,22 +118,29 @@ function VehicleSections(
     removeSchedule: (id: string) => void;
   },
 ) {
+  const gapKey = (t: ScheduleTarget) =>
+    t.kind === "vehicle"
+      ? { vehicleId: t.id, chargerId: null }
+      : { vehicleId: null, chargerId: t.id };
   return (
     <>
-      {vehicles.map((vehicle) => (
-        <VehicleScheduleSection
-          key={vehicle.id}
-          vehicle={vehicle}
-          vehicleSchedules={chargeSchedules.filter(
-            (s) => s.vehicleId === vehicle.id,
+      {targets.map((target) => (
+        <TargetScheduleSection
+          key={`${target.kind}-${target.id}`}
+          target={target}
+          targetSchedules={chargeSchedules.filter((s) =>
+            target.kind === "vehicle"
+              ? s.vehicleId === target.id
+              : s.chargerId === target.id
           )}
-          showingForm={isFormForVehicle(vehicle.id)}
-          gap={findNextGap(schedules, "charge", vehicle.id)}
+          showingForm={isFormForTarget(target)}
+          gap={findNextGap(schedules, "charge", gapKey(target))}
           editingScheduleId={editingScheduleId}
           isCreating={formTarget?.action === "create-charge" &&
-            formTarget.vehicleId === vehicle.id}
-          onAddSchedule={(vehicleId) =>
-            setFormTarget({ action: "create-charge", vehicleId })}
+            formTarget.target.kind === target.kind &&
+            formTarget.target.id === target.id}
+          onAddSchedule={() =>
+            setFormTarget({ action: "create-charge", target })}
           onSave={handleSave}
           onCancel={closeForm}
           onToggle={toggleSchedule}
@@ -276,8 +290,14 @@ function BlockoutSection(
           editingSchedule={null}
           scheduleType="blockout"
           vehicleId={null}
-          defaultStartTime={findNextGap(schedules, "blockout", null).startTime}
-          defaultEndTime={findNextGap(schedules, "blockout", null).endTime}
+          defaultStartTime={findNextGap(schedules, "blockout", {
+            vehicleId: null,
+            chargerId: null,
+          }).startTime}
+          defaultEndTime={findNextGap(schedules, "blockout", {
+            vehicleId: null,
+            chargerId: null,
+          }).endTime}
           onSave={handleSave}
           onCancel={closeForm}
         />
@@ -286,8 +306,42 @@ function BlockoutSection(
   );
 }
 
+/** Vehicles first (unchanged Tesla behaviour), then standalone smart
+ *  chargers — linked charging points already schedule via their vehicle. */
+function buildScheduleTargets(
+  vehicles: ReturnType<typeof useVehicles>["vehicles"],
+  chargers: ReturnType<typeof useChargers>["chargers"],
+): ScheduleTarget[] {
+  return [
+    ...vehicles.map((v): ScheduleTarget => ({
+      kind: "vehicle",
+      id: v.id,
+      name: v.name,
+      badge: v.adapterType,
+    })),
+    ...chargers
+      .filter((c) => c.vehicleId === null)
+      .map((c): ScheduleTarget => ({
+        kind: "charger",
+        id: c.id,
+        name: c.name,
+        badge: c.chargerAdapterType,
+      })),
+  ];
+}
+
+function SchedulesLoading() {
+  return (
+    <div className={styles.page}>
+      <Text size="5" weight="bold">Schedules</Text>
+      <Text size="2" color="gray">Loading...</Text>
+    </div>
+  );
+}
+
 export function Schedules({ onNavigateSettings }: SchedulesProps) {
   const { vehicles, loading: vehiclesLoading } = useVehicles();
+  const { chargers } = useChargers();
   const {
     schedules,
     chargeSchedules,
@@ -315,7 +369,7 @@ export function Schedules({ onNavigateSettings }: SchedulesProps) {
     closeForm,
     handleSave,
     openEdit,
-    isFormForVehicle,
+    isFormForTarget,
     isFormForBlockout,
     editingScheduleId,
   } = useFormHelpers({
@@ -325,19 +379,13 @@ export function Schedules({ onNavigateSettings }: SchedulesProps) {
     updateSchedule,
   });
 
-  if (!vehiclesLoading && vehicles.length === 0) {
+  const targets = buildScheduleTargets(vehicles, chargers);
+
+  if (!vehiclesLoading && targets.length === 0) {
     return <NoVehiclesEmptyState onNavigateSettings={onNavigateSettings} />;
   }
 
-  // Loading state
-  if (vehiclesLoading) {
-    return (
-      <div className={styles.page}>
-        <Text size="5" weight="bold">Schedules</Text>
-        <Text size="2" color="gray">Loading...</Text>
-      </div>
-    );
-  }
+  if (vehiclesLoading) return <SchedulesLoading />;
 
   return (
     <div className={styles.page}>
@@ -346,13 +394,13 @@ export function Schedules({ onNavigateSettings }: SchedulesProps) {
         activeScheduleNotes={activeScheduleNotes}
       />
 
-      <VehicleSections
-        vehicles={vehicles}
+      <TargetSections
+        targets={targets}
         chargeSchedules={chargeSchedules}
         schedules={schedules}
         formTarget={formTarget}
         editingScheduleId={editingScheduleId}
-        isFormForVehicle={isFormForVehicle}
+        isFormForTarget={isFormForTarget}
         setFormTarget={setFormTarget}
         handleSave={handleSave}
         closeForm={closeForm}

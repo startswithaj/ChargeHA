@@ -25,11 +25,13 @@ export function slotToTime(slot: number): string {
 export function findNextGap(
   schedules: Schedule[],
   scheduleType: ScheduleType,
-  vehicleId: string | null,
+  target: { vehicleId: string | null; chargerId: string | null },
 ): { startTime: string; endTime: string } {
   const relevant = schedules.filter((s) => {
     if (scheduleType === "charge") {
-      return s.scheduleType === "charge" && s.vehicleId === vehicleId;
+      return s.scheduleType === "charge" &&
+        s.vehicleId === target.vehicleId &&
+        s.chargerId === target.chargerId;
     }
     return s.scheduleType === "blockout";
   });

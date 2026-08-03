@@ -15,6 +15,7 @@ const createInput = z.object({
   chargerAdapterType: z.string(),
 });
 const ensureInput = z.object({ chargerAdapterType: z.string() });
+const setAmpsInput = z.object({ id: z.string(), amps: z.number().int() });
 
 export const chargersRouter = router({
   list: publicProcedure.query(async ({ ctx }) => {
@@ -30,6 +31,21 @@ export const chargersRouter = router({
   ensure: publicProcedure.input(ensureInput).mutation(
     async ({ ctx, input }) => {
       await ctx.chargingPointManager.ensureCharger(input.chargerAdapterType);
+    },
+  ),
+
+  setAmps: publicProcedure.input(setAmpsInput).mutation(
+    async ({ ctx, input }) => {
+      const state = ctx.chargingPointManager.getState(input.id);
+      if (!state) return { success: false as const };
+      const result = await ctx.chargingPointManager.startChargingAt(
+        input.id,
+        input.amps,
+        { origin: "user:set-amps", traceId: createTraceId() },
+        state,
+        { force: true },
+      );
+      return { success: result.success };
     },
   ),
 

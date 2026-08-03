@@ -150,6 +150,7 @@ describe("AppDatabase", () => {
     const sampleSchedule: CreateScheduleInput = {
       id: "sched-1",
       vehicleId: "VIN1",
+      chargerId: null,
       scheduleType: "charge",
       startTime: "22:00",
       endTime: "06:00",

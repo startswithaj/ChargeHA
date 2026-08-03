@@ -9,6 +9,7 @@ describe("isScheduleActiveNow", () => {
   ): EngineSchedule => ({
     id: "sched-1",
     vehicleId: "v1",
+    chargerId: null,
     scheduleType: "charge",
     startTime: "09:00",
     endTime: "17:00",

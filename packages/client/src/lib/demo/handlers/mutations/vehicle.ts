@@ -1,9 +1,5 @@
 import type { MutationHandlers } from "../types.ts";
-import type {
-  DemoState,
-  DemoVehicle,
-  DemoVehicleMode,
-} from "../../demoState.ts";
+import type { DemoState, DemoVehicle } from "../../demoState.ts";
 import { getDemoState, updateDemoState } from "../../demoState.ts";
 import { buildVehicleState } from "../vehicleState.ts";
 
@@ -11,10 +7,8 @@ type VehicleMutations = Pick<
   MutationHandlers,
   | "vehicle.create"
   | "vehicle.delete"
-  | "vehicle.setMode"
   | "vehicle.setPriority"
   | "vehicle.command"
-  | "vehicle.setAmps"
   | "vehicle.refreshState"
   | "plugin.vehicle.simulated.updateState"
 >;
@@ -47,26 +41,6 @@ const parseConfig = (
     console.warn("Demo: ignoring malformed vehicle config", error);
     return {};
   }
-};
-
-/** Whether a vehicle should be charging given a newly-set mode. */
-const chargingForMode = (mode: DemoVehicleMode, current: boolean): boolean => {
-  if (mode === "charge_now") return true;
-  if (mode === "stop") return false;
-  return current;
-};
-
-/** Apply a start/stop/wake command (wake is a no-op). "start" forces charging
- *  via charge_now so the live controller keeps it on; "stop" idles it. */
-const applyCommand = (
-  v: DemoVehicle,
-  command: "start" | "stop" | "wake",
-): DemoVehicle => {
-  if (command === "start") {
-    return { ...v, isCharging: true, mode: "charge_now" };
-  }
-  if (command === "stop") return { ...v, isCharging: false, mode: "stop" };
-  return v;
 };
 
 export const vehicleMutations: VehicleMutations = {
@@ -112,36 +86,15 @@ export const vehicleMutations: VehicleMutations = {
     return { success: true };
   },
 
-  "vehicle.setMode": (input) => {
-    patchVehicle(input.vehicleId, (v) => ({
-      ...v,
-      mode: input.mode,
-      isCharging: chargingForMode(input.mode, v.isCharging),
-    }));
-    return { success: true, mode: input.mode };
-  },
-
   "vehicle.setPriority": (input) => {
     patchVehicle(input.vehicleId, (v) => ({ ...v, priority: input.priority }));
     return { success: true, priority: input.priority };
   },
 
-  "vehicle.command": (input) => {
-    const next = patchVehicle(
-      input.vehicleId,
-      (v) => applyCommand(v, input.command),
-    );
-    return { success: true, state: stateOf(next, input.vehicleId) };
-  },
-
-  "vehicle.setAmps": (input) => {
-    const next = patchVehicle(input.vehicleId, (v) => ({
-      ...v,
-      chargeAmps: input.amps,
-      isCharging: true,
-    }));
-    return { success: true, state: stateOf(next, input.vehicleId) };
-  },
+  "vehicle.command": (input) => ({
+    success: true,
+    state: stateOf(getDemoState(), input.vehicleId),
+  }),
 
   "vehicle.refreshState": (input) => ({
     state: stateOf(getDemoState(), input.vehicleId),

@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { FakeTime } from "@std/testing/time";
-import type { VehicleAdapter } from "@chargeha/shared";
 import { buildVehicleChargeState } from "@chargeha/shared/test-factories";
 import type { VehicleRequestContext } from "../../../types.ts";
 import { TeslaVehicleMiddleware } from "./TeslaVehicleMiddleware.ts";
 import { Logger } from "@chargeha/server/lib/Logger";
+import type { TeslaAdapter } from "./TeslaAdapter.ts";
 import { MockTeslaAdapter } from "./test-helpers/MockTeslaAdapter.ts";
 
 describe("TeslaVehicleMiddleware", () => {
@@ -32,7 +32,7 @@ describe("TeslaVehicleMiddleware", () => {
     time = new FakeTime();
     adapter = new MockTeslaAdapter();
     middleware = new TeslaVehicleMiddleware(
-      adapter as unknown as VehicleAdapter,
+      adapter as unknown as TeslaAdapter,
       testLogger,
     );
   });

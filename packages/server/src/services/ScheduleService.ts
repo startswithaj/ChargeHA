@@ -8,6 +8,7 @@ function rowToSchedule(
   row: {
     id: string;
     vehicleId: string | null;
+    chargerId: string | null;
     scheduleType: string;
     startTime: string;
     endTime: string;
@@ -20,19 +21,21 @@ function rowToSchedule(
   if (row.scheduleType === "charge") {
     return {
       id: row.id,
-      vehicleId: row.vehicleId as string,
+      vehicleId: row.vehicleId,
+      chargerId: row.chargerId,
       scheduleType: row.scheduleType as "charge",
       startTime: row.startTime,
       endTime: row.endTime,
       days: row.days as DayOfWeek[],
       chargeAmps: row.chargeAmps as number,
-      chargeLimitPct: row.chargeLimitPct as number,
+      chargeLimitPct: row.chargeLimitPct,
       enabled: row.enabled,
     };
   }
   return {
     id: row.id,
     vehicleId: null,
+    chargerId: null,
     scheduleType: row.scheduleType as "blockout",
     startTime: row.startTime,
     endTime: row.endTime,
@@ -79,6 +82,7 @@ export class ScheduleService {
   async create(input: {
     scheduleType: "charge" | "blockout";
     vehicleId?: string | null;
+    chargerId?: string | null;
     startTime: string;
     endTime: string;
     days: DayOfWeek[];
@@ -87,9 +91,11 @@ export class ScheduleService {
   }) {
     // Additional validation for charge schedules
     if (input.scheduleType === "charge") {
-      if (!input.vehicleId) {
+      const targets = [input.vehicleId, input.chargerId]
+        .filter((t) => t != null);
+      if (targets.length !== 1) {
         throw new ServiceError(
-          "vehicleId is required for charge schedules",
+          "charge schedules need exactly one target: vehicleId or chargerId",
           "BAD_REQUEST",
         );
       }
@@ -99,12 +105,20 @@ export class ScheduleService {
           "BAD_REQUEST",
         );
       }
-      if (
-        !input.chargeLimitPct || input.chargeLimitPct < 1 ||
-        input.chargeLimitPct > 100
-      ) {
+      // Charger-keyed schedules have no battery visibility — no limit.
+      if (input.vehicleId != null) {
+        if (
+          !input.chargeLimitPct || input.chargeLimitPct < 1 ||
+          input.chargeLimitPct > 100
+        ) {
+          throw new ServiceError(
+            "chargeLimitPct must be between 1 and 100",
+            "BAD_REQUEST",
+          );
+        }
+      } else if (input.chargeLimitPct != null) {
         throw new ServiceError(
-          "chargeLimitPct must be between 1 and 100",
+          "chargeLimitPct only applies to vehicle-keyed schedules",
           "BAD_REQUEST",
         );
       }
@@ -115,6 +129,7 @@ export class ScheduleService {
     await this.db.createSchedule({
       id,
       vehicleId: isCharge ? (input.vehicleId ?? null) : null,
+      chargerId: isCharge ? (input.chargerId ?? null) : null,
       scheduleType: input.scheduleType,
       startTime: input.startTime,
       endTime: input.endTime,
@@ -138,6 +153,7 @@ export class ScheduleService {
   async update(input: {
     id: string;
     vehicleId?: string | null;
+    chargerId?: string | null;
     scheduleType?: "charge" | "blockout";
     startTime?: string;
     endTime?: string;
@@ -153,6 +169,7 @@ export class ScheduleService {
 
     await this.db.updateSchedule(input.id, {
       vehicleId: input.vehicleId,
+      chargerId: input.chargerId,
       scheduleType: input.scheduleType,
       startTime: input.startTime,
       endTime: input.endTime,

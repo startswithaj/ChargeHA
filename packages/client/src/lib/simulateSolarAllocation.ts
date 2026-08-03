@@ -118,6 +118,9 @@ export function findActiveSchedules(
     vehicleChargeSchedules: new Map(
       active
         .filter((s): s is ChargeSchedule => s.scheduleType === "charge")
+        .filter((s): s is ChargeSchedule & { vehicleId: string } =>
+          s.vehicleId !== null
+        )
         .map((s) => [s.vehicleId, s]),
     ),
   };
@@ -244,7 +247,10 @@ function allocateOne(
   const chargeSchedule = ctx.vehicleChargeSchedules.get(v.id);
   if (chargeSchedule && v.mode === "auto") {
     const scheduleName = `Scheduled charging at ${chargeSchedule.chargeAmps}A`;
-    if (v.batteryLevel >= chargeSchedule.chargeLimitPct) {
+    if (
+      chargeSchedule.chargeLimitPct !== null &&
+      v.batteryLevel >= chargeSchedule.chargeLimitPct
+    ) {
       return {
         allocation: makeSkip(
           v,

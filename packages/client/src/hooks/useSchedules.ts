@@ -60,7 +60,8 @@ export function validateScheduleOverlap(
     (s) =>
       s.id !== excludeId &&
       s.scheduleType === "charge" &&
-      s.vehicleId === data.vehicleId,
+      s.vehicleId === data.vehicleId &&
+      s.chargerId === data.chargerId,
   );
 
   const overlapping = siblings.find((existing) =>
@@ -73,7 +74,7 @@ export function validateScheduleOverlap(
     )
   );
   return overlapping
-    ? "This schedule overlaps with an existing charge schedule for the same vehicle."
+    ? "This schedule overlaps with an existing charge schedule for the same charging point."
     : null;
 }
 
@@ -188,6 +189,7 @@ export function useSchedules() {
       try {
         await createMutation.mutateAsync({
           ...data,
+          chargeLimitPct: data.chargeLimitPct ?? undefined,
           days: data.days as [DayOfWeek, ...DayOfWeek[]],
         });
         return null;
@@ -215,6 +217,7 @@ export function useSchedules() {
         await updateMutation.mutateAsync({
           id,
           ...data,
+          chargeLimitPct: data.chargeLimitPct ?? undefined,
           days: data.days as [DayOfWeek, ...DayOfWeek[]],
         });
         return null;

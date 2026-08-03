@@ -40,12 +40,7 @@ vi.mock("../../../hooks/useVehicles.ts", () => ({
     vehicles: [],
     loading: false,
     error: null,
-    commandPending: {},
     vehicleErrors: {},
-    startCharging: vi.fn(),
-    stopCharging: vi.fn(),
-    setAmps: vi.fn(),
-    changeMode: vi.fn(),
     refreshVehicles: vi.fn(),
   })),
 }));
@@ -158,10 +153,34 @@ vi.mock("../../../trpc.ts", () => ({
         useQuery: () => dashboardMocks.commandStatusUseQuery(),
       },
     },
+    charger: {
+      list: {
+        useQuery: vi.fn(() => ({ data: [], isLoading: false, error: null })),
+      },
+      setMode: {
+        useMutation: vi.fn(() => ({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn(),
+          isPending: false,
+        })),
+      },
+      setAmps: {
+        useMutation: vi.fn(() => ({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn(),
+          isPending: false,
+        })),
+      },
+    },
     useUtils: vi.fn(() => ({
       config: {
         systemAlert: {
           invalidate: dashboardMocks.invalidateConfig,
+        },
+      },
+      charger: {
+        list: {
+          invalidate: vi.fn(),
         },
       },
     })),
@@ -608,12 +627,7 @@ describe("Dashboard", () => {
         vehicles: [],
         loading: true,
         error: null,
-        commandPending: {},
         vehicleErrors: {},
-        startCharging: vi.fn(),
-        stopCharging: vi.fn(),
-        setAmps: vi.fn(),
-        changeMode: vi.fn(),
         refreshVehicles: vi.fn(),
       } as unknown as Parameters<DashboardHarness["setVehiclesRaw"]>[0],
     );

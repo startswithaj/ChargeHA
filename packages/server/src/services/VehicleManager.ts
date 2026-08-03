@@ -1,6 +1,5 @@
 import type {
   AdapterVehicleChargeState,
-  CallContext,
   VehicleChargeState,
 } from "@chargeha/shared";
 import { observable } from "@trpc/server/observable";
@@ -18,8 +17,6 @@ import { parseDecisionInputs } from "../db/Serialization.ts";
 import { isHome, parseHomeCoords } from "@chargeha/shared/geo";
 
 const RECENT_LOG_MS = 2 * 60 * 1000; // 2 minutes
-const MAX_COMMAND_BACKOFF_SEC = 900; // 15 minutes
-
 /** Result of a vehicle command (start/stop/setAmps/etc). */
 export interface CommandResult {
   success: boolean;
@@ -27,12 +24,6 @@ export interface CommandResult {
   state?: VehicleChargeState;
   /** Error message (if failed). */
   error?: string;
-}
-
-/** Per-vehicle command backoff state. */
-interface CommandBackoffState {
-  failures: number;
-  backoffUntil: number | null;
 }
 
 interface VehicleEntry {
@@ -53,9 +44,8 @@ interface PlugTracker {
  *
  * - Lifecycle: add/remove vehicles, sync with DB, initial state seeding
  * - Data access: requestState() for the controller, getState() for SSE/reads
- * - Commands: startChargingAt(), stopCharging() with clamping and backoff
  * - Plug transitions: detects plug-in/plug-out and emits events
- * - Error tracking: per-vehicle poll/command errors with exponential backoff
+ * - Error tracking: per-vehicle poll errors surfaced to the dashboard
  * - SSE: subscribeToUpdates / subscribeToErrors for the dashboard
  * - Mode reset: switches charge_now/stop back to auto on unplug
  *
@@ -75,7 +65,6 @@ export class VehicleManager {
       source: "fetch" | "command";
     }
   >();
-  private commandBackoff = new Map<string, CommandBackoffState>();
   private lastEmittedUpdatedAt = new Map<string, string>();
   private readonly db: AppDatabase;
   private readonly eventEmitter: TypedEventEmitter;
@@ -282,119 +271,6 @@ export class VehicleManager {
   /** Start or adjust charging. Handles: clamp amps → set amps → start →
    *  error/backoff tracking. The middleware handles wake internally.
    *  Idempotent: only sends commands when state differs from target. */
-  async startChargingAt(
-    vehicleId: string,
-    amps: number,
-    ctx: CallContext,
-    state: VehicleChargeState,
-    { force = false } = {},
-  ): Promise<CommandResult> {
-    const entry = this.vehicles.get(vehicleId);
-    if (!entry) return { success: false, error: "Vehicle not registered" };
-
-    const { backedOff, remainingMs } = this.isBackedOff(vehicleId);
-    if (backedOff && !force) {
-      this.logger.info(
-        `Command backoff active for ${vehicleId}, ${
-          Math.round((remainingMs ?? 0) / 1000)
-        }s remaining`,
-      );
-      return { success: false, error: "Command backoff active" };
-    }
-
-    try {
-      const clampedAmps = Math.max(
-        state.chargeAmpsMin,
-        Math.min(state.chargeAmpsMax, Math.round(amps)),
-      );
-
-      const ampsChanged = state.chargeAmps !== clampedAmps;
-
-      // Set amps first (whether or not currently charging)
-      if (ampsChanged) {
-        const ok = await entry.middleware.setChargeAmps(
-          clampedAmps,
-          { ...ctx, origin: `${ctx.origin}:set-amps` },
-        );
-        if (!ok) {
-          throw new Error(
-            `setChargeAmps(${clampedAmps}) rejected by vehicle`,
-          );
-        }
-      }
-
-      // Start charging if not already
-      if (!state.isCharging) {
-        const ok = await entry.middleware.startCharging(
-          { ...ctx, origin: `${ctx.origin}:start` },
-        );
-        if (!ok) throw new Error("startCharging rejected by vehicle");
-        this.logger.info(`Started ${vehicleId} at ${clampedAmps}A`);
-      }
-
-      this.resetCommandBackoff(vehicleId);
-      this.clearVehicleError(vehicleId);
-      return {
-        success: true,
-        state: (await this.getState(vehicleId)) ?? undefined,
-      };
-    } catch (error) {
-      this.applyCommandBackoff(vehicleId, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
-  }
-
-  /** Stop charging. Handles: send stop → error/backoff tracking.
-   *  The middleware updates cached state on success.
-   *  Idempotent: only sends stop when vehicle is currently charging. */
-  async stopCharging(
-    vehicleId: string,
-    ctx: CallContext,
-    state: VehicleChargeState,
-    { force = false } = {},
-  ): Promise<CommandResult> {
-    const entry = this.vehicles.get(vehicleId);
-    if (!entry) return { success: false, error: "Vehicle not registered" };
-
-    if (!state.isCharging) {
-      return { success: true, state };
-    }
-
-    const { backedOff, remainingMs } = this.isBackedOff(vehicleId);
-    if (backedOff && !force) {
-      this.logger.info(
-        `Command backoff active for ${vehicleId}, ${
-          Math.round((remainingMs ?? 0) / 1000)
-        }s remaining`,
-      );
-      return { success: false, error: "Command backoff active" };
-    }
-
-    try {
-      const ok = await entry.middleware.stopCharging(
-        { ...ctx, origin: `${ctx.origin}:stop` },
-      );
-      if (!ok) throw new Error("stopCharging rejected by vehicle");
-      this.logger.info(`Stopped ${vehicleId}`);
-
-      this.resetCommandBackoff(vehicleId);
-      this.clearVehicleError(vehicleId);
-      return {
-        success: true,
-        state: (await this.getState(vehicleId)) ?? undefined,
-      };
-    } catch (error) {
-      this.applyCommandBackoff(vehicleId, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
-  }
-
   // ── Error tracking ────────────────────────────────────────────────────
 
   reportVehicleError(
@@ -436,18 +312,6 @@ export class VehicleManager {
     const stored = this.vehicleErrors.get(vehicleId);
     if (!stored) return null;
     return { message: stored.message, at: stored.at };
-  }
-
-  /** Check whether commands for this vehicle are backed off due to repeated failures. */
-  isBackedOff(vehicleId: string): { backedOff: boolean; remainingMs?: number } {
-    const bs = this.commandBackoff.get(vehicleId);
-    if (!bs?.backoffUntil) return { backedOff: false };
-    const remaining = bs.backoffUntil - Date.now();
-    if (remaining <= 0) {
-      bs.backoffUntil = null;
-      return { backedOff: false };
-    }
-    return { backedOff: true, remainingMs: remaining };
   }
 
   // ── SSE subscriptions ─────────────────────────────────────────────────
@@ -569,37 +433,6 @@ export class VehicleManager {
         `Failed to reset mode for ${vehicleName}:`,
         error,
       );
-    }
-  }
-
-  /** Apply exponential backoff after a command failure and report the error. */
-  private applyCommandBackoff(vehicleId: string, error: unknown): void {
-    const existing = this.commandBackoff.get(vehicleId);
-    const bs = existing ?? { failures: 0, backoffUntil: null };
-    if (!existing) this.commandBackoff.set(vehicleId, bs);
-    bs.failures++;
-    const backoffSec = Math.min(
-      MAX_COMMAND_BACKOFF_SEC,
-      30 * Math.pow(2, bs.failures - 1),
-    );
-    bs.backoffUntil = Date.now() + backoffSec * 1000;
-
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    const cached = this.vehicles.get(vehicleId)?.middleware.getCachedState();
-    const vehicleName = cached?.vehicleName ?? vehicleId;
-    this.reportVehicleError(vehicleId, vehicleName, errorMsg, "command");
-    this.logger.error(
-      `Command failed for ${vehicleId} (backoff ${backoffSec}s):`,
-      error,
-    );
-  }
-
-  /** Reset command backoff after a successful command. */
-  private resetCommandBackoff(vehicleId: string): void {
-    const bs = this.commandBackoff.get(vehicleId);
-    if (bs) {
-      bs.failures = 0;
-      bs.backoffUntil = null;
     }
   }
 }

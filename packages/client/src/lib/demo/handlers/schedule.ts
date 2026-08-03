@@ -26,13 +26,19 @@ export const toSchedule = (r: DemoSchedule) => {
   if (r.scheduleType === "charge") {
     return {
       ...base,
-      vehicleId: r.vehicleId ?? "",
+      vehicleId: r.vehicleId,
+      chargerId: r.chargerId,
       scheduleType: "charge" as const,
       chargeAmps: r.chargeAmps ?? 0,
-      chargeLimitPct: r.chargeLimitPct ?? 0,
+      chargeLimitPct: r.chargeLimitPct,
     };
   }
-  return { ...base, vehicleId: null, scheduleType: "blockout" as const };
+  return {
+    ...base,
+    vehicleId: null,
+    chargerId: null,
+    scheduleType: "blockout" as const,
+  };
 };
 
 const minutesOf = (t: string): number => {

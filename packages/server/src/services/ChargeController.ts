@@ -26,7 +26,6 @@ import type {
   ChargerRow,
   ControllerLogInput,
   ScheduleRow,
-  VehicleRow,
 } from "../db/types.ts";
 import type { ChargingPointManager } from "./ChargingPointManager.ts";
 import type { VehicleManager } from "./VehicleManager.ts";
@@ -93,6 +92,8 @@ interface DecisionLogEntry {
  *  code run unchanged against either. */
 interface ControlTarget {
   id: string;
+  /** Vehicle linked to this charging point — schedules are keyed by it. */
+  vehicleId: string | null;
   name: string;
   mode: VehicleMode;
   priority: number;
@@ -163,14 +164,10 @@ export class ChargeController {
   async runOnce(): Promise<ControllerConfig> {
     const traceId = createTraceId();
     const config = await this.loadConfig();
-    const vehicles = await this.db.getVehicles();
+    // Every controllable unit is a charging point — the boot migration
+    // creates vehicle-API rows, so there is no separate vehicle path.
     const chargerRows = await this.db.getChargers();
-    // Charger rows take over control when present; installs without any
-    // (every current Tesla-only setup) run the vehicle path unchanged.
-    const targets = chargerRows.length > 0
-      ? this.buildChargerTargets(chargerRows)
-      : this.buildVehicleTargets(vehicles);
-    const targetKind = chargerRows.length > 0 ? "chargers" : "vehicles";
+    const targets = this.buildChargerTargets(chargerRows);
     const schedules = await this.db.getSchedules();
     const energySnapshot = this.poller.tryGetRealtimeSnapshot();
     const now = new Date();
@@ -179,7 +176,7 @@ export class ChargeController {
     const gridW = energy && Math.round(energy.gridPowerW);
     const energySummary = energy ? `solar=${solarW}W grid=${gridW}W` : "none";
     this.logger.debug(
-      `Loop: ${targets.length} ${targetKind}, ${schedules.length} schedules, energy=${energySummary}`,
+      `Loop: ${targets.length} charging points, ${schedules.length} schedules, energy=${energySummary}`,
     );
 
     // Compute context for middleware requests
@@ -193,7 +190,7 @@ export class ChargeController {
     const engineVehicles: EngineVehicleInput[] = await Promise.all(
       targets.map(async (target) => {
         const applicable = schedules.filter((s) =>
-          this.isScheduleApplicable(s, target.id, now, config.timezone)
+          this.isScheduleApplicable(s, target, now, config.timezone)
         );
         const activeChargeSchedule = applicable.find(
           (s) => s.scheduleType === "charge",
@@ -209,6 +206,7 @@ export class ChargeController {
         const state = await target.getState();
         return {
           id: target.id,
+          vehicleId: target.vehicleId,
           name: target.name,
           mode: target.mode,
           priority: target.priority,
@@ -286,23 +284,10 @@ export class ChargeController {
     }
   }
 
-  private buildVehicleTargets(vehicles: VehicleRow[]): ControlTarget[] {
-    return vehicles.map((v) => ({
-      id: v.id,
-      name: v.name,
-      mode: v.mode,
-      priority: v.priority,
-      requestState: (ctx) => this.vehicleManager.requestState(v.id, ctx),
-      getState: async () => await this.vehicleManager.getState(v.id),
-      start: (amps, ctx, state) =>
-        this.vehicleManager.startChargingAt(v.id, amps, ctx, state),
-      stop: (ctx, state) => this.vehicleManager.stopCharging(v.id, ctx, state),
-    }));
-  }
-
   private buildChargerTargets(rows: ChargerRow[]): ControlTarget[] {
     return rows.map((row) => ({
       id: row.id,
+      vehicleId: row.vehicleId,
       name: row.name,
       mode: row.mode,
       priority: row.priority,
@@ -450,7 +435,7 @@ export class ChargeController {
       cs.lastActiveScheduleIds = new Set(
         schedules
           .filter((s) =>
-            this.isScheduleApplicable(s, target.id, now, config.timezone)
+            this.isScheduleApplicable(s, target, now, config.timezone)
           )
           .map((s) => s.id),
       );
@@ -585,7 +570,7 @@ export class ChargeController {
     // Schedule activation: new schedule IDs not active last cycle
     const activeScheduleIds = new Set<string>(
       schedules
-        .filter((s) => this.isScheduleApplicable(s, target.id, now, timezone))
+        .filter((s) => this.isScheduleApplicable(s, target, now, timezone))
         .map((s) => s.id),
     );
     const newlyActiveSchedules = [...activeScheduleIds]
@@ -663,15 +648,20 @@ export class ChargeController {
     };
   }
 
+  /** Blockouts are always global. Charge schedules match the charging
+   *  point directly (chargerId), via its linked vehicle (vehicleId), or
+   *  everywhere when untargeted. */
   private isScheduleApplicable(
     s: ScheduleRow,
-    vehicleId: string,
+    target: { id: string; vehicleId: string | null },
     now: Date,
     timezone: string,
   ): boolean {
     if (!s.enabled || !isScheduleActiveNow(s, now, timezone)) return false;
-    return s.scheduleType === "blockout" || s.vehicleId === vehicleId ||
-      s.vehicleId === null;
+    if (s.scheduleType === "blockout") return true;
+    if (s.chargerId !== null) return s.chargerId === target.id;
+    if (s.vehicleId !== null) return s.vehicleId === target.vehicleId;
+    return true;
   }
 
   private isActiveBlockout(

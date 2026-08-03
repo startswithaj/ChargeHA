@@ -18,6 +18,7 @@ describe("ChargeController — processAutoMode", () => {
     return {
       id: "sched-1",
       vehicleId: null,
+      chargerId: null,
       scheduleType: "blockout",
       startTime,
       endTime,
@@ -36,6 +37,7 @@ describe("ChargeController — processAutoMode", () => {
     return {
       id: "charge-sched",
       vehicleId: VIN,
+      chargerId: null,
       scheduleType: "charge",
       startTime,
       endTime,

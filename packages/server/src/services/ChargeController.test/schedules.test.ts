@@ -27,6 +27,7 @@ describe("ChargeController — schedules", () => {
       await ctx.db.createSchedule({
         id: "blockout-1",
         vehicleId: null,
+        chargerId: null,
         scheduleType: "blockout",
         startTime,
         endTime,
@@ -50,6 +51,52 @@ describe("ChargeController — schedules", () => {
   });
 
   describe("charge schedule", () => {
+    it("charges at scheduled amps for a charger-keyed schedule", async () => {
+      const { today, startTime, endTime } = currentScheduleWindow();
+
+      ctx = await setupController({}, "auto");
+      const charger = (await ctx.db.getChargers())
+        .find((c) => c.vehicleId === VIN);
+      assertExists(charger);
+      await ctx.db.createSchedule({
+        id: "charge-charger-1",
+        vehicleId: null,
+        chargerId: charger.id,
+        scheduleType: "charge",
+        startTime,
+        endTime,
+        days: [today],
+        chargeAmps: 14,
+        chargeLimitPct: null,
+        enabled: true,
+      });
+      await ctx.runOneLoop();
+
+      expect(ctx.adapter.commands).toContainEqual({ cmd: "setAmps", args: 14 });
+      expect(ctx.adapter.commands).toContainEqual({ cmd: "start" });
+    });
+
+    it("ignores a charge schedule keyed to a different charger", async () => {
+      const { today, startTime, endTime } = currentScheduleWindow();
+
+      ctx = await setupController({}, "auto", null);
+      await ctx.db.createSchedule({
+        id: "charge-other-1",
+        vehicleId: null,
+        chargerId: "some-other-charger",
+        scheduleType: "charge",
+        startTime,
+        endTime,
+        days: [today],
+        chargeAmps: 14,
+        chargeLimitPct: null,
+        enabled: true,
+      });
+      await ctx.runOneLoop();
+
+      expect(ctx.adapter.commands).toEqual([]);
+    });
+
     it("charges at scheduled amps during active schedule", async () => {
       const { today, startTime, endTime } = currentScheduleWindow();
 
@@ -57,6 +104,7 @@ describe("ChargeController — schedules", () => {
       await ctx.db.createSchedule({
         id: "charge-1",
         vehicleId: VIN,
+        chargerId: null,
         scheduleType: "charge",
         startTime,
         endTime,

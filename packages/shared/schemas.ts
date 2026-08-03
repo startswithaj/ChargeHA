@@ -127,15 +127,6 @@ export const vehicleCreateInput: z.ZodType<{
 });
 export type VehicleCreateInput = z.infer<typeof vehicleCreateInput>;
 
-export const vehicleSetModeInput: z.ZodType<{
-  vehicleId: string;
-  mode: VehicleModeZ;
-}> = z.object({
-  vehicleId: z.string(),
-  mode: vehicleModeSchema,
-});
-export type VehicleSetModeInput = z.infer<typeof vehicleSetModeInput>;
-
 export const vehicleSetPriorityInput: z.ZodType<{
   vehicleId: string;
   priority: number;
@@ -147,21 +138,12 @@ export type VehicleSetPriorityInput = z.infer<typeof vehicleSetPriorityInput>;
 
 export const vehicleCommandInput: z.ZodType<{
   vehicleId: string;
-  command: "start" | "stop" | "wake";
+  command: "wake";
 }> = z.object({
   vehicleId: z.string(),
-  command: z.enum(["start", "stop", "wake"]),
+  command: z.literal("wake"),
 });
 export type VehicleCommandInput = z.infer<typeof vehicleCommandInput>;
-
-export const vehicleSetAmpsInput: z.ZodType<{
-  vehicleId: string;
-  amps: number;
-}> = z.object({
-  vehicleId: z.string(),
-  amps: z.number(),
-});
-export type VehicleSetAmpsInput = z.infer<typeof vehicleSetAmpsInput>;
 
 export const vehicleSetChargeLimitInput: z.ZodType<{
   vehicleId: string;
@@ -291,6 +273,7 @@ export const scheduleCreateInput: z.ZodType<{
   endTime: string;
   days: [DayOfWeekZ, ...DayOfWeekZ[]];
   vehicleId?: string | null | undefined;
+  chargerId?: string | null | undefined;
   chargeAmps?: number | undefined;
   chargeLimitPct?: number | undefined;
 }> = z.object({
@@ -299,8 +282,11 @@ export const scheduleCreateInput: z.ZodType<{
   endTime: timeStringSchema,
   days: z.array(dayOfWeekSchema).nonempty(),
   vehicleId: z.string().nullable().optional(),
+  chargerId: z.string().nullable().optional(),
   chargeAmps: z.number().min(1).optional(),
   chargeLimitPct: z.number().min(1).max(100).optional(),
+}).refine((v) => v.vehicleId == null || v.chargerId == null, {
+  message: "a schedule targets a vehicle or a charger, not both",
 });
 export type ScheduleCreateInput = z.infer<typeof scheduleCreateInput>;
 
@@ -311,6 +297,7 @@ export const scheduleUpdateInput: z.ZodType<{
   endTime?: string | undefined;
   days?: [DayOfWeekZ, ...DayOfWeekZ[]] | undefined;
   vehicleId?: string | null | undefined;
+  chargerId?: string | null | undefined;
   chargeAmps?: number | undefined;
   chargeLimitPct?: number | undefined;
   enabled?: boolean | undefined;
@@ -321,9 +308,12 @@ export const scheduleUpdateInput: z.ZodType<{
   endTime: timeStringSchema.optional(),
   days: z.array(dayOfWeekSchema).nonempty().optional(),
   vehicleId: z.string().nullable().optional(),
+  chargerId: z.string().nullable().optional(),
   chargeAmps: z.number().min(1).optional(),
   chargeLimitPct: z.number().min(1).max(100).optional(),
   enabled: z.boolean().optional(),
+}).refine((v) => v.vehicleId == null || v.chargerId == null, {
+  message: "a schedule targets a vehicle or a charger, not both",
 });
 export type ScheduleUpdateInput = z.infer<typeof scheduleUpdateInput>;
 

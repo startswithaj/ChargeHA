@@ -41,6 +41,9 @@ export interface ControllerConfig {
  *  database VehicleRow — only the fields relevant to decision-making. */
 export interface EngineVehicleInput {
   id: string;
+  /** Vehicle linked to this charging point; vehicle-keyed schedules match
+   *  on it, not on `id`. Null for standalone chargers. */
+  vehicleId: string | null;
   name: string;
   mode: VehicleMode;
   priority: number;
@@ -52,6 +55,7 @@ export interface EngineVehicleInput {
 export interface EngineSchedule {
   id: string;
   vehicleId: string | null;
+  chargerId: string | null;
   scheduleType: ScheduleType;
   startTime: string;
   endTime: string;

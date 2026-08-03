@@ -3,8 +3,6 @@ import {
   vehicleCommandInput,
   vehicleCreateInput,
   vehicleIdInput,
-  vehicleSetAmpsInput,
-  vehicleSetModeInput,
   vehicleSetPriorityInput,
 } from "@chargeha/shared/schemas";
 
@@ -41,13 +39,6 @@ export const vehiclesRouter = router({
       return await ctx.vehicleService.deleteVehicle(input.vehicleId);
     }),
 
-  // Set vehicle mode (auto/charge_now/stop)
-  setMode: publicProcedure
-    .input(vehicleSetModeInput)
-    .mutation(async ({ ctx, input }) => {
-      return await ctx.vehicleService.setMode(input.vehicleId, input.mode);
-    }),
-
   // Set vehicle priority
   setPriority: publicProcedure
     .input(vehicleSetPriorityInput)
@@ -58,7 +49,7 @@ export const vehiclesRouter = router({
       );
     }),
 
-  // Execute a vehicle command (start/stop/wake)
+  // Wake the vehicle for fresh data (charge commands live on chargers)
   command: publicProcedure
     .input(vehicleCommandInput)
     .mutation(async ({ ctx, input }) => {
@@ -66,13 +57,6 @@ export const vehiclesRouter = router({
         input.vehicleId,
         input.command,
       );
-    }),
-
-  // Set charging amps
-  setAmps: publicProcedure
-    .input(vehicleSetAmpsInput)
-    .mutation(async ({ ctx, input }) => {
-      return await ctx.vehicleService.setAmps(input.vehicleId, input.amps);
     }),
 
   // Force-poll vehicle for fresh state

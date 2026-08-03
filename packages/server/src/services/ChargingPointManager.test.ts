@@ -8,7 +8,7 @@ import type {
   VehicleChargeState,
 } from "@chargeha/shared";
 import type { AppDatabase } from "../db/AppDatabase.ts";
-import type { ChargerRow } from "../db/types.ts";
+import type { ChargerRow, VehicleRow } from "../db/types.ts";
 import { ChargerPluginRegistry } from "@chargeha/server/bootstrap/ChargerPluginRegistry";
 import type { ChargerMiddleware, ChargerPlugin } from "@chargeha/plugins/types";
 import type { VehicleManager } from "./VehicleManager.ts";
@@ -190,6 +190,7 @@ describe("ChargingPointManager", () => {
 
   let db: AppDatabase;
   let chargerRows: ChargerRow[];
+  let vehicleRows: VehicleRow[];
   let deletedIds: string[];
   let resequenceCallCount: number;
   let registry: ChargerPluginRegistry;
@@ -204,10 +205,12 @@ describe("ChargingPointManager", () => {
 
   beforeEach(() => {
     chargerRows = [];
+    vehicleRows = [];
     deletedIds = [];
     resequenceCallCount = 0;
     db = throwingMock<AppDatabase>("AppDatabase", {
       getChargers: () => Promise.resolve(chargerRows),
+      getVehicles: () => Promise.resolve(vehicleRows),
       upsertCharger: (input) => {
         chargerRows = [
           ...chargerRows.filter((r) => r.id !== input.id),
@@ -569,6 +572,55 @@ describe("ChargingPointManager", () => {
       await tick();
       expect(originalMw.shutdownCalls).toBe(1);
       expect(middlewares.get(ROW.id)).not.toBe(originalMw);
+    });
+  });
+
+  describe("migrateVehiclesToChargers", () => {
+    const vehicle = (id: string, adapterType: string): VehicleRow => ({
+      id,
+      name: `Car ${id}`,
+      adapterType,
+      priority: 2,
+      config: "{}",
+      mode: "charge_now",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    it("creates linked rows only for charger-role vehicle plugins", async () => {
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      vehicleRows = [vehicle("VIN1", "tesla"), vehicle("VIN2", "dataonly")];
+
+      await manager.init();
+
+      const migrated = chargerRows.filter((r) => r.vehicleId !== null);
+      expect(migrated.length).toBe(1);
+      expect(migrated[0].vehicleId).toBe("VIN1");
+      expect(migrated[0].chargerAdapterType).toBe("tesla");
+      expect(migrated[0].mode).toBe("charge_now");
+      expect(migrated[0].priority).toBe(2);
+    });
+
+    it("does nothing when a standalone smart charger owns control", async () => {
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      registerChargerPlugin(registry, middlewares, "tapo", "Tapo", INFO);
+      chargerRows = [{ ...ROW, chargerAdapterType: "tapo", vehicleId: null }];
+      vehicleRows = [vehicle("VIN1", "tesla")];
+
+      await manager.init();
+
+      expect(chargerRows.length).toBe(1);
+    });
+
+    it("is idempotent across boots", async () => {
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      vehicleRows = [vehicle("VIN1", "tesla")];
+
+      await manager.init();
+      const afterFirst = chargerRows.length;
+      await manager.init();
+
+      expect(chargerRows.length).toBe(afterFirst);
     });
   });
 

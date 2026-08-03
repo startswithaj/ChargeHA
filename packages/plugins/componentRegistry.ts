@@ -26,6 +26,9 @@ import { TapoSettings } from "./chargers/tapo/client/TapoSettings.tsx";
 // OCPP settings component
 import { OcppSettings } from "./chargers/ocpp/client/OcppSettings.tsx";
 
+// Simulated charger settings component
+import { SimulatedChargerSettings } from "./chargers/simulated/client/SimulatedChargerSettings.tsx";
+
 // Plugin wizard step definitions — imported from each plugin's client folder
 import {
   froniusCloudOption,
@@ -60,6 +63,10 @@ import {
   ocppChargerOption,
   ocppWizardSteps,
 } from "./chargers/ocpp/client/wizardSteps.ts";
+import {
+  simulatedChargerOption,
+  simulatedChargerWizardSteps,
+} from "./chargers/simulated/client/wizardSteps.ts";
 
 /** Metadata for an energy plugin option shown on the inverter type selection step. */
 export interface EnergyPluginOption {
@@ -141,27 +148,31 @@ export const energyPluginSteps: Record<string, PluginStepDef[]> = {
 
 /** Metadata for a charger plugin option on the charger type step.
  *  iconKey is a union like the vehicle/energy option types — "plug" for
- *  Tapo, "server" for OCPP. */
+ *  Tapo, "server" for OCPP, "monitor" for the simulated charger. */
 export interface ChargerPluginOption {
   id: string;
   label: string;
   description: string;
-  iconKey: "server" | "plug";
+  iconKey: "server" | "plug" | "monitor";
   demoAvailable?: boolean;
 }
 
 /** Charger plugin options for the charger type selection step. Filled by
- *  plugin change sets (tapoChargerOption, ocppChargerOption). */
+ *  plugin change sets (tapoChargerOption, ocppChargerOption,
+ *  simulatedChargerOption). */
 export const chargerPluginOptions: ChargerPluginOption[] = [
   tapoChargerOption,
   ocppChargerOption,
+  simulatedChargerOption,
 ];
 
 /** Charger plugin wizard steps, keyed by charger adapter type. Filled by
- *  plugin change sets (tapo: tapoWizardSteps, ocpp: ocppWizardSteps). */
+ *  plugin change sets (tapo: tapoWizardSteps, ocpp: ocppWizardSteps,
+ *  simulated_charger: simulatedChargerWizardSteps). */
 export const chargerPluginSteps: Record<string, PluginStepDef[]> = {
   tapo: tapoWizardSteps,
   ocpp: ocppWizardSteps,
+  simulated_charger: simulatedChargerWizardSteps,
 };
 
 /**
@@ -178,4 +189,5 @@ export const pluginSettingsComponents: Record<string, ComponentType> = {
   "simulated-energy-config": SimulatedEnergyConfig,
   "tapo-settings": TapoSettings,
   "ocpp-settings": OcppSettings,
+  "simulated-charger-settings": SimulatedChargerSettings,
 };
