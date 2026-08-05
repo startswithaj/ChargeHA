@@ -8,6 +8,8 @@ import type { ChargerWithState } from "../../../hooks/useChargers.ts";
 const { makeHookReturn, hookRef } = vi.hoisted(() => {
   const make = (overrides: Record<string, unknown> = {}) => ({
     chargers: [] as unknown[],
+    vehicles: [] as unknown[],
+    linkVehicle: vi.fn(),
     reorderable: false,
     error: null as string | null,
     confirm: null as unknown,

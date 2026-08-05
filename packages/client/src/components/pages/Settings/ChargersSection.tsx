@@ -43,8 +43,10 @@ export function ChargersSection() {
           key={charger.id}
           charger={charger}
           reorderable={settings.reorderable}
+          vehicles={settings.vehicles}
           onRemove={() => settings.requestRemove(charger.id)}
           onMove={(direction) => settings.move(charger.id, direction)}
+          onLink={(vehicleId) => settings.linkVehicle(charger.id, vehicleId)}
         />
       ))}
 

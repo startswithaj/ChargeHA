@@ -70,6 +70,10 @@ export function useChargersSettings() {
   const reorderMutation = trpc.charger.reorder.useMutation({
     onSuccess: invalidate,
   });
+  const linkMutation = trpc.charger.setLinkedVehicle.useMutation({
+    onSuccess: invalidate,
+  });
+  const vehiclesQuery = trpc.vehicle.list.useQuery();
 
   const [confirm, setConfirm] = useState<ChargerConfirm | null>(null);
   const panels = usePanelStates();
@@ -109,6 +113,12 @@ export function useChargersSettings() {
 
   return {
     chargers,
+    vehicles: (vehiclesQuery.data?.vehicles ?? []).map((v) => ({
+      id: v.id,
+      name: v.name,
+    })),
+    linkVehicle: (chargerId: string, vehicleId: string | null) =>
+      linkMutation.mutate({ id: chargerId, vehicleId }),
     reorderable: chargers.length > 1,
     error: ensureMutation.error?.message ?? removeMutation.error?.message ??
       null,

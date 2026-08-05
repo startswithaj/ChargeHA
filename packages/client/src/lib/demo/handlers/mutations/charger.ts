@@ -22,6 +22,7 @@ type ChargerMutations = Pick<
   | "charger.reorder"
   | "charger.remove"
   | "charger.setVehicleControl"
+  | "charger.setLinkedVehicle"
   | "plugin.charger.simulated_charger.updateState"
 >;
 
@@ -145,6 +146,11 @@ export const chargerMutations: ChargerMutations = {
         .filter((c) => c.id !== input.id)
         .map((c, i) => ({ ...c, priority: i + 1 })),
     }));
+    emitDemoEvent({ type: "chargers_changed", data: {} });
+  },
+
+  "charger.setLinkedVehicle": (input) => {
+    patchCharger(input.id, (c) => ({ ...c, vehicleId: input.vehicleId }));
     emitDemoEvent({ type: "chargers_changed", data: {} });
   },
 
