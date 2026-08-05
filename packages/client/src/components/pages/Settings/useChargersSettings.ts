@@ -11,10 +11,10 @@ export type ChargerConfirm =
   | { kind: "add"; typeId: string }
   | { kind: "removeLast"; chargerId: string };
 
-/** Which dialog is open: adding a new charger of a type, or editing one. */
+/** Editing an existing charger, or configuring one before it is created. */
 export type ChargerEditing =
   | { mode: "add"; typeId: string }
-  | { mode: "edit"; typeId: string; name: string };
+  | { mode: "edit"; typeId: string; chargerId: string };
 
 export const hasSettingsPanel = (typeId: string): boolean =>
   `${typeId}-settings` in pluginSettingsComponents;
@@ -53,25 +53,19 @@ export function useChargersSettings() {
   const smartChargers = chargers.filter(isSmartCharger);
   const needsAddConfirm = smartChargers.length === 0 && chargers.length > 0;
 
-  const closeDialog = () => {
-    ensureMutation.reset();
-    setEditing(null);
-  };
-
   const addCharger = (typeId: string) =>
     ensureMutation.mutate({ chargerAdapterType: typeId }, {
       onSuccess: () => setEditing(null),
     });
 
-  // Adding a charger with no settings panel has nothing to configure, so it
-  // skips the dialog entirely.
+  // A charger type with nothing to configure skips straight to creation.
   const choose = (typeId: string) => {
     if (hasSettingsPanel(typeId)) setEditing({ mode: "add", typeId });
     else if (needsAddConfirm) setConfirm({ kind: "add", typeId });
     else addCharger(typeId);
   };
 
-  const submitDialog = () => {
+  const submitEdit = () => {
     if (editing?.mode !== "add") {
       setEditing(null);
       return;
@@ -112,10 +106,13 @@ export function useChargersSettings() {
       setEditing({
         mode: "edit",
         typeId: charger.chargerAdapterType,
-        name: charger.name,
+        chargerId: charger.id,
       }),
-    submitDialog,
-    closeDialog,
+    submitEdit,
+    cancelEdit: () => {
+      ensureMutation.reset();
+      setEditing(null);
+    },
     requestRemove,
     acceptConfirm,
     cancelConfirm: () => setConfirm(null),

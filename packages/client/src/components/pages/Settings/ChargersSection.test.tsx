@@ -21,8 +21,8 @@ const { makeHookReturn, hookRef } = vi.hoisted(() => {
     busy: false,
     choose: vi.fn(),
     edit: vi.fn(),
-    submitDialog: vi.fn(),
-    closeDialog: vi.fn(),
+    submitEdit: vi.fn(),
+    cancelEdit: vi.fn(),
     requestRemove: vi.fn(),
     acceptConfirm: vi.fn(),
     cancelConfirm: vi.fn(),
@@ -103,8 +103,7 @@ describe("ChargersSection", () => {
 
   it("shows an empty state when no chargers exist", () => {
     renderWithProviders(<ChargersSection />);
-    expect(screen.getByText(/No chargers configured yet/))
-      .toBeInTheDocument();
+    expect(screen.getByText(/No chargers configured/)).toBeInTheDocument();
   });
 
   it("renders friendly labels rather than raw enum values", () => {
@@ -166,45 +165,54 @@ describe("ChargersSection", () => {
     expect(hookRef.current.requestRemove).toHaveBeenCalledWith("c1");
   });
 
-  it("puts the add control in the section action slot", () => {
-    renderWithProviders(<ChargersSection />);
-    expect(screen.getByTestId("section-action")).toBeInTheDocument();
-  });
-
   it("keeps plugin fields out of the list until a charger is opened", () => {
     hookRef.current = makeHookReturn({ chargers: [makeCharger()] });
     renderWithProviders(<ChargersSection />);
     expect(screen.queryByTestId("plugin-panel")).not.toBeInTheDocument();
   });
 
-  it("opens an edit dialog for a charger", () => {
+  it("starts editing from the row action", () => {
     hookRef.current = makeHookReturn({ chargers: [makeCharger()] });
     renderWithProviders(<ChargersSection />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Edit/ }));
+    fireEvent.click(screen.getByLabelText("Edit Garage Plug"));
     expect(hookRef.current.edit).toHaveBeenCalled();
   });
 
-  it("shows the plugin panel inside the dialog, with save and cancel", () => {
+  it("keeps the row visible while its editor is open", () => {
     hookRef.current = makeHookReturn({
-      editing: { mode: "edit", typeId: "tapo", name: "Garage Plug" },
+      chargers: [makeCharger()],
+      editing: { mode: "edit", typeId: "tapo", chargerId: "c1" },
     });
     renderWithProviders(<ChargersSection />);
 
     expect(screen.getByTestId("plugin-panel")).toBeInTheDocument();
+    expect(screen.getByText("Garage Plug")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    expect(hookRef.current.submitDialog).toHaveBeenCalled();
+    expect(hookRef.current.submitEdit).toHaveBeenCalled();
   });
 
-  it("labels the dialog as an add when creating a charger", () => {
+  it("turns the edit action into a close action while open", () => {
+    hookRef.current = makeHookReturn({
+      chargers: [makeCharger()],
+      editing: { mode: "edit", typeId: "tapo", chargerId: "c1" },
+    });
+    renderWithProviders(<ChargersSection />);
+
+    expect(screen.queryByLabelText("Edit Garage Plug")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Close Garage Plug"));
+    expect(hookRef.current.cancelEdit).toHaveBeenCalled();
+  });
+
+  it("configures a new charger inline before creating it", () => {
     hookRef.current = makeHookReturn({
       editing: { mode: "add", typeId: "tapo" },
     });
     renderWithProviders(<ChargersSection />);
 
-    expect(screen.getByText("Add Tapo Smart Plug")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add charger" }))
-      .toBeInTheDocument();
+    expect(screen.getByText("New Tapo Smart Plug")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add charger" }));
+    expect(hookRef.current.submitEdit).toHaveBeenCalled();
   });
 
   it("confirms before switching control to a smart charger", () => {

@@ -1,6 +1,6 @@
 import { ArrowDownIcon, ArrowUpIcon } from "@radix-ui/react-icons";
-import { Badge, Button, Text } from "@radix-ui/themes";
-import { Pencil, Trash2 } from "lucide-react";
+import { Badge, IconButton, Text } from "@radix-ui/themes";
+import { Pencil, Trash2, X } from "lucide-react";
 import type { ChargerStatus, ChargingPointMode } from "@chargeha/shared";
 import {
   type ChargerWithState,
@@ -38,84 +38,106 @@ const labelFor = (map: Record<string, string>, key: string): string =>
   map[key] ?? key;
 
 export function ChargerRow(
-  { charger, reorderable, editable, onEdit, onRemove, onMove }: {
+  { charger, reorderable, editable, expanded, onEdit, onRemove, onMove }: {
     charger: ChargerWithState;
     reorderable: boolean;
     editable: boolean;
+    expanded: boolean;
     onEdit: () => void;
     onRemove: () => void;
     onMove: (direction: "up" | "down") => void;
   },
 ) {
   const smart = isSmartCharger(charger);
-  const status = charger.state?.status;
+  const status = charger.state?.status as ChargerStatus | undefined;
   return (
     <div
       style={{
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        gap: 12,
-        padding: "10px 12px",
-        borderBottom: "1px solid var(--gray-a3)",
+        padding: "8px 10px",
+        opacity: charger.active ? 1 : 0.5,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <div>
-          <Text size="2" weight="bold">{charger.name}</Text>
-          <Text size="1" color="gray" style={{ display: "block" }}>
-            {smart ? charger.chargerAdapterType : "via vehicle API"}
-            {!charger.active && " — inactive"}
-          </Text>
-        </div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          flex: 1,
+          flexWrap: "wrap",
+        }}
+      >
+        <Text size="2" weight="bold" style={{ minWidth: 120 }}>
+          {charger.name}
+        </Text>
+        <Badge variant="outline" size="1" color="gray">
+          {smart ? charger.chargerAdapterType : "via vehicle API"}
+        </Badge>
         {status && (
-          <Badge size="1" color={STATUS_COLORS[status as ChargerStatus]}>
+          <Badge variant="soft" size="1" color={STATUS_COLORS[status]}>
             {labelFor(STATUS_LABELS, status)}
           </Badge>
         )}
-        <Badge size="1" variant="outline" color="gray">
+        <Badge variant="outline" size="1">
           {labelFor(MODE_LABELS, charger.mode)}
         </Badge>
+        {reorderable && (
+          <Text size="1" color="gray">Priority {charger.priority}</Text>
+        )}
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          flexShrink: 0,
+        }}
+      >
         {reorderable && (
           <>
-            <Text size="1" color="gray">Priority {charger.priority}</Text>
-            <Button
-              size="1"
+            <IconButton
               variant="ghost"
+              size="1"
               aria-label={`Move ${charger.name} up`}
               onClick={() => onMove("up")}
             >
               <ArrowUpIcon />
-            </Button>
-            <Button
-              size="1"
+            </IconButton>
+            <IconButton
               variant="ghost"
+              size="1"
               aria-label={`Move ${charger.name} down`}
               onClick={() => onMove("down")}
             >
               <ArrowDownIcon />
-            </Button>
+            </IconButton>
           </>
         )}
         {editable && (
-          <Button size="1" variant="soft" onClick={onEdit}>
-            <Pencil size={13} />
-            Edit
-          </Button>
+          <IconButton
+            variant="ghost"
+            size="1"
+            aria-label={expanded
+              ? `Close ${charger.name}`
+              : `Edit ${charger.name}`}
+            onClick={onEdit}
+          >
+            {expanded ? <X size={14} /> : <Pencil size={14} />}
+          </IconButton>
         )}
         {smart && (
-          <Button
-            size="1"
+          <IconButton
             variant="ghost"
             color="red"
+            size="1"
             aria-label={`Delete ${charger.name}`}
             onClick={onRemove}
           >
             <Trash2 size={14} />
-          </Button>
+          </IconButton>
         )}
       </div>
     </div>
