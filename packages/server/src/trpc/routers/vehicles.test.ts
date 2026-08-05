@@ -7,6 +7,7 @@ import { AppDatabase } from "../../db/AppDatabase.ts";
 import type { TypedEventEmitter } from "../../services/TypedEventEmitter.ts";
 import { VehicleManager } from "../../services/VehicleManager.ts";
 import { VehicleService } from "../../services/VehicleService.ts";
+import type { ChargingPointManager } from "../../services/ChargingPointManager.ts";
 import { Logger } from "../../lib/Logger.ts";
 import { appRouter } from "../root.ts";
 import { createCallerFactory } from "../trpc.ts";
@@ -109,6 +110,10 @@ describe("Vehicles tRPC Router", () => {
       throwingMock("ConfigService"),
       emitter,
       testLogger,
+      () =>
+        throwingMock<ChargingPointManager>("ChargingPointManager", {
+          ensureVehicleChargingPoint: () => Promise.resolve(),
+        }),
     );
 
     caller = createCaller(throwingMock<TrpcContext>("TrpcContext", {

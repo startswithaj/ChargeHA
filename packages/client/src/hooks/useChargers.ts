@@ -8,7 +8,7 @@ export type ChargerWithState = RouterOutputs["charger"]["list"][number];
 /** A smart charger controls whatever is plugged into it; a vehicle-API
  *  charging point is bound to one car. */
 export const isSmartCharger = (charger: ChargerWithState): boolean =>
-  charger.vehicleId === null;
+  charger.kind === "smart";
 
 /** Charging points with live state; kept fresh by chargers_changed +
  *  charger_update SSE events (see RealtimeSync). */

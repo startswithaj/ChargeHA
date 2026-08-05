@@ -3,6 +3,7 @@ import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { Logger } from "../lib/Logger.ts";
 import type { TunnelManager } from "./TunnelManager.ts";
 import type { VehicleManager } from "./VehicleManager.ts";
+import type { ChargingPointManager } from "./ChargingPointManager.ts";
 import type { AuthService, ChangeModeInput } from "./AuthService.ts";
 import { buildSessionCookie } from "./AuthService.ts";
 import { maybeEncrypt } from "../lib/Encryption.ts";
@@ -38,6 +39,8 @@ export class WizardService {
     private vehicleManager: VehicleManager,
     private authService: AuthService,
     private oidcService: OidcService,
+    // Resolved lazily: ChargingPointManager is built after this service.
+    private chargingPoints: () => ChargingPointManager,
   ) {}
 
   async getStatus() {
@@ -221,7 +224,10 @@ export class WizardService {
       // Fetch the full persisted row (with createdAt/updatedAt) and hand
       // it to the manager so the vehicle is immediately usable.
       const row = await this.db.getVehicle("DEMO-001");
-      if (row) await this.vehicleManager.addVehicle(row);
+      if (row) {
+        await this.vehicleManager.addVehicle(row);
+        await this.chargingPoints().ensureVehicleChargingPoint(row);
+      }
 
       this.logger.info("Demo setup completed");
       return { success: true as const };

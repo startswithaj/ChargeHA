@@ -77,6 +77,7 @@ function buildAuxServices(
     vehicleRegistry,
     vehicleManager,
     eventEmitter,
+    chargingPoints,
   }: {
     db: AppDatabase;
     energyManager: EnergyAdapterManager;
@@ -86,6 +87,7 @@ function buildAuxServices(
     vehicleRegistry: VehiclePluginRegistry;
     vehicleManager: VehicleManager;
     eventEmitter: TypedEventEmitter;
+    chargingPoints: () => ChargingPointManager;
   },
 ) {
   const tariffService = new TariffService(
@@ -131,6 +133,7 @@ function buildAuxServices(
     vehicleManager,
     authService,
     oidcService,
+    chargingPoints,
   );
   const logService = new LogService(db);
 
@@ -260,6 +263,7 @@ function buildServices(
     vehicleRegistry,
     eventEmitter,
     new Logger("VehicleService", logLevel),
+    () => chargingPointManager,
   );
   const auxServices = buildAuxServices({
     db,
@@ -270,6 +274,7 @@ function buildServices(
     vehicleRegistry,
     vehicleManager,
     eventEmitter,
+    chargingPoints: () => chargingPointManager,
   });
   const {
     tariffService,
@@ -574,6 +579,7 @@ export async function bootstrap(): Promise<
     {
       db,
       vehicleManager: services.vehicleManager,
+      chargingPoints: services.chargingPointManager,
       energyManager: services.energyManager,
       tunnel: {
         getUrl: () => services.tunnelManager.tunnelUrl,

@@ -9,6 +9,7 @@
     "./lib/Logger": "./src/lib/Logger.ts",
     "./lib/Encryption": "./src/lib/Encryption.ts",
     "./services/VehicleManager": "./src/services/VehicleManager.ts",
+    "./services/ChargingPointManager": "./src/services/ChargingPointManager.ts",
     "./services/EnergyAdapterManager": "./src/services/EnergyAdapterManager.ts",
     "./bootstrap/PluginDependencies": "./src/bootstrap/PluginDependencies.ts",
     "./bootstrap/VehiclePluginRegistry": "./src/bootstrap/VehiclePluginRegistry.ts",

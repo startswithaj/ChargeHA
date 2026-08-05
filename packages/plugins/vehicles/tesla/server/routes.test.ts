@@ -3,6 +3,7 @@ import { expect } from "@std/expect";
 import { AppDatabase } from "@chargeha/server/db";
 import { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import type { VehicleManager } from "@chargeha/server/services/VehicleManager";
+import type { ChargingPointManager } from "@chargeha/server/services/ChargingPointManager";
 import type { EnergyAdapterManager } from "../../../../server/src/services/EnergyAdapterManager.ts";
 import { throwingMock } from "../../../../server/src/test-helpers/throwingMock.ts";
 import { Logger } from "@chargeha/server/lib/Logger";
@@ -19,6 +20,10 @@ describe("Tesla HTTP routes", () => {
     PluginDependencies.create({
       db: appDb,
       vehicleManager: throwingMock<VehicleManager>("VehicleManager"),
+      chargingPoints: throwingMock<ChargingPointManager>(
+        "ChargingPointManager",
+        { ensureVehicleChargingPoint: () => Promise.resolve() },
+      ),
       energyManager: throwingMock<EnergyAdapterManager>("EnergyAdapterManager"),
       tunnel: {
         getUrl: () => null,

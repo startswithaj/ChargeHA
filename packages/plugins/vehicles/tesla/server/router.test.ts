@@ -6,6 +6,7 @@ import { createAppRouter } from "../../../../server/src/trpc/root.ts";
 import { createCallerFactory } from "../../../../server/src/trpc/trpc.ts";
 import type { TrpcContext } from "../../../../server/src/trpc/trpc.ts";
 import { VehicleManager } from "@chargeha/server/services/VehicleManager";
+import type { ChargingPointManager } from "@chargeha/server/services/ChargingPointManager";
 import { TypedEventEmitter } from "../../../../server/src/services/TypedEventEmitter.ts";
 import { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
 import { EnergyPluginRegistry } from "@chargeha/server/bootstrap/EnergyPluginRegistry";
@@ -84,6 +85,10 @@ describe("Tesla Plugin Router", () => {
     const deps = PluginDependencies.create({
       db,
       vehicleManager,
+      chargingPoints: throwingMock<ChargingPointManager>(
+        "ChargingPointManager",
+        { ensureVehicleChargingPoint: () => Promise.resolve() },
+      ),
       energyManager,
       tunnel: {
         getUrl: () => null,

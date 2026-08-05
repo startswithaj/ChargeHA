@@ -105,19 +105,20 @@ export class ScheduleService {
           "BAD_REQUEST",
         );
       }
-      if (input.vehicleId != null) {
-        if (
-          !input.chargeLimitPct || input.chargeLimitPct < 1 ||
-          input.chargeLimitPct > 100
-        ) {
-          throw new ServiceError(
-            "chargeLimitPct must be between 1 and 100",
-            "BAD_REQUEST",
-          );
-        }
-      } else if (input.chargeLimitPct != null) {
+      // A charger-keyed schedule can still stop at a target SOC: the engine
+      // reads battery level from whichever vehicle resolves to the charger.
+      if (input.vehicleId != null && input.chargeLimitPct == null) {
         throw new ServiceError(
-          "chargeLimitPct only applies to vehicle-keyed schedules",
+          "chargeLimitPct must be between 1 and 100",
+          "BAD_REQUEST",
+        );
+      }
+      if (
+        input.chargeLimitPct != null &&
+        (input.chargeLimitPct < 1 || input.chargeLimitPct > 100)
+      ) {
+        throw new ServiceError(
+          "chargeLimitPct must be between 1 and 100",
           "BAD_REQUEST",
         );
       }

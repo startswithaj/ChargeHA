@@ -13,6 +13,9 @@ import { RateLimiter } from "../../middleware/rateLimit.ts";
 import { throwingMock } from "../../test-helpers/throwingMock.ts";
 
 describe("Wizard tRPC Router", () => {
+  const stubChargingPoints = {
+    ensureVehicleChargingPoint: () => Promise.resolve(),
+  } as never;
   const createCaller = createCallerFactory(appRouter);
 
   const mockLogger = {
@@ -57,6 +60,7 @@ describe("Wizard tRPC Router", () => {
       } as never,
       authService,
       oidcService,
+      () => stubChargingPoints,
     );
     return createCaller(throwingMock<TrpcContext>("TrpcContext", {
       db,
@@ -99,6 +103,7 @@ describe("Wizard tRPC Router", () => {
       } as never,
       {} as never,
       {} as never,
+      () => stubChargingPoints,
     );
     return {
       caller: createCaller(throwingMock<TrpcContext>("TrpcContext", {
@@ -355,6 +360,7 @@ describe("Wizard tRPC Router", () => {
           } as never,
           authSvc,
           oidcSvc,
+          () => stubChargingPoints,
         ),
         authService: authSvc,
         oidcService: oidcSvc,

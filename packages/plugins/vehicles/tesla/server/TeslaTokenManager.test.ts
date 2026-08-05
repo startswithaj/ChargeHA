@@ -6,6 +6,7 @@ import { TeslaTokenManager } from "./TeslaTokenManager.ts";
 import { Logger } from "@chargeha/server/lib/Logger";
 import { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import type { VehicleManager } from "@chargeha/server/services/VehicleManager";
+import type { ChargingPointManager } from "@chargeha/server/services/ChargingPointManager";
 import type { EnergyAdapterManager } from "../../../../server/src/services/EnergyAdapterManager.ts";
 import { throwingMock } from "../../../../server/src/test-helpers/throwingMock.ts";
 
@@ -16,6 +17,10 @@ describe("TeslaTokenManager", () => {
     PluginDependencies.create({
       db: appDb,
       vehicleManager: throwingMock<VehicleManager>("VehicleManager"),
+      chargingPoints: throwingMock<ChargingPointManager>(
+        "ChargingPointManager",
+        { ensureVehicleChargingPoint: () => Promise.resolve() },
+      ),
       energyManager: throwingMock<EnergyAdapterManager>("EnergyAdapterManager"),
       tunnel: {
         getUrl: () => null,
@@ -54,6 +59,10 @@ describe("TeslaTokenManager", () => {
     deps = PluginDependencies.create({
       db,
       vehicleManager: throwingMock<VehicleManager>("VehicleManager"),
+      chargingPoints: throwingMock<ChargingPointManager>(
+        "ChargingPointManager",
+        { ensureVehicleChargingPoint: () => Promise.resolve() },
+      ),
       energyManager: throwingMock<EnergyAdapterManager>("EnergyAdapterManager"),
       tunnel: {
         getUrl: () => null,

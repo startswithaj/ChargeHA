@@ -76,6 +76,8 @@ describe("ChargersSection", () => {
       mode: "auto",
       priority: 1,
       vehicleId: null,
+      kind: "smart",
+      active: true,
       state: { status: "charging" },
       ...overrides,
     }) as unknown as ChargerWithState;
@@ -127,7 +129,12 @@ describe("ChargersSection", () => {
   it("marks vehicle-API charging points and does not offer deletion", () => {
     hookRef.current = makeHookReturn({
       chargers: [
-        makeCharger({ id: "t1", name: "Model 3", vehicleId: "VIN1" }),
+        makeCharger({
+          id: "t1",
+          name: "Model 3",
+          vehicleId: "VIN1",
+          kind: "vehicle_api",
+        }),
       ],
     });
     renderWithProviders(<ChargersSection />);

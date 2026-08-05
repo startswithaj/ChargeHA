@@ -3,6 +3,9 @@ import { expect } from "@std/expect";
 import { WizardService } from "./WizardService.ts";
 
 describe("WizardService", () => {
+  const stubChargingPoints = {
+    ensureVehicleChargingPoint: () => Promise.resolve(),
+  } as never;
   const mockLogger = {
     info: () => {},
     error: () => {},
@@ -73,6 +76,7 @@ describe("WizardService", () => {
       vehicleManager as never,
       authService as never,
       oidcService as never,
+      () => stubChargingPoints,
     );
   }
 

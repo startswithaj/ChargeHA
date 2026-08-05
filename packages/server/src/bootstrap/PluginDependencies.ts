@@ -2,6 +2,7 @@ import type { GeocodeResult } from "@chargeha/shared/geocode";
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { UpsertVehicleInput, VehicleRow } from "../db/types.ts";
 import type { VehicleManager } from "../services/VehicleManager.ts";
+import type { ChargingPointManager } from "../services/ChargingPointManager.ts";
 import type { VehicleChargeState } from "@chargeha/shared";
 import type { VehicleRequestContext } from "@chargeha/plugins/types";
 import type { EnergyAdapterManager } from "../services/EnergyAdapterManager.ts";
@@ -26,6 +27,7 @@ export interface PluginTunnelApi {
 export interface PluginDependenciesInit {
   db: AppDatabase;
   vehicleManager: VehicleManager;
+  chargingPoints: ChargingPointManager;
   energyManager: EnergyAdapterManager;
   tunnel: PluginTunnelApi;
   geocode: (query: string) => Promise<GeocodeResult>;
@@ -57,6 +59,7 @@ export class PluginDependencies<K extends string = string> {
   readonly encryptionConfigured: () => boolean;
   private readonly db: AppDatabase;
   private readonly vehicleManager: VehicleManager;
+  private readonly chargingPoints: ChargingPointManager;
   private readonly energyManager: EnergyAdapterManager;
   private readonly prefix: string;
 
@@ -67,6 +70,7 @@ export class PluginDependencies<K extends string = string> {
   private constructor(init: PluginDependenciesInit) {
     this.db = init.db;
     this.vehicleManager = init.vehicleManager;
+    this.chargingPoints = init.chargingPoints;
     this.energyManager = init.energyManager;
     this.tunnel = init.tunnel;
     this.geocode = init.geocode;
@@ -145,11 +149,14 @@ export class PluginDependencies<K extends string = string> {
   }
 
   /** Upsert a vehicle for this plugin. The adapter type is stamped with the
-   *  plugin's own id — a plugin cannot write another plugin's vehicles. */
-  upsertVehicleRow(
+   *  plugin's own id — a plugin cannot write another plugin's vehicles.
+   *  Routed through the host so a new vehicle gets its charging point. */
+  async upsertVehicleRow(
     input: Omit<UpsertVehicleInput, "adapterType">,
   ): Promise<void> {
-    return this.db.upsertVehicle({ ...input, adapterType: this.pluginId });
+    await this.db.upsertVehicle({ ...input, adapterType: this.pluginId });
+    const row = await this.db.getVehicle(input.id);
+    if (row) await this.chargingPoints.ensureVehicleChargingPoint(row);
   }
 
   // ── Vehicle lifecycle (notify VehicleManager) ────────────────────────

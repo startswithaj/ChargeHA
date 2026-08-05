@@ -241,6 +241,12 @@ describe("ChargingPointManager", () => {
         resequenceCallCount++;
         return Promise.resolve();
       },
+      updateChargerActive: (id, active) => {
+        chargerRows = chargerRows.map((r) =>
+          r.id === id ? { ...r, active } : r
+        );
+        return Promise.resolve();
+      },
     });
 
     middlewares = new Map();
@@ -579,7 +585,7 @@ describe("ChargingPointManager", () => {
     });
   });
 
-  describe("migrateVehiclesToChargers", () => {
+  describe("ensureVehicleChargingPoint", () => {
     const vehicle = (id: string, adapterType: string): VehicleRow => ({
       id,
       name: `Car ${id}`,
@@ -591,40 +597,46 @@ describe("ChargingPointManager", () => {
       updatedAt: "2026-01-01T00:00:00.000Z",
     });
 
-    it("creates linked rows only for charger-role vehicle plugins", async () => {
+    it("derives the id from the vehicle so it survives deactivation", async () => {
       registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
-      vehicleRows = [vehicle("VIN1", "tesla"), vehicle("VIN2", "dataonly")];
-
       await manager.init();
 
-      const migrated = chargerRows.filter((r) => r.vehicleId !== null);
-      expect(migrated.length).toBe(1);
-      expect(migrated[0].vehicleId).toBe("VIN1");
-      expect(migrated[0].chargerAdapterType).toBe("tesla");
-      expect(migrated[0].mode).toBe("charge_now");
-      expect(migrated[0].priority).toBe(2);
+      await manager.ensureVehicleChargingPoint(vehicle("VIN1", "tesla"));
+
+      expect(chargerRows.length).toBe(1);
+      expect(chargerRows[0].id).toBe("cp-VIN1");
+      expect(chargerRows[0].kind).toBe("vehicle_api");
+      expect(chargerRows[0].mode).toBe("charge_now");
+      expect(chargerRows[0].priority).toBe(2);
     });
 
-    it("does nothing when a standalone smart charger owns control", async () => {
+    it("creates nothing for a plugin with no charger role", async () => {
+      await manager.init();
+
+      await manager.ensureVehicleChargingPoint(vehicle("VIN2", "dataonly"));
+
+      expect(chargerRows.length).toBe(0);
+    });
+
+    it("creates nothing while a smart charger owns control", async () => {
       registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
       registerChargerPlugin(registry, middlewares, "tapo", "Tapo", INFO);
-      chargerRows = [{ ...ROW, chargerAdapterType: "tapo", vehicleId: null }];
-      vehicleRows = [vehicle("VIN1", "tesla")];
-
+      chargerRows = [{ ...ROW, chargerAdapterType: "tapo", kind: "smart" }];
       await manager.init();
+
+      await manager.ensureVehicleChargingPoint(vehicle("VIN1", "tesla"));
 
       expect(chargerRows.length).toBe(1);
     });
 
-    it("is idempotent across boots", async () => {
+    it("is idempotent", async () => {
       registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
-      vehicleRows = [vehicle("VIN1", "tesla")];
-
-      await manager.init();
-      const afterFirst = chargerRows.length;
       await manager.init();
 
-      expect(chargerRows.length).toBe(afterFirst);
+      await manager.ensureVehicleChargingPoint(vehicle("VIN1", "tesla"));
+      await manager.ensureVehicleChargingPoint(vehicle("VIN1", "tesla"));
+
+      expect(chargerRows.length).toBe(1);
     });
   });
 
@@ -640,23 +652,11 @@ describe("ChargingPointManager", () => {
       updatedAt: "2026-01-01T00:00:00.000Z",
     });
 
-    it("creates the charging point for a vehicle added after boot", async () => {
-      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
-      await manager.init();
-      expect(chargerRows.length).toBe(0);
-
-      vehicleRows = [vehicle("VIN1", "tesla")];
-      await manager.syncVehicleChargingPoints();
-
-      expect(chargerRows.length).toBe(1);
-      expect(chargerRows[0].vehicleId).toBe("VIN1");
-      expect(manager.getState(chargerRows[0].id)).toBeDefined();
-    });
-
     it("drops the charging point when its vehicle is deleted", async () => {
       registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
       vehicleRows = [vehicle("VIN1", "tesla")];
       await manager.init();
+      await manager.ensureVehicleChargingPoint(vehicle("VIN1", "tesla"));
       expect(chargerRows.length).toBe(1);
 
       vehicleRows = [];
@@ -665,16 +665,71 @@ describe("ChargingPointManager", () => {
       expect(chargerRows.filter((r) => r.vehicleId !== null).length).toBe(0);
     });
 
-    it("creates nothing while a standalone smart charger owns control", async () => {
+    it("does not create points for newly added vehicles", async () => {
       registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
-      registerChargerPlugin(registry, middlewares, "tapo", "Tapo", INFO);
-      chargerRows = [{ ...ROW, chargerAdapterType: "tapo", vehicleId: null }];
       await manager.init();
 
       vehicleRows = [vehicle("VIN1", "tesla")];
       await manager.syncVehicleChargingPoints();
 
-      expect(chargerRows.length).toBe(1);
+      expect(chargerRows.length).toBe(0);
+    });
+  });
+
+  describe("control path switching", () => {
+    const linkedRow = (vehicleId: string) => ({
+      ...ROW,
+      id: `cp-${vehicleId}`,
+      chargerAdapterType: "tesla",
+      vehicleId,
+      kind: "vehicle_api" as const,
+    });
+
+    it("deactivates vehicle-API points when the first smart charger arrives", async () => {
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      chargerRows = [linkedRow("VIN1")];
+      await manager.init();
+
+      await manager.createCharger({
+        name: "Wallbox",
+        chargerAdapterType: CHARGER_TYPE,
+      });
+
+      const linked = chargerRows.find((r) => r.vehicleId === "VIN1");
+      expect(linked).toBeDefined();
+      expect(linked?.active).toBe(false);
+      expect(deletedIds).toEqual([]);
+    });
+
+    it("reactivates them when the last smart charger is removed", async () => {
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      chargerRows = [linkedRow("VIN1")];
+      await manager.init();
+      const smart = await manager.createCharger({
+        name: "Wallbox",
+        chargerAdapterType: CHARGER_TYPE,
+      });
+
+      await manager.deleteCharger(smart.id);
+
+      expect(chargerRows.find((r) => r.vehicleId === "VIN1")?.active).toBe(
+        true,
+      );
+    });
+
+    it("switches one vehicle without touching the others", async () => {
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      chargerRows = [linkedRow("VIN1"), linkedRow("VIN2")];
+      await manager.init();
+
+      await manager.setVehicleApiControl("VIN1", false);
+
+      expect(chargerRows.find((r) => r.vehicleId === "VIN1")?.active).toBe(
+        false,
+      );
+      expect(chargerRows.find((r) => r.vehicleId === "VIN2")?.active).toBe(
+        true,
+      );
     });
   });
 

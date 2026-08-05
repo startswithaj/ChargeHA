@@ -6,7 +6,7 @@ import type {
 import { SolarAllocator } from "@chargeha/shared/engine";
 import { linkedChargingPointId } from "@chargeha/shared/chargingPoints";
 import type { AppDatabase } from "../db/AppDatabase.ts";
-import type { ChargerRow } from "../db/types.ts";
+import type { ChargerRow, VehicleRow } from "../db/types.ts";
 import type { TypedEventEmitter } from "./TypedEventEmitter.ts";
 import type { VehicleManager } from "./VehicleManager.ts";
 import type { EnergyPoller } from "./EnergyPoller.ts";
@@ -57,7 +57,7 @@ export class ChargingPointManager {
   // ── Lifecycle ────────────────────────────────────────────────────────
 
   async addCharger(row: ChargerRow): Promise<void> {
-    if (this.chargers.has(row.id)) return;
+    if (this.chargers.has(row.id) || !row.active) return;
     const plugin = this.chargerPlugins.get(row.chargerAdapterType);
     if (!plugin) {
       this.logger.warn(
@@ -103,19 +103,53 @@ export class ChargingPointManager {
     await this.db.deleteCharger(id);
     await this.db.resequenceChargerPriorities();
     this.logger.info(`Charger deleted: ${id}`);
-    // Last smart charger gone → control returns to the vehicle API.
     const remaining = await this.db.getChargers();
-    if (!remaining.some((r) => r.vehicleId === null)) {
-      await this.migrateVehiclesToChargers();
-      const rows = await this.db.getChargers();
-      await rows
-        .filter((row) => !this.chargers.has(row.id))
-        .reduce(
-          (chain, row) => chain.then(() => this.addCharger(row)),
-          Promise.resolve(),
-        );
+    if (!remaining.some((r) => r.kind === "smart")) {
+      await this.setVehicleApiActive(true);
     }
     this.eventEmitter.emit("chargers_changed", {});
+  }
+
+  /** Vehicle-API points are deactivated rather than deleted so that their
+   *  schedules, logs and stats survive a control-path switch. */
+  private async setVehicleApiActive(active: boolean): Promise<void> {
+    const rows = await this.db.getChargers();
+    const targets = rows.filter((r) =>
+      r.kind === "vehicle_api" && r.active !== active
+    );
+    await targets.reduce(
+      (chain, row) =>
+        chain.then(async () => {
+          await this.db.updateChargerActive(row.id, active);
+          if (active) await this.addCharger({ ...row, active: true });
+          else await this.stopAndUnregister(row.id);
+          this.logger.info(
+            `Charging point ${row.name} ${
+              active ? "reactivated" : "deactivated"
+            }`,
+          );
+        }),
+      Promise.resolve(),
+    );
+    if (targets.length > 0) this.eventEmitter.emit("chargers_changed", {});
+  }
+
+  // Handing control over must not leave the car drawing under a stale amp
+  // command that nothing will revisit.
+  private async stopAndUnregister(id: string): Promise<void> {
+    const entry = this.chargers.get(id);
+    if (!entry) return;
+    const state = entry.middleware.getCachedState();
+    if (state?.isCharging) {
+      await this.stopCharging(
+        id,
+        { origin: "control-path", traceId: crypto.randomUUID() },
+        state,
+        { force: true },
+      );
+    }
+    await entry.middleware.shutdown();
+    this.chargers.delete(id);
   }
 
   // ── State ────────────────────────────────────────────────────────────
@@ -189,7 +223,6 @@ export class ChargingPointManager {
   }
 
   async init(): Promise<void> {
-    await this.migrateVehiclesToChargers();
     const solar = await this.configService.getSolar();
     this.cachedGridVoltage = solar.gridVoltage;
     this.eventEmitter.subscribe("config_changed", async ({ key }) => {
@@ -211,8 +244,9 @@ export class ChargingPointManager {
     );
   }
 
+  /** Drops charging points whose vehicle no longer exists. Creating points
+   *  for new vehicles is the vehicle-creation path's job, not an event's. */
   async syncVehicleChargingPoints(): Promise<void> {
-    await this.migrateVehiclesToChargers();
     const [vehicles, rows] = await Promise.all([
       this.db.getVehicles(),
       this.db.getChargers(),
@@ -225,48 +259,50 @@ export class ChargingPointManager {
       (chain, r) => chain.then(() => this.deleteCharger(r.id)),
       Promise.resolve(),
     );
-    const fresh = await this.db.getChargers();
-    await fresh
-      .filter((row) => !this.chargers.has(row.id))
-      .reduce(
-        (chain, row) => chain.then(() => this.addCharger(row)),
-        Promise.resolve(),
-      );
   }
 
-  // Idempotent: linked rows only for charger-role plugins, never while a
-  // standalone smart charger owns control.
-  private async migrateVehiclesToChargers(): Promise<void> {
-    const [vehicles, chargers] = await Promise.all([
-      this.db.getVehicles(),
-      this.db.getChargers(),
-    ]);
-    const hasSmartCharger = chargers.some((c) => c.vehicleId === null);
-    if (hasSmartCharger) return;
-    const covered = new Set(
-      chargers.map((c) => c.vehicleId).filter((id) => id !== null),
+  /** Gives a newly added vehicle its own charging point, unless a smart
+   *  charger already owns control or its plugin has no charger role. */
+  async ensureVehicleChargingPoint(vehicle: VehicleRow): Promise<void> {
+    if (!this.chargerPlugins.get(vehicle.adapterType)) return;
+    const rows = await this.db.getChargers();
+    if (rows.some((r) => r.kind === "smart")) return;
+    const id = linkedChargingPointId(vehicle.id);
+    if (rows.some((r) => r.id === id)) return;
+    const now = new Date().toISOString();
+    const row: ChargerRow = {
+      id,
+      name: vehicle.name,
+      chargerAdapterType: vehicle.adapterType,
+      chargerConfig: "{}",
+      mode: vehicle.mode,
+      priority: vehicle.priority,
+      vehicleId: vehicle.id,
+      kind: "vehicle_api",
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await this.db.upsertCharger(row);
+    await this.addCharger(row);
+    this.logger.info(`Charging point created for vehicle ${vehicle.name}`);
+  }
+
+  /** Per-vehicle control-path switch: whether this car is driven by its own
+   *  API or by whichever smart charger it is plugged into. */
+  async setVehicleApiControl(
+    vehicleId: string,
+    active: boolean,
+  ): Promise<void> {
+    const rows = await this.db.getChargers();
+    const row = rows.find((r) =>
+      r.kind === "vehicle_api" && r.vehicleId === vehicleId
     );
-    const missing = vehicles.filter((v) =>
-      !covered.has(v.id) &&
-      this.chargerPlugins.get(v.adapterType) !== undefined
-    );
-    await missing.reduce(
-      (chain, v) =>
-        chain.then(async () => {
-          await this.db.upsertCharger({
-            id: linkedChargingPointId(v.id),
-            name: v.name,
-            chargerAdapterType: v.adapterType,
-            mode: v.mode,
-            priority: v.priority,
-            vehicleId: v.id,
-            kind: "vehicle_api",
-            active: true,
-          });
-          this.logger.info(`Migrated vehicle ${v.name} to a charging point`);
-        }),
-      Promise.resolve(),
-    );
+    if (!row || row.active === active) return;
+    await this.db.updateChargerActive(row.id, active);
+    if (active) await this.addCharger({ ...row, active: true });
+    else await this.stopAndUnregister(row.id);
+    this.eventEmitter.emit("chargers_changed", {});
   }
 
   private async rebuildMiddlewaresFor(pluginId: string): Promise<void> {
@@ -392,8 +428,18 @@ export class ChargingPointManager {
       return { kind: "linked", vehicleId: entry.row.vehicleId };
     }
 
+    // A car driven by its own API is not a candidate for this charger, and
+    // one that is away cannot be plugged into it. isHome is null when
+    // unknown, so only an explicit false rules a vehicle out.
+    const selfDriven = new Set(
+      (await this.db.getChargers())
+        .filter((r) => r.kind === "vehicle_api" && r.active)
+        .map((r) => r.vehicleId),
+    );
     const pluggedIn = [...(await this.vehicleManager.getAllStates())]
-      .filter(([, v]) => v.isPluggedIn);
+      .filter(([vehicleId, v]) =>
+        v.isPluggedIn && v.isHome !== false && !selfDriven.has(vehicleId)
+      );
     const resolution: VehicleResolution = pluggedIn.length === 1
       ? { kind: "inferred", vehicleId: pluggedIn[0][0] }
       : { kind: pluggedIn.length > 1 ? "ambiguous" : "none", vehicleId: null };
@@ -458,32 +504,10 @@ export class ChargingPointManager {
     await this.db.upsertCharger(row);
     await this.addCharger(row);
     // One control path per car: the first smart charger takes over.
-    const hadSmartCharger = rows.some((r) => r.vehicleId === null);
-    if (!hadSmartCharger) await this.retireVehicleApiRows(rows);
-    return row;
-  }
-
-  private async retireVehicleApiRows(rows: ChargerRow[]): Promise<void> {
-    const linked = rows.filter((r) => r.vehicleId !== null);
-    await linked.reduce(
-      (chain, r) =>
-        chain.then(async () => {
-          const entry = this.chargers.get(r.id);
-          if (entry) {
-            await entry.middleware.shutdown();
-            this.chargers.delete(r.id);
-          }
-          await this.db.deleteCharger(r.id);
-          this.logger.info(
-            `Control path switched: retired vehicle-API charging point ${r.name}`,
-          );
-        }),
-      Promise.resolve(),
-    );
-    if (linked.length > 0) {
-      await this.db.resequenceChargerPriorities();
-      this.eventEmitter.emit("chargers_changed", {});
+    if (!rows.some((r) => r.kind === "smart")) {
+      await this.setVehicleApiActive(false);
     }
+    return row;
   }
 
   async ensureCharger(chargerAdapterType: string): Promise<void> {

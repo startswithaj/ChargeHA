@@ -139,7 +139,7 @@ export class DataRecorder {
     const points = await this.chargingPointManager.getChargersWithState();
     const charging = await Promise.all(
       points
-        .filter((p) => p.state?.isCharging === true)
+        .filter((p) => p.active && p.state?.isCharging === true)
         .map(async (p) => ({
           id: p.resolvedVehicleId ?? p.id,
           chargePowerKw: p.state?.chargePowerKw ?? 0,

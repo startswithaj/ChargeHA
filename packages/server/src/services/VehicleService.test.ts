@@ -7,11 +7,15 @@ import { Logger } from "../lib/Logger.ts";
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { VehicleRow } from "../db/types.ts";
 import type { VehicleManager } from "./VehicleManager.ts";
+import type { ChargingPointManager } from "./ChargingPointManager.ts";
 import type { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
 import type { VehicleChargeState } from "@chargeha/shared";
 
 describe("VehicleService", () => {
   const testLogger = new Logger("VehicleServiceTest", "error");
+  const stubChargingPoints = {
+    ensureVehicleChargingPoint: () => Promise.resolve(),
+  } as unknown as ChargingPointManager;
 
   const VEHICLE_ROW: VehicleRow = {
     id: "v1",
@@ -123,6 +127,7 @@ describe("VehicleService", () => {
       registry,
       new TypedEventEmitter(),
       testLogger,
+      () => stubChargingPoints,
     );
   });
 
@@ -145,6 +150,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        () => stubChargingPoints,
       );
 
       const result = await service.getPluginSummaries();
@@ -172,6 +178,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        () => stubChargingPoints,
       );
 
       const result = await service.getPluginSummaries();
@@ -200,6 +207,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        () => stubChargingPoints,
       );
 
       const result = await service.getPluginSummaries();
@@ -223,6 +231,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        () => stubChargingPoints,
       );
 
       const result = await service.getCommandStatus("UNKNOWN");
@@ -250,6 +259,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        () => stubChargingPoints,
       );
 
       const result = await service.getCommandStatus("v1");
@@ -302,6 +312,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        () => stubChargingPoints,
       );
 
       const result = await service.listVehicles();
@@ -323,6 +334,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        () => stubChargingPoints,
       );
 
       const result = await service.listVehicles();
@@ -341,6 +353,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        () => stubChargingPoints,
       );
 
       const result = await service.listVehicles();
@@ -376,6 +389,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        () => stubChargingPoints,
       );
 
       const result = await service.createVehicle({
@@ -405,6 +419,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        () => stubChargingPoints,
       );
 
       const result = await service.createVehicle({
@@ -453,6 +468,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         warnLogger,
+        () => stubChargingPoints,
       );
 
       const result = await service.createVehicle({
@@ -480,6 +496,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        () => stubChargingPoints,
       );
 
       const result = await service.createVehicle({
@@ -511,6 +528,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        () => stubChargingPoints,
       );
 
       const result = await service.deleteVehicle("v1");
@@ -546,6 +564,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        () => stubChargingPoints,
       );
 
       const result = await service.setPriority("v1", 3);
@@ -573,6 +592,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        () => stubChargingPoints,
       );
 
       const result = await service.executeCommand("v1", "wake");
@@ -597,6 +617,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        () => stubChargingPoints,
       );
 
       const result = await service.refreshState("v1");

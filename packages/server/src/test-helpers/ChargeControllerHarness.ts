@@ -349,6 +349,7 @@ export async function setupController(
     await manager.requestState(VIN, SETUP_REQUEST_CONTEXT);
   }
   await chargingPointManager.init();
+  await chargingPointManager.ensureVehicleChargingPoint(row);
 
   return {
     db,
@@ -453,6 +454,11 @@ export async function setupMultiVehicleController(
     await manager.requestState(v.vin, SETUP_REQUEST_CONTEXT);
   }, Promise.resolve());
   await chargingPointManager.init();
+  await (await db.getVehicles()).reduce(
+    (chain, row) =>
+      chain.then(() => chargingPointManager.ensureVehicleChargingPoint(row)),
+    Promise.resolve(),
+  );
 
   return {
     db,

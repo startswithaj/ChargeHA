@@ -84,6 +84,7 @@ describe("DataRecorder", () => {
         Promise.resolve(
           [...vehicles.getAllStates()].map(([id, state]) => ({
             id: `cp-${id}`,
+            active: true,
             resolvedVehicleId: id,
             state: {
               isCharging: state.isCharging,
