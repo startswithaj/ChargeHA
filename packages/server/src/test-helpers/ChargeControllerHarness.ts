@@ -167,11 +167,8 @@ export interface ControllerCtx {
   /** Run one controller loop iteration. Cancels the next-timer afterwards
    *  so FakeTime.tick can't fire a concurrent loop later in the test. */
   runOneLoop(): Promise<void>;
-  /** Set the mode on the charging point migrated for the given vehicle.
-   *  DB-only, like the old updateVehicleMode calls — the next loop picks
-   *  it up; no immediate command side effects. */
+  // DB-only mode write; the next loop picks it up.
   setMode(mode: ChargingPointMode, vehicleId?: string): Promise<void>;
-  /** Command-backoff state of the charging point migrated for the vehicle. */
   getBackoff(
     vehicleId?: string,
   ): Promise<{ backedOff: boolean; remainingMs: number }>;
@@ -198,10 +195,7 @@ async function setChargerMode(
   await db.updateChargerMode(await chargerIdFor(db, vehicleId), mode);
 }
 
-/** Mock registries for the dual-role "tesla" plugin. Both roles share one
- *  TeslaVehicleMiddleware per vehicle: the vehicle registry creates it, the
- *  charger registry wraps that same instance in a real TeslaChargerMiddleware
- *  — mirroring production wiring. */
+// Both roles share one TeslaVehicleMiddleware per vehicle, as in prod.
 export function makeMockRegistries(
   resolveAdapter: (row: VehicleRow) => MockAdapter,
 ): { vehicles: VehiclePluginRegistry; chargers: ChargerPluginRegistry } {

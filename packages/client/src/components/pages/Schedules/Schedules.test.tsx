@@ -29,8 +29,16 @@ vi.mock("../../../hooks/useSchedules.ts", () => ({
   })),
 }));
 
+// Schedule sections derive from charging points, so the mock mirrors the
+// currently-mocked vehicles: one linked point per vehicle.
+const chargersHolder = vi.hoisted(
+  (): { chargers: Array<Record<string, unknown>> } => ({ chargers: [] }),
+);
 vi.mock("../../../hooks/useChargers.ts", () => ({
-  useChargers: () => ({ chargers: [], isLoading: false }),
+  useChargers: () => ({
+    chargers: chargersHolder.chargers,
+    isLoading: false,
+  }),
 }));
 
 vi.mock("../../../hooks/useVehicles.ts", () => ({
@@ -133,7 +141,21 @@ vi.mock("../../ScheduleDialog/ScheduleDialog.tsx", () => ({
 
 describe("Schedules", () => {
   const setVehicles = (overrides: Partial<UseVehiclesReturn> = {}): void => {
-    vi.mocked(useVehicles).mockReturnValue(makeVehiclesReturn(overrides));
+    const vehiclesReturn = makeVehiclesReturn(overrides);
+    vi.mocked(useVehicles).mockReturnValue(vehiclesReturn);
+    chargersHolder.chargers = vehiclesReturn.vehicles.map((v) => ({
+      id: `cp-${v.id}`,
+      name: v.name,
+      chargerAdapterType: v.adapterType,
+      chargerConfig: "{}",
+      mode: v.mode,
+      priority: v.priority,
+      vehicleId: v.id,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      state: null,
+      resolvedVehicleId: v.id,
+    }));
   };
   const setSchedules = (overrides: Partial<UseSchedulesReturn> = {}): void => {
     vi.mocked(useSchedules).mockReturnValue(makeSchedulesReturn(overrides));

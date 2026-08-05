@@ -26,6 +26,12 @@ describe("OCPP e2e", () => {
     expect(status.wsPath).toBe(`/api/charger/ocpp/${CP_ID}`);
   });
 
+  it("test connection round-trips a call to the charger", async () => {
+    const result = await ocppTrpc.plugin.charger.ocpp.testConnection.mutate();
+    expect(result.success).toBe(true);
+    expect(result.success === true && result.latencyMs >= 0).toBe(true);
+  });
+
   it("rejects a connection with an unknown charger id", async () => {
     // Direct WS attempt with a wrong id — the mount must 404 before upgrade.
     const res = await fetch(

@@ -13,8 +13,6 @@ export function useChargers() {
   };
 }
 
-/** The charging point linked to a vehicle, or null if none resolved yet.
- *  Every driveable vehicle gets one via the boot migration. */
 export function useChargingPointForVehicle(vehicleId: string) {
   const { chargers } = useChargers();
   return chargers.find((c) => c.vehicleId === vehicleId) ?? null;

@@ -1,6 +1,7 @@
 import type { EnergyData } from "@chargeha/shared";
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { VehicleManager } from "./VehicleManager.ts";
+import type { ChargingPointManager } from "./ChargingPointManager.ts";
 import type { TariffService } from "./TariffService.ts";
 import type { TypedEventEmitter } from "./TypedEventEmitter.ts";
 import type { Logger } from "../lib/Logger.ts";
@@ -15,6 +16,7 @@ const PRUNE_EVERY_N_TICKS = 100;
 export class DataRecorder {
   private readonly db: AppDatabase;
   private readonly vehicleManager: VehicleManager;
+  private readonly chargingPointManager: ChargingPointManager;
   private readonly tariffService: TariffService;
   private readonly logger: Logger;
   /** Promise of the next pending setTimeout id. The async ctor-time
@@ -28,12 +30,14 @@ export class DataRecorder {
   constructor(
     db: AppDatabase,
     vehicleManager: VehicleManager,
+    chargingPointManager: ChargingPointManager,
     tariffService: TariffService,
     eventEmitter: TypedEventEmitter,
     logger: Logger,
   ) {
     this.db = db;
     this.vehicleManager = vehicleManager;
+    this.chargingPointManager = chargingPointManager;
     this.tariffService = tariffService;
     this.logger = logger;
 
@@ -117,31 +121,38 @@ export class DataRecorder {
     }
 
     try {
-      await this.recordVehicleCharges(ratePerKwh);
+      await this.recordChargeReadings(ratePerKwh);
     } catch (error) {
       this.logger.error(
-        "Failed to write vehicle charge reading:",
+        "Failed to write charge reading:",
         error,
       );
     }
   }
 
-  private async recordVehicleCharges(
+  // Measured values only; a meterless charging session records zero power.
+  private async recordChargeReadings(
     ratePerKwh: number | null,
   ): Promise<void> {
     if (!this.latestRealtime) return;
 
-    const allStates = await this.vehicleManager.getAllStates();
-    if (allStates.size === 0) return;
+    const points = await this.chargingPointManager.getChargersWithState();
+    const charging = await Promise.all(
+      points
+        .filter((p) => p.state?.isCharging === true)
+        .map(async (p) => ({
+          id: p.resolvedVehicleId ?? p.id,
+          chargePowerKw: p.state?.chargePowerKw ?? 0,
+          chargeAmps: p.state?.chargeAmps ?? 0,
+          vehicle: p.resolvedVehicleId !== null
+            ? await this.vehicleManager.getState(p.resolvedVehicleId)
+            : null,
+        })),
+    );
+    const totalChargePowerW = charging
+      .reduce((sum, p) => sum + p.chargePowerKw * 1000, 0);
 
-    // Collect charging vehicles and their power
-    const chargingVehicles = [...allStates]
-      .filter(([_, state]) => state.isCharging && state.chargePowerKw > 0)
-      .map(([id, state]) => ({ id, state }));
-    const totalChargePowerW = chargingVehicles
-      .reduce((sum, { state }) => sum + state.chargePowerKw * 1000, 0);
-
-    if (chargingVehicles.length === 0) return;
+    if (charging.length === 0) return;
 
     // Get energy data for solar attribution
     const energy = this.latestRealtime;
@@ -156,37 +167,40 @@ export class DataRecorder {
     const homeLng = await this.db.getConfig("home_longitude");
     const home = parseHomeCoords(homeLat, homeLng);
 
-    await chargingVehicles.reduce((chain, { id, state }) => {
-      const chargePowerW = state.chargePowerKw * 1000;
-      const isHome = computeIsHome(home, state) ?? true; // Default to home if unknown
+    await charging.reduce(
+      (chain, { id, chargePowerKw, chargeAmps, vehicle }) => {
+        const chargePowerW = chargePowerKw * 1000;
+        const isHome = (vehicle ? computeIsHome(home, vehicle) : null) ?? true; // Default to home if unknown
 
-      // For away charging: solar_contribution_w = 0, grid_contribution_w = 0
-      const homeAttribution = this.attributeHomeCharge(
-        energyPollFailed,
-        chargePowerW,
-        totalChargePowerW,
-        solarProductionW,
-        homeConsumptionW,
-      );
-      const awayDefault = { solarContributionW: 0, gridContributionW: 0 };
-      const { solarContributionW, gridContributionW } = isHome
-        ? homeAttribution
-        : awayDefault;
-      // charge_power_w carries the total for away aggregation
-
-      return chain.then(() =>
-        this.db.insertVehicleChargeReading({
-          vehicleId: id,
+        // For away charging: solar_contribution_w = 0, grid_contribution_w = 0
+        const homeAttribution = this.attributeHomeCharge(
+          energyPollFailed,
           chargePowerW,
-          chargeAmps: state.chargeAmps,
-          batteryLevel: state.batteryLevel,
-          solarContributionW,
-          gridContributionW,
-          isHome,
-          ratePerKwh,
-        })
-      );
-    }, Promise.resolve());
+          totalChargePowerW,
+          solarProductionW,
+          homeConsumptionW,
+        );
+        const awayDefault = { solarContributionW: 0, gridContributionW: 0 };
+        const { solarContributionW, gridContributionW } = isHome
+          ? homeAttribution
+          : awayDefault;
+        // charge_power_w carries the total for away aggregation
+
+        return chain.then(() =>
+          this.db.insertVehicleChargeReading({
+            vehicleId: id,
+            chargePowerW,
+            chargeAmps,
+            batteryLevel: vehicle?.batteryLevel ?? null,
+            solarContributionW,
+            gridContributionW,
+            isHome,
+            ratePerKwh,
+          })
+        );
+      },
+      Promise.resolve(),
+    );
   }
 
   /** Resolve the per-vehicle attribution at home, routing all charging to grid

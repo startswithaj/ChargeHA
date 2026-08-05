@@ -9,7 +9,7 @@ import {
   Text,
   TextField,
 } from "@radix-ui/themes";
-import type { VehicleWithState } from "@chargeha/shared";
+import type {} from "@chargeha/shared";
 import type { ActionType, TimeRangePreset } from "./Logs.tsx";
 import {
   ACTION_LABELS,
@@ -23,7 +23,8 @@ import styles from "./Logs.module.css";
 interface LogFilterBarProps {
   vehicleFilter: string;
   onVehicleFilterChange: (v: string) => void;
-  vehicles: VehicleWithState[];
+  /** Charging points — controller logs key by charging-point id. */
+  vehicles: Array<{ id: string; name: string }>;
   timeRange: TimeRangePreset;
   onTimeRangeChange: (v: TimeRangePreset) => void;
   customFrom: string;
@@ -139,9 +140,9 @@ export function LogFilterBar({
           value={vehicleFilter}
           onValueChange={onVehicleFilterChange}
         >
-          <Select.Trigger placeholder="All vehicles" />
+          <Select.Trigger placeholder="All charging points" />
           <Select.Content>
-            <Select.Item value="all">All vehicles</Select.Item>
+            <Select.Item value="all">All charging points</Select.Item>
             {vehicles.map((v) => (
               <Select.Item key={v.id} value={v.id}>
                 {v.name}

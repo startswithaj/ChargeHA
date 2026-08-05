@@ -55,6 +55,11 @@ export const dashboardMocks = {
     isLoading: false,
     error: null,
   })),
+  chargerListUseQuery: vi.fn(() => ({
+    data: [] as Array<Record<string, unknown>>,
+    isLoading: false,
+    error: null,
+  })),
   commandStatusUseQuery: vi.fn<() => CommandStatusReturn>(() => ({
     data: { commandsDisabled: false, reason: null },
     isLoading: false,
@@ -116,6 +121,58 @@ export function makeSleepingVehicle(overrides: Record<string, unknown> = {}) {
     lastLocation: null,
     ...overrides,
   };
+}
+
+/** Charging points mirroring the mocked vehicles — the dashboard iterates
+ *  charger.list, so every vehicle fixture needs its linked point. */
+function chargerStateFrom(
+  vehicleId: unknown,
+  state: Record<string, unknown> | null,
+  now: string,
+): Record<string, unknown> | null {
+  if (!state) return null;
+  return {
+    chargerId: `cp-${vehicleId}`,
+    isCharging: state.isCharging ?? false,
+    isPluggedIn: state.isPluggedIn ?? true,
+    chargeAmps: state.chargeAmps ?? 0,
+    chargeAmpsMax: state.chargeAmpsMax ?? 32,
+    chargeAmpsMin: state.chargeAmpsMin ?? 5,
+    chargePowerKw: state.chargePowerKw ?? 0,
+    chargerVoltage: state.chargerVoltage ?? 240,
+    chargerPhases: state.chargerPhases ?? 1,
+    energyAddedKwh: 0,
+    status: state.isCharging ? "charging" : "available",
+    statusDetail: null,
+    lastUpdated: now,
+  };
+}
+
+function setPointsFromVehicles(
+  vehicles: Array<Record<string, unknown>>,
+): void {
+  const now = "2026-01-01T00:00:00.000Z";
+  dashboardMocks.chargerListUseQuery.mockReturnValue({
+    data: vehicles.map((v) => ({
+      id: `cp-${v.id}`,
+      name: v.name,
+      chargerAdapterType: v.adapterType ?? "simulated",
+      chargerConfig: "{}",
+      mode: v.mode ?? "auto",
+      priority: v.priority ?? 1,
+      vehicleId: v.id,
+      createdAt: now,
+      updatedAt: now,
+      resolvedVehicleId: v.id,
+      state: chargerStateFrom(
+        v.id,
+        v.state as Record<string, unknown> | null,
+        now,
+      ),
+    })),
+    isLoading: false,
+    error: null,
+  });
 }
 
 export function makeVehiclesReturn(
@@ -209,8 +266,7 @@ export interface DashboardHarness {
   ) => ReturnType<typeof renderWithProviders>;
 }
 
-export function setupDashboard(): DashboardHarness {
-  // Reset to defaults each call
+function resetDashboardMocks(): void {
   dashboardMocks.capturedDismiss.onSuccess = undefined;
   dashboardMocks.tariffCurrentRateUseQuery.mockReturnValue({
     data: null,
@@ -235,6 +291,10 @@ export function setupDashboard(): DashboardHarness {
   dashboardMocks.dismissMutate.mockImplementation(() => {
     dashboardMocks.capturedDismiss.onSuccess?.();
   });
+}
+
+export function setupDashboard(): DashboardHarness {
+  resetDashboardMocks();
 
   return {
     setEnergy(overrides) {
@@ -250,10 +310,19 @@ export function setupDashboard(): DashboardHarness {
       );
     },
     setVehicles(vehicles) {
-      vi.mocked(useVehicles).mockReturnValue(makeVehiclesReturn(vehicles));
+      const vehiclesReturn = makeVehiclesReturn(vehicles);
+      vi.mocked(useVehicles).mockReturnValue(vehiclesReturn);
+      setPointsFromVehicles(
+        vehiclesReturn.vehicles as unknown as Array<Record<string, unknown>>,
+      );
     },
     setVehiclesRaw(returnValue) {
       vi.mocked(useVehicles).mockReturnValue(returnValue);
+      setPointsFromVehicles(
+        (returnValue.vehicles ?? []) as unknown as Array<
+          Record<string, unknown>
+        >,
+      );
     },
     setSystemAlert(alert) {
       dashboardMocks.configGetAllUseQuery.mockReturnValue({

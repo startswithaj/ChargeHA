@@ -135,6 +135,13 @@ export class OcppCentralSystem {
     return results.every(isAccepted);
   }
 
+  // GetConfiguration round trip: proves the charger answers calls.
+  async ping(): Promise<{ latencyMs: number }> {
+    const startedAt = performance.now();
+    await this.send("GetConfiguration", { key: ["HeartbeatInterval"] });
+    return { latencyMs: Math.round(performance.now() - startedAt) };
+  }
+
   async changeConfiguration(key: string, value: string): Promise<boolean> {
     const res = await this.send("ChangeConfiguration", { key, value });
     return isAccepted(res);

@@ -18,7 +18,12 @@ import { EnergyFlowDiagram } from "../../EnergyFlowDiagram/EnergyFlowDiagram.tsx
 import { MetricCard } from "../../MetricCard/MetricCard.tsx";
 import { kwhValue, kwValue } from "../../../utils/Format.ts";
 import { trpc } from "../../../trpc.ts";
-import { formatTimeUntil, useChargingVehicleFlows } from "./energyHelpers.ts";
+import {
+  chargingEntriesFromPoints,
+  formatTimeUntil,
+  useChargingFlows,
+} from "./energyHelpers.ts";
+import { useChargers } from "../../../hooks/useChargers.ts";
 import styles from "./Dashboard.module.css";
 
 interface PluginWarning {
@@ -148,7 +153,11 @@ function useOverviewData() {
     { refetchInterval: 30_000 },
   );
 
-  const chargingVehicles = useChargingVehicleFlows(realtime, vehicles);
+  const { chargers } = useChargers();
+  const chargingVehicles = useChargingFlows(
+    realtime,
+    chargingEntriesFromPoints(chargers),
+  );
   const hasBattery = realtime?.batteryPowerW !== null &&
     realtime?.batteryPowerW !== undefined;
 

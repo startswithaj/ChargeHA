@@ -32,6 +32,25 @@ export function createOcppRouter(
       };
     }),
 
+    testConnection: publicProcedure.mutation(async () => {
+      if (!centralSystem.getData().connected) {
+        return {
+          success: false as const,
+          error: "Charger not connected — check the charger URL in its " +
+            "OCPP settings and your network",
+        };
+      }
+      try {
+        const { latencyMs } = await centralSystem.ping();
+        return { success: true as const, latencyMs };
+      } catch (error) {
+        return {
+          success: false as const,
+          error: error instanceof Error ? error.message : "Round trip failed",
+        };
+      }
+    }),
+
     /** Security Profile 1 bootstrap: push the key to the charger via
      *  ChangeConfiguration, then store it — future connects must Basic Auth. */
     setAuthorizationKey: publicProcedure

@@ -8,3 +8,11 @@ export type SimulatedAppRouter = ReturnType<
     Record<string, never>
   >
 >;
+
+export type SimulatedDataOnlyAppRouter = ReturnType<
+  typeof createAppRouter<
+    { simulated_dataonly: ReturnType<typeof createSimulatedRouter> },
+    Record<string, never>,
+    Record<string, never>
+  >
+>;

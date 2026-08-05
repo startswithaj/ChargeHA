@@ -82,6 +82,10 @@ vi.mock("../../../trpc.ts", () => ({
   },
 }));
 
+vi.mock("../../../hooks/useChargers.ts", () => ({
+  useChargers: () => ({ chargers: [], isLoading: false }),
+}));
+
 vi.mock("../../../hooks/useToast.tsx", async (importOriginal) => ({
   ...await importOriginal<typeof import("../../../hooks/useToast.tsx")>(),
   useToast: vi.fn(() => ({

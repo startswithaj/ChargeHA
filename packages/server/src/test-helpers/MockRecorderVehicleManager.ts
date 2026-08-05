@@ -14,4 +14,8 @@ export class MockRecorderVehicleManager {
   getAllStates(): Map<string, VehicleChargeState> {
     return new Map(this.states);
   }
+
+  getState(id: string): Promise<VehicleChargeState | null> {
+    return Promise.resolve(this.states.get(id) ?? null);
+  }
 }

@@ -6,7 +6,10 @@ import type {
   Schedule,
   ScheduleFormData,
 } from "@chargeha/shared";
-import { vehicleScheduleNotes } from "@chargeha/plugins/componentRegistry";
+import {
+  chargerPluginOptions,
+  vehicleScheduleNotes,
+} from "@chargeha/plugins/componentRegistry";
 import { useSchedules } from "../../../hooks/useSchedules.ts";
 import { useVehicles } from "../../../hooks/useVehicles.ts";
 import { useChargers } from "../../../hooks/useChargers.ts";
@@ -306,28 +309,30 @@ function BlockoutSection(
   );
 }
 
-/** Vehicles first (unchanged Tesla behaviour), then standalone smart
- *  chargers — linked charging points already schedule via their vehicle. */
+// Sections per charging point: linked points key schedules by vehicle,
+// standalone chargers by charger id.
 function buildScheduleTargets(
   vehicles: ReturnType<typeof useVehicles>["vehicles"],
   chargers: ReturnType<typeof useChargers>["chargers"],
 ): ScheduleTarget[] {
-  return [
-    ...vehicles.map((v): ScheduleTarget => ({
-      kind: "vehicle",
-      id: v.id,
-      name: v.name,
-      badge: v.adapterType,
-    })),
-    ...chargers
-      .filter((c) => c.vehicleId === null)
-      .map((c): ScheduleTarget => ({
-        kind: "charger",
-        id: c.id,
-        name: c.name,
-        badge: c.chargerAdapterType,
-      })),
-  ];
+  return chargers.map((c): ScheduleTarget => {
+    if (c.vehicleId !== null) {
+      const vehicle = vehicles.find((v) => v.id === c.vehicleId);
+      return {
+        kind: "vehicle",
+        id: c.vehicleId,
+        name: vehicle?.name ?? c.name,
+        badge: vehicle?.adapterType ?? c.chargerAdapterType,
+      };
+    }
+    return {
+      kind: "charger",
+      id: c.id,
+      name: c.name,
+      badge: chargerPluginOptions.find((o) => o.id === c.chargerAdapterType)
+        ?.label ?? c.chargerAdapterType,
+    };
+  });
 }
 
 function SchedulesLoading() {

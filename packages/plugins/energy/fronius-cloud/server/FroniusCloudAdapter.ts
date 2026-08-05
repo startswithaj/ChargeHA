@@ -6,6 +6,11 @@ import type {
 import type { Logger } from "@chargeha/server/lib/Logger";
 
 const BASE_URL = "https://api.solarweb.com/swqapi";
+// Not a leaked personal credential — this is the shared app-level key
+// Fronius's own Solar.web app uses for its free login flow (vs. the paid
+// per-account SWQAPI key). The same value is reused across independent
+// open-source Fronius integrations (e.g. drc38/Fronius_solarweb,
+// TA2k/ioBroker.fronius-solarweb) for the same reason.
 const DEFAULT_ACCESS_KEY_ID = "FKIAB4CDA71C0763413DA942DC756742318B";
 const DEFAULT_ACCESS_KEY_VALUE = "67315e19-6805-479e-994d-7193ee5f6125";
 // Refresh token if within this many seconds of expiry

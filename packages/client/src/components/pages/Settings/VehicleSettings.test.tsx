@@ -21,7 +21,6 @@ const { makeHookReturn, hookRef } = vi.hoisted(() => {
     error: null as string | null,
     recentlyAddedVins: new Set<string>(),
     handleDelete: vi.fn(),
-    handleMovePriority: vi.fn(),
     handleAddSimulatedVehicle: vi.fn(),
     vehiclePlugins: [] as Array<{
       id: string;
@@ -135,31 +134,6 @@ describe("VehicleSettings", () => {
     expect(screen.getByText("Model 3")).toBeInTheDocument();
     expect(screen.getByText("VIN1")).toBeInTheDocument();
     expect(screen.getByText("tesla")).toBeInTheDocument();
-  });
-
-  it("renders priority controls when multiple vehicles", () => {
-    hookRef.current = makeHookReturn({
-      vehicles: [
-        { id: "VIN1", name: "Model 3", adapterType: "tesla", priority: 1 },
-        { id: "VIN2", name: "Model Y", adapterType: "tesla", priority: 2 },
-      ],
-    });
-    renderWithProviders(<VehicleSettings />);
-    expect(screen.getByText("Priority 1")).toBeInTheDocument();
-    expect(screen.getByText("Priority 2")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Priority determines which vehicle/),
-    ).toBeInTheDocument();
-  });
-
-  it("does not render priority controls for single vehicle", () => {
-    hookRef.current = makeHookReturn({
-      vehicles: [
-        { id: "VIN1", name: "Model 3", adapterType: "tesla", priority: 1 },
-      ],
-    });
-    renderWithProviders(<VehicleSettings />);
-    expect(screen.queryByText("Priority 1")).not.toBeInTheDocument();
   });
 
   it("calls handleDelete when delete button clicked", () => {

@@ -10,8 +10,6 @@ import { ScheduleForm } from "../../ScheduleDialog/ScheduleDialog.tsx";
 import { EmptyState } from "../../ui/EmptyState.tsx";
 import styles from "./Schedules.module.css";
 
-/** A schedulable charging target: a vehicle (schedules keyed by vehicleId)
- *  or a standalone smart charger (keyed by chargerId). */
 export interface ScheduleTarget {
   kind: "vehicle" | "charger";
   id: string;

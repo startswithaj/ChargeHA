@@ -11,23 +11,22 @@ import { useEnergyData } from "../../../hooks/useEnergyData.ts";
 import { useVehicles } from "../../../hooks/useVehicles.ts";
 import { useToast } from "../../../hooks/useToast.tsx";
 import { useControllerStatuses } from "../../../hooks/controllerStatusStore.ts";
-import {
-  useChargerCommands,
-  useChargingPointForVehicle,
-} from "../../../hooks/useChargers.ts";
+import { useChargerCommands, useChargers } from "../../../hooks/useChargers.ts";
 import { VehicleCard } from "../../VehicleCard/VehicleCard.tsx";
+import { ChargerCard } from "./ChargerCard.tsx";
 import { trpc } from "../../../trpc.ts";
-import { useVehicleSolarGrid } from "./energyHelpers.ts";
+import {
+  chargingEntriesFromPoints,
+  useChargingSolarGrid,
+} from "./energyHelpers.ts";
 
 type VehicleCardProps = ComponentProps<typeof VehicleCard>;
 
-/** Wraps VehicleCard with a per-vehicle commandStatus query and the linked
- *  charging point's mode/amps/start/stop controls — charge commands are
- *  addressed by charging-point id, not vehicle id, so the lookup and
- *  mutations live here rather than in the vehicles list above. */
+type ChargingPoint = ReturnType<typeof useChargers>["chargers"][number];
+
 function ConnectedVehicleCard(
-  { vehicleId, vehicleMode, ...props }:
-    & { vehicleId: string; vehicleMode: VehicleMode }
+  { vehicleId, chargingPoint, ...props }:
+    & { vehicleId: string; chargingPoint: ChargingPoint }
     & Omit<
       VehicleCardProps,
       | "commandsDisabled"
@@ -38,35 +37,28 @@ function ConnectedVehicleCard(
       | "onStopCharging"
       | "onSetAmps"
       | "onChangeMode"
+      | "chargerStatus"
     >,
 ) {
   const { data: cmdStatus } = trpc.vehicle.commandStatus.useQuery(
     { vehicleId },
     { refetchInterval: 30_000 },
   );
-  const chargingPoint = useChargingPointForVehicle(vehicleId);
   const { commandPending, startCharging, stopCharging, setAmps, changeMode } =
-    useChargerCommands(chargingPoint?.id ?? null);
-
-  // Should not happen post-migration (every driveable vehicle gets a
-  // charging point), but never crash — disable controls with a reason.
-  const commandsDisabled = !chargingPoint ||
-    (cmdStatus?.commandsDisabled ?? false);
-  const commandsDisabledReason = !chargingPoint
-    ? "No charging point linked to this vehicle"
-    : cmdStatus?.reason ?? undefined;
+    useChargerCommands(chargingPoint.id);
 
   return (
     <VehicleCard
       {...props}
-      mode={chargingPoint?.mode ?? vehicleMode}
+      mode={chargingPoint.mode as VehicleMode}
       commandPending={commandPending}
       onStartCharging={startCharging}
       onStopCharging={stopCharging}
       onSetAmps={setAmps}
       onChangeMode={changeMode}
-      commandsDisabled={commandsDisabled}
-      commandsDisabledReason={commandsDisabledReason}
+      commandsDisabled={cmdStatus?.commandsDisabled ?? false}
+      commandsDisabledReason={cmdStatus?.reason ?? undefined}
+      chargerStatus={chargingPoint.state}
     />
   );
 }
@@ -164,52 +156,57 @@ function NoVehiclesCard(
 
 function useAllocationStatus(
   priorityChargingEnabled: boolean | undefined,
-  vehicles: ReturnType<typeof useVehicles>["vehicles"],
+  points: ChargingPoint[],
   controllerStatuses: ReturnType<typeof useControllerStatuses>,
 ) {
   return useMemo(() => {
-    if (!priorityChargingEnabled || vehicles.length < 2) return {};
-    const sorted = [...vehicles].sort((a, b) => a.priority - b.priority);
-    const topCharging = sorted.find((v) =>
-      v.state?.isCharging &&
-      controllerStatuses[v.id]?.reason === "solar_tracking"
+    if (!priorityChargingEnabled || points.length < 2) return {};
+    const sorted = [...points].sort((a, b) => a.priority - b.priority);
+    const topCharging = sorted.find((p) =>
+      p.state?.isCharging &&
+      controllerStatuses[p.id]?.reason === "solar_tracking"
     );
     return Object.fromEntries(
       sorted
-        .map((v): [string, string] | null => {
-          const isSolarCharging = v.state?.isCharging &&
-            controllerStatuses[v.id]?.reason === "solar_tracking";
-          if (isSolarCharging && v === topCharging) {
-            return [v.id, "Priority: receiving all solar"];
+        .map((p): [string, string] | null => {
+          const isSolarCharging = p.state?.isCharging &&
+            controllerStatuses[p.id]?.reason === "solar_tracking";
+          if (isSolarCharging && p === topCharging) {
+            return [p.id, "Priority: receiving all solar"];
           }
-          if (!v.state?.isCharging && topCharging) {
-            return [v.id, "Waiting for priority vehicle"];
+          if (!p.state?.isCharging && topCharging) {
+            return [p.id, "Waiting for priority vehicle"];
           }
           return null;
         })
         .filter((entry): entry is [string, string] => entry !== null),
     );
-  }, [priorityChargingEnabled, vehicles, controllerStatuses]);
+  }, [priorityChargingEnabled, points, controllerStatuses]);
 }
 
-function VehicleCards(
+// One card per charging point; linked points (Tesla) render the full
+// vehicle card. Vehicles without a linked point get their own read-only
+// card below — vehicle data stays on vehicle cards.
+function ChargingPointCards(
   {
+    points,
     vehicles,
     home,
     vehiclesLoading,
     vehicleErrors,
-    vehicleSolarGrid,
+    solarGrid,
     allocationStatus,
     controllerStatuses,
     wakeMutation,
     refreshMutation,
     onNavigateSettings,
   }: {
+    points: ChargingPoint[];
     vehicles: ReturnType<typeof useVehicles>["vehicles"];
     home: { lat: number; lng: number } | null;
     vehiclesLoading: boolean;
     vehicleErrors: Record<string, string | undefined>;
-    vehicleSolarGrid: Record<string, { solarW: number; gridW: number }>;
+    solarGrid: Record<string, { solarW: number; gridW: number }>;
     allocationStatus: Record<string, string>;
     controllerStatuses: ReturnType<typeof useControllerStatuses>;
     wakeMutation: ReturnType<typeof trpc.vehicle.command.useMutation>;
@@ -219,27 +216,116 @@ function VehicleCards(
 ) {
   return (
     <>
-      {vehicles.map((v) => {
-        if (v.state) {
+      {points.map((point) => {
+        const vehicle = point.vehicleId !== null
+          ? vehicles.find((v) => v.id === point.vehicleId) ?? null
+          : null;
+        if (vehicle?.state) {
           return (
             <ConnectedVehicleCard
+              key={point.id}
+              vehicleId={vehicle.id}
+              chargingPoint={point}
+              name={vehicle.name || vehicle.state.vehicleName}
+              state={vehicle.state}
+              priority={point.priority}
+              solarPowerW={solarGrid[point.id]?.solarW ?? 0}
+              gridPowerW={solarGrid[point.id]?.gridW ?? 0}
+              loading={vehiclesLoading}
+              lastLocation={vehicle.lastLocation}
+              atHome={vehicle.lastLocation
+                ? isHome(home, vehicle.lastLocation)
+                : null}
+              vehicleError={vehicleErrors[vehicle.id]}
+              allocationStatus={allocationStatus[point.id] ?? null}
+              pollingSuspended={vehicle.pollingSuspended}
+              pollingSuspendReason={vehicle.pollingSuspendReason}
+              controllerReason={controllerStatuses[point.id]?.reason ?? null}
+              controllerDetail={controllerStatuses[point.id]?.detail ?? null}
+              onNavigateSettings={onNavigateSettings}
+              onRefresh={() =>
+                refreshMutation.mutateAsync({ vehicleId: vehicle.id })}
+            />
+          );
+        }
+        if (vehicle) {
+          const isWaking = wakeMutation.isPending &&
+            wakeMutation.variables?.vehicleId === vehicle.id;
+          return (
+            <AsleepVehicleCard
+              key={point.id}
+              v={vehicle}
+              isWaking={isWaking}
+              onWake={() =>
+                wakeMutation.mutate({ vehicleId: vehicle.id, command: "wake" })}
+            />
+          );
+        }
+        return (
+          <ChargerCard
+            key={point.id}
+            id={point.id}
+            name={point.name}
+            mode={point.mode}
+            state={point.state}
+            solarW={solarGrid[point.id]?.solarW ?? 0}
+            gridW={solarGrid[point.id]?.gridW ?? 0}
+            controllerDetail={controllerStatuses[point.id]?.detail ?? null}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+// Vehicles not represented by a linked charging point: data-only cards.
+function DataOnlyVehicleCards(
+  {
+    vehicles,
+    points,
+    home,
+    vehiclesLoading,
+    vehicleErrors,
+    wakeMutation,
+    refreshMutation,
+    onNavigateSettings,
+  }: {
+    vehicles: ReturnType<typeof useVehicles>["vehicles"];
+    points: ChargingPoint[];
+    home: { lat: number; lng: number } | null;
+    vehiclesLoading: boolean;
+    vehicleErrors: Record<string, string | undefined>;
+    wakeMutation: ReturnType<typeof trpc.vehicle.command.useMutation>;
+    refreshMutation: ReturnType<typeof trpc.vehicle.refreshState.useMutation>;
+    onNavigateSettings?: () => void;
+  },
+) {
+  const linked = new Set(
+    points.map((p) => p.vehicleId).filter((id) => id !== null),
+  );
+  return (
+    <>
+      {vehicles.filter((v) => !linked.has(v.id)).map((v) => {
+        if (v.state) {
+          return (
+            <VehicleCard
               key={v.id}
-              vehicleId={v.id}
-              vehicleMode={v.mode as VehicleMode}
+              readOnly
               name={v.name || v.state.vehicleName}
               state={v.state}
               priority={v.priority}
-              solarPowerW={vehicleSolarGrid[v.id]?.solarW ?? 0}
-              gridPowerW={vehicleSolarGrid[v.id]?.gridW ?? 0}
+              mode={v.mode as VehicleMode}
+              commandPending={false}
+              onStartCharging={() => {}}
+              onStopCharging={() => {}}
+              onSetAmps={() => {}}
+              onChangeMode={() => {}}
               loading={vehiclesLoading}
               lastLocation={v.lastLocation}
               atHome={v.lastLocation ? isHome(home, v.lastLocation) : null}
               vehicleError={vehicleErrors[v.id]}
-              allocationStatus={allocationStatus[v.id] ?? null}
               pollingSuspended={v.pollingSuspended}
               pollingSuspendReason={v.pollingSuspendReason}
-              controllerReason={controllerStatuses[v.id]?.reason ?? null}
-              controllerDetail={controllerStatuses[v.id]?.detail ?? null}
               onNavigateSettings={onNavigateSettings}
               onRefresh={() => refreshMutation.mutateAsync({ vehicleId: v.id })}
             />
@@ -294,11 +380,15 @@ export function VehicleList(
     },
   });
 
-  const vehicleSolarGrid = useVehicleSolarGrid(realtime, vehicles);
+  const { chargers: points } = useChargers();
+  const solarGrid = useChargingSolarGrid(
+    realtime,
+    chargingEntriesFromPoints(points),
+  );
   const controllerStatuses = useControllerStatuses();
   const allocationStatus = useAllocationStatus(
     chargingConfig?.priorityChargingEnabled,
-    vehicles,
+    points,
     controllerStatuses,
   );
 
@@ -311,14 +401,15 @@ export function VehicleList(
         weight="medium"
         style={{ textTransform: "uppercase", letterSpacing: "0.05em" }}
       >
-        Vehicles
+        Charging
       </Text>
-      <VehicleCards
+      <ChargingPointCards
+        points={points}
         vehicles={vehicles}
         home={home}
         vehiclesLoading={vehiclesLoading}
         vehicleErrors={vehicleErrors}
-        vehicleSolarGrid={vehicleSolarGrid}
+        solarGrid={solarGrid}
         allocationStatus={allocationStatus}
         controllerStatuses={controllerStatuses}
         wakeMutation={wakeMutation}
@@ -326,14 +417,27 @@ export function VehicleList(
         onNavigateSettings={onNavigateSettings}
       />
 
-      {!vehiclesLoading && vehicles.length === 0 && vehiclesError && (
+      <DataOnlyVehicleCards
+        vehicles={vehicles}
+        points={points}
+        home={home}
+        vehiclesLoading={vehiclesLoading}
+        vehicleErrors={vehicleErrors}
+        wakeMutation={wakeMutation}
+        refreshMutation={refreshMutation}
+        onNavigateSettings={onNavigateSettings}
+      />
+
+      {!vehiclesLoading && points.length === 0 && vehicles.length === 0 &&
+        vehiclesError && (
         <VehicleListErrorCard
           error={vehiclesError}
           onRetry={refreshVehicles}
         />
       )}
 
-      {!vehiclesLoading && vehicles.length === 0 && !vehiclesError && (
+      {!vehiclesLoading && points.length === 0 && vehicles.length === 0 &&
+        !vehiclesError && (
         <NoVehiclesCard onNavigateSettings={onNavigateSettings} />
       )}
     </div>

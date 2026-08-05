@@ -28,6 +28,11 @@ vi.mock("../trpc.ts", () => ({
         }),
       },
     },
+    charger: {
+      list: {
+        useQuery: () => ({ data: [], isPending: false }),
+      },
+    },
     useQueries: (fn: (t: Record<string, unknown>) => unknown[]) => {
       // Call the factory to exercise the switch branches
       const t = {

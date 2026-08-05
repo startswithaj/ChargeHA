@@ -44,7 +44,7 @@ describe("LogFilterBar", () => {
 
   it("renders all filter controls", () => {
     renderWithProviders(<LogFilterBar {...defaultProps} />);
-    expect(screen.getByText("All vehicles")).toBeTruthy();
+    expect(screen.getByText("All charging points")).toBeTruthy();
     expect(screen.getByTestId("time-range-trigger")).toBeTruthy();
     expect(screen.getByTestId("changes-only")).toBeTruthy();
     expect(screen.getByText("Changes only")).toBeTruthy();

@@ -96,7 +96,7 @@ describe("VehicleTypeStep", () => {
     );
 
     expect(screen.getByRole("button", { name: /Tesla/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Simulated/ }))
+    expect(screen.getByRole("button", { name: /^Simulated Creates a virtual/ }))
       .toBeInTheDocument();
     expect(screen.getByText(/Tesla Fleet API/)).toBeInTheDocument();
     expect(screen.getByText(/virtual vehicle for testing/))
@@ -111,7 +111,7 @@ describe("VehicleTypeStep", () => {
 
     expect(screen.getByRole("button", { name: /Tesla/ }))
       .toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByRole("button", { name: /Simulated/ }))
+    expect(screen.getByRole("button", { name: /^Simulated Creates a virtual/ }))
       .toHaveAttribute("aria-disabled", "false");
   });
 
@@ -133,7 +133,9 @@ describe("VehicleTypeStep", () => {
       <StepNextHarness def={vehicleTypeStep} onAdvance={mockAdvance} />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Simulated/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Simulated Creates a virtual/ }),
+    );
 
     expect(mockDemoMutate).toHaveBeenCalledWith({ adapterType: "simulated" });
     expect(mockAdvance).toHaveBeenCalledWith({ vehicleType: "simulated" });
@@ -145,7 +147,9 @@ describe("VehicleTypeStep", () => {
       <StepNextHarness def={vehicleTypeStep} onAdvance={mockAdvance} />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Simulated/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Simulated Creates a virtual/ }),
+    );
 
     expect(mockDemoMutate).toHaveBeenCalled();
     expect(mockAdvance).not.toHaveBeenCalled();
@@ -176,7 +180,9 @@ describe("VehicleTypeStep", () => {
       <StepNextHarness def={vehicleTypeStep} onAdvance={mockAdvance} />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Simulated/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Simulated Creates a virtual/ }),
+    );
 
     expect(mockDemoMutate).not.toHaveBeenCalled();
     expect(mockAdvance).toHaveBeenCalledWith({ vehicleType: "simulated" });

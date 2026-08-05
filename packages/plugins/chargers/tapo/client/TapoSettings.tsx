@@ -1,7 +1,49 @@
 import { useState } from "react";
 import { Badge, Button, Text, TextField } from "@radix-ui/themes";
-import { SettingsRow } from "../../../hostUi.ts";
+import { type PluginConfigField, PluginConfigForm } from "../../../hostUi.ts";
 import { trpc } from "./trpc.ts";
+
+const FIELDS: PluginConfigField[] = [
+  {
+    key: "tapoHost",
+    label: "Plug IP address",
+    help: "Local IP of your Tapo plug. Use Search to auto-detect it.",
+    width: 150,
+  },
+  {
+    key: "tapoEmail",
+    label: "Tapo account email",
+    width: 220,
+  },
+  {
+    key: "tapoPassword",
+    label: "Tapo account password",
+    help: "Stored encrypted. Only used locally to authenticate with the plug.",
+    secret: true,
+    width: 220,
+  },
+  {
+    key: "tapoFixedDrawAmps",
+    label: "EVSE draw (amps)",
+    help: "The current your EVSE draws from this socket. The plug's " +
+      "continuous rating must be at or above this.",
+    width: 80,
+  },
+  {
+    key: "tapoDetectionThresholdW",
+    label: "Charging detection threshold (W)",
+    help: "Measured draw at or above this counts as charging; below it the " +
+      "plug reports no draw.",
+    width: 80,
+  },
+  {
+    key: "tapoPollIntervalSeconds",
+    label: "Poll interval (seconds)",
+    help: "How often the plug is polled. Local and free — 10s tracks solar " +
+      "closely.",
+    width: 80,
+  },
+];
 
 export function TapoDiscoverySection(
   { onUse }: { onUse: (host: string) => void },
@@ -53,16 +95,15 @@ export function TapoTestButton(
     host: string;
     email: string;
     password: string;
-    onValidated: () => void;
+    onValidated?: () => void;
   },
 ) {
   const test = trpc.plugin.charger.tapo.testConnection.useMutation({
     onSuccess: (data) => {
-      if (data.success) onValidated();
+      if (data.success) onValidated?.();
     },
   });
-  const ok = test.isSuccess && test.data.success ? test.data : null;
-
+  const result = test.data;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <Button
@@ -73,13 +114,11 @@ export function TapoTestButton(
       >
         {test.isPending ? "Testing..." : "Test Connection"}
       </Button>
-      {ok && (
-        <Badge color="green" size="2">
-          Connected — {ok.model} (fw {ok.firmwareVersion})
-        </Badge>
+      {result?.success === true && (
+        <Badge color="green" size="1">Connected</Badge>
       )}
-      {test.isSuccess && !test.data.success && (
-        <Text size="2" color="red">{test.data.error}</Text>
+      {result?.success === false && (
+        <Text size="2" color="red">{result.error}</Text>
       )}
     </div>
   );
@@ -94,74 +133,20 @@ export function TapoSettings(): JSX.Element | null {
 
   if (!config) return null;
 
-  const field = (
-    key:
-      | "tapoHost"
-      | "tapoEmail"
-      | "tapoFixedDrawAmps"
-      | "tapoDetectionThresholdW"
-      | "tapoPollIntervalSeconds",
-    width = 150,
-  ) => (
-    <TextField.Root
-      size="2"
-      value={config[key]}
-      onChange={(e: { target: { value: string } }) =>
-        configMutation.mutate({ [key]: e.target.value })}
-      style={{ width }}
-    />
-  );
-
   return (
     <>
-      <SettingsRow
-        label="Plug IP address"
-        help="Local IP of your Tapo plug. Use Search to auto-detect it."
-      >
-        {field("tapoHost")}
-      </SettingsRow>
+      <PluginConfigForm
+        data={config}
+        fields={FIELDS}
+        onSave={(draft, opts) => configMutation.mutate(draft, opts)}
+      />
       <TapoDiscoverySection
         onUse={(host) => configMutation.mutate({ tapoHost: host })}
       />
-      <SettingsRow label="Tapo account email">
-        {field("tapoEmail", 220)}
-      </SettingsRow>
-      <SettingsRow
-        label="Tapo account password"
-        help="Stored encrypted. Only used locally to authenticate with the plug."
-      >
-        <TextField.Root
-          size="2"
-          type="password"
-          value={config.tapoPassword}
-          onChange={(e: { target: { value: string } }) =>
-            configMutation.mutate({ tapoPassword: e.target.value })}
-          style={{ width: 220 }}
-        />
-      </SettingsRow>
-      <SettingsRow
-        label="EVSE draw (amps)"
-        help="The current your EVSE draws from this socket. The plug's continuous rating must be at or above this."
-      >
-        {field("tapoFixedDrawAmps", 80)}
-      </SettingsRow>
-      <SettingsRow
-        label="Charging detection threshold (W)"
-        help="Measured draw at or above this counts as charging; below it the plug reports no draw."
-      >
-        {field("tapoDetectionThresholdW", 80)}
-      </SettingsRow>
-      <SettingsRow
-        label="Poll interval (seconds)"
-        help="How often the plug is polled. Local and free — 10s tracks solar closely."
-      >
-        {field("tapoPollIntervalSeconds", 80)}
-      </SettingsRow>
       <TapoTestButton
         host={config.tapoHost}
         email={config.tapoEmail}
         password={config.tapoPassword}
-        onValidated={() => {}}
       />
     </>
   );

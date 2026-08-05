@@ -134,13 +134,6 @@ function buildAuxServices(
   );
   const logService = new LogService(db);
 
-  new DataRecorder(
-    db,
-    vehicleManager,
-    tariffService,
-    eventEmitter,
-    new Logger("DataRecorder", logLevel),
-  );
   const poller = new EnergyPoller(
     energyManager,
     eventEmitter,
@@ -180,6 +173,47 @@ function registerNotificationListeners(
     scheduleService,
     new Logger("Notifications", logLevel),
   );
+}
+
+function startBackgroundServices(
+  {
+    db,
+    vehicleManager,
+    chargingPointManager,
+    poller,
+    configService,
+    tariffService,
+    eventEmitter,
+    logLevel,
+  }: {
+    db: AppDatabase;
+    vehicleManager: VehicleManager;
+    chargingPointManager: ChargingPointManager;
+    poller: EnergyPoller;
+    configService: ConfigService;
+    tariffService: TariffService;
+    eventEmitter: TypedEventEmitter;
+    logLevel: LogLevel;
+  },
+): void {
+  new DataRecorder(
+    db,
+    vehicleManager,
+    chargingPointManager,
+    tariffService,
+    eventEmitter,
+    new Logger("DataRecorder", logLevel),
+  );
+  new ChargeController(
+    vehicleManager,
+    chargingPointManager,
+    poller,
+    db,
+    configService,
+    eventEmitter,
+    new Logger("ChargeController", logLevel),
+  );
+  new Overseer(db, eventEmitter, new Logger("Overseer", logLevel));
 }
 
 function buildServices(
@@ -277,16 +311,16 @@ function buildServices(
     encryptionKey,
   );
 
-  new ChargeController(
+  startBackgroundServices({
+    db,
     vehicleManager,
     chargingPointManager,
     poller,
-    db,
     configService,
+    tariffService,
     eventEmitter,
-    new Logger("ChargeController", logLevel),
-  );
-  new Overseer(db, eventEmitter, new Logger("Overseer", logLevel));
+    logLevel,
+  });
 
   return {
     notificationService,

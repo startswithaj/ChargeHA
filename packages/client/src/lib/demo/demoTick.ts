@@ -13,6 +13,7 @@ import { getDemoState, updateDemoStateLive } from "./demoState.ts";
 import { minuteOfDay, timeToMinutes } from "./demoDates.ts";
 import { hash01 } from "./hash.ts";
 import { isActiveNow } from "./handlers/schedule.ts";
+import type { SSEEvent } from "@chargeha/shared";
 
 const TICK_INTERVAL_MS = 3000;
 const INTERVAL_H = 0.25; // 15-min buckets
@@ -279,4 +280,17 @@ export const startDemoTick = (): void => {
 export const onDemoTick = (cb: () => void): () => void => {
   emitter.addEventListener("tick", cb);
   return () => emitter.removeEventListener("tick", cb);
+};
+
+// Structural events pushed by demo mutations — the SSE stand-in.
+type DemoEventListener = (event: SSEEvent) => void;
+const eventListeners = new Set<DemoEventListener>();
+
+export const onDemoEvent = (cb: DemoEventListener): () => void => {
+  eventListeners.add(cb);
+  return () => eventListeners.delete(cb);
+};
+
+export const emitDemoEvent = (event: SSEEvent): void => {
+  eventListeners.forEach((cb) => cb(event));
 };

@@ -105,7 +105,6 @@ export class ScheduleService {
           "BAD_REQUEST",
         );
       }
-      // Charger-keyed schedules have no battery visibility — no limit.
       if (input.vehicleId != null) {
         if (
           !input.chargeLimitPct || input.chargeLimitPct < 1 ||
@@ -165,6 +164,36 @@ export class ScheduleService {
     const existing = await this.db.getSchedule(input.id);
     if (!existing) {
       throw new ServiceError("Schedule not found", "NOT_FOUND");
+    }
+
+    // The merged row must satisfy the same invariants as create.
+    const merged = {
+      vehicleId: input.vehicleId !== undefined
+        ? input.vehicleId
+        : existing.vehicleId,
+      chargerId: input.chargerId !== undefined
+        ? input.chargerId
+        : existing.chargerId,
+      scheduleType: input.scheduleType ?? existing.scheduleType,
+      chargeLimitPct: input.chargeLimitPct !== undefined
+        ? input.chargeLimitPct
+        : existing.chargeLimitPct,
+    };
+    if (merged.scheduleType === "charge") {
+      const targets = [merged.vehicleId, merged.chargerId]
+        .filter((t) => t != null);
+      if (targets.length !== 1) {
+        throw new ServiceError(
+          "charge schedules need exactly one target: vehicleId or chargerId",
+          "BAD_REQUEST",
+        );
+      }
+      if (merged.vehicleId == null && merged.chargeLimitPct != null) {
+        throw new ServiceError(
+          "chargeLimitPct only applies to vehicle-keyed schedules",
+          "BAD_REQUEST",
+        );
+      }
     }
 
     await this.db.updateSchedule(input.id, {

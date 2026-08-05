@@ -624,6 +624,56 @@ describe("ChargingPointManager", () => {
     });
   });
 
+  describe("syncVehicleChargingPoints", () => {
+    const vehicle = (id: string, adapterType: string): VehicleRow => ({
+      id,
+      name: `Car ${id}`,
+      adapterType,
+      priority: 1,
+      config: "{}",
+      mode: "auto",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    it("creates the charging point for a vehicle added after boot", async () => {
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      await manager.init();
+      expect(chargerRows.length).toBe(0);
+
+      vehicleRows = [vehicle("VIN1", "tesla")];
+      await manager.syncVehicleChargingPoints();
+
+      expect(chargerRows.length).toBe(1);
+      expect(chargerRows[0].vehicleId).toBe("VIN1");
+      expect(manager.getState(chargerRows[0].id)).toBeDefined();
+    });
+
+    it("drops the charging point when its vehicle is deleted", async () => {
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      vehicleRows = [vehicle("VIN1", "tesla")];
+      await manager.init();
+      expect(chargerRows.length).toBe(1);
+
+      vehicleRows = [];
+      await manager.syncVehicleChargingPoints();
+
+      expect(chargerRows.filter((r) => r.vehicleId !== null).length).toBe(0);
+    });
+
+    it("creates nothing while a standalone smart charger owns control", async () => {
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      registerChargerPlugin(registry, middlewares, "tapo", "Tapo", INFO);
+      chargerRows = [{ ...ROW, chargerAdapterType: "tapo", vehicleId: null }];
+      await manager.init();
+
+      vehicleRows = [vehicle("VIN1", "tesla")];
+      await manager.syncVehicleChargingPoints();
+
+      expect(chargerRows.length).toBe(1);
+    });
+  });
+
   describe("resolveVehicleId", () => {
     it("returns the linked vehicle id without inspecting state", async () => {
       const row = { ...ROW, id: "charger-linked", vehicleId: "VEH1" };

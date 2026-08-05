@@ -61,7 +61,7 @@ export interface TestableDataRecorder {
   tick(): Promise<void>;
   tickCount: number;
   scheduleNext(): void;
-  recordVehicleCharges(ratePerKwh: number | null): Promise<void>;
+  recordChargeReadings(ratePerKwh: number | null): Promise<void>;
 }
 
 export interface TestableOverseer {

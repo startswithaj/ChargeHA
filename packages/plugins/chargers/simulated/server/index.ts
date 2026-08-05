@@ -22,7 +22,7 @@ export class SimulatedChargerPlugin implements ChargerPlugin {
   readonly id = "simulated_charger";
   readonly displayName = "Simulated Charger";
   readonly vendor = "ChargeHA";
-  readonly settingsComponentKey = "simulated-charger-settings";
+  readonly settingsComponentKey = "simulated_charger-settings";
   readonly configDef = simulatedChargerConfigDef;
   readonly secretKeys: readonly string[] = [];
 

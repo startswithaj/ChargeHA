@@ -23,7 +23,12 @@ describe("Chargers tRPC Router", () => {
     updatedAt: "2024-01-01T00:00:00.000Z",
   };
 
-  const CHARGERS_WITH_STATE = [{ ...CHARGER_ROW, state: null }];
+  const CHARGERS_WITH_STATE = [{
+    ...CHARGER_ROW,
+    state: null,
+    resolvedVehicleId: null,
+    vehicleResolution: "none" as const,
+  }];
 
   const callerWithStub = (overrides: Partial<ChargingPointManager>) =>
     createCaller(throwingMock<TrpcContext>("TrpcContext", {

@@ -86,10 +86,7 @@ interface DecisionLogEntry {
   scheduleLimitContext?: { scheduleLimitPct: number; batteryLevel: number };
 }
 
-/** One controllable unit for the loop: a vehicle (installs with no charger
- *  rows — today's path) or a charging point (charger row, commands via the
- *  charger, optional vehicle enrichment). The engine, logging, and event
- *  code run unchanged against either. */
+/** One controllable unit for the loop: a charging point. */
 interface ControlTarget {
   id: string;
   /** Vehicle linked to this charging point — schedules are keyed by it. */
@@ -164,8 +161,6 @@ export class ChargeController {
   async runOnce(): Promise<ControllerConfig> {
     const traceId = createTraceId();
     const config = await this.loadConfig();
-    // Every controllable unit is a charging point — the boot migration
-    // creates vehicle-API rows, so there is no separate vehicle path.
     const chargerRows = await this.db.getChargers();
     const targets = this.buildChargerTargets(chargerRows);
     const schedules = await this.db.getSchedules();
@@ -214,6 +209,8 @@ export class ChargeController {
         };
       }),
     );
+
+    await this.refreshUnlinkedVehicles(targets, traceId, hasSolar, hasBlockout);
 
     // Run the pure decision engine
     const output = this.engine.decide({
@@ -284,6 +281,33 @@ export class ChargeController {
     }
   }
 
+  // Vehicles with no charging point (data-only) still need fresh state
+  // for display, inference, and stop-at-limit.
+  private async refreshUnlinkedVehicles(
+    targets: ControlTarget[],
+    traceId: string,
+    hasSolar: boolean,
+    hasBlockout: boolean,
+  ): Promise<void> {
+    const linked = new Set(
+      targets.map((t) => t.vehicleId).filter((id) => id !== null),
+    );
+    const vehicles = await this.db.getVehicles();
+    await Promise.all(
+      vehicles
+        .filter((v) => !linked.has(v.id))
+        .map((v) =>
+          this.vehicleManager.requestState(v.id, {
+            origin: "controller",
+            traceId,
+            hasSolar,
+            hasSchedule: false,
+            hasBlockout,
+          })
+        ),
+    );
+  }
+
   private buildChargerTargets(rows: ChargerRow[]): ControlTarget[] {
     return rows.map((row) => ({
       id: row.id,
@@ -301,8 +325,6 @@ export class ChargeController {
         }
       },
       getState: () => this.mergedChargerState(row),
-      // Commands take the manager's own cached ChargerState — each layer
-      // keeps its own state type; the merged view is engine-only.
       start: (amps, ctx) => {
         const chargerState = this.chargingPointManager.getState(row.id);
         if (!chargerState) return Promise.resolve();
@@ -337,9 +359,7 @@ export class ChargeController {
     return this.mergeChargingPointState(charger, vehicle, row.name);
   }
 
-  /** Charger state + optional vehicle enrichment → the engine's state
-   *  shape. Each fallback is the "don't block charging on data we don't
-   *  have" choice. */
+  // Fallbacks are the "don't block charging on missing data" choice.
   private mergeChargingPointState(
     charger: ChargerState,
     vehicle: VehicleChargeState | null,

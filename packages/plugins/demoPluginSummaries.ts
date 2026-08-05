@@ -24,6 +24,11 @@ export const demoVehiclePluginSummaries: DemoVehiclePluginSummary[] = [
     displayName: "Simulated",
     settingsComponentKey: "simulated-settings",
   },
+  {
+    id: "simulated_dataonly",
+    displayName: "Simulated (data only)",
+    settingsComponentKey: "simulated-dataonly-settings",
+  },
 ];
 
 export const demoEnergyPluginSummaries: DemoEnergyPluginSummary[] = [
@@ -46,3 +51,17 @@ export const demoEnergyPluginSummaries: DemoEnergyPluginSummary[] = [
     settingsComponentKey: "simulated-energy-config",
   },
 ];
+
+/** Vehicle adapters whose plugin also has the charger role. */
+export const chargerCapableVehicleAdapters: readonly string[] = [
+  "tesla",
+  "simulated",
+];
+
+export const dataOnlyVehicleAdapterId = "simulated_dataonly";
+
+export const demoChargerDisplayNames: Record<string, string> = {
+  simulated_charger: "Simulated Charger",
+  tapo: "Tapo Smart Plug",
+  ocpp: "OCPP Charger",
+};

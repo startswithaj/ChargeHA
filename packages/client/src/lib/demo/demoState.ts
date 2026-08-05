@@ -32,6 +32,9 @@ export interface DemoCharger {
   mode: DemoVehicleMode;
   priority: number;
   vehicleId: string | null;
+  /** Simulated-charger dev knobs (plugged-in car and its onboard limit). */
+  simPluggedIn?: boolean;
+  simCarMaxAmps?: number;
 }
 
 export interface DemoSchedule {

@@ -1,11 +1,14 @@
 import { useMemo } from "react";
-import type {
-  EnergyData,
-  VehicleChargeState,
-  VehicleWithState,
-} from "@chargeha/shared";
+import type { EnergyData } from "@chargeha/shared";
 import { calculateSolarAttribution } from "@chargeha/shared/solarAttribution";
 import type { ChargingVehicleFlow } from "../../EnergyFlowDiagram/EnergyFlowDiagram.tsx";
+
+export interface ChargingEntry {
+  id: string;
+  name: string;
+  isCharging: boolean;
+  chargePowerKw: number;
+}
 
 /** Format minutes until a future time as a human-readable string (e.g., "2h 15m", "45m"). */
 export function formatTimeUntil(isoString: string): string {
@@ -17,60 +20,65 @@ export function formatTimeUntil(isoString: string): string {
   return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
 }
 
-/** Per-vehicle { solarW, gridW } map for currently-charging vehicles. */
-export function useVehicleSolarGrid(
+export function useChargingSolarGrid(
   realtime: EnergyData | null,
-  vehicles: VehicleWithState[],
+  entries: ChargingEntry[],
 ): Record<string, { solarW: number; gridW: number }> {
   return useMemo(() => {
     if (!realtime) return {};
 
-    const chargingVehicles = vehicles.filter(
-      (v): v is VehicleWithState & { state: VehicleChargeState } =>
-        !!v.state?.isCharging && v.state.chargePowerKw > 0,
-    );
-    const totalChargePowerW = chargingVehicles.reduce(
-      (sum, v) => sum + (v.state.chargePowerKw * 1000),
+    const charging = entries.filter((e) => e.isCharging && e.chargePowerKw > 0);
+    const totalChargePowerW = charging.reduce(
+      (sum, e) => sum + (e.chargePowerKw * 1000),
       0,
     );
 
     return Object.fromEntries(
-      chargingVehicles.map((v) => [
-        v.id,
+      charging.map((e) => [
+        e.id,
         calculateSolarAttribution(
-          v.state.chargePowerKw * 1000,
+          e.chargePowerKw * 1000,
           totalChargePowerW,
           realtime.solarProductionW,
           realtime.homeConsumptionW,
         ),
       ]),
     );
-  }, [realtime, vehicles]);
+  }, [realtime, entries]);
 }
 
-/**
- * Compute solar vs grid split per charging vehicle and build the
- * ChargingVehicleFlow[] list for the energy flow diagram.
- */
-export function useChargingVehicleFlows(
+export function useChargingFlows(
   realtime: EnergyData | null,
-  vehicles: VehicleWithState[],
+  entries: ChargingEntry[],
 ): ChargingVehicleFlow[] {
-  const vehicleSolarGrid = useVehicleSolarGrid(realtime, vehicles);
+  const solarGrid = useChargingSolarGrid(realtime, entries);
 
-  // Build charging vehicles list for the energy flow diagram
   return useMemo(() => {
-    return vehicles
-      .filter(
-        (v): v is VehicleWithState & { state: VehicleChargeState } =>
-          !!v.state?.isCharging && v.state.chargePowerKw > 0,
-      )
-      .map((v) => ({
-        id: v.id,
-        name: v.name || v.state.vehicleName,
-        chargePowerW: v.state.chargePowerKw * 1000,
-        solarW: vehicleSolarGrid[v.id]?.solarW ?? 0,
-        gridW: vehicleSolarGrid[v.id]?.gridW ?? 0,
+    return entries
+      .filter((e) => e.isCharging && e.chargePowerKw > 0)
+      .map((e) => ({
+        id: e.id,
+        name: e.name,
+        chargePowerW: e.chargePowerKw * 1000,
+        solarW: solarGrid[e.id]?.solarW ?? 0,
+        gridW: solarGrid[e.id]?.gridW ?? 0,
       }));
-  }, [vehicles, vehicleSolarGrid]);
+  }, [entries, solarGrid]);
+}
+
+export function chargingEntriesFromPoints(
+  points: Array<
+    {
+      id: string;
+      name: string;
+      state: { isCharging: boolean; chargePowerKw: number | null } | null;
+    }
+  >,
+): ChargingEntry[] {
+  return points.map((p) => ({
+    id: p.id,
+    name: p.name,
+    isCharging: p.state?.isCharging ?? false,
+    chargePowerKw: p.state?.chargePowerKw ?? 0,
+  }));
 }

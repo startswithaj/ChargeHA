@@ -15,6 +15,9 @@ import type { createSimulatedRouter } from "../../../../plugins/vehicles/simulat
 import type { createFroniusLocalRouter } from "../../../../plugins/energy/fronius-local/server/router.ts";
 import type { createFroniusCloudRouter } from "../../../../plugins/energy/fronius-cloud/server/router.ts";
 import type { createSimulatedEnergyRouter } from "../../../../plugins/energy/simulated/server/router.ts";
+import type { createTapoRouter } from "../../../../plugins/chargers/tapo/server/router.ts";
+import type { createOcppRouter } from "../../../../plugins/chargers/ocpp/server/router.ts";
+import type { createSimulatedChargerRouter } from "../../../../plugins/chargers/simulated/server/router.ts";
 
 // The fully-merged router type (core + every plugin), built purely from types —
 // mirrors how each plugin's routerType.ts merges, but type-only so nothing
@@ -24,13 +27,18 @@ type FullAppRouter = ReturnType<
     {
       tesla: ReturnType<typeof createTeslaRouter>;
       simulated: ReturnType<typeof createSimulatedRouter>;
+      simulated_dataonly: ReturnType<typeof createSimulatedRouter>;
     },
     {
       fronius_local: ReturnType<typeof createFroniusLocalRouter>;
       fronius_cloud: ReturnType<typeof createFroniusCloudRouter>;
       simulated_energy: ReturnType<typeof createSimulatedEnergyRouter>;
     },
-    Record<never, never>
+    {
+      tapo: ReturnType<typeof createTapoRouter>;
+      ocpp: ReturnType<typeof createOcppRouter>;
+      simulated_charger: ReturnType<typeof createSimulatedChargerRouter>;
+    }
   >
 >;
 

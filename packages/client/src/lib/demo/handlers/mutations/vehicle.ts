@@ -1,6 +1,7 @@
 import type { MutationHandlers } from "../types.ts";
 import type { DemoState, DemoVehicle } from "../../demoState.ts";
 import { getDemoState, updateDemoState } from "../../demoState.ts";
+import { emitDemoEvent } from "../../demoTick.ts";
 import { buildVehicleState } from "../vehicleState.ts";
 
 type VehicleMutations = Pick<
@@ -11,15 +12,14 @@ type VehicleMutations = Pick<
   | "vehicle.command"
   | "vehicle.refreshState"
   | "plugin.vehicle.simulated.updateState"
+  | "plugin.vehicle.simulated_dataonly.updateState"
 >;
 
-/** The live state of a vehicle after a mutation, or null if it's gone. */
 const stateOf = (s: DemoState, vehicleId: string) => {
   const v = s.vehicles.find((x) => x.id === vehicleId);
   return v ? buildVehicleState(v, new Date().toISOString()) : null;
 };
 
-/** Replace one vehicle by id via a pure mapper, persisting the change. */
 const patchVehicle = (
   vehicleId: string,
   fn: (v: DemoVehicle) => DemoVehicle,
@@ -64,6 +64,8 @@ export const vehicleMutations: VehicleMutations = {
         chargeAmps: 16,
       }],
     }));
+    emitDemoEvent({ type: "vehicles_changed", data: {} });
+    emitDemoEvent({ type: "chargers_changed", data: {} });
     return {
       success: true,
       vehicle: {
@@ -83,6 +85,8 @@ export const vehicleMutations: VehicleMutations = {
       vehicles: m.vehicles.filter((v) => v.id !== input.vehicleId),
       schedules: m.schedules.filter((s) => s.vehicleId !== input.vehicleId),
     }));
+    emitDemoEvent({ type: "vehicles_changed", data: {} });
+    emitDemoEvent({ type: "chargers_changed", data: {} });
     return { success: true };
   },
 
@@ -99,6 +103,9 @@ export const vehicleMutations: VehicleMutations = {
   "vehicle.refreshState": (input) => ({
     state: stateOf(getDemoState(), input.vehicleId),
   }),
+
+  "plugin.vehicle.simulated_dataonly.updateState": (input) =>
+    vehicleMutations["plugin.vehicle.simulated.updateState"](input),
 
   "plugin.vehicle.simulated.updateState": (input) => {
     const next = patchVehicle(input.vehicleId, (v) => ({

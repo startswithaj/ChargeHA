@@ -3,6 +3,7 @@ import type { DemoVehicle } from "../demoState.ts";
 import { buildVehicleState, SYDNEY } from "./vehicleState.ts";
 import { demoVehiclePluginSummaries } from "@chargeha/plugins/demoPluginSummaries";
 import { geocodeAddress } from "@chargeha/shared/geocode";
+import { dataOnlyVehicleAdapterId } from "@chargeha/plugins/demoPluginSummaries";
 
 const CREATED_AT = "2026-01-01T00:00:00.000Z";
 
@@ -57,4 +58,16 @@ export const vehicleHandlers: Record<string, QueryHandler> = {
 
   "plugin.vehicle.simulated.geocode": (input) =>
     geocodeAddress((input as { q: string }).q),
+
+  "plugin.vehicle.simulated_dataonly.geocode": (input) =>
+    geocodeAddress((input as { q: string }).q),
+
+  "plugin.vehicle.simulated_dataonly.listVehicles": (_i, s) => {
+    const now = new Date().toISOString();
+    return {
+      vehicles: s.vehicles
+        .filter((v) => v.adapterType === dataOnlyVehicleAdapterId)
+        .map((v) => toListItem(v, now)),
+    };
+  },
 };

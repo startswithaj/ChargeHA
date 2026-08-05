@@ -4,7 +4,12 @@ import type { AnyRouter } from "@trpc/server";
 import type { SSEEvent } from "@chargeha/shared";
 import { resolveDemoMutation, resolveDemoQuery } from "./resolveDemoOp.ts";
 import { getDemoState } from "./demoState.ts";
-import { currentSnapshot, onDemoTick, runLiveController } from "./demoTick.ts";
+import {
+  currentSnapshot,
+  onDemoEvent,
+  onDemoTick,
+  runLiveController,
+} from "./demoTick.ts";
 import { demoNow } from "./demoClock.ts";
 import { buildVehicleState } from "./handlers/vehicleState.ts";
 
@@ -41,7 +46,14 @@ export const demoLink =
           );
         observer.next({ result: { type: "started" } });
         emit();
-        return onDemoTick(emit);
+        const offTick = onDemoTick(emit);
+        const offEvent = onDemoEvent((data) =>
+          observer.next({ result: { type: "data", data } })
+        );
+        return () => {
+          offTick();
+          offEvent();
+        };
       }
       try {
         const data = op.type === "mutation"

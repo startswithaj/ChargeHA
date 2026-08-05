@@ -39,19 +39,43 @@ export const simulatedConfigDef = defineSection({});
  * testing and demo use. Pushes aggregated simulated charging load into
  * EnergyAdapterManager via `deps.setSimulatedLoad`.
  */
+interface SimulatedPluginIdentity {
+  id: string;
+  displayName: string;
+  settingsComponentKey: string;
+}
+
+const DUAL_ROLE_IDENTITY: SimulatedPluginIdentity = {
+  id: "simulated",
+  displayName: "Simulated",
+  settingsComponentKey: "simulated-settings",
+};
+
+export const DATA_ONLY_IDENTITY: SimulatedPluginIdentity = {
+  id: "simulated_dataonly",
+  displayName: "Simulated (data only)",
+  settingsComponentKey: "simulated-dataonly-settings",
+};
+
 export class SimulatedVehiclePlugin implements VehiclePlugin, ChargerPlugin {
-  readonly id = "simulated";
-  readonly displayName = "Simulated";
+  readonly id: string;
+  readonly displayName: string;
   readonly vendor = "ChargeHA";
   readonly configDef = simulatedConfigDef;
   readonly secretKeys: readonly string[] = [];
-  readonly settingsComponentKey = "simulated-settings";
+  readonly settingsComponentKey: string;
 
   private readonly adapters = new Map<string, SimulatedVehicleAdapter>();
   private readonly middlewares = new Map<string, SimulatedVehicleMiddleware>();
   private readonly startupPromise: Promise<void>;
 
-  constructor(private readonly deps: PluginDependencies) {
+  constructor(
+    private readonly deps: PluginDependencies,
+    identity: SimulatedPluginIdentity = DUAL_ROLE_IDENTITY,
+  ) {
+    this.id = identity.id;
+    this.displayName = identity.displayName;
+    this.settingsComponentKey = identity.settingsComponentKey;
     this.startupPromise = this.startup();
   }
 
@@ -82,8 +106,6 @@ export class SimulatedVehiclePlugin implements VehiclePlugin, ChargerPlugin {
     return middleware;
   }
 
-  // The charger role. The migration guarantees vehicleId is set on
-  // simulated charger rows.
   async createChargerMiddleware(row: ChargerRow): Promise<ChargerMiddleware> {
     if (row.vehicleId === null) {
       throw new Error(`Simulated charger row ${row.id} has no vehicleId`);

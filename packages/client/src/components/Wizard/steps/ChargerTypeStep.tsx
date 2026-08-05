@@ -2,6 +2,7 @@ import { Text } from "@radix-ui/themes";
 import { Monitor, Plug, Server } from "lucide-react";
 import { useWizardState } from "../../../hooks/useWizardState.ts";
 import { chargerPluginOptions } from "@chargeha/plugins/componentRegistry";
+import { demoMode } from "../../../lib/featureFlags.ts";
 import type { StepDef, WizardNext } from "../flow.ts";
 import { OptionCard } from "./OptionCard.tsx";
 import styles from "./steps.module.css";
@@ -42,6 +43,8 @@ export const chargerTypeStep: StepDef = {
           <div className={styles.optionCards}>
             {chargerPluginOptions.map((option) => {
               const Icon = icons[option.iconKey];
+              // In demo, real hardware plugins can't be served.
+              const blocked = demoMode.blockedPlugins(chargerPluginOptions);
               return (
                 <OptionCard
                   key={option.id}
@@ -49,6 +52,7 @@ export const chargerTypeStep: StepDef = {
                   title={option.label}
                   description={option.description}
                   selected={option.id === selectedType}
+                  disabled={blocked.has(option.id)}
                   onSelect={() => onAdvance({ chargerType: option.id })}
                 />
               );

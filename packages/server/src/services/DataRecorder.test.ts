@@ -9,6 +9,7 @@ import type {
 } from "@chargeha/shared";
 import { AppDatabase } from "../db/AppDatabase.ts";
 import type { VehicleManager } from "./VehicleManager.ts";
+import type { ChargingPointManager } from "./ChargingPointManager.ts";
 import { DataRecorder } from "./DataRecorder.ts";
 import { TariffService } from "./TariffService.ts";
 import { TypedEventEmitter } from "./TypedEventEmitter.ts";
@@ -72,6 +73,28 @@ describe("DataRecorder", () => {
     dailyGridExportWh: 0,
   };
 
+  /** Charging points mirroring the mock vehicles 1:1 (Tesla parity):
+   *  linked point per vehicle, charger state carrying the same
+   *  measured values. */
+  function mockChargingPoints(
+    vehicles: MockRecorderVehicleManager,
+  ): ChargingPointManager {
+    return {
+      getChargersWithState: () =>
+        Promise.resolve(
+          [...vehicles.getAllStates()].map(([id, state]) => ({
+            id: `cp-${id}`,
+            resolvedVehicleId: id,
+            state: {
+              isCharging: state.isCharging,
+              chargePowerKw: state.chargePowerKw,
+              chargeAmps: state.chargeAmps,
+            },
+          })),
+        ),
+    } as unknown as ChargingPointManager;
+  }
+
   /** Emit an energy_update event to feed data into the recorder. */
   function feedEnergy(
     emitter: TypedEventEmitter,
@@ -95,6 +118,7 @@ describe("DataRecorder", () => {
     recorder = new DataRecorder(
       db,
       vehicleManager as unknown as VehicleManager,
+      mockChargingPoints(vehicleManager),
       tariffService,
       emitter,
       testLogger,
@@ -461,7 +485,7 @@ describe("DataRecorder", () => {
       await testable(recorder).record();
     });
 
-    it("logs error when recordVehicleCharges throws", async () => {
+    it("logs error when recordChargeReadings throws", async () => {
       feedEnergy(emitter, ENERGY_DATA);
       vehicleManager.setVehicleState("VIN1", CHARGE_STATE);
 
@@ -474,22 +498,22 @@ describe("DataRecorder", () => {
     });
   });
 
-  describe("recordVehicleCharges", () => {
+  describe("recordChargeReadings", () => {
     it("returns early when latestRealtime is null", async () => {
       // Don't call updateData — latestRealtime stays null
       vehicleManager.setVehicleState("VIN1", CHARGE_STATE);
 
-      // Call recordVehicleCharges directly — should return early
-      await testable(recorder).recordVehicleCharges(25);
+      // Call recordChargeReadings directly — should return early
+      await testable(recorder).recordChargeReadings(25);
     });
 
     it("returns early when no vehicles have state", async () => {
       feedEnergy(emitter, ENERGY_DATA);
       // No vehicle states set — allStates.size === 0
-      await testable(recorder).recordVehicleCharges(25);
+      await testable(recorder).recordChargeReadings(25);
     });
 
-    it("skips vehicles that are charging=true but chargePowerKw=0", async () => {
+    it("records a zero-power reading when charging with no measured draw", async () => {
       feedEnergy(emitter, ENERGY_DATA);
       vehicleManager.setVehicleState("VIN1", {
         ...CHARGE_STATE,
@@ -503,9 +527,10 @@ describe("DataRecorder", () => {
         return Promise.resolve();
       };
 
-      await testable(recorder).recordVehicleCharges(25);
-      // chargePowerKw === 0 → isNowCharging = false → no insert
-      expect(insertCalled).toBe(false);
+      await testable(recorder).recordChargeReadings(25);
+      // isCharging with no measured draw still records — zero power is an
+      // honest gap, never a skipped session.
+      expect(insertCalled).toBe(true);
     });
 
     it("skips vehicles that are not charging", async () => {
@@ -522,7 +547,7 @@ describe("DataRecorder", () => {
         return Promise.resolve();
       };
 
-      await testable(recorder).recordVehicleCharges(25);
+      await testable(recorder).recordChargeReadings(25);
       // isCharging === false → isNowCharging = false → no insert
       expect(insertCalled).toBe(false);
     });
@@ -541,7 +566,7 @@ describe("DataRecorder", () => {
         return originalInsert(reading);
       };
 
-      await testable(recorder).recordVehicleCharges(25);
+      await testable(recorder).recordChargeReadings(25);
       expect(capturedReading).not.toBeNull();
       expect(capturedReading.isHome).toBe(true);
       expect(capturedReading.solarContributionW).toBeGreaterThan(0);
@@ -564,7 +589,7 @@ describe("DataRecorder", () => {
         return originalInsert(reading);
       };
 
-      await testable(recorder).recordVehicleCharges(25);
+      await testable(recorder).recordChargeReadings(25);
       expect(capturedReading.isHome).toBe(true);
       expect(capturedReading.solarContributionW).toBeGreaterThan(0);
     });
@@ -588,7 +613,7 @@ describe("DataRecorder", () => {
         return originalInsert(reading);
       };
 
-      await testable(recorder).recordVehicleCharges(25);
+      await testable(recorder).recordChargeReadings(25);
       expect(capturedReading.isHome).toBe(true);
       expect(capturedReading.solarContributionW).toBe(3700);
       expect(capturedReading.gridContributionW).toBe(0);
@@ -611,7 +636,7 @@ describe("DataRecorder", () => {
         return originalInsert(reading);
       };
 
-      await testable(recorder).recordVehicleCharges(25);
+      await testable(recorder).recordChargeReadings(25);
       expect(capturedReading.isHome).toBe(false);
       expect(capturedReading.solarContributionW).toBe(0);
       expect(capturedReading.gridContributionW).toBe(0);
@@ -643,7 +668,7 @@ describe("DataRecorder", () => {
         return originalInsert(reading);
       };
 
-      await testable(recorder).recordVehicleCharges(null);
+      await testable(recorder).recordChargeReadings(null);
       expect(capturedReadings).toHaveLength(2);
       expect(capturedReadings[0].solarContributionW).toBeCloseTo(3245.6, 0);
       expect(capturedReadings[0].gridContributionW).toBeCloseTo(454.4, 0);
@@ -682,7 +707,7 @@ describe("DataRecorder", () => {
         return originalInsert(reading);
       };
 
-      await testable(recorder).recordVehicleCharges(25);
+      await testable(recorder).recordChargeReadings(25);
       expect(capturedReading.solarContributionW).toBe(500);
       expect(capturedReading.gridContributionW).toBe(3200);
     });
@@ -710,7 +735,7 @@ describe("DataRecorder", () => {
         return originalInsert(reading);
       };
 
-      await testable(recorder).recordVehicleCharges(25);
+      await testable(recorder).recordChargeReadings(25);
       expect(capturedReading.solarContributionW).toBe(0);
       expect(capturedReading.gridContributionW).toBe(3700);
     });
@@ -742,7 +767,7 @@ describe("DataRecorder", () => {
         return originalInsert(reading);
       };
 
-      await testable(recorder).recordVehicleCharges(25);
+      await testable(recorder).recordChargeReadings(25);
       // Solar attribution must never exceed actual solar production
       expect(capturedReading.solarContributionW).toBeLessThanOrEqual(114);
       // The remainder is grid
@@ -773,7 +798,7 @@ describe("DataRecorder", () => {
         return originalInsert(reading);
       };
 
-      await testable(recorder).recordVehicleCharges(25);
+      await testable(recorder).recordChargeReadings(25);
       expect(capturedReading.solarContributionW).toBe(0);
       expect(capturedReading.gridContributionW).toBe(3700);
     });

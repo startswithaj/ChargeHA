@@ -3,7 +3,13 @@ import { Badge, Button, Text } from "@radix-ui/themes";
 import { FlaskConical, Pencil } from "lucide-react";
 import type { VehicleWithState } from "@chargeha/shared";
 import { trpc } from "./trpc.ts";
+import { trpcDataOnly } from "./trpcDataOnly.ts";
 import { SimulatedVehicleDialog } from "./SimulatedVehicleDialog.tsx";
+
+export interface SimulateUpdate {
+  vehicleId: string;
+  [key: string]: unknown;
+}
 
 /** Wrapper that renders one SimulatedVehicleDialog per simulated vehicle. */
 export function SimulatedVehicleSettings(): JSX.Element | null {
@@ -17,10 +23,40 @@ export function SimulatedVehicleSettings(): JSX.Element | null {
     .useMutation({
       onSuccess: () => vehiclesQuery.refetch(),
     });
+  return (
+    <SimulatedVehicleList
+      title="Simulated Vehicle Settings"
+      vehicles={vehiclesQuery.data ?? []}
+      onSimulate={(update) => simulateMutation.mutateAsync(update)}
+    />
+  );
+}
 
+export function SimulatedDataOnlySettings(): JSX.Element | null {
+  const vehiclesQuery = trpcDataOnly.plugin.vehicle.simulated_dataonly
+    .listVehicles.useQuery(undefined, {
+      select: (data: { vehicles: VehicleWithState[] }) => data.vehicles,
+    });
+  const simulateMutation = trpcDataOnly.plugin.vehicle.simulated_dataonly
+    .updateState.useMutation({
+      onSuccess: () => vehiclesQuery.refetch(),
+    });
+  return (
+    <SimulatedVehicleList
+      title="Simulated Vehicle (data only) Settings"
+      vehicles={vehiclesQuery.data ?? []}
+      onSimulate={(update) => simulateMutation.mutateAsync(update)}
+    />
+  );
+}
+
+function SimulatedVehicleList({ title, vehicles, onSimulate }: {
+  title: string;
+  vehicles: VehicleWithState[];
+  onSimulate: (update: SimulateUpdate) => Promise<unknown>;
+}): JSX.Element | null {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  const vehicles = vehiclesQuery.data ?? [];
   if (vehicles.length === 0) return null;
 
   const toggleExpanded = (id: string) =>
@@ -48,7 +84,7 @@ export function SimulatedVehicleSettings(): JSX.Element | null {
         }}
       >
         <FlaskConical size={14} />
-        <Text size="2" weight="medium">Simulated Vehicle Settings</Text>
+        <Text size="2" weight="medium">{title}</Text>
       </div>
       {vehicles.map((v) => {
         const isExpanded = expanded.has(v.id);
@@ -89,10 +125,7 @@ export function SimulatedVehicleSettings(): JSX.Element | null {
                   lastLocation={v.lastLocation ?? null}
                   onSave={async (data) => {
                     try {
-                      await simulateMutation.mutateAsync({
-                        vehicleId: v.id,
-                        ...data,
-                      });
+                      await onSimulate({ vehicleId: v.id, ...data });
                       return null;
                     } catch (e) {
                       return e instanceof Error ? e.message : "Save failed";

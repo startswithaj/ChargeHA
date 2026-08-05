@@ -30,6 +30,11 @@ export const GATED_QUERIES: readonly string[] = [
   "plugin.energy.fronius_cloud.getConfig",
   // Setup tunnel — Tesla-only setup step, never reached.
   "plugin.vehicle.tesla.tunnelStatus",
+  // Real charger hardware — disabled in the demo charger dropdown.
+  "plugin.charger.tapo.getConfig",
+  "plugin.charger.tapo.status",
+  "plugin.charger.ocpp.getConfig",
+  "plugin.charger.ocpp.status",
 ] as const satisfies readonly QueryPath[];
 
 /** Queries known to exist but not yet implemented. Empty — all are handled. */
@@ -61,6 +66,14 @@ export const GATED_MUTATIONS = [
   // Setup tunnel — Tesla-only setup step, never reached.
   "plugin.vehicle.tesla.startTunnel",
   "plugin.vehicle.tesla.stopTunnel",
+  // Real charger hardware — disabled in the demo charger dropdown.
+  "plugin.charger.tapo.setConfig",
+  "plugin.charger.tapo.discover",
+  "plugin.charger.tapo.testConnection",
+  "plugin.charger.tapo.setPower",
+  "plugin.charger.ocpp.setConfig",
+  "plugin.charger.ocpp.setAuthorizationKey",
+  "plugin.charger.ocpp.testConnection",
 ] as const satisfies readonly MutationPath[];
 
 /** The gated mutation paths as a literal union. */

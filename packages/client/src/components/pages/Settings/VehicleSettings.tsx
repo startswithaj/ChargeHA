@@ -1,6 +1,5 @@
 import { Car, FlaskConical, Plus, Trash2 } from "lucide-react";
-import { ArrowDownIcon, ArrowUpIcon } from "@radix-ui/react-icons";
-import { Badge, Button, Card, Switch, Text } from "@radix-ui/themes";
+import { Badge, Button, Card, Text } from "@radix-ui/themes";
 import { ErrorBoundary } from "../../ui/ErrorBoundary.tsx";
 import {
   pluginSettingsComponents,
@@ -8,11 +7,7 @@ import {
   vehiclePluginSteps,
 } from "@chargeha/plugins/componentRegistry";
 import { demoMode } from "../../../lib/featureFlags.ts";
-import {
-  useChargingConfig,
-  useChargingConfigMutation,
-} from "../../../hooks/useSectionConfig.ts";
-import { SettingsRow, SettingsSection } from "./SettingsLayout.tsx";
+import { SettingsSection } from "./SettingsLayout.tsx";
 import { useVehicleSettings } from "./useVehicleSettings.ts";
 
 type Vehicle = ReturnType<typeof useVehicleSettings>["vehicles"][number];
@@ -21,19 +16,9 @@ type VehiclePlugin = ReturnType<
 >["vehiclePlugins"][number];
 
 function VehicleRow(
-  {
-    v,
-    idx,
-    vehiclesLength,
-    recentlyAddedVins,
-    handleMovePriority,
-    handleDelete,
-  }: {
+  { v, recentlyAddedVins, handleDelete }: {
     v: Vehicle;
-    idx: number;
-    vehiclesLength: number;
     recentlyAddedVins: Set<string>;
-    handleMovePriority: (vin: string, direction: "up" | "down") => void;
     handleDelete: (vin: string) => void;
   },
 ) {
@@ -60,31 +45,16 @@ function VehicleRow(
             {v.id}
           </Text>
         </div>
-        <Badge variant="outline" size="1">{v.adapterType}</Badge>
+        <Badge variant="outline" size="1">
+          {vehiclePluginOptions.find((o) => o.id === v.adapterType)?.label ??
+            v.adapterType}
+        </Badge>
       </div>
+      {
+        /* Charging priority lives on the charging point (Chargers
+          section) — vehicles are data-only. */
+      }
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        {vehiclesLength > 1 && (
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <Text size="1" color="gray">Priority {v.priority}</Text>
-            <Button
-              variant="soft"
-              size="1"
-              disabled={idx === 0}
-              onClick={() =>
-                handleMovePriority(v.id, "up")}
-            >
-              <ArrowUpIcon />
-            </Button>
-            <Button
-              variant="soft"
-              size="1"
-              disabled={idx === vehiclesLength - 1}
-              onClick={() => handleMovePriority(v.id, "down")}
-            >
-              <ArrowDownIcon />
-            </Button>
-          </div>
-        )}
         <Button
           variant="ghost"
           color="red"
@@ -140,7 +110,10 @@ function UnconfiguredPluginCard(
 }
 
 function SimulatedVehicleSection(
-  { handleAddSimulatedVehicle }: { handleAddSimulatedVehicle: () => void },
+  { handleAddSimulatedVehicle, handleAddDataOnlyVehicle }: {
+    handleAddSimulatedVehicle: () => void;
+    handleAddDataOnlyVehicle: () => void;
+  },
 ) {
   return (
     <div
@@ -165,10 +138,16 @@ function SimulatedVehicleSection(
         Add a virtual EV for testing charge control, schedules, and solar
         tracking without a real vehicle.
       </Text>
-      <Button size="1" variant="soft" onClick={handleAddSimulatedVehicle}>
-        <FlaskConical size={14} />
-        Add Simulated Vehicle
-      </Button>
+      <div style={{ display: "flex", gap: 8 }}>
+        <Button size="1" variant="soft" onClick={handleAddSimulatedVehicle}>
+          <FlaskConical size={14} />
+          Add Simulated Vehicle
+        </Button>
+        <Button size="1" variant="soft" onClick={handleAddDataOnlyVehicle}>
+          <FlaskConical size={14} />
+          Add Data-Only Vehicle
+        </Button>
+      </div>
     </div>
   );
 }
@@ -197,45 +176,13 @@ function ConfiguredPluginSettings(
   );
 }
 
-function PriorityChargingHeader(
-  { priorityChargingEnabled, setPriorityCharging }: {
-    priorityChargingEnabled: boolean;
-    setPriorityCharging: (enabled: boolean) => void;
-  },
-) {
-  return (
-    <>
-      <SettingsRow
-        label="Priority Charging"
-        help="When enabled, the highest-priority vehicle receives all excess solar first. Remaining solar flows to lower-priority vehicles. When disabled, available solar is split equally across all eligible vehicles."
-      >
-        <Switch
-          size="2"
-          checked={priorityChargingEnabled}
-          onCheckedChange={setPriorityCharging}
-        />
-      </SettingsRow>
-      <Text
-        size="1"
-        color="gray"
-        style={{ display: "block", marginBottom: 4 }}
-      >
-        Priority determines which vehicle receives excess solar energy first.
-        Lower priority number = charged first.
-      </Text>
-    </>
-  );
-}
-
 function VehicleListBlock(
-  { vehicles, loadFailed, recentlyAddedVins, handleMovePriority, handleDelete }:
-    {
-      vehicles: Vehicle[];
-      loadFailed: boolean;
-      recentlyAddedVins: Set<string>;
-      handleMovePriority: (vin: string, direction: "up" | "down") => void;
-      handleDelete: (vin: string) => void;
-    },
+  { vehicles, loadFailed, recentlyAddedVins, handleDelete }: {
+    vehicles: Vehicle[];
+    loadFailed: boolean;
+    recentlyAddedVins: Set<string>;
+    handleDelete: (vin: string) => void;
+  },
 ) {
   return (
     <>
@@ -248,14 +195,11 @@ function VehicleListBlock(
           again.
         </Text>
       )}
-      {[...vehicles].sort((a, b) => a.priority - b.priority).map((v, idx) => (
+      {vehicles.map((v) => (
         <VehicleRow
           key={v.id}
           v={v}
-          idx={idx}
-          vehiclesLength={vehicles.length}
           recentlyAddedVins={recentlyAddedVins}
-          handleMovePriority={handleMovePriority}
           handleDelete={handleDelete}
         />
       ))}
@@ -271,19 +215,11 @@ export function VehicleSettings() {
     error,
     recentlyAddedVins,
     handleDelete,
-    handleMovePriority,
     handleAddSimulatedVehicle,
+    handleAddDataOnlyVehicle,
     vehiclePlugins,
     handleStartOnboarding,
   } = useVehicleSettings();
-
-  const { data: chargingConfig } = useChargingConfig();
-  const chargingMutation = useChargingConfigMutation();
-  const priorityChargingEnabled = chargingConfig?.priorityChargingEnabled ??
-    false;
-  const setPriorityCharging = (enabled: boolean) => {
-    chargingMutation.mutate({ priorityChargingEnabled: enabled });
-  };
 
   if (loading) {
     return (
@@ -328,18 +264,10 @@ export function VehicleSettings() {
         title="Vehicles"
         description="Manage your electric vehicles and charging integrations."
       >
-        {vehicles.length > 1 && (
-          <PriorityChargingHeader
-            priorityChargingEnabled={priorityChargingEnabled}
-            setPriorityCharging={setPriorityCharging}
-          />
-        )}
-
         <VehicleListBlock
           vehicles={vehicles}
           loadFailed={loadFailed}
           recentlyAddedVins={recentlyAddedVins}
-          handleMovePriority={handleMovePriority}
           handleDelete={handleDelete}
         />
 
@@ -353,6 +281,7 @@ export function VehicleSettings() {
 
         <SimulatedVehicleSection
           handleAddSimulatedVehicle={handleAddSimulatedVehicle}
+          handleAddDataOnlyVehicle={handleAddDataOnlyVehicle}
         />
 
         <ConfiguredPluginSettings vehiclePlugins={vehiclePlugins} />

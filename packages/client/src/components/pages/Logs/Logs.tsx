@@ -7,6 +7,7 @@ import { useVehicleUpdates } from "../../../hooks/useVehicleUpdates.ts";
 import { usePluginLogs } from "../../../hooks/usePluginLogs.ts";
 import { trpc } from "../../../trpc.ts";
 import { LogFilterBar } from "./LogFilterBar.tsx";
+import { useChargers } from "../../../hooks/useChargers.ts";
 import { LogTable } from "./LogTable.tsx";
 import { SimpleFilterBar } from "./SimpleFilterBar.tsx";
 import { EnergyReadsTable } from "./EnergyReadsTable.tsx";
@@ -410,6 +411,7 @@ export function Logs() {
     () => (vehiclesData?.vehicles ?? []) as VehicleWithState[],
     [vehiclesData],
   );
+  const { chargers: points } = useChargers();
 
   const cc = useChargeControlTab(initialFilters);
   const er = useEnergyReadsTab();
@@ -449,7 +451,7 @@ export function Logs() {
         </Tabs.List>
 
         <Tabs.Content value="charge-control">
-          <ChargeControlTab cc={cc} vehicles={vehicles} />
+          <ChargeControlTab cc={cc} points={points} />
         </Tabs.Content>
         <Tabs.Content value="energy-reads">
           <EnergyReadsTabContent er={er} />
@@ -466,9 +468,9 @@ export function Logs() {
 }
 
 function ChargeControlTab(
-  { cc, vehicles }: {
+  { cc, points }: {
     cc: ReturnType<typeof useChargeControlTab>;
-    vehicles: VehicleWithState[];
+    points: Array<{ id: string; name: string }>;
   },
 ) {
   return (
@@ -476,7 +478,7 @@ function ChargeControlTab(
       <LogFilterBar
         vehicleFilter={cc.vehicleFilter}
         onVehicleFilterChange={cc.setVehicleFilter}
-        vehicles={vehicles}
+        vehicles={points}
         timeRange={cc.timeRange}
         onTimeRangeChange={cc.setTimeRange}
         customFrom={cc.customFrom}

@@ -1,6 +1,44 @@
-import { Badge, Code, Text } from "@radix-ui/themes";
-import { SettingsRow } from "../../../hostUi.ts";
+import { Badge, Button, Code, Text } from "@radix-ui/themes";
+import {
+  type PluginConfigField,
+  PluginConfigForm,
+  SettingsRow,
+} from "../../../hostUi.ts";
 import { trpc } from "./trpc.ts";
+
+const FIELDS: PluginConfigField[] = [
+  {
+    key: "ocppChargerId",
+    label: "Charger ID",
+    help: "Path component of the charger URL. Letters, numbers, dots, " +
+      "dashes and underscores only.",
+    width: 180,
+  },
+  {
+    key: "ocppMaxAmps",
+    label: "Max amps",
+    help: "The charger's maximum charging current.",
+    width: 80,
+  },
+  {
+    key: "ocppMinAmps",
+    label: "Min amps",
+    help: "The charger's minimum charging current (J1772 floor is 6A).",
+    width: 80,
+  },
+  {
+    key: "ocppPhases",
+    label: "Phases (1 or 3)",
+    help: "Used to derive amps from reported watts.",
+    width: 80,
+  },
+  {
+    key: "ocppMeterTimeoutSeconds",
+    label: "Meter timeout (seconds)",
+    help: "Reported state goes stale when no MeterValues arrive within this.",
+    width: 80,
+  },
+];
 
 function connectionBadge(
   data: {
@@ -21,6 +59,10 @@ function connectionBadge(
 
 export function OcppSettings(): JSX.Element | null {
   const { data: config } = trpc.plugin.charger.ocpp.getConfig.useQuery();
+  const utils = trpc.useUtils();
+  const configMutation = trpc.plugin.charger.ocpp.setConfig.useMutation({
+    onSuccess: () => utils.plugin.charger.ocpp.getConfig.invalidate(),
+  });
   const status = trpc.plugin.charger.ocpp.status.useQuery(undefined, {
     refetchInterval: 5000,
   });
@@ -33,6 +75,11 @@ export function OcppSettings(): JSX.Element | null {
 
   return (
     <>
+      <PluginConfigForm
+        data={config}
+        fields={FIELDS}
+        onSave={(draft, opts) => configMutation.mutate(draft, opts)}
+      />
       <SettingsRow
         label="Charger URL"
         help="Enter this in your charger's OCPP settings. The charger connects to ChargeHA over your LAN."
@@ -47,6 +94,32 @@ export function OcppSettings(): JSX.Element | null {
           <Text size="2">{status.data.status}</Text>
         </SettingsRow>
       )}
+      <OcppTestButton />
     </>
+  );
+}
+
+function OcppTestButton(): JSX.Element {
+  const test = trpc.plugin.charger.ocpp.testConnection.useMutation();
+  const result = test.data;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <Button
+        size="2"
+        variant="soft"
+        disabled={test.isPending}
+        onClick={() => test.mutate()}
+      >
+        {test.isPending ? "Testing..." : "Test Connection"}
+      </Button>
+      {result?.success === true && (
+        <Badge color="green" size="1">
+          Responding ({result.latencyMs} ms)
+        </Badge>
+      )}
+      {result?.success === false && (
+        <Text size="2" color="red">{result.error}</Text>
+      )}
+    </div>
   );
 }

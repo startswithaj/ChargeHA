@@ -19,6 +19,7 @@
     "dev": "deno task dev:server & deno task dev:client & wait",
     "dev:server": "deno run --watch --unsafely-ignore-certificate-errors=localhost --allow-net --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-sys=networkInterfaces --unstable-ffi packages/server/src/main.ts",
     "dev:client": "deno task --filter client dev",
+    "dev:demo": "deno task --filter client dev:demo",
     "build": "deno task --filter client build",
     "build:demo": "deno task --filter client build:demo",
     "start": "deno run --allow-net --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-sys=networkInterfaces --unstable-ffi --unsafely-ignore-certificate-errors=localhost packages/server/src/main.ts",

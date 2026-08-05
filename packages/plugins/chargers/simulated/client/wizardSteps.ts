@@ -6,7 +6,6 @@ export const simulatedChargerWizardSteps: PluginStepDef[] = [
   simulatedChargerSetupStep,
 ];
 
-/** Simulated charger option metadata for the charger type selection step. */
 export const simulatedChargerOption: ChargerPluginOption = {
   id: "simulated_charger",
   label: "Simulated Charger",
@@ -15,4 +14,6 @@ export const simulatedChargerOption: ChargerPluginOption = {
     "amps modulation, mode/priority and blockout the same way a real smart " +
     "charger would.",
   iconKey: "monitor",
+  directAdd: true,
+  demoAvailable: true,
 };

@@ -42,6 +42,28 @@ interface VehicleCardProps {
   pollingSuspendReason?: string | null;
   controllerReason?: string | null;
   controllerDetail?: string | null;
+  chargerStatus?: { status: string; statusDetail: string | null } | null;
+  /** Data-only vehicle: charging is owned by a smart charger, so no
+   *  mode/start/stop/amps controls render. */
+  readOnly?: boolean;
+}
+
+function ChargerStatusLine(
+  { chargerStatus }: {
+    chargerStatus: { status: string; statusDetail: string | null } | null;
+  },
+) {
+  if (!chargerStatus) return null;
+  if (chargerStatus.status === "no_draw") {
+    return (
+      <Text size="2" color="gray">
+        No draw — vehicle may be absent, finished, or paused
+        {chargerStatus.statusDetail ? ` (${chargerStatus.statusDetail})` : ""}
+      </Text>
+    );
+  }
+  if (!chargerStatus.statusDetail) return null;
+  return <Text size="1" color="gray">{chargerStatus.statusDetail}</Text>;
 }
 
 const MODE_LABELS: Record<VehicleMode, string> = {
@@ -300,6 +322,8 @@ export function VehicleCard({
   pollingSuspendReason,
   controllerReason,
   controllerDetail,
+  chargerStatus,
+  readOnly = false,
 }: VehicleCardProps) {
   if (loading) {
     return (
@@ -337,20 +361,22 @@ export function VehicleCard({
         onRefresh={onRefresh}
       />
       <VehicleCardBanners
-        commandsDisabled={commandsDisabled}
+        commandsDisabled={!readOnly && commandsDisabled}
         commandsDisabledReason={commandsDisabledReason}
         onNavigateSettings={onNavigateSettings}
         vehicleError={vehicleError}
         pollingSuspended={pollingSuspended}
         pollingSuspendReason={pollingSuspendReason}
       />
-      <VehicleModeToggle
-        mode={mode}
-        disabled={disabled}
-        isPluggedIn={state.isPluggedIn}
-        pending={pending}
-        onChangeMode={onChangeMode}
-      />
+      {!readOnly && (
+        <VehicleModeToggle
+          mode={mode}
+          disabled={disabled}
+          isPluggedIn={state.isPluggedIn}
+          pending={pending}
+          onChangeMode={onChangeMode}
+        />
+      )}
       <VehicleBatterySection
         batteryPercent={batteryPercent}
         chargeLimitPercent={chargeLimitPercent}
@@ -363,11 +389,13 @@ export function VehicleCard({
         <Text size="2">{getStatusText(state, mode, atHome)}</Text>
       </div>
 
+      <ChargerStatusLine chargerStatus={chargerStatus ?? null} />
+
       {/* Spacer when unplugged so the card has room for the map below. */}
       {!state.isPluggedIn && <div style={{ height: 20 }} />}
 
       {/* Charge details and controls (when plugged in) */}
-      {state.isPluggedIn && (
+      {state.isPluggedIn && !readOnly && (
         <VehicleCardDetails
           allocationStatus={allocationStatus ?? null}
           controllerReason={controllerReason ?? null}

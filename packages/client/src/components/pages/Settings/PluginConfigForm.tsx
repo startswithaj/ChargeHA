@@ -8,6 +8,8 @@ export interface PluginConfigField {
   key: string;
   label: string;
   help?: string;
+  secret?: boolean;
+  width?: number;
 }
 
 type SaveOpts = { onSuccess: () => void; onError: (err: unknown) => void };
@@ -58,10 +60,11 @@ export function PluginConfigForm({
         <SettingsRow key={field.key} label={field.label} help={field.help}>
           <TextField.Root
             size="2"
+            type={field.secret ? "password" : undefined}
             value={draft[field.key] ?? String(data[field.key] ?? "")}
             onChange={(e: { target: { value: string } }) =>
               setDraft((d) => ({ ...d, [field.key]: e.target.value }))}
-            style={{ width: 100 }}
+            style={{ width: field.width ?? 100 }}
           />
         </SettingsRow>
       ))}

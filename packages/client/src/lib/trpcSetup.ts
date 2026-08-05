@@ -70,6 +70,11 @@ queryClient.setQueryDefaults([["vehicle", "list"]], {
   refetchOnMount: "always",
 });
 
+queryClient.setQueryDefaults([["charger", "list"]], {
+  staleTime: 0,
+  refetchOnMount: "always",
+});
+
 const createLinks = (): TRPCLink<AppRouter>[] => {
   if (isDemoBuild) return [demoLink()];
   return [

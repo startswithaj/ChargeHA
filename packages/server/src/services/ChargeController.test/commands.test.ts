@@ -47,6 +47,25 @@ describe("ChargeController — commands + backoff", () => {
     });
   });
 
+  describe("charge_now — car-limited draw", () => {
+    it("does not re-command amps when the car draws less than asked", async () => {
+      // Car appetite 16A on a 32A charger: one adjust, then quiet.
+      ctx = await setupController(
+        { isCharging: true, chargeAmps: 16, chargeAmpsMax: 32 },
+        "charge_now",
+      );
+
+      await ctx.runOneLoop();
+      const afterFirst = ctx.adapter.commands.length;
+      expect(ctx.adapter.commands).toContainEqual({ cmd: "setAmps", args: 32 });
+
+      await ctx.runOneLoop();
+      await ctx.runOneLoop();
+
+      expect(ctx.adapter.commands.length).toBe(afterFirst);
+    });
+  });
+
   describe("stopCharging — command backoff", () => {
     it("skips stop command when command backoff is active", async () => {
       ctx = await setupController({ isCharging: true }, "stop");

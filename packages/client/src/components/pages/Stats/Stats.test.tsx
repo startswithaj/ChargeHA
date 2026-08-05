@@ -52,6 +52,16 @@ vi.mock("../../../trpc.ts", () => ({
   widenTrpc: vi.fn(),
   trpc: {
     useQueries: vi.fn(() => []),
+    charger: {
+      list: {
+        useQuery: vi.fn(() => ({
+          data: [],
+          isLoading: false,
+          isPending: false,
+          error: null,
+        })),
+      },
+    },
     vehicle: {
       list: {
         useQuery: vi.fn(() => ({

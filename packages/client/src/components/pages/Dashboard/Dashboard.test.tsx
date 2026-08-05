@@ -155,7 +155,7 @@ vi.mock("../../../trpc.ts", () => ({
     },
     charger: {
       list: {
-        useQuery: vi.fn(() => ({ data: [], isLoading: false, error: null })),
+        useQuery: () => dashboardMocks.chargerListUseQuery(),
       },
       setMode: {
         useMutation: vi.fn(() => ({
