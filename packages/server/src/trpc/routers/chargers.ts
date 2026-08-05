@@ -20,10 +20,6 @@ const vehicleControlInput = z.object({
   vehicleId: z.string(),
   active: z.boolean(),
 });
-const linkedVehicleInput = z.object({
-  id: z.string(),
-  vehicleId: z.string().nullable(),
-});
 
 export const chargersRouter = router({
   list: publicProcedure.query(async ({ ctx }) => {
@@ -73,15 +69,6 @@ export const chargersRouter = router({
   remove: publicProcedure.input(idInput).mutation(async ({ ctx, input }) => {
     await ctx.chargingPointManager.deleteCharger(input.id);
   }),
-
-  setLinkedVehicle: publicProcedure.input(linkedVehicleInput).mutation(
-    async ({ ctx, input }) => {
-      await ctx.chargingPointManager.setLinkedVehicle(
-        input.id,
-        input.vehicleId,
-      );
-    },
-  ),
 
   setVehicleControl: publicProcedure.input(vehicleControlInput).mutation(
     async ({ ctx, input }) => {

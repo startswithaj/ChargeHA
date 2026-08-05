@@ -1,6 +1,5 @@
-import { useState } from "react";
 import { Button, Dialog, Select, Switch, Text } from "@radix-ui/themes";
-import { Plug } from "lucide-react";
+import { Plug, Plus } from "lucide-react";
 import {
   chargerPluginOptions,
   pluginSettingsComponents,
@@ -21,21 +20,33 @@ import {
 } from "./useChargersSettings.ts";
 import type { ChargerWithState } from "../../../hooks/useChargers.ts";
 
+const panelKeyFor = (typeId: string) => `${typeId}-settings`;
+
 export function ChargersSection() {
   const settings = useChargersSettings();
+  const configuredTypes = [
+    ...new Set(settings.chargers.map((c) => c.chargerAdapterType)),
+  ];
+
   return (
     <SettingsSection
       icon={<Plug size={18} />}
       title="Chargers"
-      description="Manage smart chargers and their charging priority."
+      description="Configure your smart chargers and their charging priority."
+      action={settings.pendingType === null
+        ? <AddChargerSelect onChoose={settings.choose} />
+        : undefined}
       saveStatus={settings.panels.saveStatus}
       isDirty={settings.panels.isDirty}
       onSave={settings.panels.save}
     >
       {settings.reorderable && <PriorityChargingRow />}
 
-      {settings.chargers.length === 0 && (
-        <Text size="2" color="gray">No chargers configured yet.</Text>
+      {settings.chargers.length === 0 && settings.pendingType === null && (
+        <Text size="2" color="gray">
+          No chargers configured yet. Add one to control charging through a
+          smart charger instead of the vehicle's own API.
+        </Text>
       )}
 
       {settings.chargers.map((charger) => (
@@ -43,21 +54,28 @@ export function ChargersSection() {
           key={charger.id}
           charger={charger}
           reorderable={settings.reorderable}
-          vehicles={settings.vehicles}
           onRemove={() => settings.requestRemove(charger.id)}
           onMove={(direction) => settings.move(charger.id, direction)}
-          onLink={(vehicleId) => settings.linkVehicle(charger.id, vehicleId)}
         />
       ))}
 
-      <AddChargerRow onAdd={settings.startAdd} />
+      {settings.pendingType !== null && (
+        <PendingCharger
+          typeId={settings.pendingType}
+          adding={settings.adding}
+          reporterFor={settings.panels.reporterFor}
+          onAdd={settings.confirmAdd}
+          onCancel={settings.cancelAdd}
+        />
+      )}
 
-      {settings.error && <Text size="2" color="red">{settings.error}</Text>}
-
-      <ChargerPluginPanels
-        chargers={settings.chargers}
+      <ConfiguredPluginSettings
+        types={configuredTypes}
+        pendingType={settings.pendingType}
         reporterFor={settings.panels.reporterFor}
       />
+
+      {settings.error && <Text size="2" color="red">{settings.error}</Text>}
 
       <ControlPathDialog
         confirm={settings.confirm}
@@ -65,6 +83,94 @@ export function ChargersSection() {
         onConfirm={settings.acceptConfirm}
       />
     </SettingsSection>
+  );
+}
+
+function AddChargerSelect({ onChoose }: { onChoose: (id: string) => void }) {
+  const disabledIds = demoMode.blockedPlugins(chargerPluginOptions);
+  return (
+    <Select.Root onValueChange={onChoose}>
+      <Select.Trigger placeholder="Add charger" variant="soft" />
+      <Select.Content>
+        {chargerPluginOptions.map((option) => (
+          <Select.Item
+            key={option.id}
+            value={option.id}
+            disabled={disabledIds.has(option.id)}
+          >
+            {option.label}
+          </Select.Item>
+        ))}
+      </Select.Content>
+    </Select.Root>
+  );
+}
+
+function PendingCharger(
+  { typeId, adding, reporterFor, onAdd, onCancel }: {
+    typeId: string;
+    adding: boolean;
+    reporterFor: (key: string) => PanelReporter;
+    onAdd: () => void;
+    onCancel: () => void;
+  },
+) {
+  const option = chargerPluginOptions.find((o) => o.id === typeId);
+  const Panel = pluginSettingsComponents[panelKeyFor(typeId)];
+  return (
+    <>
+      <SettingsRow
+        label={`New ${option?.label ?? typeId}`}
+        help={option?.description}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Button size="1" onClick={onAdd} disabled={adding}>
+            <Plus size={14} />
+            Add
+          </Button>
+          <Button size="1" variant="soft" color="gray" onClick={onCancel}>
+            Cancel
+          </Button>
+        </div>
+      </SettingsRow>
+      {Panel && (
+        <PluginSettingsHostProvider value={reporterFor(typeId)}>
+          <ErrorBoundary label="Plugin Settings">
+            <Panel />
+          </ErrorBoundary>
+        </PluginSettingsHostProvider>
+      )}
+    </>
+  );
+}
+
+// Plugin config keys are plugin-scoped rather than per-row, so two chargers
+// of one type share a single panel.
+function ConfiguredPluginSettings(
+  { types, pendingType, reporterFor }: {
+    types: string[];
+    pendingType: string | null;
+    reporterFor: (key: string) => PanelReporter;
+  },
+) {
+  return (
+    <>
+      {types
+        .filter((type) =>
+          type !== pendingType && panelKeyFor(type) in pluginSettingsComponents
+        )
+        .map((type) => {
+          const Panel = pluginSettingsComponents[panelKeyFor(type)];
+          if (!Panel) return null;
+          return (
+            <PluginSettingsHostProvider key={type} value={reporterFor(type)}>
+              <ErrorBoundary label="Plugin Settings">
+                <Panel />
+              </ErrorBoundary>
+            </PluginSettingsHostProvider>
+          );
+        })}
+    </>
   );
 }
 
@@ -83,80 +189,6 @@ function PriorityChargingRow() {
           chargingMutation.mutate({ priorityChargingEnabled: enabled })}
       />
     </SettingsRow>
-  );
-}
-
-function AddChargerRow({ onAdd }: { onAdd: (typeId: string) => void }) {
-  const [choosing, setChoosing] = useState(false);
-  const disabledIds = demoMode.blockedPlugins(chargerPluginOptions);
-
-  if (!choosing) {
-    return (
-      <SettingsRow
-        label="Add a charger"
-        help="Connect a smart charger or wallbox."
-      >
-        <Button size="2" variant="soft" onClick={() => setChoosing(true)}>
-          Add charger
-        </Button>
-      </SettingsRow>
-    );
-  }
-
-  return (
-    <SettingsRow label="Charger type">
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <Select.Root onValueChange={onAdd}>
-          <Select.Trigger placeholder="Choose a charger type" />
-          <Select.Content>
-            {chargerPluginOptions.map((option) => (
-              <Select.Item
-                key={option.id}
-                value={option.id}
-                disabled={disabledIds.has(option.id)}
-              >
-                {option.label}
-              </Select.Item>
-            ))}
-          </Select.Content>
-        </Select.Root>
-        <Button
-          size="1"
-          variant="soft"
-          color="gray"
-          onClick={() => setChoosing(false)}
-        >
-          Cancel
-        </Button>
-      </div>
-    </SettingsRow>
-  );
-}
-
-// Plugin config keys are plugin-scoped rather than per-row, so two chargers
-// of one type share a single panel.
-function ChargerPluginPanels(
-  { chargers, reporterFor }: {
-    chargers: ChargerWithState[];
-    reporterFor: (key: string) => PanelReporter;
-  },
-) {
-  const types = [...new Set(chargers.map((c) => c.chargerAdapterType))]
-    .filter((type) => `${type}-settings` in pluginSettingsComponents);
-  return (
-    <>
-      {types.map((type) => {
-        const Panel = pluginSettingsComponents[`${type}-settings`];
-        if (!Panel) return null;
-        return (
-          <PluginSettingsHostProvider key={type} value={reporterFor(type)}>
-            <ErrorBoundary label="Plugin Settings">
-              <Panel />
-            </ErrorBoundary>
-          </PluginSettingsHostProvider>
-        );
-      })}
-    </>
   );
 }
 
@@ -190,3 +222,5 @@ function ControlPathDialog(
     </Dialog.Root>
   );
 }
+
+export type { ChargerWithState };

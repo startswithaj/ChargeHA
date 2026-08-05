@@ -288,22 +288,6 @@ export class ChargingPointManager {
     this.logger.info(`Charging point created for vehicle ${vehicle.name}`);
   }
 
-  /** Pins which car is plugged into a smart charger. A smart plug cannot
-   *  observe the vehicle itself, so naming it removes the guesswork that
-   *  inference would otherwise have to do. */
-  async setLinkedVehicle(
-    chargerId: string,
-    vehicleId: string | null,
-  ): Promise<void> {
-    const entry = this.chargers.get(chargerId);
-    const rows = await this.db.getChargers();
-    const row = rows.find((r) => r.id === chargerId);
-    if (!row || row.kind !== "smart") return;
-    await this.db.upsertCharger({ ...row, vehicleId });
-    if (entry) entry.row = { ...entry.row, vehicleId };
-    this.eventEmitter.emit("chargers_changed", {});
-  }
-
   /** Per-vehicle control-path switch: whether this car is driven by its own
    *  API or by whichever smart charger it is plugged into. */
   async setVehicleApiControl(

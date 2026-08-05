@@ -97,11 +97,8 @@ export const chargerHandlers: Record<string, QueryHandler> = {
         createdAt: CREATED_AT,
         updatedAt: now,
         state: simChargerState(s, c, now),
-        // An explicitly assigned vehicle beats inference.
-        resolvedVehicleId: c.vehicleId ?? inferredId,
-        vehicleResolution: c.vehicleId !== null
-          ? ("linked" as const)
-          : resolution,
+        resolvedVehicleId: inferredId,
+        vehicleResolution: resolution,
       }));
     }
     return s.vehicles

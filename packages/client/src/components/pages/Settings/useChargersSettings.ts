@@ -1,8 +1,5 @@
 import { useCallback, useState } from "react";
-import { chargerPluginOptions } from "@chargeha/plugins/componentRegistry";
 import { trpc } from "../../../trpc.ts";
-import { useRouter } from "../../../hooks/useRouter.ts";
-import { clearPluginOnboarding } from "../../../hooks/usePluginOnboardingState.ts";
 import {
   type ChargerWithState,
   isSmartCharger,
@@ -56,7 +53,6 @@ function usePanelStates() {
 }
 
 export function useChargersSettings() {
-  const { navigate } = useRouter();
   const { chargers } = useChargers();
   const utils = trpc.useUtils();
   const invalidate = () => utils.charger.list.invalidate();
@@ -70,27 +66,22 @@ export function useChargersSettings() {
   const reorderMutation = trpc.charger.reorder.useMutation({
     onSuccess: invalidate,
   });
-  const linkMutation = trpc.charger.setLinkedVehicle.useMutation({
-    onSuccess: invalidate,
-  });
-  const vehiclesQuery = trpc.vehicle.list.useQuery();
 
+  const [pendingType, setPendingType] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<ChargerConfirm | null>(null);
   const panels = usePanelStates();
   const smartChargers = chargers.filter(isSmartCharger);
   const needsAddConfirm = smartChargers.length === 0 && chargers.length > 0;
 
-  // `directAdd` plugins need no configuration, so the row is created here.
-  // Everything else runs the plugin's own setup flow, which creates the row
-  // via charger.ensure on completion.
-  const startAdd = (typeId: string) => {
-    if (!chargerPluginOptions.find((o) => o.id === typeId)?.directAdd) {
-      clearPluginOnboarding(typeId);
-      navigate({ type: "pluginSetup", pluginId: typeId });
-      return;
-    }
-    if (needsAddConfirm) setConfirm({ kind: "add", typeId });
-    else ensureMutation.mutate({ chargerAdapterType: typeId });
+  const addCharger = (typeId: string) =>
+    ensureMutation.mutate({ chargerAdapterType: typeId }, {
+      onSuccess: () => setPendingType(null),
+    });
+
+  const confirmAdd = () => {
+    if (!pendingType) return;
+    if (needsAddConfirm) setConfirm({ kind: "add", typeId: pendingType });
+    else addCharger(pendingType);
   };
 
   const requestRemove = (chargerId: string) => {
@@ -103,28 +94,26 @@ export function useChargersSettings() {
 
   const acceptConfirm = () => {
     if (!confirm) return;
-    if (confirm.kind === "add") {
-      ensureMutation.mutate({ chargerAdapterType: confirm.typeId });
-    } else {
-      removeMutation.mutate({ id: confirm.chargerId });
-    }
+    if (confirm.kind === "add") addCharger(confirm.typeId);
+    else removeMutation.mutate({ id: confirm.chargerId });
     setConfirm(null);
   };
 
   return {
     chargers,
-    vehicles: (vehiclesQuery.data?.vehicles ?? []).map((v) => ({
-      id: v.id,
-      name: v.name,
-    })),
-    linkVehicle: (chargerId: string, vehicleId: string | null) =>
-      linkMutation.mutate({ id: chargerId, vehicleId }),
     reorderable: chargers.length > 1,
     error: ensureMutation.error?.message ?? removeMutation.error?.message ??
       null,
+    pendingType,
     confirm,
     panels,
-    startAdd,
+    adding: ensureMutation.isPending,
+    choose: setPendingType,
+    cancelAdd: () => {
+      ensureMutation.reset();
+      setPendingType(null);
+    },
+    confirmAdd,
     requestRemove,
     acceptConfirm,
     cancelConfirm: () => setConfirm(null),

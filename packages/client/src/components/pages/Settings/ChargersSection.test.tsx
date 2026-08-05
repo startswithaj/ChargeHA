@@ -8,8 +8,6 @@ import type { ChargerWithState } from "../../../hooks/useChargers.ts";
 const { makeHookReturn, hookRef } = vi.hoisted(() => {
   const make = (overrides: Record<string, unknown> = {}) => ({
     chargers: [] as unknown[],
-    vehicles: [] as unknown[],
-    linkVehicle: vi.fn(),
     reorderable: false,
     error: null as string | null,
     confirm: null as unknown,
@@ -19,7 +17,11 @@ const { makeHookReturn, hookRef } = vi.hoisted(() => {
       save: vi.fn(),
       saveStatus: { state: "idle", tick: 0 },
     },
-    startAdd: vi.fn(),
+    pendingType: null as string | null,
+    adding: false,
+    choose: vi.fn(),
+    cancelAdd: vi.fn(),
+    confirmAdd: vi.fn(),
     requestRemove: vi.fn(),
     acceptConfirm: vi.fn(),
     cancelConfirm: vi.fn(),
@@ -35,10 +37,15 @@ vi.mock("./useChargersSettings.ts", () => ({
 
 vi.mock("./SettingsLayout.tsx", () => ({
   SettingsSection: (
-    { children, title }: { children: React.ReactNode; title: string },
+    { children, title, action }: {
+      children: React.ReactNode;
+      title: string;
+      action?: React.ReactNode;
+    },
   ) => (
     <div data-testid="settings-section">
       <h3>{title}</h3>
+      {action && <div data-testid="section-action">{action}</div>}
       {children}
     </div>
   ),
@@ -92,7 +99,8 @@ describe("ChargersSection", () => {
 
   it("shows an empty state when no chargers exist", () => {
     renderWithProviders(<ChargersSection />);
-    expect(screen.getByText("No chargers configured yet.")).toBeInTheDocument();
+    expect(screen.getByText(/No chargers configured yet/))
+      .toBeInTheDocument();
   });
 
   it("renders friendly labels rather than raw enum values", () => {
@@ -154,12 +162,24 @@ describe("ChargersSection", () => {
     expect(hookRef.current.requestRemove).toHaveBeenCalledWith("c1");
   });
 
-  it("reveals the charger type picker before adding", () => {
+  it("puts the add control in the section action slot", () => {
+    renderWithProviders(<ChargersSection />);
+    expect(screen.getByTestId("section-action")).toBeInTheDocument();
+  });
+
+  it("configures a pending charger inline rather than navigating away", () => {
+    hookRef.current = makeHookReturn({ pendingType: "tapo" });
     renderWithProviders(<ChargersSection />);
 
-    expect(screen.queryByText("Charger type")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Add charger" }));
-    expect(screen.getByText("Charger type")).toBeInTheDocument();
+    expect(screen.getByText("New Tapo Smart Plug")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(hookRef.current.confirmAdd).toHaveBeenCalled();
+  });
+
+  it("hides the add control while a charger is pending", () => {
+    hookRef.current = makeHookReturn({ pendingType: "tapo" });
+    renderWithProviders(<ChargersSection />);
+    expect(screen.queryByTestId("section-action")).not.toBeInTheDocument();
   });
 
   it("confirms before switching control to a smart charger", () => {
