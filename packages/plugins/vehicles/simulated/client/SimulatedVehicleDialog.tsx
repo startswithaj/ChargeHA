@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Card, Switch, Text } from "@radix-ui/themes";
+import { Button, Switch, Text } from "@radix-ui/themes";
 import type { VehicleChargeState } from "@chargeha/shared";
 import { LocationField } from "./LocationField.tsx";
 import { dialogStyles as styles } from "../../../hostUi.ts";
@@ -161,10 +161,7 @@ export function SimulatedVehicleDialog({
     setBatteryLevel((prev) => Math.max(0, Math.min(100, prev + delta)));
 
   return (
-    <Card
-      className={styles.formCard}
-      style={{ "--accent": "var(--purple-9)" } as React.CSSProperties}
-    >
+    <div style={{ padding: "0 10px 10px" }}>
       <form onSubmit={handleSubmit} className={styles.form}>
         <Text size="1" color="gray">
           Override runtime state for this simulated vehicle. Changes take effect
@@ -226,6 +223,6 @@ export function SimulatedVehicleDialog({
           </Button>
         </div>
       </form>
-    </Card>
+    </div>
   );
 }
