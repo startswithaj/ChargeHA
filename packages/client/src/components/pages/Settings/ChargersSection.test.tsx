@@ -17,11 +17,12 @@ const { makeHookReturn, hookRef } = vi.hoisted(() => {
       save: vi.fn(),
       saveStatus: { state: "idle", tick: 0 },
     },
-    pendingType: null as string | null,
-    adding: false,
+    editing: null as unknown,
+    busy: false,
     choose: vi.fn(),
-    cancelAdd: vi.fn(),
-    confirmAdd: vi.fn(),
+    edit: vi.fn(),
+    submitDialog: vi.fn(),
+    closeDialog: vi.fn(),
     requestRemove: vi.fn(),
     acceptConfirm: vi.fn(),
     cancelConfirm: vi.fn(),
@@ -33,6 +34,7 @@ const { makeHookReturn, hookRef } = vi.hoisted(() => {
 
 vi.mock("./useChargersSettings.ts", () => ({
   useChargersSettings: () => hookRef.current,
+  hasSettingsPanel: () => true,
 }));
 
 vi.mock("./SettingsLayout.tsx", () => ({
@@ -65,7 +67,9 @@ vi.mock("../../../hooks/useSectionConfig.ts", () => ({
 }));
 
 vi.mock("@chargeha/plugins/componentRegistry", () => ({
-  pluginSettingsComponents: {} as Record<string, React.FC>,
+  pluginSettingsComponents: {
+    "tapo-settings": () => <div data-testid="plugin-panel" />,
+  } as Record<string, React.FC>,
   chargerPluginOptions: [
     { id: "tapo", label: "Tapo Smart Plug" },
     { id: "ocpp", label: "OCPP Charger" },
@@ -149,16 +153,16 @@ describe("ChargersSection", () => {
     });
     renderWithProviders(<ChargersSection />);
 
-    expect(screen.getByText("Model 3 — via vehicle API")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Delete" }))
-      .not.toBeInTheDocument();
+    expect(screen.getByText("Model 3")).toBeInTheDocument();
+    expect(screen.getByText("via vehicle API")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Delete /)).not.toBeInTheDocument();
   });
 
   it("offers deletion for smart chargers", () => {
     hookRef.current = makeHookReturn({ chargers: [makeCharger()] });
     renderWithProviders(<ChargersSection />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    fireEvent.click(screen.getByLabelText("Delete Garage Plug"));
     expect(hookRef.current.requestRemove).toHaveBeenCalledWith("c1");
   });
 
@@ -167,19 +171,40 @@ describe("ChargersSection", () => {
     expect(screen.getByTestId("section-action")).toBeInTheDocument();
   });
 
-  it("configures a pending charger inline rather than navigating away", () => {
-    hookRef.current = makeHookReturn({ pendingType: "tapo" });
+  it("keeps plugin fields out of the list until a charger is opened", () => {
+    hookRef.current = makeHookReturn({ chargers: [makeCharger()] });
     renderWithProviders(<ChargersSection />);
-
-    expect(screen.getByText("New Tapo Smart Plug")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Add" }));
-    expect(hookRef.current.confirmAdd).toHaveBeenCalled();
+    expect(screen.queryByTestId("plugin-panel")).not.toBeInTheDocument();
   });
 
-  it("hides the add control while a charger is pending", () => {
-    hookRef.current = makeHookReturn({ pendingType: "tapo" });
+  it("opens an edit dialog for a charger", () => {
+    hookRef.current = makeHookReturn({ chargers: [makeCharger()] });
     renderWithProviders(<ChargersSection />);
-    expect(screen.queryByTestId("section-action")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Edit/ }));
+    expect(hookRef.current.edit).toHaveBeenCalled();
+  });
+
+  it("shows the plugin panel inside the dialog, with save and cancel", () => {
+    hookRef.current = makeHookReturn({
+      editing: { mode: "edit", typeId: "tapo", name: "Garage Plug" },
+    });
+    renderWithProviders(<ChargersSection />);
+
+    expect(screen.getByTestId("plugin-panel")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(hookRef.current.submitDialog).toHaveBeenCalled();
+  });
+
+  it("labels the dialog as an add when creating a charger", () => {
+    hookRef.current = makeHookReturn({
+      editing: { mode: "add", typeId: "tapo" },
+    });
+    renderWithProviders(<ChargersSection />);
+
+    expect(screen.getByText("Add Tapo Smart Plug")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add charger" }))
+      .toBeInTheDocument();
   });
 
   it("confirms before switching control to a smart charger", () => {

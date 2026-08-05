@@ -1,18 +1,23 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
+import { pluginSettingsComponents } from "@chargeha/plugins/componentRegistry";
 import { trpc } from "../../../trpc.ts";
 import {
   type ChargerWithState,
   isSmartCharger,
   useChargers,
 } from "../../../hooks/useChargers.ts";
-import type { PluginSettingsState } from "./pluginSettingsHost.ts";
-import type { SaveStatus } from "../../../hooks/useSectionConfig.ts";
 
 export type ChargerConfirm =
   | { kind: "add"; typeId: string }
   | { kind: "removeLast"; chargerId: string };
 
-export type PanelReporter = (state: PluginSettingsState | null) => void;
+/** Which dialog is open: adding a new charger of a type, or editing one. */
+export type ChargerEditing =
+  | { mode: "add"; typeId: string }
+  | { mode: "edit"; typeId: string; name: string };
+
+export const hasSettingsPanel = (typeId: string): boolean =>
+  `${typeId}-settings` in pluginSettingsComponents;
 
 function reorderedIds(
   ids: string[],
@@ -26,30 +31,6 @@ function reorderedIds(
   next[index] = next[target];
   next[target] = chargerId;
   return next;
-}
-
-// Tapo/OCPP panels use PluginConfigForm, which renders fields but no Save —
-// it reports dirty state up instead. Without this aggregation into the
-// section header those panels cannot be saved at all.
-function usePanelStates() {
-  const [states, setStates] = useState<
-    Record<string, PluginSettingsState | null>
-  >({});
-  const reporterFor = useCallback(
-    (key: string): PanelReporter => (state) =>
-      setStates((prev) => ({ ...prev, [key]: state })),
-    [],
-  );
-  const live = Object.values(states).filter((s) => s !== null);
-  const activeStatus = live.map((s) => s.saveStatus)
-    .find((st) => st.state !== "idle");
-  const saveStatus: SaveStatus = activeStatus ?? { state: "idle", tick: 0 };
-  return {
-    reporterFor,
-    isDirty: live.some((s) => s.isDirty),
-    save: () => live.filter((s) => s.isDirty).forEach((s) => s.save()),
-    saveStatus,
-  };
 }
 
 export function useChargersSettings() {
@@ -67,21 +48,40 @@ export function useChargersSettings() {
     onSuccess: invalidate,
   });
 
-  const [pendingType, setPendingType] = useState<string | null>(null);
+  const [editing, setEditing] = useState<ChargerEditing | null>(null);
   const [confirm, setConfirm] = useState<ChargerConfirm | null>(null);
-  const panels = usePanelStates();
   const smartChargers = chargers.filter(isSmartCharger);
   const needsAddConfirm = smartChargers.length === 0 && chargers.length > 0;
 
+  const closeDialog = () => {
+    ensureMutation.reset();
+    setEditing(null);
+  };
+
   const addCharger = (typeId: string) =>
     ensureMutation.mutate({ chargerAdapterType: typeId }, {
-      onSuccess: () => setPendingType(null),
+      onSuccess: () => setEditing(null),
     });
 
-  const confirmAdd = () => {
-    if (!pendingType) return;
-    if (needsAddConfirm) setConfirm({ kind: "add", typeId: pendingType });
-    else addCharger(pendingType);
+  // Adding a charger with no settings panel has nothing to configure, so it
+  // skips the dialog entirely.
+  const choose = (typeId: string) => {
+    if (hasSettingsPanel(typeId)) setEditing({ mode: "add", typeId });
+    else if (needsAddConfirm) setConfirm({ kind: "add", typeId });
+    else addCharger(typeId);
+  };
+
+  const submitDialog = () => {
+    if (editing?.mode !== "add") {
+      setEditing(null);
+      return;
+    }
+    if (needsAddConfirm) {
+      setConfirm({ kind: "add", typeId: editing.typeId });
+      setEditing(null);
+    } else {
+      addCharger(editing.typeId);
+    }
   };
 
   const requestRemove = (chargerId: string) => {
@@ -104,16 +104,18 @@ export function useChargersSettings() {
     reorderable: chargers.length > 1,
     error: ensureMutation.error?.message ?? removeMutation.error?.message ??
       null,
-    pendingType,
+    editing,
     confirm,
-    panels,
-    adding: ensureMutation.isPending,
-    choose: setPendingType,
-    cancelAdd: () => {
-      ensureMutation.reset();
-      setPendingType(null);
-    },
-    confirmAdd,
+    busy: ensureMutation.isPending,
+    choose,
+    edit: (charger: ChargerWithState) =>
+      setEditing({
+        mode: "edit",
+        typeId: charger.chargerAdapterType,
+        name: charger.name,
+      }),
+    submitDialog,
+    closeDialog,
     requestRemove,
     acceptConfirm,
     cancelConfirm: () => setConfirm(null),

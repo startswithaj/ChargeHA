@@ -1,48 +1,33 @@
 import { Button, Dialog, Select, Switch, Text } from "@radix-ui/themes";
-import { Plug, Plus } from "lucide-react";
-import {
-  chargerPluginOptions,
-  pluginSettingsComponents,
-} from "@chargeha/plugins/componentRegistry";
+import { Plug } from "lucide-react";
+import { chargerPluginOptions } from "@chargeha/plugins/componentRegistry";
 import { SettingsRow, SettingsSection } from "./SettingsLayout.tsx";
 import {
   useChargingConfig,
   useChargingConfigMutation,
 } from "../../../hooks/useSectionConfig.ts";
-import { ErrorBoundary } from "../../ui/ErrorBoundary.tsx";
-import { PluginSettingsHostProvider } from "./pluginSettingsHost.ts";
 import { demoMode } from "../../../lib/featureFlags.ts";
 import { ChargerRow } from "./ChargerRow.tsx";
+import { ChargerEditDialog } from "./ChargerEditDialog.tsx";
 import {
   type ChargerConfirm,
-  type PanelReporter,
+  hasSettingsPanel,
   useChargersSettings,
 } from "./useChargersSettings.ts";
-import type { ChargerWithState } from "../../../hooks/useChargers.ts";
-
-const panelKeyFor = (typeId: string) => `${typeId}-settings`;
+import { isSmartCharger } from "../../../hooks/useChargers.ts";
 
 export function ChargersSection() {
   const settings = useChargersSettings();
-  const configuredTypes = [
-    ...new Set(settings.chargers.map((c) => c.chargerAdapterType)),
-  ];
-
   return (
     <SettingsSection
       icon={<Plug size={18} />}
       title="Chargers"
       description="Configure your smart chargers and their charging priority."
-      action={settings.pendingType === null
-        ? <AddChargerSelect onChoose={settings.choose} />
-        : undefined}
-      saveStatus={settings.panels.saveStatus}
-      isDirty={settings.panels.isDirty}
-      onSave={settings.panels.save}
+      action={<AddChargerSelect onChoose={settings.choose} />}
     >
       {settings.reorderable && <PriorityChargingRow />}
 
-      {settings.chargers.length === 0 && settings.pendingType === null && (
+      {settings.chargers.length === 0 && (
         <Text size="2" color="gray">
           No chargers configured yet. Add one to control charging through a
           smart charger instead of the vehicle's own API.
@@ -54,28 +39,34 @@ export function ChargersSection() {
           key={charger.id}
           charger={charger}
           reorderable={settings.reorderable}
+          editable={isSmartCharger(charger) &&
+            hasSettingsPanel(charger.chargerAdapterType)}
+          onEdit={() => settings.edit(charger)}
           onRemove={() => settings.requestRemove(charger.id)}
           onMove={(direction) => settings.move(charger.id, direction)}
         />
       ))}
 
-      {settings.pendingType !== null && (
-        <PendingCharger
-          typeId={settings.pendingType}
-          adding={settings.adding}
-          reporterFor={settings.panels.reporterFor}
-          onAdd={settings.confirmAdd}
-          onCancel={settings.cancelAdd}
-        />
+      {settings.error && !settings.editing && (
+        <Text size="2" color="red">{settings.error}</Text>
       )}
 
-      <ConfiguredPluginSettings
-        types={configuredTypes}
-        pendingType={settings.pendingType}
-        reporterFor={settings.panels.reporterFor}
-      />
-
-      {settings.error && <Text size="2" color="red">{settings.error}</Text>}
+      {settings.editing && (
+        <ChargerEditDialog
+          typeId={settings.editing.typeId}
+          title={settings.editing.mode === "add"
+            ? `Add ${labelFor(settings.editing.typeId)}`
+            : settings.editing.name}
+          description={settings.editing.mode === "add"
+            ? descriptionFor(settings.editing.typeId)
+            : undefined}
+          submitLabel={settings.editing.mode === "add" ? "Add charger" : "Save"}
+          error={settings.error}
+          busy={settings.busy}
+          onSubmit={settings.submitDialog}
+          onCancel={settings.closeDialog}
+        />
+      )}
 
       <ControlPathDialog
         confirm={settings.confirm}
@@ -86,10 +77,16 @@ export function ChargersSection() {
   );
 }
 
+const labelFor = (typeId: string) =>
+  chargerPluginOptions.find((o) => o.id === typeId)?.label ?? typeId;
+
+const descriptionFor = (typeId: string) =>
+  chargerPluginOptions.find((o) => o.id === typeId)?.description;
+
 function AddChargerSelect({ onChoose }: { onChoose: (id: string) => void }) {
   const disabledIds = demoMode.blockedPlugins(chargerPluginOptions);
   return (
-    <Select.Root onValueChange={onChoose}>
+    <Select.Root value="" onValueChange={onChoose}>
       <Select.Trigger placeholder="Add charger" variant="soft" />
       <Select.Content>
         {chargerPluginOptions.map((option) => (
@@ -103,74 +100,6 @@ function AddChargerSelect({ onChoose }: { onChoose: (id: string) => void }) {
         ))}
       </Select.Content>
     </Select.Root>
-  );
-}
-
-function PendingCharger(
-  { typeId, adding, reporterFor, onAdd, onCancel }: {
-    typeId: string;
-    adding: boolean;
-    reporterFor: (key: string) => PanelReporter;
-    onAdd: () => void;
-    onCancel: () => void;
-  },
-) {
-  const option = chargerPluginOptions.find((o) => o.id === typeId);
-  const Panel = pluginSettingsComponents[panelKeyFor(typeId)];
-  return (
-    <>
-      <SettingsRow
-        label={`New ${option?.label ?? typeId}`}
-        help={option?.description}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Button size="1" onClick={onAdd} disabled={adding}>
-            <Plus size={14} />
-            Add
-          </Button>
-          <Button size="1" variant="soft" color="gray" onClick={onCancel}>
-            Cancel
-          </Button>
-        </div>
-      </SettingsRow>
-      {Panel && (
-        <PluginSettingsHostProvider value={reporterFor(typeId)}>
-          <ErrorBoundary label="Plugin Settings">
-            <Panel />
-          </ErrorBoundary>
-        </PluginSettingsHostProvider>
-      )}
-    </>
-  );
-}
-
-// Plugin config keys are plugin-scoped rather than per-row, so two chargers
-// of one type share a single panel.
-function ConfiguredPluginSettings(
-  { types, pendingType, reporterFor }: {
-    types: string[];
-    pendingType: string | null;
-    reporterFor: (key: string) => PanelReporter;
-  },
-) {
-  return (
-    <>
-      {types
-        .filter((type) =>
-          type !== pendingType && panelKeyFor(type) in pluginSettingsComponents
-        )
-        .map((type) => {
-          const Panel = pluginSettingsComponents[panelKeyFor(type)];
-          if (!Panel) return null;
-          return (
-            <PluginSettingsHostProvider key={type} value={reporterFor(type)}>
-              <ErrorBoundary label="Plugin Settings">
-                <Panel />
-              </ErrorBoundary>
-            </PluginSettingsHostProvider>
-          );
-        })}
-    </>
   );
 }
 
@@ -222,5 +151,3 @@ function ControlPathDialog(
     </Dialog.Root>
   );
 }
-
-export type { ChargerWithState };
