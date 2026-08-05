@@ -7,8 +7,9 @@ code actually does today, not an aspiration.
 
 ## Hard rules
 
-1. **Editing happens inline.** A dialog confirms a destructive action; it never
-   edits. Two inline shapes are allowed — replace the row, or expand beneath it.
+1. **Editing happens inline, expanding beneath the row.** The row stays visible
+   with its live state; the editor opens under it inside the same grey band. A
+   dialog confirms a destructive action; it never edits.
 2. **Never launch the wizard from Settings** except for flows that genuinely
    need more than one page (Tesla onboarding). If a plugin has a settings
    component, configure it in place.
@@ -169,18 +170,29 @@ tariff periods are the same shape: a list you add to, edit and delete from.
 
 Rows are stacked in `flex column, gap 6`. Disabled rows use `opacity: 0.5`.
 
-**Editing replaces the row in place. There is no edit modal.**
+**Editing expands beneath the row. There is no edit modal.**
+
+Wrap the row and its editor in one grey band so an open entity reads as a single
+expanded block rather than two stacked things — see
+`ChargersSection.ChargerListItem`:
 
 ```tsx
-{periods.map((period) =>
-  editingId === period.id
-    ? <PeriodForm key={period.id} … submitLabel="Update" onCancel={onCancelEdit} />
-    : <PeriodRow key={period.id} … onStartEdit={onStartEdit} />
-)}
+<div style={{ borderRadius: 6, background: "var(--gray-a2)" }}>
+  <ChargerRow … expanded={expanded} onEdit={toggle} />
+  {expanded && <ChargerEditForm … submitLabel="Save" />}
+</div>
 ```
 
+The row itself carries no background when nested this way — the wrapper owns it
+— and the edit action flips from `Pencil` to `X` with its `aria-label` changing
+from `Edit {name}` to `Close {name}`.
+
+`TariffPeriodsSection` still replaces the row rather than expanding
+(`editingId === period.id` swaps `PeriodRow` for `PeriodForm`). That predates
+this rule; new lists expand.
+
 **The add form is the same component**, rendered below the list with
-`submitLabel="Add Period"`. One form component serves both.
+`submitLabel="Add …"`. One form component serves both.
 
 **The form block** (`PeriodForm`):
 

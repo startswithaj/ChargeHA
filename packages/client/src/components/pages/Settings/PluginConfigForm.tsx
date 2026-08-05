@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import {
+  Fragment,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 import { TextField } from "@radix-ui/themes";
 import { SettingsRow } from "./SettingsLayout.tsx";
 import { useSaveStatus } from "../../../hooks/useSectionConfig.ts";
@@ -10,6 +16,10 @@ export interface PluginConfigField {
   help?: string;
   secret?: boolean;
   width?: number;
+  /** Rendered directly beneath this field's row, so a control that fills the
+   *  field in (network discovery, say) sits with it rather than orphaned at
+   *  the end of the form. Receives a setter for this field's draft value. */
+  after?: (setValue: (value: string) => void) => ReactNode;
 }
 
 type SaveOpts = { onSuccess: () => void; onError: (err: unknown) => void };
@@ -25,10 +35,14 @@ export function PluginConfigForm({
   data,
   fields,
   onSave,
+  renderFooter,
 }: {
   data: Record<string, unknown> | undefined;
   fields: PluginConfigField[];
   onSave: (draft: Record<string, string>, opts: SaveOpts) => void;
+  /** Trailing content that needs the live edited values rather than the saved
+   *  ones — a connection test, for instance. */
+  renderFooter?: (values: Record<string, string>) => ReactNode;
 }) {
   const [draft, setDraft] = useState<Record<string, string>>({});
   const { saveStatus, onMutate, onSuccess, onError } = useSaveStatus();
@@ -54,20 +68,30 @@ export function PluginConfigForm({
 
   if (!data) return null;
 
+  const setValue = (key: string) => (value: string) =>
+    setDraft((d) => ({ ...d, [key]: value }));
+  const values = Object.fromEntries(
+    fields.map((f) => [f.key, draft[f.key] ?? String(data[f.key] ?? "")]),
+  );
+
   return (
     <>
       {fields.map((field) => (
-        <SettingsRow key={field.key} label={field.label} help={field.help}>
-          <TextField.Root
-            size="2"
-            type={field.secret ? "password" : undefined}
-            value={draft[field.key] ?? String(data[field.key] ?? "")}
-            onChange={(e: { target: { value: string } }) =>
-              setDraft((d) => ({ ...d, [field.key]: e.target.value }))}
-            style={{ width: field.width ?? 100 }}
-          />
-        </SettingsRow>
+        <Fragment key={field.key}>
+          <SettingsRow label={field.label} help={field.help}>
+            <TextField.Root
+              size="2"
+              type={field.secret ? "password" : undefined}
+              value={values[field.key]}
+              onChange={(e: { target: { value: string } }) =>
+                setValue(field.key)(e.target.value)}
+              style={{ width: field.width ?? 100 }}
+            />
+          </SettingsRow>
+          {field.after?.(setValue(field.key))}
+        </Fragment>
       ))}
+      {renderFooter?.(values)}
     </>
   );
 }

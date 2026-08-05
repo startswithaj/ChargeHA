@@ -9,6 +9,7 @@ const FIELDS: PluginConfigField[] = [
     label: "Plug IP address",
     help: "Local IP of your Tapo plug. Use Search to auto-detect it.",
     width: 150,
+    after: (setHost) => <TapoDiscoverySection onUse={setHost} />,
   },
   {
     key: "tapoEmail",
@@ -139,14 +140,13 @@ export function TapoSettings(): JSX.Element | null {
         data={config}
         fields={FIELDS}
         onSave={(draft, opts) => configMutation.mutate(draft, opts)}
-      />
-      <TapoDiscoverySection
-        onUse={(host) => configMutation.mutate({ tapoHost: host })}
-      />
-      <TapoTestButton
-        host={config.tapoHost}
-        email={config.tapoEmail}
-        password={config.tapoPassword}
+        renderFooter={(values) => (
+          <TapoTestButton
+            host={values.tapoHost}
+            email={values.tapoEmail}
+            password={values.tapoPassword}
+          />
+        )}
       />
     </>
   );

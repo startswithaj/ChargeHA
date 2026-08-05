@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Switch, Text, TextField } from "@radix-ui/themes";
+import { Badge, Switch, TextField } from "@radix-ui/themes";
 import { SettingsRow } from "../../../hostUi.ts";
 import { trpc } from "./trpc.ts";
 
@@ -49,11 +49,13 @@ export function SimulatedChargerSettings(): JSX.Element | null {
           style={{ width: 80 }}
         />
       </SettingsRow>
-      <Text size="2" color="gray">
-        {status.on
-          ? `Energized at ${status.commandedAmps}A, drawing ${status.drawAmps}A`
-          : "Off"}
-      </Text>
+      <SettingsRow label="Reported state">
+        <Badge size="1" variant="soft" color={status.on ? "green" : "gray"}>
+          {status.on
+            ? `Energized at ${status.commandedAmps}A, drawing ${status.drawAmps}A`
+            : "Off"}
+        </Badge>
+      </SettingsRow>
     </>
   );
 }

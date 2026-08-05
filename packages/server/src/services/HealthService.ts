@@ -8,6 +8,14 @@ import type {
 
 const DEFAULT_TIMEOUT_MS = 5000;
 
+/**
+ * Plugins that implement multiple roles (Tesla is both vehicle and charger) are
+ * registered in more than one registry, so the same check arrives twice.
+ */
+function dedupeByName(checks: PluginHealthCheck[]): PluginHealthCheck[] {
+  return [...new Map(checks.map((check) => [check.name, check])).values()];
+}
+
 function raceWithTimeout(
   task: Promise<HealthCheckResult>,
   timeoutMs: number,
@@ -45,11 +53,11 @@ export class HealthService {
   async getPluginWarnings(): Promise<
     Array<{ title: string; message: string }>
   > {
-    const checks = [
+    const checks = dedupeByName([
       ...this.vehiclePlugins.getHealthChecks(),
       ...this.energyPlugins.getHealthChecks(),
       ...this.chargerPlugins.getHealthChecks(),
-    ];
+    ]);
     if (checks.length === 0) return [];
 
     const results = await this.runChecks(checks);

@@ -170,5 +170,32 @@ describe("HealthService", () => {
         { title: "Fail Warning", message: "This should appear" },
       ]);
     });
+
+    it("dedupes a check shared by a plugin registered in two registries", async () => {
+      const runs: string[] = [];
+      const check: PluginHealthCheck = {
+        name: "tesla-proxy",
+        warningTitle: "Tesla Proxy Unreachable",
+        warningMessage: "Vehicle commands will fail.",
+        run: () => {
+          runs.push("tesla-proxy");
+          return Promise.resolve({ status: "error", message: "down" });
+        },
+      };
+      const service = new HealthService(
+        createMockRegistry([check]),
+        emptyEnergyRegistry,
+        throwingMock<ChargerPluginRegistry>("ChargerPluginRegistry", {
+          getHealthChecks: () => [check],
+        }),
+        null,
+      );
+      const result = await service.getPluginWarnings();
+      expect(result).toEqual([{
+        title: "Tesla Proxy Unreachable",
+        message: "Vehicle commands will fail.",
+      }]);
+      expect(runs).toEqual(["tesla-proxy"]);
+    });
   });
 });
