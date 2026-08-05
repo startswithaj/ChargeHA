@@ -4,6 +4,7 @@ import type {
   ChargingPointMode,
 } from "@chargeha/shared";
 import { SolarAllocator } from "@chargeha/shared/engine";
+import { linkedChargingPointId } from "@chargeha/shared/chargingPoints";
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { ChargerRow } from "../db/types.ts";
 import type { TypedEventEmitter } from "./TypedEventEmitter.ts";
@@ -253,12 +254,14 @@ export class ChargingPointManager {
       (chain, v) =>
         chain.then(async () => {
           await this.db.upsertCharger({
-            id: crypto.randomUUID(),
+            id: linkedChargingPointId(v.id),
             name: v.name,
             chargerAdapterType: v.adapterType,
             mode: v.mode,
             priority: v.priority,
             vehicleId: v.id,
+            kind: "vehicle_api",
+            active: true,
           });
           this.logger.info(`Migrated vehicle ${v.name} to a charging point`);
         }),
@@ -447,6 +450,8 @@ export class ChargingPointManager {
       mode: "auto",
       priority: rows.length + 1,
       vehicleId: null,
+      kind: "smart",
+      active: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

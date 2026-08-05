@@ -11,6 +11,7 @@
     "./simulation": "./simulation/mod.ts",
     "./engine": "./engine/mod.ts",
     "./async": "./async.ts",
+    "./chargingPoints": "./chargingPoints.ts",
     "./geo": "./geo.ts",
     "./solarAttribution": "./solarAttribution.ts",
     "./geocode": "./geocode.ts",

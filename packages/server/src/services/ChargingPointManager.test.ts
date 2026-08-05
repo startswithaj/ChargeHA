@@ -127,6 +127,8 @@ describe("ChargingPointManager", () => {
     mode: "auto",
     priority: 1,
     vehicleId: null,
+    kind: "smart",
+    active: true,
     createdAt: "2024-01-01T00:00:00.000Z",
     updatedAt: "2024-01-01T00:00:00.000Z",
   };
@@ -222,6 +224,8 @@ describe("ChargingPointManager", () => {
             mode: input.mode ?? "auto",
             priority: input.priority ?? chargerRows.length + 1,
             vehicleId: input.vehicleId ?? null,
+            kind: input.kind ?? "smart",
+            active: input.active ?? true,
             createdAt: "2024-01-01T00:00:00.000Z",
             updatedAt: "2024-01-01T00:00:00.000Z",
           },

@@ -194,6 +194,8 @@ export const chargers = sqliteTable("chargers", {
   mode: text("mode").notNull().default("auto"),
   priority: integer("priority").notNull().default(1),
   vehicleId: text("vehicle_id"),
+  kind: text("kind").notNull().default("smart"),
+  active: integer("active").notNull().default(1),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
 });

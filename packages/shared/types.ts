@@ -158,6 +158,10 @@ export interface SimulationControls {
 
 export type ChargerControlMode = "amps" | "switch";
 
+/** A smart charger controls whatever is plugged into it; a vehicle-API
+ *  charging point drives one specific car through its own API. */
+export type ChargerKind = "smart" | "vehicle_api";
+
 export type ChargerStatus =
   | "available"
   | "preparing"

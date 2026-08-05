@@ -92,6 +92,8 @@ export const chargerMutations: ChargerMutations = {
       mode: charger.mode,
       priority: charger.priority,
       vehicleId: charger.vehicleId,
+      kind: "smart" as const,
+      active: true,
       createdAt: CREATED_AT,
       updatedAt: CREATED_AT,
     };

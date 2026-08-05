@@ -77,6 +77,8 @@ describe("SimulatedChargerMiddleware", () => {
     mode: "auto",
     priority: 1,
     vehicleId: "vehicle-1",
+    kind: "vehicle_api",
+    active: true,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
     ...overrides,

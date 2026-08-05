@@ -1,4 +1,5 @@
 import type {
+  ChargerKind,
   ChargingPointMode,
   ControllerAction,
   DayOfWeek,
@@ -43,6 +44,9 @@ export interface ChargerRow {
   mode: ChargingPointMode;
   priority: number;
   vehicleId: string | null;
+  kind: ChargerKind;
+  /** Inactive points keep their row (and schedules) but are not controlled. */
+  active: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -55,6 +59,8 @@ export interface UpsertChargerInput {
   mode?: ChargingPointMode;
   priority?: number;
   vehicleId?: string | null;
+  kind?: ChargerKind;
+  active?: boolean;
 }
 
 export interface ScheduleRow {
