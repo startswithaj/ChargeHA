@@ -88,25 +88,28 @@ function UnconfiguredPluginCard(
         style={{
           display: "flex",
           alignItems: "center",
+          justifyContent: "space-between",
           gap: 8,
           marginBottom: 8,
         }}
       >
-        <Car size={14} />
-        <Text size="2" weight="medium">{plugin.displayName}</Text>
-        <Badge color="gray" size="1">Not configured</Badge>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Car size={14} />
+          <Text size="2" weight="bold">{plugin.displayName}</Text>
+          <Badge color="gray" size="1">Not configured</Badge>
+        </div>
+        <Button
+          size="1"
+          variant="soft"
+          onClick={() => handleStartOnboarding(plugin.id)}
+        >
+          <Plus size={14} />
+          Set up {plugin.displayName}
+        </Button>
       </div>
-      <Text size="1" color="gray" style={{ display: "block", marginBottom: 8 }}>
+      <Text size="1" color="gray" style={{ display: "block" }}>
         Run the setup wizard to configure {plugin.displayName} vehicles.
       </Text>
-      <Button
-        size="1"
-        variant="soft"
-        onClick={() => handleStartOnboarding(plugin.id)}
-      >
-        <Plus size={14} />
-        Set up {plugin.displayName}
-      </Button>
     </div>
   );
 }
@@ -128,21 +131,24 @@ function SimulatedVehicleSection(
         style={{
           display: "flex",
           alignItems: "center",
+          justifyContent: "space-between",
           gap: 8,
           marginBottom: 8,
         }}
       >
-        <FlaskConical size={14} />
-        <Text size="2" weight="medium">Simulated Vehicle</Text>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <FlaskConical size={14} />
+          <Text size="2" weight="bold">Simulated Vehicle</Text>
+        </div>
+        <Button size="1" variant="soft" onClick={handleAddSimulatedVehicle}>
+          <Plus size={14} />
+          Add Simulated Vehicle
+        </Button>
       </div>
-      <Text size="1" color="gray" style={{ display: "block", marginBottom: 8 }}>
+      <Text size="1" color="gray" style={{ display: "block" }}>
         Add a virtual EV for testing charge control, schedules, and solar
         tracking without a real vehicle.
       </Text>
-      <Button size="1" variant="soft" onClick={handleAddSimulatedVehicle}>
-        <FlaskConical size={14} />
-        Add Simulated Vehicle
-      </Button>
     </div>
   );
 }
