@@ -62,12 +62,19 @@ export function ChargerEditForm(
 
       {error && <Text size="2" color="red">{error}</Text>}
 
-      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-        <Button size="2" disabled={busy} onClick={submit}>
-          {busy ? "Saving..." : submitLabel}
-        </Button>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 8,
+          marginTop: 4,
+        }}
+      >
         <Button size="2" variant="soft" color="gray" onClick={onCancel}>
           Cancel
+        </Button>
+        <Button size="2" disabled={busy} onClick={submit}>
+          {busy ? "Saving..." : submitLabel}
         </Button>
       </div>
     </div>

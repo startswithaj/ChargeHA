@@ -13,10 +13,34 @@ code actually does today, not an aspiration.
    need more than one page (Tesla onboarding). If a plugin has a settings
    component, configure it in place.
 3. **Buttons in a group get `gap: 8`.** Never butted together.
-4. **Icon-only buttons carry an `aria-label`.**
-5. **Never render a raw enum.** Map it to a label.
-6. **Every setting sits in a `SettingsRow`.** Bare buttons and divs are not
+4. **Cancel left, primary right, right-aligned.** Everywhere — inline forms,
+   dialogs, confirm banners. No exceptions.
+5. **Icon-only buttons carry an `aria-label`.**
+6. **Never render a raw enum.** Map it to a label.
+7. **Every setting sits in a `SettingsRow`.** Bare buttons and divs are not
    direct Section children — only sub-section blocks, status text and dialogs.
+
+## Save / Cancel placement
+
+One rule, no exceptions:
+
+```tsx
+<div
+  style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}
+>
+  <Button size="2" variant="soft" color="gray" onClick={onCancel}>
+    Cancel
+  </Button>
+  <Button size="2" disabled={!isValid} onClick={onSubmit}>{submitLabel}</Button>
+</div>;
+```
+
+Cancel is `variant="soft" color="gray"`. Primary is solid (no `variant`), and
+`color="red"` when the action is destructive. `ScheduleDialog.module.css`
+`.footer` is the same spec (`flex-end`, `gap: 8px`) and is exported through
+`hostUi` as `dialogStyles` — dialog components use the class, Settings panels
+use the inline equivalent, because Settings does not otherwise carry CSS
+Modules.
 
 ## The shell
 

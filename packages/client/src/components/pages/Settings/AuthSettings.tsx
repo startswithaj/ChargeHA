@@ -377,10 +377,7 @@ function FormButtons(
   },
 ) {
   return (
-    <Flex gap="2" style={{ alignSelf: "flex-start" }}>
-      <Button type="submit" size="2" disabled={isPending}>
-        {isPending ? "Saving..." : submitLabel}
-      </Button>
+    <Flex gap="2" justify="end">
       <Button
         type="button"
         size="2"
@@ -390,6 +387,9 @@ function FormButtons(
         disabled={isPending}
       >
         Cancel
+      </Button>
+      <Button type="submit" size="2" disabled={isPending}>
+        {isPending ? "Saving..." : submitLabel}
       </Button>
     </Flex>
   );

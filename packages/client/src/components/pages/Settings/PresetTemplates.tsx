@@ -69,22 +69,23 @@ export function PresetTemplates({
             gap: 8,
           }}
         >
-          <Text size="2">
+          <Text size="2" style={{ flex: 1 }}>
             This will replace all existing tariff periods. Continue?
           </Text>
+          <Button
+            size="1"
+            variant="soft"
+            color="gray"
+            onClick={onCancelConfirm}
+          >
+            Cancel
+          </Button>
           <Button
             size="1"
             color="red"
             onClick={() => onLoadPreset(confirmPreset)}
           >
             Replace
-          </Button>
-          <Button
-            size="1"
-            variant="soft"
-            onClick={onCancelConfirm}
-          >
-            Cancel
           </Button>
         </div>
       )}
