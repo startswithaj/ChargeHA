@@ -45,10 +45,6 @@ const realPaths = (type: "query" | "mutation"): string[] => {
         {} as unknown as SimulatedVehiclePlugin,
         stubDeps("simulated"),
       ),
-      simulated_dataonly: createSimulatedRouter(
-        {} as unknown as SimulatedVehiclePlugin,
-        stubDeps("simulated_dataonly"),
-      ),
     },
     energy: {
       fronius_local: createFroniusLocalRouter(stubDeps("fronius_local")),

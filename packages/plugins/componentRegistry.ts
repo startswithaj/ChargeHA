@@ -8,10 +8,7 @@ import { SimulatedEnergyConfig } from "./energy/simulated/client/SimulatedEnergy
 import { TeslaSettings } from "./vehicles/tesla/client/TeslaSettings.tsx";
 
 // Simulated vehicle settings component
-import {
-  SimulatedDataOnlySettings,
-  SimulatedVehicleSettings,
-} from "./vehicles/simulated/client/SimulatedVehicleSettings.tsx";
+import { SimulatedVehicleSettings } from "./vehicles/simulated/client/SimulatedVehicleSettings.tsx";
 
 // Fronius settings components
 import { FroniusCloudConfig } from "./energy/fronius-cloud/client/FroniusCloudConfig.tsx";
@@ -127,21 +124,6 @@ export const vehiclePluginOptions: VehiclePluginOption[] = [
       chargeLimitPercent: 80,
     },
   },
-  {
-    id: "simulated_dataonly",
-    label: "Simulated (data only)",
-    description:
-      "A virtual vehicle with no charging API — pair it with a smart " +
-      "charger to test charger-controlled setups.",
-    iconKey: "monitor",
-    demoSetup: true,
-    demoAvailable: true,
-    defaultVehicleConfig: {
-      batteryCapacityKwh: 75,
-      initialSocPercent: 50,
-      chargeLimitPercent: 80,
-    },
-  },
 ];
 
 /** Schedule notes from vehicle plugins, shown on the Schedules page. */
@@ -203,7 +185,6 @@ export const chargerPluginSteps: Record<string, PluginStepDef[]> = {
 export const pluginSettingsComponents: Record<string, ComponentType> = {
   "tesla-settings": TeslaSettings,
   "simulated-settings": SimulatedVehicleSettings,
-  "simulated-dataonly-settings": SimulatedDataOnlySettings,
   "fronius-local-config": FroniusLocalConfig,
   "fronius-cloud-config": FroniusCloudConfig,
   "sigenergy-local-config": SigenergyLocalConfig,

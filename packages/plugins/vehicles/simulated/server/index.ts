@@ -39,43 +39,19 @@ export const simulatedConfigDef = defineSection({});
  * testing and demo use. Pushes aggregated simulated charging load into
  * EnergyAdapterManager via `deps.setSimulatedLoad`.
  */
-interface SimulatedPluginIdentity {
-  id: string;
-  displayName: string;
-  settingsComponentKey: string;
-}
-
-const DUAL_ROLE_IDENTITY: SimulatedPluginIdentity = {
-  id: "simulated",
-  displayName: "Simulated",
-  settingsComponentKey: "simulated-settings",
-};
-
-export const DATA_ONLY_IDENTITY: SimulatedPluginIdentity = {
-  id: "simulated_dataonly",
-  displayName: "Simulated (data only)",
-  settingsComponentKey: "simulated-dataonly-settings",
-};
-
 export class SimulatedVehiclePlugin implements VehiclePlugin, ChargerPlugin {
-  readonly id: string;
-  readonly displayName: string;
+  readonly id = "simulated";
+  readonly displayName = "Simulated";
   readonly vendor = "ChargeHA";
   readonly configDef = simulatedConfigDef;
   readonly secretKeys: readonly string[] = [];
-  readonly settingsComponentKey: string;
+  readonly settingsComponentKey = "simulated-settings";
 
   private readonly adapters = new Map<string, SimulatedVehicleAdapter>();
   private readonly middlewares = new Map<string, SimulatedVehicleMiddleware>();
   private readonly startupPromise: Promise<void>;
 
-  constructor(
-    private readonly deps: PluginDependencies,
-    identity: SimulatedPluginIdentity = DUAL_ROLE_IDENTITY,
-  ) {
-    this.id = identity.id;
-    this.displayName = identity.displayName;
-    this.settingsComponentKey = identity.settingsComponentKey;
+  constructor(private readonly deps: PluginDependencies) {
     this.startupPromise = this.startup();
   }
 

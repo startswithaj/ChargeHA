@@ -112,9 +112,8 @@ function UnconfiguredPluginCard(
 }
 
 function SimulatedVehicleSection(
-  { handleAddSimulatedVehicle, handleAddDataOnlyVehicle }: {
+  { handleAddSimulatedVehicle }: {
     handleAddSimulatedVehicle: () => void;
-    handleAddDataOnlyVehicle: () => void;
   },
 ) {
   return (
@@ -140,16 +139,10 @@ function SimulatedVehicleSection(
         Add a virtual EV for testing charge control, schedules, and solar
         tracking without a real vehicle.
       </Text>
-      <div style={{ display: "flex", gap: 8 }}>
-        <Button size="1" variant="soft" onClick={handleAddSimulatedVehicle}>
-          <FlaskConical size={14} />
-          Add Simulated Vehicle
-        </Button>
-        <Button size="1" variant="soft" onClick={handleAddDataOnlyVehicle}>
-          <FlaskConical size={14} />
-          Add Data-Only Vehicle
-        </Button>
-      </div>
+      <Button size="1" variant="soft" onClick={handleAddSimulatedVehicle}>
+        <FlaskConical size={14} />
+        Add Simulated Vehicle
+      </Button>
     </div>
   );
 }
@@ -218,7 +211,6 @@ export function VehicleSettings() {
     recentlyAddedVins,
     handleDelete,
     handleAddSimulatedVehicle,
-    handleAddDataOnlyVehicle,
     vehiclePlugins,
     handleStartOnboarding,
   } = useVehicleSettings();
@@ -283,7 +275,6 @@ export function VehicleSettings() {
 
         <SimulatedVehicleSection
           handleAddSimulatedVehicle={handleAddSimulatedVehicle}
-          handleAddDataOnlyVehicle={handleAddDataOnlyVehicle}
         />
 
         <ConfiguredPluginSettings vehiclePlugins={vehiclePlugins} />

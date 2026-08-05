@@ -7,10 +7,7 @@ import type { EnergyPluginRegistry } from "@chargeha/server/bootstrap/EnergyPlug
 import type { ChargerPluginRegistry } from "@chargeha/server/bootstrap/ChargerPluginRegistry";
 import { TeslaVehiclePlugin } from "./vehicles/tesla/server/index.ts";
 import { TeslaProxyManager } from "./vehicles/tesla/server/TeslaProxyManager.ts";
-import {
-  DATA_ONLY_IDENTITY,
-  SimulatedVehiclePlugin,
-} from "./vehicles/simulated/server/index.ts";
+import { SimulatedVehiclePlugin } from "./vehicles/simulated/server/index.ts";
 import { FroniusLocalPlugin } from "./energy/fronius-local/server/index.ts";
 import { FroniusCloudPlugin } from "./energy/fronius-cloud/server/index.ts";
 import { SigenergyLocalPlugin } from "./energy/sigenergy-local/server/index.ts";
@@ -50,14 +47,6 @@ export function registerPlugins(
   const simulatedPlugin = new SimulatedVehiclePlugin(make("simulated"));
   vehicleRegistry.register(simulatedPlugin);
   chargerRegistry.register(simulatedPlugin);
-
-  // Vehicle role only — no charging point is ever created for it.
-  vehicleRegistry.register(
-    new SimulatedVehiclePlugin(
-      make(DATA_ONLY_IDENTITY.id),
-      DATA_ONLY_IDENTITY,
-    ),
-  );
 
   energyRegistry.register(new FroniusLocalPlugin(make("fronius_local")));
   energyRegistry.register(new FroniusCloudPlugin(make("fronius_cloud")));

@@ -12,7 +12,6 @@ type VehicleMutations = Pick<
   | "vehicle.command"
   | "vehicle.refreshState"
   | "plugin.vehicle.simulated.updateState"
-  | "plugin.vehicle.simulated_dataonly.updateState"
 >;
 
 const stateOf = (s: DemoState, vehicleId: string) => {
@@ -103,9 +102,6 @@ export const vehicleMutations: VehicleMutations = {
   "vehicle.refreshState": (input) => ({
     state: stateOf(getDemoState(), input.vehicleId),
   }),
-
-  "plugin.vehicle.simulated_dataonly.updateState": (input) =>
-    vehicleMutations["plugin.vehicle.simulated.updateState"](input),
 
   "plugin.vehicle.simulated.updateState": (input) => {
     const next = patchVehicle(input.vehicleId, (v) => ({

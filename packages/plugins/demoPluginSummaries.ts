@@ -24,11 +24,6 @@ export const demoVehiclePluginSummaries: DemoVehiclePluginSummary[] = [
     displayName: "Simulated",
     settingsComponentKey: "simulated-settings",
   },
-  {
-    id: "simulated_dataonly",
-    displayName: "Simulated (data only)",
-    settingsComponentKey: "simulated-dataonly-settings",
-  },
 ];
 
 export const demoEnergyPluginSummaries: DemoEnergyPluginSummary[] = [
@@ -57,8 +52,6 @@ export const chargerCapableVehicleAdapters: readonly string[] = [
   "tesla",
   "simulated",
 ];
-
-export const dataOnlyVehicleAdapterId = "simulated_dataonly";
 
 export const demoChargerDisplayNames: Record<string, string> = {
   simulated_charger: "Simulated Charger",

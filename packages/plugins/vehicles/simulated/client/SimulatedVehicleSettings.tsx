@@ -3,7 +3,6 @@ import { Badge, Button, Text } from "@radix-ui/themes";
 import { FlaskConical, Pencil } from "lucide-react";
 import type { VehicleWithState } from "@chargeha/shared";
 import { trpc } from "./trpc.ts";
-import { trpcDataOnly } from "./trpcDataOnly.ts";
 import { SimulatedVehicleDialog } from "./SimulatedVehicleDialog.tsx";
 
 export interface SimulateUpdate {
@@ -26,24 +25,6 @@ export function SimulatedVehicleSettings(): JSX.Element | null {
   return (
     <SimulatedVehicleList
       title="Simulated Vehicle Settings"
-      vehicles={vehiclesQuery.data ?? []}
-      onSimulate={(update) => simulateMutation.mutateAsync(update)}
-    />
-  );
-}
-
-export function SimulatedDataOnlySettings(): JSX.Element | null {
-  const vehiclesQuery = trpcDataOnly.plugin.vehicle.simulated_dataonly
-    .listVehicles.useQuery(undefined, {
-      select: (data: { vehicles: VehicleWithState[] }) => data.vehicles,
-    });
-  const simulateMutation = trpcDataOnly.plugin.vehicle.simulated_dataonly
-    .updateState.useMutation({
-      onSuccess: () => vehiclesQuery.refetch(),
-    });
-  return (
-    <SimulatedVehicleList
-      title="Simulated Vehicle (data only) Settings"
       vehicles={vehiclesQuery.data ?? []}
       onSimulate={(update) => simulateMutation.mutateAsync(update)}
     />

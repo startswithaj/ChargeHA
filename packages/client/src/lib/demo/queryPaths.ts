@@ -27,7 +27,6 @@ type FullAppRouter = ReturnType<
     {
       tesla: ReturnType<typeof createTeslaRouter>;
       simulated: ReturnType<typeof createSimulatedRouter>;
-      simulated_dataonly: ReturnType<typeof createSimulatedRouter>;
     },
     {
       fronius_local: ReturnType<typeof createFroniusLocalRouter>;

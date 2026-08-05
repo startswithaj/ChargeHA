@@ -2,7 +2,6 @@ import { useCallback, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import type { VehicleWithState } from "@chargeha/shared";
 import { vehiclePluginOptions } from "@chargeha/plugins/componentRegistry";
-import { dataOnlyVehicleAdapterId } from "@chargeha/plugins/demoPluginSummaries";
 import { useHomeConfig } from "../../../hooks/useSectionConfig.ts";
 import { trpc } from "../../../trpc.ts";
 import { useRouter } from "../../../hooks/useRouter.ts";
@@ -101,14 +100,6 @@ export function useVehicleSettings() {
     adapterType: demoPlugin?.id,
     namePrefix: "Demo EV",
   });
-  const addDataOnlyMutation = useAddSimulatedVehicleMutation({
-    utils,
-    vehicles,
-    homeConfig,
-    setRecentlyAddedVins,
-    adapterType: dataOnlyVehicleAdapterId,
-    namePrefix: "Data-Only EV",
-  });
 
   // --- Mutation handlers ---
 
@@ -116,7 +107,6 @@ export function useVehicleSettings() {
     deleteMutation.mutate({ vehicleId: vin });
 
   const handleAddSimulatedVehicle = () => addSimMutation.mutate();
-  const handleAddDataOnlyVehicle = () => addDataOnlyMutation.mutate();
 
   // --- Plugin onboarding ---
 
@@ -133,7 +123,6 @@ export function useVehicleSettings() {
   const mutations = [
     deleteMutation,
     addSimMutation,
-    addDataOnlyMutation,
   ];
   const displayError = vehiclesQuery.error?.message ??
     mutations.find((m) => m.error)?.error?.message ?? null;
@@ -146,7 +135,6 @@ export function useVehicleSettings() {
     recentlyAddedVins,
     handleDelete,
     handleAddSimulatedVehicle,
-    handleAddDataOnlyVehicle,
     vehiclePlugins,
     handleStartOnboarding,
   };
