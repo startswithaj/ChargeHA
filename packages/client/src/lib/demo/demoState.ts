@@ -23,6 +23,8 @@ export interface DemoVehicle {
   isCharging: boolean;
   isPluggedIn: boolean;
   chargeAmps: number;
+  /** Whether this car's own API drives charging. Undefined means yes. */
+  apiControlActive?: boolean;
 }
 
 export interface DemoCharger {

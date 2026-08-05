@@ -112,7 +112,7 @@ export const chargerHandlers: Record<string, QueryHandler> = {
         priority: v.priority,
         vehicleId: v.id,
         kind: "vehicle_api" as const,
-        active: true,
+        active: v.apiControlActive !== false,
         createdAt: CREATED_AT,
         updatedAt: now,
         state: linkedChargerState(v, now),

@@ -41,6 +41,10 @@ vi.mock("./useVehicleSettings.ts", () => ({
   useVehicleSettings: () => hookRef.current,
 }));
 
+vi.mock("./VehicleControlToggle.tsx", () => ({
+  VehicleControlToggle: () => <div data-testid="vehicle-control-toggle" />,
+}));
+
 vi.mock("./SettingsLayout.tsx", () => ({
   SettingsSection: (
     { children, title }: { children: React.ReactNode; title: string },

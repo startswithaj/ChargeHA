@@ -9,6 +9,7 @@ import {
 import { demoMode } from "../../../lib/featureFlags.ts";
 import { SettingsSection } from "./SettingsLayout.tsx";
 import { useVehicleSettings } from "./useVehicleSettings.ts";
+import { VehicleControlToggle } from "./VehicleControlToggle.tsx";
 
 type Vehicle = ReturnType<typeof useVehicleSettings>["vehicles"][number];
 type VehiclePlugin = ReturnType<
@@ -55,6 +56,7 @@ function VehicleRow(
           section) — vehicles are data-only. */
       }
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <VehicleControlToggle vehicleId={v.id} />
         <Button
           variant="ghost"
           color="red"

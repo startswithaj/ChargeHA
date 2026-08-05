@@ -16,6 +16,10 @@ const createInput = z.object({
 });
 const ensureInput = z.object({ chargerAdapterType: z.string() });
 const setAmpsInput = z.object({ id: z.string(), amps: z.number().int() });
+const vehicleControlInput = z.object({
+  vehicleId: z.string(),
+  active: z.boolean(),
+});
 
 export const chargersRouter = router({
   list: publicProcedure.query(async ({ ctx }) => {
@@ -65,4 +69,13 @@ export const chargersRouter = router({
   remove: publicProcedure.input(idInput).mutation(async ({ ctx, input }) => {
     await ctx.chargingPointManager.deleteCharger(input.id);
   }),
+
+  setVehicleControl: publicProcedure.input(vehicleControlInput).mutation(
+    async ({ ctx, input }) => {
+      await ctx.chargingPointManager.setVehicleApiControl(
+        input.vehicleId,
+        input.active,
+      );
+    },
+  ),
 });
