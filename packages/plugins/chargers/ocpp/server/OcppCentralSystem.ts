@@ -74,6 +74,10 @@ const PAIRING_ACTIONS = new Set([
   "StatusNotification",
 ]);
 
+/** A socket that reached us without a charge point id — should not happen,
+ *  but keys the map rather than silently sharing one entry. */
+const UNKNOWN_CHARGER = "";
+
 const idlePairing = (): OcppPairingState => ({
   armed: false,
   expiresAt: null,
@@ -111,41 +115,69 @@ const freshData = (): OcppLiveData => ({
   lastUpdated: new Date().toISOString(),
 });
 
+/** Everything that belongs to one charge point's live socket. Previously
+ *  these were single fields on the class, which is why a second charger
+ *  evicted the first and why both would have shared a transaction counter. */
+interface OcppConnection {
+  socket: WebSocket;
+  data: OcppLiveData;
+  /** Per socket: a CALLRESULT from one charger must never settle a call sent
+   *  to another. */
+  pending: PendingCalls;
+  transactionCounter: number;
+}
+
+/** A central system bound to one charge point. Adapters take this rather than
+ *  the whole central system, so an adapter cannot command a charger other than
+ *  its own, and cannot reach plugin-wide operations like pairing. */
+export interface OcppChargerHandle {
+  getData(): OcppLiveData;
+  remoteStart(): Promise<boolean>;
+  remoteStop(): Promise<boolean>;
+  setChargingProfiles(payloads: Array<Record<string, unknown>>): Promise<
+    boolean
+  >;
+  ping(): Promise<{ latencyMs: number }>;
+  restoreTransaction(tx: ActiveTransaction): void;
+}
+
 /** Plugin-internal OCPP 1.6J central system for a single charger.
  *  Owns the live socket, answers charger-initiated CALLs, tracks pushed
  *  state, and sends our CALLs (RemoteStart/Stop, SetChargingProfile...). */
 export class OcppCentralSystem {
-  private socket: WebSocket | null = null;
-  private data: OcppLiveData = freshData();
-  private readonly pending = new PendingCalls();
-  private transactionCounter = 0;
+  private readonly connections = new Map<string, OcppConnection>();
   private pairing: OcppPairingState = idlePairing();
   /** Last charger turned away for an unknown id, and when. A charger set up
    *  before listening started retries every couple of seconds; that is a
    *  signal worth showing the user, not noise to bury in the log. */
   private knocking: { chargerId: string; at: number } | null = null;
-  /** Charge point id of the currently attached socket. */
-  private connectedId: string | null = null;
 
   constructor(
     private readonly logger: Logger,
     private readonly dbLog: PluginDbLogger,
     /** Persists the active transaction (null = cleared) so a mid-charge
      *  restart keeps stop-control. Failures are logged, never thrown. */
+    /** Scoped by charge point id so a mid-charge restart restores each
+     *  charger's own session rather than one shared row. */
     private readonly persistTransaction: (
+      chargePointId: string,
       tx: ActiveTransaction | null,
     ) => Promise<void>,
   ) {}
 
-  getData(): OcppLiveData {
-    return this.data;
+  /** Disconnected chargers report fresh state rather than nothing, so callers
+   *  never have to special-case "no connection yet". */
+  getData(chargePointId: string): OcppLiveData {
+    return this.connections.get(chargePointId)?.data ?? freshData();
   }
 
   /** Seed a persisted mid-charge transaction on boot. No-op once live. */
-  restoreTransaction(tx: ActiveTransaction): void {
-    if (this.data.transactionId !== null) return;
-    this.transactionCounter = tx.transactionId;
-    this.patch({
+  restoreTransaction(chargePointId: string, tx: ActiveTransaction): void {
+    const connection = this.connections.get(chargePointId);
+    if (connection === undefined) return;
+    if (connection.data.transactionId !== null) return;
+    connection.transactionCounter = tx.transactionId;
+    this.patch(chargePointId, {
       transactionId: tx.transactionId,
       meterStartWh: tx.meterStartWh,
     });
@@ -165,8 +197,8 @@ export class OcppCentralSystem {
     this.pairing = {
       armed: true,
       expiresAt: Date.now() + ttlMs,
-      announcedId: this.data.provisional ? this.pairing.announcedId : null,
-      info: this.data.provisional ? this.pairing.info : null,
+      announcedId: this.hasProvisional() ? this.pairing.announcedId : null,
+      info: this.hasProvisional() ? this.pairing.info : null,
       // Keep the list across a renewal — the panel renews every minute while
       // open, and forgetting what was found would empty the picker.
       seen: this.pairing.armed ? this.pairing.seen : [],
@@ -175,10 +207,12 @@ export class OcppCentralSystem {
   }
 
   cancelPairing(): void {
-    const wasProvisional = this.data.provisional;
     this.pairing = idlePairing();
-    // A socket only tolerated because pairing was open must not outlive it.
-    if (wasProvisional) this.socket?.close();
+    // Sockets tolerated only because pairing was open must not outlive it.
+    // An adopted charger's connection is untouched.
+    this.connections.forEach((connection) => {
+      if (connection.data.provisional) connection.socket.close();
+    });
   }
 
   /** Expired windows report themselves closed without needing a timer. */
@@ -202,7 +236,14 @@ export class OcppCentralSystem {
    *  full connection — no reconnect wait. */
   promotePairing(): void {
     this.pairing = idlePairing();
-    if (this.data.provisional) this.patch({ provisional: false });
+    this.connections.forEach((connection, id) => {
+      if (connection.data.provisional) this.patch(id, { provisional: false });
+    });
+  }
+
+  /** Any connection still awaiting adoption. */
+  private hasProvisional(): boolean {
+    return [...this.connections.values()].some((c) => c.data.provisional);
   }
 
   /** Adopt an upgraded socket (from wsRoutes). A reconnect replaces the old
@@ -212,19 +253,47 @@ export class OcppCentralSystem {
     socket: WebSocket,
     opts: { provisional?: boolean; chargerId?: string } = {},
   ): void {
-    this.socket?.close();
-    this.socket = socket;
-    this.connectedId = opts.chargerId ?? null;
+    const id = opts.chargerId ?? UNKNOWN_CHARGER;
+    // Close only the previous socket for THIS charge point — that is a
+    // reconnect. A different id is a different charger and must be left
+    // alone; closing it is what made a second charger evict the first.
+    this.connections.get(id)?.socket.close();
+    const connection: OcppConnection = {
+      socket,
+      data: {
+        ...freshData(),
+        connected: true,
+        provisional: opts.provisional === true,
+      },
+      pending: new PendingCalls(),
+      transactionCounter: 0,
+    };
+    this.connections.set(id, connection);
     // deno-lint-ignore custom-no-param-mutation/no-param-mutation -- WebSocket handler wiring
-    socket.onmessage = (event) => this.onMessage(String(event.data));
+    socket.onmessage = (event) => this.onMessage(id, String(event.data));
     // deno-lint-ignore custom-no-param-mutation/no-param-mutation -- WebSocket handler wiring
-    socket.onclose = () => this.onClose(socket);
+    socket.onclose = () => this.onClose(id, socket);
     // deno-lint-ignore custom-no-param-mutation/no-param-mutation -- WebSocket handler wiring
     socket.onerror = (event) => this.logger.warn(`OCPP socket error: ${event}`);
-    this.patch({ connected: true, provisional: opts.provisional === true });
     this.logger.info(
-      opts.provisional ? "Charger connected (pairing)" : "Charger connected",
+      opts.provisional
+        ? `Charger ${id} connected (pairing)`
+        : `Charger ${id} connected`,
     );
+  }
+
+  /** A bound view for one charge point. Adapters take this so they cannot
+   *  command another charger, nor reach plugin-wide operations. */
+  forCharger(chargePointId: string): OcppChargerHandle {
+    return {
+      getData: () => this.getData(chargePointId),
+      remoteStart: () => this.remoteStart(chargePointId),
+      remoteStop: () => this.remoteStop(chargePointId),
+      setChargingProfiles: (payloads) =>
+        this.setChargingProfiles(chargePointId, payloads),
+      ping: () => this.ping(chargePointId),
+      restoreTransaction: (tx) => this.restoreTransaction(chargePointId, tx),
+    };
   }
 
   /** A charger tried to connect but its id is not configured and no window is
@@ -262,82 +331,104 @@ export class OcppCentralSystem {
   }
 
   shutdown(): void {
-    this.pending.rejectAll("Central system shutting down");
-    this.socket?.close();
-    this.socket = null;
+    this.connections.forEach((connection) => {
+      connection.pending.rejectAll("Central system shutting down");
+      connection.socket.close();
+    });
+    this.connections.clear();
   }
 
   // ── Outgoing commands ────────────────────────────────────────────────
 
-  async remoteStart(): Promise<boolean> {
-    const res = await this.send("RemoteStartTransaction", {
+  async remoteStart(chargePointId: string): Promise<boolean> {
+    const res = await this.send(chargePointId, "RemoteStartTransaction", {
       connectorId: 1,
       idTag: "chargeha",
     });
     return isAccepted(res);
   }
 
-  async remoteStop(): Promise<boolean> {
-    if (this.data.transactionId === null) return false;
-    const res = await this.send("RemoteStopTransaction", {
-      transactionId: this.data.transactionId,
+  async remoteStop(chargePointId: string): Promise<boolean> {
+    const transactionId = this.getData(chargePointId).transactionId;
+    if (transactionId === null) return false;
+    const res = await this.send(chargePointId, "RemoteStopTransaction", {
+      transactionId,
     });
     return isAccepted(res);
   }
 
   async setChargingProfiles(
+    chargePointId: string,
     payloads: Array<Record<string, unknown>>,
   ): Promise<boolean> {
     const results = await Promise.all(
-      payloads.map((p) => this.send("SetChargingProfile", p)),
+      payloads.map((p) => this.send(chargePointId, "SetChargingProfile", p)),
     );
     return results.every(isAccepted);
   }
 
   // GetConfiguration round trip: proves the charger answers calls.
-  async ping(): Promise<{ latencyMs: number }> {
+  async ping(chargePointId: string): Promise<{ latencyMs: number }> {
     const startedAt = performance.now();
-    await this.send("GetConfiguration", { key: ["HeartbeatInterval"] });
+    await this.send(chargePointId, "GetConfiguration", {
+      key: ["HeartbeatInterval"],
+    });
     return { latencyMs: Math.round(performance.now() - startedAt) };
   }
 
   // ── Incoming ─────────────────────────────────────────────────────────
 
-  private onMessage(raw: string): void {
+  private onMessage(chargePointId: string, raw: string): void {
+    const connection = this.connections.get(chargePointId);
+    if (connection === undefined) return;
     try {
       const frame = OcppFraming.decode(raw);
-      if (this.pending.settle(frame)) return;
+      if (connection.pending.settle(frame)) return;
       if (frame.kind !== "call") return;
-      this.reply(frame);
+      this.reply(chargePointId, frame);
     } catch (error) {
       this.logger.warn(`Bad OCPP message dropped: ${error}`);
     }
   }
 
-  private reply(frame: OcppFrame & { kind: "call" }): void {
+  private reply(
+    chargePointId: string,
+    frame: OcppFrame & { kind: "call" },
+  ): void {
+    const socket = this.connections.get(chargePointId)?.socket;
     try {
-      const payload = this.handleAction(frame.action, frame.payload);
+      const payload = this.handleAction(
+        chargePointId,
+        frame.action,
+        frame.payload,
+      );
       const message = payload === null
         ? OcppFraming.error(frame.id, "NotImplemented", frame.action)
         : OcppFraming.result(frame.id, payload);
-      this.socket?.send(message);
+      socket?.send(message);
     } catch (error) {
       // OCPP-J: a CALL with a bad payload still gets a targeted CALLERROR —
       // never a silent drop that leaves the charger waiting on its timeout.
       this.logger.warn(`OCPP ${frame.action} payload rejected: ${error}`);
-      this.socket?.send(
+      socket?.send(
         OcppFraming.error(frame.id, "FormationViolation", String(error)),
       );
     }
   }
 
   /** Returns the CALLRESULT payload, or null for unsupported actions. */
-  private handleAction(action: string, payload: unknown): unknown | null {
+  private handleAction(
+    chargePointId: string,
+    action: string,
+    payload: unknown,
+  ): unknown | null {
     this.dbLog.debug(`← ${action}`, { payload: { raw: payload } });
     // An unadopted charger gets a NotImplemented CALLERROR for anything
     // outside the pairing set — a targeted refusal rather than a silent drop,
     // and nothing it sends can reach the database.
-    if (this.data.provisional && !PAIRING_ACTIONS.has(action)) {
+    if (
+      this.getData(chargePointId).provisional && !PAIRING_ACTIONS.has(action)
+    ) {
       this.logger.warn(`OCPP ${action} refused: charger not adopted yet`);
       return null;
     }
@@ -349,7 +440,7 @@ export class OcppCentralSystem {
           model: boot.chargePointModel,
           firmwareVersion: boot.firmwareVersion ?? "unknown",
         };
-        this.patch({ info });
+        this.patch(chargePointId, { info });
         // Surface vendor/model on the pairing state too, so the panel can
         // name the charger that turned up before it is adopted.
         if (this.pairing.armed) {
@@ -357,7 +448,7 @@ export class OcppCentralSystem {
             ...this.pairing,
             info,
             seen: this.pairing.seen.map((c) =>
-              c.chargerId === this.connectedId ? { ...c, info } : c
+              c.chargerId === chargePointId ? { ...c, info } : c
             ),
           };
         }
@@ -371,37 +462,42 @@ export class OcppCentralSystem {
         return { currentTime: new Date().toISOString() };
       case "StatusNotification": {
         const s = statusNotificationReq.parse(payload);
-        this.patch({ status: s.status, errorCode: s.errorCode });
+        this.patch(chargePointId, { status: s.status, errorCode: s.errorCode });
         return {};
       }
       case "MeterValues": {
-        this.patch({
-          ...this.readMeterValues(meterValuesReq.parse(payload)),
+        this.patch(chargePointId, {
+          ...this.readMeterValues(
+            chargePointId,
+            meterValuesReq.parse(payload),
+          ),
           lastMeterValuesAt: Date.now(),
         });
         return {};
       }
       case "StartTransaction": {
         const start = startTransactionReq.parse(payload);
-        this.transactionCounter++;
-        this.patch({
-          transactionId: this.transactionCounter,
+        const connection = this.connections.get(chargePointId);
+        if (connection === undefined) return null;
+        connection.transactionCounter++;
+        this.patch(chargePointId, {
+          transactionId: connection.transactionCounter,
           meterStartWh: start.meterStart,
         });
-        this.persistTransaction({
-          transactionId: this.transactionCounter,
+        this.persistTransaction(chargePointId, {
+          transactionId: connection.transactionCounter,
           meterStartWh: start.meterStart,
         }).catch((error) =>
           this.logger.error("Persist transaction failed:", error)
         );
         return {
-          transactionId: this.transactionCounter,
+          transactionId: connection.transactionCounter,
           idTagInfo: { status: "Accepted" },
         };
       }
       case "StopTransaction": {
-        this.patch({ transactionId: null, meterStartWh: null });
-        this.persistTransaction(null).catch((error) =>
+        this.patch(chargePointId, { transactionId: null, meterStartWh: null });
+        this.persistTransaction(chargePointId, null).catch((error) =>
           this.logger.error("Persist transaction failed:", error)
         );
         return { idTagInfo: { status: "Accepted" } };
@@ -415,6 +511,7 @@ export class OcppCentralSystem {
   }
 
   private readMeterValues(
+    chargePointId: string,
     mv: ReturnType<typeof meterValuesReq.parse>,
   ): Partial<OcppLiveData> {
     const samples = mv.meterValue.flatMap((entry) => entry.sampledValue);
@@ -434,7 +531,7 @@ export class OcppCentralSystem {
       // fast the register counts up. Tier 3 (current × voltage) stays in
       // the adapter for when neither power nor a register delta exists.
       powerW: rawPower === null
-        ? this.derivePowerFromRegister(energyRegisterWh)
+        ? this.derivePowerFromRegister(chargePointId, energyRegisterWh)
         : toWatts(rawPower, powerUnit),
       currentA: read("Current.Import"),
       voltageV: read("Voltage"),
@@ -445,9 +542,13 @@ export class OcppCentralSystem {
   /** Watts from successive register readings: (ΔWh × 3600) / Δseconds.
    *  Needs two readings — the first after boot/reconnect yields null; a
    *  negative delta (register reset) yields null rather than a guess. */
-  private derivePowerFromRegister(registerWh: number | null): number | null {
-    const prevWh = this.data.energyRegisterWh;
-    const prevAt = this.data.lastMeterValuesAt;
+  private derivePowerFromRegister(
+    chargePointId: string,
+    registerWh: number | null,
+  ): number | null {
+    const previous = this.getData(chargePointId);
+    const prevWh = previous.energyRegisterWh;
+    const prevAt = previous.lastMeterValuesAt;
     if (registerWh === null || prevWh === null || prevAt === null) return null;
     const elapsedSec = (Date.now() - prevAt) / 1000;
     if (elapsedSec <= 0) return null;
@@ -456,30 +557,39 @@ export class OcppCentralSystem {
     return (deltaWh * 3600) / elapsedSec;
   }
 
-  private onClose(socket: WebSocket): void {
-    if (this.socket !== socket) return; // replaced by a reconnect
-    this.socket = null;
-    this.pending.rejectAll("Charger disconnected");
-    // Clear provisional with the socket it described, or a disconnected
-    // charger keeps reporting itself as mid-pairing.
-    this.patch({ connected: false, provisional: false });
-    this.logger.warn("Charger disconnected");
+  private onClose(chargePointId: string, socket: WebSocket): void {
+    const connection = this.connections.get(chargePointId);
+    // A reconnect already replaced this entry — the old socket closing must
+    // not tear down the new one.
+    if (connection === undefined || connection.socket !== socket) return;
+    connection.pending.rejectAll("Charger disconnected");
+    this.connections.delete(chargePointId);
+    this.logger.warn(`Charger ${chargePointId} disconnected`);
   }
 
-  private async send(action: string, payload: unknown): Promise<unknown> {
-    const socket = this.socket;
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      throw new Error("Charger not connected");
+  private async send(
+    chargePointId: string,
+    action: string,
+    payload: unknown,
+  ): Promise<unknown> {
+    const connection = this.connections.get(chargePointId);
+    if (
+      connection === undefined ||
+      connection.socket.readyState !== WebSocket.OPEN
+    ) {
+      throw new Error(`Charger ${chargePointId} not connected`);
     }
     const id = crypto.randomUUID();
     this.dbLog.debug(`→ ${action}`, { payload: { raw: payload } });
-    socket.send(OcppFraming.call(id, action, payload));
-    return await this.pending.wait(id);
+    connection.socket.send(OcppFraming.call(id, action, payload));
+    return await connection.pending.wait(id);
   }
 
-  private patch(delta: Partial<OcppLiveData>): void {
-    this.data = {
-      ...this.data,
+  private patch(chargePointId: string, delta: Partial<OcppLiveData>): void {
+    const connection = this.connections.get(chargePointId);
+    if (connection === undefined) return;
+    connection.data = {
+      ...connection.data,
       ...delta,
       lastUpdated: new Date().toISOString(),
     };

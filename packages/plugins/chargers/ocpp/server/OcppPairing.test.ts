@@ -43,13 +43,13 @@ describe("OCPP pairing", () => {
   };
 
   const build = () => {
-    const persisted: Array<unknown> = [];
+    const persisted: Array<{ chargePointId: string; tx: unknown }> = [];
     const logger = new Logger("OcppTest", "error");
     const cs = new OcppCentralSystem(
       logger,
       new PluginDbLogger(() => Promise.resolve(), logger),
-      (tx) => {
-        persisted.push(tx);
+      (chargePointId, tx) => {
+        persisted.push({ chargePointId, tx });
         return Promise.resolve();
       },
     );
@@ -70,6 +70,7 @@ describe("OCPP pairing", () => {
   };
 
   const BOOT = { chargePointVendor: "ACME", chargePointModel: "Wallbox9000" };
+  const CP = "ABB-83214";
 
   it("is closed until armed, so an unknown charger is refused", () => {
     const { cs } = build();
@@ -82,20 +83,26 @@ describe("OCPP pairing", () => {
     expect(cs.acceptsPairing()).toBe(true);
 
     const socket = fakeSocket();
-    cs.notePairedCharger("ABB-83214");
-    cs.attach(socket as unknown as WebSocket, { provisional: true });
+    cs.notePairedCharger(CP);
+    cs.attach(socket as unknown as WebSocket, {
+      provisional: true,
+      chargerId: CP,
+    });
 
-    expect(cs.getData().connected).toBe(true);
-    expect(cs.getData().provisional).toBe(true);
-    expect(cs.pairingState().announcedId).toBe("ABB-83214");
+    expect(cs.getData(CP).connected).toBe(true);
+    expect(cs.getData(CP).provisional).toBe(true);
+    expect(cs.pairingState().announcedId).toBe(CP);
   });
 
   it("surfaces vendor and model from BootNotification for the panel", () => {
     const { cs } = build();
     cs.armPairing(60_000);
     const socket = fakeSocket();
-    cs.notePairedCharger("ABB-83214");
-    cs.attach(socket as unknown as WebSocket, { provisional: true });
+    cs.notePairedCharger(CP);
+    cs.attach(socket as unknown as WebSocket, {
+      provisional: true,
+      chargerId: CP,
+    });
 
     const reply = call(socket, "BootNotification", BOOT);
 
@@ -109,7 +116,10 @@ describe("OCPP pairing", () => {
     const { cs, persisted } = build();
     cs.armPairing(60_000);
     const socket = fakeSocket();
-    cs.attach(socket as unknown as WebSocket, { provisional: true });
+    cs.attach(socket as unknown as WebSocket, {
+      provisional: true,
+      chargerId: CP,
+    });
 
     const reply = call(socket, "StartTransaction", {
       connectorId: 1,
@@ -120,7 +130,7 @@ describe("OCPP pairing", () => {
 
     expect(reply.messageTypeId).toBe(4); // CALLERROR, not a silent drop
     expect(reply.payloadOrCode).toBe("NotImplemented");
-    expect(cs.getData().transactionId).toBeNull();
+    expect(cs.getData(CP).transactionId).toBeNull();
     expect(persisted).toEqual([]);
   });
 
@@ -128,7 +138,10 @@ describe("OCPP pairing", () => {
     const { cs } = build();
     cs.armPairing(60_000);
     const socket = fakeSocket();
-    cs.attach(socket as unknown as WebSocket, { provisional: true });
+    cs.attach(socket as unknown as WebSocket, {
+      provisional: true,
+      chargerId: CP,
+    });
 
     const reply = call(socket, "MeterValues", {
       connectorId: 1,
@@ -139,19 +152,22 @@ describe("OCPP pairing", () => {
     });
 
     expect(reply.messageTypeId).toBe(4);
-    expect(cs.getData().powerW).toBeNull();
+    expect(cs.getData(CP).powerW).toBeNull();
   });
 
   it("accepts the same calls once the charger is adopted", () => {
     const { cs, persisted } = build();
     cs.armPairing(60_000);
     const socket = fakeSocket();
-    cs.notePairedCharger("ABB-83214");
-    cs.attach(socket as unknown as WebSocket, { provisional: true });
+    cs.notePairedCharger(CP);
+    cs.attach(socket as unknown as WebSocket, {
+      provisional: true,
+      chargerId: CP,
+    });
 
     cs.promotePairing();
 
-    expect(cs.getData().provisional).toBe(false);
+    expect(cs.getData(CP).provisional).toBe(false);
     expect(cs.pairingState().armed).toBe(false);
 
     const reply = call(socket, "StartTransaction", {
@@ -162,8 +178,47 @@ describe("OCPP pairing", () => {
     });
 
     expect(reply.messageTypeId).toBe(3);
-    expect(cs.getData().transactionId).not.toBeNull();
+    expect(cs.getData(CP).transactionId).not.toBeNull();
     expect(persisted.length).toBe(1);
+    expect(persisted[0].chargePointId).toBe(CP);
+  });
+
+  it("keeps two chargers independent — ids, state and disconnects", () => {
+    const { cs, persisted } = build();
+    cs.armPairing(60_000);
+    const a = fakeSocket();
+    const b = fakeSocket();
+    cs.notePairedCharger("charger-a");
+    cs.attach(a as unknown as WebSocket, { chargerId: "charger-a" });
+    cs.notePairedCharger("charger-b");
+    cs.attach(b as unknown as WebSocket, { chargerId: "charger-b" });
+
+    // Attaching the second must not evict the first — that was the bug.
+    expect(cs.getData("charger-a").connected).toBe(true);
+    expect(cs.getData("charger-b").connected).toBe(true);
+
+    const startTx = (socket: ReturnType<typeof fakeSocket>) =>
+      call(socket, "StartTransaction", {
+        connectorId: 1,
+        idTag: "tag",
+        meterStart: 1000,
+        timestamp: new Date().toISOString(),
+      });
+    startTx(a);
+    startTx(b);
+
+    // Separate counters: a shared one would give the second charger id 2.
+    expect(cs.getData("charger-a").transactionId).toBe(1);
+    expect(cs.getData("charger-b").transactionId).toBe(1);
+    expect(persisted.map((p) => p.chargePointId)).toEqual([
+      "charger-a",
+      "charger-b",
+    ]);
+
+    // One disconnecting leaves the other alone.
+    a.onclose();
+    expect(cs.getData("charger-a").connected).toBe(false);
+    expect(cs.getData("charger-b").connected).toBe(true);
   });
 
   it("reports the window closed once it has expired", () => {
@@ -177,15 +232,18 @@ describe("OCPP pairing", () => {
     const { cs } = build();
     cs.armPairing(60_000);
     const socket = fakeSocket();
-    cs.attach(socket as unknown as WebSocket, { provisional: true });
-    expect(cs.getData().provisional).toBe(true);
+    cs.attach(socket as unknown as WebSocket, {
+      provisional: true,
+      chargerId: CP,
+    });
+    expect(cs.getData(CP).provisional).toBe(true);
 
     socket.onclose();
 
     // A disconnected charger reporting itself as mid-pairing would leave the
     // panel showing a charger that is no longer there.
-    expect(cs.getData().connected).toBe(false);
-    expect(cs.getData().provisional).toBe(false);
+    expect(cs.getData(CP).connected).toBe(false);
+    expect(cs.getData(CP).provisional).toBe(false);
   });
 
   it("cancelling closes the window", () => {

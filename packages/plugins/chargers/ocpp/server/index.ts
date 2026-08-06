@@ -31,13 +31,17 @@ export class OcppChargerPlugin implements ChargerPlugin {
     this.centralSystem = new OcppCentralSystem(
       deps.log,
       deps.dbLog,
-      (tx) => this.persistTransaction(tx),
+      (chargePointId, tx) => this.persistTransaction(chargePointId, tx),
     );
     deps.log.info("OCPP plugin initialized");
   }
 
-  /** setConfig(key, null) clears — data-layer null boundary (code.md). */
+  /** setConfig(key, null) clears — data-layer null boundary (code.md).
+   *  Still one key while the plugin drives a single charger; the charge point
+   *  id is threaded through so per-charger storage is a change of key, not a
+   *  change of shape. */
   private async persistTransaction(
+    _chargePointId: string,
     tx: ActiveTransaction | null,
   ): Promise<void> {
     await this.deps.setConfig(
@@ -50,7 +54,10 @@ export class OcppChargerPlugin implements ChargerPlugin {
     const raw = await this.deps.getConfig("active_transaction");
     if (!raw) return;
     try {
+      const configuredId = await this.deps.getConfig("charger_id");
+      if (!configuredId) return;
       this.centralSystem.restoreTransaction(
+        configuredId,
         JSON.parse(raw) as ActiveTransaction,
       );
     } catch (error) {
@@ -60,12 +67,16 @@ export class OcppChargerPlugin implements ChargerPlugin {
 
   async createChargerMiddleware(row: ChargerRow): Promise<ChargerMiddleware> {
     await this.restorePersistedTransaction();
-    const [timeoutRaw, maxRaw, minRaw, phasesRaw] = await Promise.all([
-      this.deps.getConfig("meter_timeout_seconds"),
-      this.deps.getConfig("max_amps"),
-      this.deps.getConfig("min_amps"),
-      this.deps.getConfig("phases"),
-    ]);
+    const [timeoutRaw, maxRaw, minRaw, phasesRaw, chargePointId] = await Promise
+      .all([
+        this.deps.getConfig("meter_timeout_seconds"),
+        this.deps.getConfig("max_amps"),
+        this.deps.getConfig("min_amps"),
+        this.deps.getConfig("phases"),
+        // Which charge point this row drives. Still plugin-wide, so all rows
+        // resolve to the same one until per-row config lands.
+        this.deps.getConfig("charger_id"),
+      ]);
     const adapter = new OcppChargerAdapter(
       {
         chargerId: row.id,
@@ -74,7 +85,7 @@ export class OcppChargerPlugin implements ChargerPlugin {
         minAmps: parseInt(minRaw ?? "6", 10) || 6,
         phases: phasesRaw === "3" ? 3 : 1,
       },
-      this.centralSystem,
+      this.centralSystem.forCharger(chargePointId ?? ""),
     );
     return new PollingChargerMiddleware(adapter, this.deps.log);
   }
@@ -101,7 +112,7 @@ export class OcppChargerPlugin implements ChargerPlugin {
       run: async () => {
         const chargerId = await this.deps.getConfig("charger_id");
         if (!chargerId) return { status: "ok" }; // unconfigured — silent
-        return this.centralSystem.getData().connected
+        return this.centralSystem.getData(chargerId).connected
           ? { status: "ok" }
           : { status: "error", message: "Charger not connected" };
       },

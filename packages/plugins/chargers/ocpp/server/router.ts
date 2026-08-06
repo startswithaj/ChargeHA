@@ -87,8 +87,8 @@ export function createOcppRouter(
 
     /** Connection status + charger info for settings/wizard live display. */
     status: publicProcedure.query(async () => {
-      const data = centralSystem.getData();
       const chargerId = await deps.getConfig("charger_id");
+      const data = centralSystem.getData(chargerId ?? "");
       const pairing = centralSystem.pairingState();
       return {
         connected: data.connected,
@@ -132,7 +132,8 @@ export function createOcppRouter(
     ...pairingProcedures(deps, centralSystem),
 
     testConnection: publicProcedure.mutation(async () => {
-      if (!centralSystem.getData().connected) {
+      const chargerId = (await deps.getConfig("charger_id")) ?? "";
+      if (!centralSystem.getData(chargerId).connected) {
         return {
           success: false as const,
           error: "Charger not connected — check the charger URL in its " +
@@ -140,7 +141,7 @@ export function createOcppRouter(
         };
       }
       try {
-        const { latencyMs } = await centralSystem.ping();
+        const { latencyMs } = await centralSystem.ping(chargerId);
         return { success: true as const, latencyMs };
       } catch (error) {
         return {

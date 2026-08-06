@@ -5,7 +5,7 @@ import type {
   ChargerState,
   ChargerStatus,
 } from "@chargeha/shared";
-import type { OcppCentralSystem, OcppLiveData } from "./OcppCentralSystem.ts";
+import type { OcppChargerHandle, OcppLiveData } from "./OcppCentralSystem.ts";
 import { chargingProfilePayload } from "./OcppMessages.ts";
 import type { ChargePointStatus } from "./OcppMessages.ts";
 
@@ -45,7 +45,8 @@ export interface OcppAdapterConfig {
 export class OcppChargerAdapter implements ChargerAdapter {
   constructor(
     private readonly config: OcppAdapterConfig,
-    private readonly cs: OcppCentralSystem,
+    /** Bound to this charger, so the adapter cannot command another one. */
+    private readonly cs: OcppChargerHandle,
   ) {}
 
   pollIntervalSeconds(): null {
