@@ -1,7 +1,7 @@
 import type { DayOfWeek } from "@chargeha/shared";
 import type { SystemAlert } from "./types.ts";
 import type { DecisionCheck } from "@chargeha/shared/engine";
-import type { DecisionInputs } from "../services/ChargeController.ts";
+import type { DecisionInputs } from "./types.ts";
 
 /** Parse a JSON string into DecisionInputs, returning null on failure. */
 export function parseDecisionInputs(json: string): DecisionInputs | null {

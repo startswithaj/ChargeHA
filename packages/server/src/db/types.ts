@@ -7,6 +7,7 @@ import type {
   VehicleAdapterType,
   VehicleMode,
 } from "@chargeha/shared";
+import type { ControllerConfig } from "@chargeha/shared/engine";
 
 /** Structure of the JSON stored in the system_alert config key. */
 export interface SystemAlert {
@@ -292,4 +293,35 @@ export interface CreateSessionInput {
   email?: string | null;
   createdAt: number;
   expiresAt: number;
+}
+
+/** Structured inputs snapshot captured each decision cycle. Persisted as
+ *  controller_logs.inputs_json, so it belongs with the row types rather than
+ *  with the service that produces it — db must never import from services. */
+export interface DecisionInputs {
+  energy: {
+    solarProductionW: number;
+    gridPowerW: number;
+    homeConsumptionW: number;
+    batterySoc: number | null;
+  } | null;
+  vehicleState: {
+    isPluggedIn: boolean;
+    isCharging: boolean;
+    batteryLevel: number;
+    chargeLimit: number;
+    chargeAmps: number;
+    chargeAmpsMin: number;
+    chargeAmpsMax: number;
+    chargePowerKw: number;
+    latitude: number | null;
+    longitude: number | null;
+  } | null;
+  config: ControllerConfig;
+  activeSchedules: Array<{
+    id: string;
+    type: string;
+    startTime: string;
+    endTime: string;
+  }>;
 }

@@ -25,6 +25,7 @@ import type { AppDatabase } from "../db/AppDatabase.ts";
 import type {
   ChargerRow,
   ControllerLogInput,
+  DecisionInputs,
   ScheduleRow,
 } from "../db/types.ts";
 import type { ChargingPointManager } from "./ChargingPointManager.ts";
@@ -39,35 +40,6 @@ const DEFAULT_LOOP_MS = 30_000;
 
 // Prune old log entries every N loops
 const PRUNE_EVERY_N_LOOPS = 100;
-
-/** Structured inputs snapshot captured each decision cycle. */
-export interface DecisionInputs {
-  energy: {
-    solarProductionW: number;
-    gridPowerW: number;
-    homeConsumptionW: number;
-    batterySoc: number | null;
-  } | null;
-  vehicleState: {
-    isPluggedIn: boolean;
-    isCharging: boolean;
-    batteryLevel: number;
-    chargeLimit: number;
-    chargeAmps: number;
-    chargeAmpsMin: number;
-    chargeAmpsMax: number;
-    chargePowerKw: number;
-    latitude: number | null;
-    longitude: number | null;
-  } | null;
-  config: ControllerConfig;
-  activeSchedules: Array<{
-    id: string;
-    type: string;
-    startTime: string;
-    endTime: string;
-  }>;
-}
 
 /** Decision log entry built per vehicle per loop iteration. */
 interface DecisionLogEntry {
