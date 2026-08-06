@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Badge, Button, Text } from "@radix-ui/themes";
-import { NetworkDeviceSearch } from "../../../hostUi.ts";
+import { Badge, Text } from "@radix-ui/themes";
+import { NetworkDeviceSearch, PluginTestRow } from "../../../hostUi.ts";
 import { trpc } from "./trpc.ts";
 
 /** Guidance shown only when a locked plug turned up. Listing it with an
@@ -59,22 +59,26 @@ export function TapoTestButton(
     },
   });
   const result = test.data;
+  const incomplete = !host || !email || !password;
+
+  const message = (() => {
+    if (incomplete) {
+      return "Fill in the plug address and account details first.";
+    }
+    if (result?.success === false) return result.error;
+    return null;
+  })();
+
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <Button
-        size="2"
-        variant="soft"
-        disabled={!host || !email || !password || test.isPending}
-        onClick={() => test.mutate({ host, email, password })}
-      >
-        {test.isPending ? "Testing..." : "Test Connection"}
-      </Button>
-      {result?.success === true && (
-        <Badge color="green" size="1">Connected</Badge>
-      )}
-      {result?.success === false && (
-        <Text size="2" color="red">{result.error}</Text>
-      )}
-    </div>
+    <PluginTestRow
+      pending={test.isPending}
+      disabled={incomplete}
+      status={result?.success === true
+        ? <Badge color="green" size="1">Connected</Badge>
+        : undefined}
+      message={message}
+      tone={incomplete || result?.success === false ? "red" : "gray"}
+      onTest={() => test.mutate({ host, email, password })}
+    />
   );
 }

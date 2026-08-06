@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Badge, Select, TextField } from "@radix-ui/themes";
+import { Badge, Button, Select, Text, TextField } from "@radix-ui/themes";
 import { SettingsRow } from "./SettingsLayout.tsx";
 import { useSaveStatus } from "../../../hooks/useSectionConfig.ts";
 import {
@@ -201,5 +201,52 @@ export function PluginConfigForm({
       />
       {renderFooter?.(values)}
     </>
+  );
+}
+
+/** The "check it actually works" action every device plugin ends with.
+ *  Lives here rather than in its own module: a new file exported from
+ *  `hostUi` breaks Vite's resolution of `@chargeha/plugins/*` under vitest
+ *  (see DENO_VITE_PLUGIN_BUG.md). */
+export function PluginTestRow(
+  {
+    label = "Test Connection",
+    pending,
+    disabled,
+    status,
+    message,
+    tone,
+    onTest,
+  }: {
+    label?: string;
+    pending: boolean;
+    disabled?: boolean;
+    status?: ReactNode;
+    message?: string | null;
+    tone?: "gray" | "red";
+    onTest: () => void;
+  },
+) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        flexWrap: "wrap",
+        marginTop: 8,
+      }}
+    >
+      <Button
+        size="2"
+        variant="soft"
+        disabled={pending || disabled}
+        onClick={onTest}
+      >
+        {pending ? "Testing…" : label}
+      </Button>
+      {status}
+      {message && <Text size="2" color={tone ?? "gray"}>{message}</Text>}
+    </div>
   );
 }

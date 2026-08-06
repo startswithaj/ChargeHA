@@ -28,6 +28,7 @@ export {
   type PluginConfigField,
   PluginConfigForm,
   PluginFieldInputs,
+  PluginTestRow,
 } from "../client/src/components/pages/Settings/PluginConfigForm.tsx";
 export { usePluginSettingsHost } from "../client/src/components/pages/Settings/pluginSettingsHost.ts";
 export { useSaveStatus } from "../client/src/hooks/useSectionConfig.ts";
