@@ -3,8 +3,7 @@ import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDepend
 import type { OcppCentralSystem } from "./OcppCentralSystem.ts";
 
 /** The public: true mount. Path (relative to /api/charger/ocpp):
- *  GET /:chargerId — WS upgrade. Validates the configured charger id, then
- *  Basic Auth when an AuthorizationKey is set, then upgrades and hands the
+ *  GET /:chargerId — WS upgrade. Validates the configured charger id, then upgrades and hands the
  *  socket to the central system. */
 export function createOcppWsRoutes(
   deps: PluginDependencies,
@@ -15,18 +14,20 @@ export function createOcppWsRoutes(
   app.get("/:chargerId", async (c) => {
     const chargerId = c.req.param("chargerId");
     const configuredId = await deps.getConfig("charger_id");
-    if (!configuredId || chargerId !== configuredId) {
-      deps.log.warn(`OCPP connect rejected: unknown charger id ${chargerId}`);
+    const adopted = configuredId !== null && chargerId === configuredId;
+    // Pairing accepts an id we have never seen, so the panel can prove the
+    // charger reaches us before the user commits an id. The connection is
+    // provisional: OcppCentralSystem refuses everything outside the pairing
+    // action set, so nothing it sends is trusted or persisted.
+    const pairing = !adopted && centralSystem.acceptsPairing();
+    if (!adopted && !pairing) {
+      // Log once, then at most once a minute: a charger configured before the
+      // user pressed Listen retries every couple of seconds indefinitely.
+      if (centralSystem.shouldLogRejection(chargerId)) {
+        deps.log.warn(`OCPP connect rejected: unknown charger id ${chargerId}`);
+      }
+      centralSystem.noteRejected(chargerId);
       return c.text("Unknown charger", 404);
-    }
-
-    const authKey = await deps.getSecret("authorization_key");
-    if (
-      authKey &&
-      !validBasicAuth(c.req.header("Authorization"), chargerId, authKey)
-    ) {
-      deps.log.warn("OCPP connect rejected: bad Authorization");
-      return c.text("Unauthorized", 401);
     }
 
     if (c.req.header("Upgrade")?.toLowerCase() !== "websocket") {
@@ -43,18 +44,14 @@ export function createOcppWsRoutes(
     const { socket, response } = Deno.upgradeWebSocket(c.req.raw, {
       protocol: "ocpp1.6",
     });
-    socket.onopen = () => centralSystem.attach(socket);
+    if (pairing) {
+      deps.log.info(`OCPP pairing: charger announced id ${chargerId}`);
+      centralSystem.notePairedCharger(chargerId);
+    }
+    socket.onopen = () =>
+      centralSystem.attach(socket, { provisional: pairing, chargerId });
     return response;
   });
 
   return app;
-}
-
-function validBasicAuth(
-  header: string | undefined,
-  chargerId: string,
-  key: string,
-): boolean {
-  const expected = `Basic ${btoa(`${chargerId}:${key}`)}`;
-  return header === expected;
 }

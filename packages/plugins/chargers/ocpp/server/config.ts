@@ -8,19 +8,13 @@ import {
 export const ocppConfigDef = defineSection({
   ocppChargerId: {
     key: "charger_id",
-    // URL path component + Basic Auth (btoa) — keep it ASCII-safe.
+    // Goes into the websocket URL path, which OCPP-J requires to be
+    // percent-encoded per RFC3986 — restricting the charset avoids needing to.
     schema: z.string().regex(
       /^[A-Za-z0-9._~-]*$/,
       "Letters, numbers, dots, dashes and underscores only",
     ),
     default: "",
-  },
-  // Clearable → nullable, default null (homeLatitude pattern). null clears
-  // the stored secret via the data-layer null boundary.
-  ocppAuthorizationKey: {
-    key: "authorization_key",
-    schema: z.string().nullable(),
-    default: null,
   },
   ocppMeterTimeoutSeconds: {
     key: "meter_timeout_seconds",
@@ -61,6 +55,5 @@ export type OcppConfigKey = SectionKeys<typeof ocppConfigDef>;
 
 // Typed against the config keys so a rename is a compile error, not a
 // silently unencrypted secret (fronius-cloud pattern).
-export const OCPP_SECRET_KEYS = [
-  "authorization_key",
-] as const satisfies readonly OcppConfigKey[];
+/** OCPP stores no secrets. Kept so the plugin contract is explicit. */
+export const OCPP_SECRET_KEYS = [] as const satisfies readonly OcppConfigKey[];

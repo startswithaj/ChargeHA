@@ -32,6 +32,10 @@ export interface PluginConfigField {
    *  field in (network discovery, say) sits with it rather than orphaned at
    *  the end of the form. Receives a setter for this field's draft value. */
   after?: (setValue: (value: string) => void) => ReactNode;
+  /** Replaces the default input entirely. For a value the user should not
+   *  normally type — one discovered from the device, say — where the plugin
+   *  wants to show it as text plus its own escape hatch. */
+  render?: (value: string, setValue: (value: string) => void) => ReactNode;
 }
 
 type SaveOpts = { onSuccess: () => void; onError: (err: unknown) => void };
@@ -45,6 +49,7 @@ function FieldControl(
     autoFocus?: boolean;
   },
 ) {
+  if (field.render) return <>{field.render(value, onChange)}</>;
   if (field.options) {
     return (
       <Select.Root
@@ -141,6 +146,7 @@ export function PluginConfigForm({
   fields,
   onSave,
   renderFooter,
+  renderHeader,
   autoFocus,
 }: {
   data: Record<string, unknown> | undefined;
@@ -149,6 +155,13 @@ export function PluginConfigForm({
   /** Trailing content that needs the live edited values rather than the saved
    *  ones — a connection test, for instance. */
   renderFooter?: (values: Record<string, string>) => ReactNode;
+  /** Leading content, above the field rows. For setup a user must do *before*
+   *  the fields make sense — and which may itself fill one in, hence the
+   *  setter. */
+  renderHeader?: (
+    values: Record<string, string>,
+    setValue: (key: string, value: string) => void,
+  ) => ReactNode;
   autoFocus?: boolean;
 }) {
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -187,12 +200,18 @@ export function PluginConfigForm({
 
   const setValue = (key: string) => (value: string) =>
     setDraft((d) => ({ ...d, [key]: value }));
-  const values = Object.fromEntries(
-    fields.map((f) => [f.key, draft[f.key] ?? String(data[f.key] ?? "")]),
-  );
+  // Draft keys that have no row still belong here: a header can own a value
+  // the field list does not render.
+  const values = {
+    ...Object.fromEntries(
+      Object.keys(data).map((k) => [k, String(data[k] ?? "")]),
+    ),
+    ...draft,
+  };
 
   return (
     <>
+      {renderHeader?.(values, (key, value) => setValue(key)(value))}
       <PluginFieldInputs
         fields={fields}
         values={values}

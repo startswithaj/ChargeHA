@@ -151,20 +151,6 @@ describe("OCPP e2e", () => {
     expect(state.isPluggedIn).toBe(false); // Available = no cable
   });
 
-  it("AuthorizationKey bootstrap: charger accepts, key is stored", async () => {
-    // vcp replies Accepted to ChangeConfiguration but does not apply the key
-    // (verified stub) — reconnect-with-key is exercised by the auth suite.
-    const result = await ocppTrpc.plugin.charger.ocpp.setAuthorizationKey
-      .mutate({ key: "e2e-bootstrap-key" });
-    expect(result.success).toBe(true);
-    // Clear it so later reconnects in this suite stay unauthenticated.
-    // Depends on: ocppAuthorizationKey's z.string().nullable() schema +
-    // the null-clearing chain (setConfig/setSecret null → row deleted).
-    await ocppTrpc.plugin.charger.ocpp.setConfig.mutate({
-      ocppAuthorizationKey: null,
-    });
-  });
-
   it("derives power for an energy-only charger (register deltas)", async () => {
     // Some budget chargers send ONLY the running-total meter. Two readings
     // a few seconds apart must yield a derived power figure (tier 2 of the

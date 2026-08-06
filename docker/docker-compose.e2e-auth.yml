@@ -1,6 +1,0 @@
-services:
-  ocpp-vcp:
-    environment:
-      - WS_URL=ws://app:8000/api/charger/ocpp
-      - CP_ID=vcp-test
-      - PASSWORD=e2e-secret-key

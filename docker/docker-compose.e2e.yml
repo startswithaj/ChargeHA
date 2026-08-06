@@ -52,9 +52,6 @@ services:
       - WS_URL=ws://app:8000/api/charger/ocpp
       - CP_ID=vcp-test
       - ADMIN_PORT=9999
-      # PASSWORD intentionally unset for the default suite; the Basic Auth
-      # test sets the AuthorizationKey mid-suite and restarts this service
-      # with PASSWORD via a dedicated compose override (see review note 1).
     ports:
       - "19999:9999" # admin API for the test runner
     depends_on:

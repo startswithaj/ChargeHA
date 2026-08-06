@@ -1,8 +1,9 @@
+import { useMemo } from "react";
 import { Badge } from "@radix-ui/themes";
 import { PluginConfigForm, PluginTestRow } from "../../../hostUi.ts";
 import { trpc } from "./trpc.ts";
 import { OCPP_FIELDS } from "./fields.ts";
-import { OcppConnectionDetails } from "./OcppConnection.tsx";
+import { OcppConnectBlock } from "./OcppConnection.tsx";
 
 type OcppStatus = {
   connected: boolean;
@@ -28,9 +29,22 @@ function chargerDetail(data: OcppStatus): string | null {
 export function OcppSettings(): JSX.Element | null {
   const { data: config } = trpc.plugin.charger.ocpp.getConfig.useQuery();
   const utils = trpc.useUtils();
+  const promote = trpc.plugin.charger.ocpp.promotePairing.useMutation();
   const configMutation = trpc.plugin.charger.ocpp.setConfig.useMutation({
-    onSuccess: () => utils.plugin.charger.ocpp.getConfig.invalidate(),
+    onSuccess: () => {
+      utils.plugin.charger.ocpp.getConfig.invalidate();
+      // The paired socket is already open — promote it rather than making the
+      // charger reconnect just because we saved its id.
+      promote.mutate();
+    },
   });
+  // Pairing sits under the Charger ID row so "Use this ID" is beside the field
+  // it fills; `after` is what hands us the setter.
+  // Charger ID is discovered in the connect block above, not typed in a row.
+  const fields = useMemo(
+    () => OCPP_FIELDS.filter((f) => f.key !== "ocppChargerId"),
+    [],
+  );
   const status = trpc.plugin.charger.ocpp.status.useQuery(undefined, {
     refetchInterval: 5000,
   });
@@ -40,16 +54,19 @@ export function OcppSettings(): JSX.Element | null {
   return (
     <PluginConfigForm
       data={config}
-      fields={OCPP_FIELDS}
+      fields={fields}
       onSave={(draft, opts) => configMutation.mutate(draft, opts)}
+      renderHeader={(values, setValue) => (
+        <OcppConnectBlock
+          chargerId={values.ocppChargerId ?? ""}
+          onDetected={(id) => setValue("ocppChargerId", id)}
+        />
+      )}
       renderFooter={(values) => (
-        <>
-          <OcppConnectionDetails chargerId={values.ocppChargerId} />
-          <ConnectionRow
-            chargerId={values.ocppChargerId}
-            status={status.data}
-          />
-        </>
+        <ConnectionRow
+          chargerId={values.ocppChargerId ?? ""}
+          status={status.data}
+        />
       )}
     />
   );

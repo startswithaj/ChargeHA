@@ -35,6 +35,9 @@ export const GATED_QUERIES: readonly string[] = [
   "plugin.charger.tapo.status",
   "plugin.charger.ocpp.getConfig",
   "plugin.charger.ocpp.status",
+  // Enumerates the server's own network interfaces — nothing to report in a
+  // browser-only demo.
+  "plugin.charger.ocpp.connectionUrls",
 ] as const satisfies readonly QueryPath[];
 
 /** Queries known to exist but not yet implemented. Empty — all are handled. */
@@ -72,8 +75,11 @@ export const GATED_MUTATIONS = [
   "plugin.charger.tapo.testConnection",
   "plugin.charger.tapo.setPower",
   "plugin.charger.ocpp.setConfig",
-  "plugin.charger.ocpp.setAuthorizationKey",
   "plugin.charger.ocpp.testConnection",
+  // Pairing drives a real websocket handshake from real hardware.
+  "plugin.charger.ocpp.beginPairing",
+  "plugin.charger.ocpp.cancelPairing",
+  "plugin.charger.ocpp.promotePairing",
 ] as const satisfies readonly MutationPath[];
 
 /** The gated mutation paths as a literal union. */

@@ -10,8 +10,12 @@ export const OCPP_FIELDS: PluginConfigField[] = [
   {
     key: "ocppChargerId",
     label: "Charger ID",
-    help: "Any name you choose. You must enter this same value in your " +
-      "charger as its charge point id. Letters, numbers, dots, dashes and " +
+    // "Any name you choose" is wrong for a large class of chargers: where the
+    // charge point id is the serial number it cannot be renamed, so the id has
+    // to come from the charger.
+    help: "Must match your charger's charge point id exactly. Many chargers " +
+      "use their serial number and cannot be renamed — connect the charger " +
+      "and ChargeHA will fill this in. Letters, numbers, dots, dashes and " +
       "underscores only.",
     placeholder: CHARGER_ID_PLACEHOLDER,
     required: true,

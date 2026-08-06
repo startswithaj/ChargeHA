@@ -22,8 +22,33 @@ export interface ActiveTransaction {
   meterStartWh: number;
 }
 
+/** A charger that reached us during a pairing window but whose id is not the
+ *  configured one yet. Reported so the panel can show what turned up and
+ *  offer to adopt it. */
+/** One charger that turned up during a pairing window. More than one can:
+ *  a household may have two, or an old id may still be retrying alongside a
+ *  new one, so the user picks rather than us guessing. */
+export interface OcppSeenCharger {
+  chargerId: string;
+  info: OcppChargerInfo | null;
+  at: number;
+}
+
+export interface OcppPairingState {
+  armed: boolean;
+  expiresAt: number | null;
+  /** Most recent arrival — kept for the single-charger case. */
+  announcedId: string | null;
+  info: OcppChargerInfo | null;
+  /** Everything that connected during this window, newest last. */
+  seen: OcppSeenCharger[];
+}
+
 export interface OcppLiveData {
   connected: boolean;
+  /** True while the live socket is a pairing connection: proven reachable but
+   *  not yet adopted, so it must not drive charging or write any state. */
+  provisional: boolean;
   status: ChargePointStatus | null;
   errorCode: string | null;
   info: OcppChargerInfo | null;
@@ -39,8 +64,40 @@ export interface OcppLiveData {
   lastUpdated: string;
 }
 
+/** Charger-initiated actions a provisional connection may use. Enough to
+ *  prove the charger is real and reachable and to show what it is; everything
+ *  else is refused until the user adopts it, so an unadopted charger can never
+ *  open a transaction or write meter state. */
+const PAIRING_ACTIONS = new Set([
+  "BootNotification",
+  "Heartbeat",
+  "StatusNotification",
+]);
+
+const idlePairing = (): OcppPairingState => ({
+  armed: false,
+  expiresAt: null,
+  announcedId: null,
+  info: null,
+  seen: [],
+});
+
+/** Add a charger to the seen list, or refresh the one already there. Chargers
+ *  reconnect often; a duplicate row per reconnect would be noise. */
+function withCharger(
+  seen: OcppSeenCharger[],
+  chargerId: string,
+): OcppSeenCharger[] {
+  const known = seen.some((c) => c.chargerId === chargerId);
+  if (!known) return [...seen, { chargerId, info: null, at: Date.now() }];
+  return seen.map((c) =>
+    c.chargerId === chargerId ? { ...c, at: Date.now() } : c
+  );
+}
+
 const freshData = (): OcppLiveData => ({
   connected: false,
+  provisional: false,
   status: null,
   errorCode: null,
   info: null,
@@ -62,6 +119,13 @@ export class OcppCentralSystem {
   private data: OcppLiveData = freshData();
   private readonly pending = new PendingCalls();
   private transactionCounter = 0;
+  private pairing: OcppPairingState = idlePairing();
+  /** Last charger turned away for an unknown id, and when. A charger set up
+   *  before listening started retries every couple of seconds; that is a
+   *  signal worth showing the user, not noise to bury in the log. */
+  private knocking: { chargerId: string; at: number } | null = null;
+  /** Charge point id of the currently attached socket. */
+  private connectedId: string | null = null;
 
   constructor(
     private readonly logger: Logger,
@@ -87,19 +151,114 @@ export class OcppCentralSystem {
     });
   }
 
+  // ── Pairing ──────────────────────────────────────────────────────────
+
+  /** Open a time-boxed window in which a charger announcing any id may
+   *  connect provisionally. Lets the panel prove reachability before the user
+   *  commits a charger id, which otherwise cannot happen: the socket is
+   *  rejected until an id is saved, and the id cannot be verified until a
+   *  socket arrives. */
+  armPairing(ttlMs: number): void {
+    // Re-arming must not forget a charger that is already paired. The panel
+    // re-arms from polled state that can be a couple of seconds stale, so a
+    // reset here would blank the "found" display and make it flicker.
+    this.pairing = {
+      armed: true,
+      expiresAt: Date.now() + ttlMs,
+      announcedId: this.data.provisional ? this.pairing.announcedId : null,
+      info: this.data.provisional ? this.pairing.info : null,
+      // Keep the list across a renewal — the panel renews every minute while
+      // open, and forgetting what was found would empty the picker.
+      seen: this.pairing.armed ? this.pairing.seen : [],
+    };
+    this.logger.info(`OCPP pairing armed for ${Math.round(ttlMs / 1000)}s`);
+  }
+
+  cancelPairing(): void {
+    const wasProvisional = this.data.provisional;
+    this.pairing = idlePairing();
+    // A socket only tolerated because pairing was open must not outlive it.
+    if (wasProvisional) this.socket?.close();
+  }
+
+  /** Expired windows report themselves closed without needing a timer. */
+  pairingState(): OcppPairingState {
+    if (!this.pairing.armed) return this.pairing;
+    if (
+      this.pairing.expiresAt !== null && Date.now() > this.pairing.expiresAt
+    ) {
+      return idlePairing();
+    }
+    return this.pairing;
+  }
+
+  /** wsRoutes gate: may a charger whose id is not the configured one connect
+   *  right now? */
+  acceptsPairing(): boolean {
+    return this.pairingState().armed;
+  }
+
+  /** The user adopted the paired charger, so the live socket graduates to a
+   *  full connection — no reconnect wait. */
+  promotePairing(): void {
+    this.pairing = idlePairing();
+    if (this.data.provisional) this.patch({ provisional: false });
+  }
+
   /** Adopt an upgraded socket (from wsRoutes). A reconnect replaces the old
-   *  socket; state is retained (PRD: reconnection restores state). */
-  attach(socket: WebSocket): void {
+   *  socket; state is retained (PRD: reconnection restores state).
+   *  `provisional` marks a pairing connection — see OcppLiveData. */
+  attach(
+    socket: WebSocket,
+    opts: { provisional?: boolean; chargerId?: string } = {},
+  ): void {
     this.socket?.close();
     this.socket = socket;
+    this.connectedId = opts.chargerId ?? null;
     // deno-lint-ignore custom-no-param-mutation/no-param-mutation -- WebSocket handler wiring
     socket.onmessage = (event) => this.onMessage(String(event.data));
     // deno-lint-ignore custom-no-param-mutation/no-param-mutation -- WebSocket handler wiring
     socket.onclose = () => this.onClose(socket);
     // deno-lint-ignore custom-no-param-mutation/no-param-mutation -- WebSocket handler wiring
     socket.onerror = (event) => this.logger.warn(`OCPP socket error: ${event}`);
-    this.patch({ connected: true });
-    this.logger.info("Charger connected");
+    this.patch({ connected: true, provisional: opts.provisional === true });
+    this.logger.info(
+      opts.provisional ? "Charger connected (pairing)" : "Charger connected",
+    );
+  }
+
+  /** A charger tried to connect but its id is not configured and no window is
+   *  open. Recorded so the panel can offer to accept it. */
+  noteRejected(chargerId: string): void {
+    this.knocking = { chargerId, at: Date.now() };
+  }
+
+  /** Who has been knocking in the last 30 seconds, if anyone. */
+  knockingCharger(): string | null {
+    if (this.knocking === null) return null;
+    return Date.now() - this.knocking.at < 30_000
+      ? this.knocking.chargerId
+      : null;
+  }
+
+  /** True the first time an id is turned away, then at most once a minute —
+   *  a charger retrying on a 2s loop must not fill the log. */
+  shouldLogRejection(chargerId: string): boolean {
+    const last = this.knocking;
+    return last === null || last.chargerId !== chargerId ||
+      Date.now() - last.at > 60_000;
+  }
+
+  /** Record a charger that announced itself during the window. Re-announcing
+   *  the same id updates its row rather than adding a duplicate — chargers
+   *  reconnect frequently. */
+  notePairedCharger(chargerId: string): void {
+    if (!this.pairing.armed) return;
+    this.pairing = {
+      ...this.pairing,
+      announcedId: chargerId,
+      seen: withCharger(this.pairing.seen, chargerId),
+    };
   }
 
   shutdown(): void {
@@ -142,11 +301,6 @@ export class OcppCentralSystem {
     return { latencyMs: Math.round(performance.now() - startedAt) };
   }
 
-  async changeConfiguration(key: string, value: string): Promise<boolean> {
-    const res = await this.send("ChangeConfiguration", { key, value });
-    return isAccepted(res);
-  }
-
   // ── Incoming ─────────────────────────────────────────────────────────
 
   private onMessage(raw: string): void {
@@ -180,16 +334,33 @@ export class OcppCentralSystem {
   /** Returns the CALLRESULT payload, or null for unsupported actions. */
   private handleAction(action: string, payload: unknown): unknown | null {
     this.dbLog.debug(`← ${action}`, { payload: { raw: payload } });
+    // An unadopted charger gets a NotImplemented CALLERROR for anything
+    // outside the pairing set — a targeted refusal rather than a silent drop,
+    // and nothing it sends can reach the database.
+    if (this.data.provisional && !PAIRING_ACTIONS.has(action)) {
+      this.logger.warn(`OCPP ${action} refused: charger not adopted yet`);
+      return null;
+    }
     switch (action) {
       case "BootNotification": {
         const boot = bootNotificationReq.parse(payload);
-        this.patch({
-          info: {
-            vendor: boot.chargePointVendor,
-            model: boot.chargePointModel,
-            firmwareVersion: boot.firmwareVersion ?? "unknown",
-          },
-        });
+        const info = {
+          vendor: boot.chargePointVendor,
+          model: boot.chargePointModel,
+          firmwareVersion: boot.firmwareVersion ?? "unknown",
+        };
+        this.patch({ info });
+        // Surface vendor/model on the pairing state too, so the panel can
+        // name the charger that turned up before it is adopted.
+        if (this.pairing.armed) {
+          this.pairing = {
+            ...this.pairing,
+            info,
+            seen: this.pairing.seen.map((c) =>
+              c.chargerId === this.connectedId ? { ...c, info } : c
+            ),
+          };
+        }
         return {
           status: "Accepted",
           currentTime: new Date().toISOString(),
@@ -289,7 +460,9 @@ export class OcppCentralSystem {
     if (this.socket !== socket) return; // replaced by a reconnect
     this.socket = null;
     this.pending.rejectAll("Charger disconnected");
-    this.patch({ connected: false });
+    // Clear provisional with the socket it described, or a disconnected
+    // charger keeps reporting itself as mid-pairing.
+    this.patch({ connected: false, provisional: false });
     this.logger.warn("Charger disconnected");
   }
 
