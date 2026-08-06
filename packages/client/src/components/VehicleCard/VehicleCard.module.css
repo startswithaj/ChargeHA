@@ -1,7 +1,5 @@
-.card {
-  position: relative;
-  border-left: 3px solid var(--accent);
-}
+/* Header, mode toggle, status and detail-row layout live in
+   ui/CardLayout.module.css — shared with ChargerCard. */
 
 .mapCircle {
   position: absolute;
@@ -50,29 +48,6 @@
   left: 0;
 }
 
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-
-.headerLeft {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.modeToggle {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-
 .batterySection {
   margin-bottom: 12px;
 }
@@ -104,27 +79,6 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-.status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.details {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 12px;
-}
-
-.detailRow {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--gray-11);
 }
 
 .controls {

@@ -541,7 +541,7 @@ export class ControllerEngine {
     if (targetAmps < state.chargeAmpsMin) {
       const reason = `insufficient solar (${
         Math.round(availableW)
-      }W → ${targetAmps}A < min ${state.chargeAmpsMin}A)`;
+      }W == ${targetAmps}A < min ${state.chargeAmpsMin}A)`;
       const result = this.handleInsufficientSolar(
         state,
         controlState,

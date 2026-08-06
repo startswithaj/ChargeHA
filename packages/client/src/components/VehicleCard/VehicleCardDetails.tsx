@@ -13,6 +13,7 @@ import { Button, Text, Tooltip } from "@radix-ui/themes";
 import type { VehicleChargeState } from "@chargeha/shared";
 import { kwValue } from "../../utils/Format.ts";
 import { Spinner } from "../ui/Spinner.tsx";
+import layout from "../ui/CardLayout.module.css";
 import styles from "./VehicleCard.module.css";
 
 /** Which controller reasons warrant a visible status row. */
@@ -133,7 +134,7 @@ function ControllerReasonRow(
   const label = REASON_LABELS[reason]?.(detail) ?? detail;
   const color = REASON_COLORS[reason] ?? "gray";
   return (
-    <div className={styles.detailRow}>
+    <div className={layout.detailRow}>
       {Icon && <Icon size={14} />}
       <Text size="1" color={color}>{label}</Text>
     </div>
@@ -194,8 +195,8 @@ export function VehicleCardDetails({
   return (
     <>
       {/* Charge details */}
-      <div className={styles.details}>
-        <div className={styles.detailRow}>
+      <div className={layout.details}>
+        <div className={layout.detailRow}>
           <Zap size={14} />
           <Text size="1" color="gray">
             {state.isCharging
@@ -204,7 +205,7 @@ export function VehicleCardDetails({
           </Text>
         </div>
         {allocationStatus && (
-          <div className={styles.detailRow}>
+          <div className={layout.detailRow}>
             <ArrowUpDown size={14} />
             <Text size="1" color="yellow">{allocationStatus}</Text>
           </div>
@@ -219,21 +220,21 @@ export function VehicleCardDetails({
         {state.isCharging && (
           <>
             {(solarPowerW > 0 || gridPowerW > 0) && (
-              <div className={styles.detailRow}>
+              <div className={layout.detailRow}>
                 <Sun size={14} />
                 <Text size="1" color="gray">
                   {kwValue(solarPowerW)} solar, {kwValue(gridPowerW)} grid
                 </Text>
               </div>
             )}
-            <div className={styles.detailRow}>
+            <div className={layout.detailRow}>
               <BatteryCharging size={14} />
               <Text size="1" color="gray">
                 {state.energyAddedKwh.toFixed(1)} kWh added
               </Text>
             </div>
             {state.minutesToFull > 0 && (
-              <div className={styles.detailRow}>
+              <div className={layout.detailRow}>
                 <Plug size={14} />
                 <Text size="1" color="gray">
                   {formatMinutes(state.minutesToFull)} to {chargeLimitPercent}%

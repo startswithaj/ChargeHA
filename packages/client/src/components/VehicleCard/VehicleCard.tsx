@@ -15,6 +15,7 @@ import { StaticMap } from "../StaticMap/StaticMap.tsx";
 import { Spinner } from "../ui/Spinner.tsx";
 import { ErrorBanner } from "../ui/ErrorBanner.tsx";
 import { VehicleCardDetails } from "./VehicleCardDetails.tsx";
+import layout from "../ui/CardLayout.module.css";
 import styles from "./VehicleCard.module.css";
 
 interface VehicleCardProps {
@@ -122,8 +123,8 @@ function VehicleCardHeader(
 ) {
   const [refreshing, setRefreshing] = useState(false);
   return (
-    <div className={styles.header}>
-      <div className={styles.headerLeft}>
+    <div className={layout.header}>
+      <div className={layout.headerLeft}>
         <Car size={20} style={{ color: "var(--color-vehicle)" }} />
         <Text size="3" weight="bold">{name}</Text>
         <Badge variant="outline" color="gray" size="1">
@@ -236,7 +237,7 @@ function VehicleModeToggle(
 ) {
   return (
     <>
-      <div className={styles.modeToggle}>
+      <div className={layout.modeToggle}>
         {MODE_BUTTONS.map((btn) => (
           <Button
             key={btn.value}
@@ -327,7 +328,7 @@ export function VehicleCard({
 }: VehicleCardProps) {
   if (loading) {
     return (
-      <Card className={styles.card}>
+      <Card className={layout.card}>
         <Skeleton width="100%" height="180px" />
       </Card>
     );
@@ -350,7 +351,7 @@ export function VehicleCard({
 
   return (
     <Card
-      className={styles.card}
+      className={layout.card}
       style={{ "--accent": "var(--color-vehicle)" } as React.CSSProperties}
     >
       <VehicleCardHeader
@@ -384,7 +385,7 @@ export function VehicleCard({
       />
 
       {/* Status */}
-      <div className={styles.status}>
+      <div className={layout.status}>
         <StatusIcon state={state} />
         <Text size="2">{getStatusText(state, mode, atHome)}</Text>
       </div>
