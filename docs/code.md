@@ -22,8 +22,8 @@
 | Build          | Vite (client), Deno (server)                                 |
 | Misc           | qrcode.react (QR codes)                                      |
 
-Deno workspace with four members: `packages/shared/`, `packages/server/`,
-`packages/client/`, `packages/plugins/`.
+Deno workspace with five members: `packages/app/`, `packages/shared/`,
+`packages/server/`, `packages/client/`, `packages/plugins/`.
 
 ### Dev server flag
 
@@ -35,9 +35,14 @@ see denoland/deno#28632. Remove once this behavior becomes Deno's default.
 ## Project Structure
 
 ```
+packages/app/
+  main.ts                    — Entry point. The only file that imports both the
+                               server and the list of plugins, and wires them together.
 packages/shared/
   types.ts                   — All shared types (EnergyData, VehicleChargeState,
-                               StatsResponse, Schedule, TariffBreakdownEntry, etc.)
+                               StatsResponse, Schedule, VehicleRow, ChargerRow, etc.)
+  plugins.ts                 — The plugin contract (BasePlugin, VehiclePlugin,
+                               ChargerPlugin, EnergyPlugin, middleware interfaces)
   schemas.ts                 — Zod schemas shared between server and client
   configSections.ts          — Config section definitions + key registry
   engine/                    — Pure charging logic (ControllerEngine, SolarAllocator,
@@ -46,10 +51,11 @@ packages/shared/
   test-factories.ts          — Shared test factories (buildVehicleChargeState, etc.)
 packages/plugins/
   componentRegistry.ts          — Client-side plugin component registry
+  pluginOptions.ts              — Option metadata shapes a plugin uses to advertise
+                                  itself to the wizard (kept out of componentRegistry,
+                                  which imports every plugin)
   createPluginConfigProcedures.ts — Factory for plugin tRPC config procedures
-  PluginDbLogger.ts             — DB-backed logger exposed to plugins
   registerPlugins.ts            — Wires plugins into the server registries on boot
-  types.ts                      — Plugin interfaces (EnergyPlugin, VehiclePlugin, etc.)
   energy/
     fronius-local/              — Fronius inverter (local HTTP) plugin
     fronius-cloud/              — Fronius Cloud API plugin
@@ -57,7 +63,6 @@ packages/plugins/
     tesla/                      — Tesla Fleet API plugin (adapter, proxy, tokens, router)
     simulated/                  — Simulated vehicle for dev/demo
 packages/server/src/
-  main.ts                    — Entry point, initializes all services + plugins
   healthcheck.ts             — Standalone health probe (used by Docker)
   bootstrap/                 — App creation, service wiring, lifecycle, and the
                                EnergyPluginRegistry / VehiclePluginRegistry that
@@ -81,7 +86,8 @@ packages/server/src/
     rateLimit.ts             — Rate limiting middleware
   services/                  — One class per domain concern (ChargeController,
                                VehicleManager, ConfigService, etc.)
-  lib/                       — Utilities (Logger, Encryption, Geo, Tariffs)
+  lib/                       — Utilities (Logger, PluginDbLogger, Encryption, Geo,
+                               Tariffs)
   test-helpers/              — Test factories and helpers for server tests
 packages/client/src/
   App.tsx                    — Root component, routing
@@ -121,6 +127,81 @@ should not reference specific plugin IDs — interact through registry interface
 
 Plugin routers are merged into the app router dynamically via
 `createAppRouter(pluginRouters)` in `trpc/root.ts`.
+
+## Package Dependencies
+
+Imports flow one way. There are no exceptions.
+
+```
+app  ──▶  server  ──▶  shared
+ └───▶  plugins  ──▶  server  ──▶  shared
+```
+
+- **`shared` imports nothing** from the other packages.
+- **`plugins` can import `server`.** A plugin needs the app it plugs into —
+  `Logger`, `PluginDbLogger`, `PluginDependencies` and `trpc.ts` are all fine to
+  import.
+- **`server` must never import `plugins`.** It reaches plugins through
+  `@chargeha/shared/plugins` and the three registries instead.
+- **Only `packages/app` imports both**, and nothing imports `packages/app`.
+
+When two packages import each other, that is a cycle. Cycles cause errors that
+point at the wrong file, and they drag the whole server into the client's
+bundle.
+
+### Where to put a type
+
+| The type is…                    | Put it in                |
+| ------------------------------- | ------------------------ |
+| Used by both server and plugins | `shared/plugins.ts`      |
+| A DB row that a plugin is given | `shared/types.ts`        |
+| Server code a plugin just uses  | `server/src/lib/`        |
+| Used by one plugin only         | that plugin's own folder |
+
+The test: if `server` needs a type in order to describe how plugins plug into
+it, then both sides use that type, so it goes in `shared`. Put it in `plugins`
+instead and `server` has to import `plugins` to compile — and now the two
+packages import each other.
+
+### Two mistakes that cause this
+
+**1. A file that collects things also defines the type those things use.**
+
+`componentRegistry.ts` imports every plugin's `wizardSteps.ts` to build the
+registry. If `wizardSteps.ts` imports its option type back out of
+`componentRegistry.ts`, those two files import each other. That is why the
+option types live in `pluginOptions.ts` instead.
+
+The same thing happens inside a single plugin. `index.ts` imports `router.ts`,
+so `router.ts` must not import the plugin class back from `index.ts`. Write out
+only the methods the router actually calls:
+
+```ts
+// router.ts — NOT `import type { TeslaVehiclePlugin } from "./index.ts"`
+interface TeslaRouterPlugin {
+  readonly teslaService: TeslaService;
+  generateKeys(): Promise<{ success: true; publicKey: string }>;
+}
+```
+
+The plugin class already matches this, so nothing at the call site changes.
+
+**2. Startup code importing the list of plugins.**
+
+`bootstrap()` takes `registerPlugins` as an argument rather than importing it.
+`packages/app/main.ts` is the only file allowed to name which plugins exist.
+
+**`import type` still counts.** TypeScript deletes those imports when it
+compiles, so they cost nothing at runtime — but Deno and Vite still follow them
+when working out which files belong to the project. A type-only import creates a
+real cycle.
+
+### Checking
+
+`deno info --json <file>` lists every file that file imports, directly or
+indirectly, including type-only imports. Follow those lists from both starting
+points — `packages/app/main.ts` and `packages/plugins/componentRegistry.ts` —
+since neither reaches the whole tree alone. Both must report zero cycles.
 
 ## Wizard Steps
 
