@@ -1,129 +1,9 @@
-import { useState } from "react";
-import { Badge, Button, Text, TextField } from "@radix-ui/themes";
-import { type PluginConfigField, PluginConfigForm } from "../../../hostUi.ts";
+import { PluginConfigForm } from "../../../hostUi.ts";
 import { trpc } from "./trpc.ts";
+import { TAPO_FIELDS } from "./fields.tsx";
+import { TapoTestButton } from "./TapoControls.tsx";
 
-const FIELDS: PluginConfigField[] = [
-  {
-    key: "tapoHost",
-    label: "Plug IP address",
-    help: "Local IP of your Tapo plug. Use Search to auto-detect it.",
-    width: 150,
-    after: (setHost) => <TapoDiscoverySection onUse={setHost} />,
-  },
-  {
-    key: "tapoEmail",
-    label: "Tapo account email",
-    width: 220,
-  },
-  {
-    key: "tapoPassword",
-    label: "Tapo account password",
-    help: "Stored encrypted. Only used locally to authenticate with the plug.",
-    secret: true,
-    width: 220,
-  },
-  {
-    key: "tapoFixedDrawAmps",
-    label: "EVSE draw (amps)",
-    help: "The current your EVSE draws from this socket. The plug's " +
-      "continuous rating must be at or above this.",
-    width: 80,
-  },
-  {
-    key: "tapoDetectionThresholdW",
-    label: "Charging detection threshold (W)",
-    help: "Measured draw at or above this counts as charging; below it the " +
-      "plug reports no draw.",
-    width: 80,
-  },
-  {
-    key: "tapoPollIntervalSeconds",
-    label: "Poll interval (seconds)",
-    help: "How often the plug is polled. Local and free — 10s tracks solar " +
-      "closely.",
-    width: 80,
-  },
-];
-
-export function TapoDiscoverySection(
-  { onUse }: { onUse: (host: string) => void },
-) {
-  const [subnet, setSubnet] = useState("");
-  const discover = trpc.plugin.charger.tapo.discover.useMutation();
-  const found = discover.data?.found ?? [];
-
-  return (
-    <>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <Button
-          size="1"
-          variant="soft"
-          disabled={discover.isPending}
-          onClick={() => discover.mutate({ subnet: subnet || undefined })}
-        >
-          {discover.isPending ? "Scanning..." : "Search Network"}
-        </Button>
-        <Text size="1" color="gray">or enter subnet:</Text>
-        <TextField.Root
-          size="1"
-          placeholder="e.g. 192.168.0"
-          value={subnet}
-          onChange={(e: { target: { value: string } }) =>
-            setSubnet(e.target.value)}
-          style={{ width: 100 }}
-        />
-      </div>
-      {(discover.isSuccess || discover.isError) && found.length === 0 && (
-        <Text size="2" color="orange">
-          No Tapo devices found. Try entering your subnet above.
-        </Text>
-      )}
-      {found.map((d) => (
-        <div key={d.host} style={{ display: "flex", gap: 8 }}>
-          <Text size="2">{d.host}</Text>
-          <Button size="1" variant="soft" onClick={() => onUse(d.host)}>
-            Use
-          </Button>
-        </div>
-      ))}
-    </>
-  );
-}
-
-export function TapoTestButton(
-  { host, email, password, onValidated }: {
-    host: string;
-    email: string;
-    password: string;
-    onValidated?: () => void;
-  },
-) {
-  const test = trpc.plugin.charger.tapo.testConnection.useMutation({
-    onSuccess: (data) => {
-      if (data.success) onValidated?.();
-    },
-  });
-  const result = test.data;
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <Button
-        size="2"
-        variant="soft"
-        disabled={!host || !email || !password || test.isPending}
-        onClick={() => test.mutate({ host, email, password })}
-      >
-        {test.isPending ? "Testing..." : "Test Connection"}
-      </Button>
-      {result?.success === true && (
-        <Badge color="green" size="1">Connected</Badge>
-      )}
-      {result?.success === false && (
-        <Text size="2" color="red">{result.error}</Text>
-      )}
-    </div>
-  );
-}
+export { TapoDiscoverySection, TapoTestButton } from "./TapoControls.tsx";
 
 export function TapoSettings(): JSX.Element | null {
   const { data: config } = trpc.plugin.charger.tapo.getConfig.useQuery();
@@ -135,19 +15,17 @@ export function TapoSettings(): JSX.Element | null {
   if (!config) return null;
 
   return (
-    <>
-      <PluginConfigForm
-        data={config}
-        fields={FIELDS}
-        onSave={(draft, opts) => configMutation.mutate(draft, opts)}
-        renderFooter={(values) => (
-          <TapoTestButton
-            host={values.tapoHost}
-            email={values.tapoEmail}
-            password={values.tapoPassword}
-          />
-        )}
-      />
-    </>
+    <PluginConfigForm
+      data={config}
+      fields={TAPO_FIELDS}
+      onSave={(draft, opts) => configMutation.mutate(draft, opts)}
+      renderFooter={(values) => (
+        <TapoTestButton
+          host={values.tapoHost}
+          email={values.tapoEmail}
+          password={values.tapoPassword}
+        />
+      )}
+    />
   );
 }

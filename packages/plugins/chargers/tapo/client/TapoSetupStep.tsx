@@ -1,20 +1,14 @@
 import { useState } from "react";
-import { Text, TextField } from "@radix-ui/themes";
+import { Text } from "@radix-ui/themes";
 import {
+  PluginFieldInputs,
   type PluginStepDef,
-  SettingsRow,
   stepStyles as styles,
   type WizardNext,
 } from "../../../hostUi.ts";
 import { trpc } from "./trpc.ts";
-import { TapoDiscoverySection, TapoTestButton } from "./TapoSettings.tsx";
-
-interface TapoForm {
-  host: string;
-  email: string;
-  password: string;
-  fixedDrawAmps: string;
-}
+import { TAPO_DEFAULTS, TAPO_FIELDS } from "./fields.tsx";
+import { TapoTestButton } from "./TapoControls.tsx";
 
 function tapoNext(
   validated: boolean,
@@ -32,29 +26,19 @@ function tapoNext(
 
 export const tapoSetupStep: PluginStepDef = {
   id: "tapo-setup",
-  label: "Tapo Smart Plug",
+  label: "Tapo P110/115 Smart Plug",
   useStep: () => {
     const saveMutation = trpc.plugin.charger.tapo.setConfig.useMutation();
-    const [form, setForm] = useState<TapoForm>({
-      host: "",
-      email: "",
-      password: "",
-      fixedDrawAmps: "10",
-    });
+    const [form, setForm] = useState<Record<string, string>>(TAPO_DEFAULTS);
     const [validated, setValidated] = useState(false);
 
-    const patch = (delta: Partial<TapoForm>) => {
-      setForm((f) => ({ ...f, ...delta }));
+    const patch = (key: string, value: string) => {
+      setForm((f) => ({ ...f, [key]: value }));
       setValidated(false);
     };
 
     const save = async () => {
-      await saveMutation.mutateAsync({
-        tapoHost: form.host,
-        tapoEmail: form.email,
-        tapoPassword: form.password,
-        tapoFixedDrawAmps: form.fixedDrawAmps,
-      });
+      await saveMutation.mutateAsync(form);
     };
 
     return {
@@ -66,51 +50,15 @@ export const tapoSetupStep: PluginStepDef = {
             Tapo account credentials never leave this server — they are only
             used to talk to the plug locally.
           </Text>
-          <TapoDiscoverySection
-            onUse={(host) => patch({ host })}
+          <PluginFieldInputs
+            fields={TAPO_FIELDS}
+            values={form}
+            onChange={patch}
           />
-          <SettingsRow label="Plug IP address">
-            <TextField.Root
-              size="2"
-              placeholder="192.168.1.60"
-              value={form.host}
-              onChange={(e: { target: { value: string } }) =>
-                patch({ host: e.target.value })}
-            />
-          </SettingsRow>
-          <SettingsRow label="Tapo account email">
-            <TextField.Root
-              size="2"
-              value={form.email}
-              onChange={(e: { target: { value: string } }) =>
-                patch({ email: e.target.value })}
-            />
-          </SettingsRow>
-          <SettingsRow label="Tapo account password">
-            <TextField.Root
-              size="2"
-              type="password"
-              value={form.password}
-              onChange={(e: { target: { value: string } }) =>
-                patch({ password: e.target.value })}
-            />
-          </SettingsRow>
-          <SettingsRow
-            label="EVSE draw (amps)"
-            help="The current your EVSE draws from this socket (e.g. 10A for an AU 10A socket). The plug's continuous rating must be at or above this."
-          >
-            <TextField.Root
-              size="2"
-              value={form.fixedDrawAmps}
-              onChange={(e: { target: { value: string } }) =>
-                patch({ fixedDrawAmps: e.target.value })}
-              style={{ width: 80 }}
-            />
-          </SettingsRow>
           <TapoTestButton
-            host={form.host}
-            email={form.email}
-            password={form.password}
+            host={form.tapoHost}
+            email={form.tapoEmail}
+            password={form.tapoPassword}
             onValidated={() => setValidated(true)}
           />
         </div>

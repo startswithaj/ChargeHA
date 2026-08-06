@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { Badge, Code, Text, TextField } from "@radix-ui/themes";
+import { Badge, Code, Text } from "@radix-ui/themes";
 import {
+  PluginFieldInputs,
   type PluginStepDef,
-  SettingsRow,
   stepStyles as styles,
   type WizardNext,
 } from "../../../hostUi.ts";
 import { trpc } from "./trpc.ts";
+import { OCPP_DEFAULTS, OCPP_FIELDS } from "./fields.ts";
 
 function ocppNext(connected: boolean): WizardNext {
   if (!connected) {
@@ -41,40 +42,35 @@ export const ocppSetupStep: PluginStepDef = {
     const status = trpc.plugin.charger.ocpp.status.useQuery(undefined, {
       refetchInterval: 2000,
     });
-    const [chargerId, setChargerId] = useState<string | null>(null);
+    const [draft, setDraft] = useState<Record<string, string>>({});
 
-    const effectiveId = chargerId ?? config?.ocppChargerId ?? "";
+    const values = { ...OCPP_DEFAULTS, ...(config ?? {}), ...draft };
+    const chargerId = values.ocppChargerId;
     // location.port is "" on default ports (80/443) — omit the colon then.
     const wsUrl = `ws://${globalThis.location.hostname}${
       globalThis.location.port ? `:${globalThis.location.port}` : ""
-    }/api/charger/ocpp/${effectiveId || "<charger-id>"}`;
+    }/api/charger/ocpp/${chargerId || "<charger-id>"}`;
     const connected = status.data?.connected === true;
+
+    // Committed on blur, not per keystroke — the id gates the WS route
+    // allowlist and half-typed ids must never hit the DB.
+    const commit = (key: string) => {
+      const value = (draft[key] ?? "").trim();
+      if (draft[key] === undefined) return;
+      if (value === String((config ?? {})[key] ?? "")) return;
+      saveMutation.mutate({ [key]: value });
+    };
 
     return {
       next: ocppNext(connected),
       view: (
         <div className={styles.stepContainer}>
-          <SettingsRow
-            label="Charger ID"
-            help="Any name you choose — it becomes part of the URL below and identifies your charger."
-          >
-            <TextField.Root
-              size="2"
-              placeholder="my-wallbox"
-              value={effectiveId}
-              onChange={(e: { target: { value: string } }) =>
-                setChargerId(e.target.value)}
-              onBlur={() => {
-                // Save on blur, not per keystroke — the id gates the WS
-                // route allowlist and half-typed ids must never hit the DB
-                // (same local-state-then-save pattern as the other plugins).
-                const trimmed = (chargerId ?? "").trim();
-                if (trimmed && trimmed !== config?.ocppChargerId) {
-                  saveMutation.mutate({ ocppChargerId: trimmed });
-                }
-              }}
-            />
-          </SettingsRow>
+          <PluginFieldInputs
+            fields={OCPP_FIELDS}
+            values={values}
+            onChange={(key, value) => setDraft((d) => ({ ...d, [key]: value }))}
+            onCommit={commit}
+          />
           <Text size="2">
             Enter this URL in your charger's OCPP settings (its app or web
             portal), then wait — the charger connects to ChargeHA:

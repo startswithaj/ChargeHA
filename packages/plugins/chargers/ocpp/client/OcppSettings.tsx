@@ -1,48 +1,7 @@
 import { Badge, Button, Code, Text } from "@radix-ui/themes";
-import {
-  type PluginConfigField,
-  PluginConfigForm,
-  SettingsRow,
-} from "../../../hostUi.ts";
+import { PluginConfigForm, SettingsRow } from "../../../hostUi.ts";
 import { trpc } from "./trpc.ts";
-
-const FIELDS: PluginConfigField[] = [
-  {
-    key: "ocppChargerId",
-    label: "Charger ID",
-    help: "Path component of the charger URL. Letters, numbers, dots, " +
-      "dashes and underscores only.",
-    width: 180,
-  },
-  {
-    key: "ocppMaxAmps",
-    label: "Max amps",
-    help: "The charger's maximum charging current.",
-    width: 80,
-  },
-  {
-    key: "ocppMinAmps",
-    label: "Min amps",
-    help: "The charger's minimum charging current (J1772 floor is 6A).",
-    width: 80,
-  },
-  {
-    key: "ocppPhases",
-    label: "Phases",
-    help: "Used to derive amps from reported watts when the charger does " +
-      "not report current.",
-    options: [
-      { value: "1", label: "Single phase" },
-      { value: "3", label: "Three phase" },
-    ],
-  },
-  {
-    key: "ocppMeterTimeoutSeconds",
-    label: "Meter timeout (seconds)",
-    help: "Reported state goes stale when no MeterValues arrive within this.",
-    width: 80,
-  },
-];
+import { OCPP_FIELDS } from "./fields.ts";
 
 function connectionBadge(
   data: {
@@ -81,7 +40,7 @@ export function OcppSettings(): JSX.Element | null {
     <>
       <PluginConfigForm
         data={config}
-        fields={FIELDS}
+        fields={OCPP_FIELDS}
         onSave={(draft, opts) => configMutation.mutate(draft, opts)}
       />
       <SettingsRow
