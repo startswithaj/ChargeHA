@@ -1,14 +1,11 @@
 // The one local-network device search control, shared by every plugin that can
 // discover hardware on the LAN.
 //
-// IMPORTANT: keep this file to two import statements. A new module reaching the
-// plugins graph with three or more imports makes @deno/vite-plugin fail to
-// resolve "@chargeha/plugins/*" under vitest, which surfaces as ~13 unrelated
-// client suites failing with "Failed to resolve import
-// @chargeha/plugins/componentRegistry". Reproduced with three trivial local
-// imports and no npm dependencies at all, so it is the import count, not what
-// is imported. Spinner therefore comes from Radix rather than the client's own,
-// and node types are avoided in favour of the global JSX namespace.
+// Imports nothing from hostUi.ts: hostUi is what plugin client code imports
+// from, and componentRegistry imports hostUi in turn, so pulling hostUi in
+// here would close a cycle. Spinner therefore comes from Radix rather than
+// the client's own, and JSX.Element is used instead of importing React's
+// ReactNode. See the dependency rules in docs/code.md.
 import { Badge, Button, Spinner, Text, TextField } from "@radix-ui/themes";
 import { Search } from "lucide-react";
 

@@ -239,10 +239,6 @@ function ListenStep(
  * 1.6 carries it in the URL, and on many chargers it is the serial number and
  * cannot be changed. So we take whatever id turns up and report it back rather
  * than demanding one up front.
- *
- * Lives in this file rather than its own module on purpose: a new module in
- * the plugins graph with three or more imports breaks @deno/vite-plugin's
- * resolution of "@chargeha/plugins/*". See DENO_VITE_PLUGIN_BUG.md.
  */
 export function OcppConnectBlock(
   { chargerId, onDetected }: {

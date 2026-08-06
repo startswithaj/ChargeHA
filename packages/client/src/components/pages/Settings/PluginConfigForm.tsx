@@ -223,10 +223,7 @@ export function PluginConfigForm({
   );
 }
 
-/** The "check it actually works" action every device plugin ends with.
- *  Lives here rather than in its own module: a new file exported from
- *  `hostUi` breaks Vite's resolution of `@chargeha/plugins/*` under vitest
- *  (see DENO_VITE_PLUGIN_BUG.md). */
+/** The "check it actually works" action every device plugin ends with. */
 export function PluginTestRow(
   {
     label = "Test Connection",
