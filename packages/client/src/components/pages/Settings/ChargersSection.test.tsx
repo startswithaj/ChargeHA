@@ -211,7 +211,7 @@ describe("ChargersSection", () => {
     renderWithProviders(<ChargersSection />);
 
     expect(screen.getByText("New Tapo Smart Plug")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Add charger" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
     expect(hookRef.current.submitEdit).toHaveBeenCalled();
   });
 

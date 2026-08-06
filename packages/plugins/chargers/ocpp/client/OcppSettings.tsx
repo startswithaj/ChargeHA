@@ -28,9 +28,13 @@ const FIELDS: PluginConfigField[] = [
   },
   {
     key: "ocppPhases",
-    label: "Phases (1 or 3)",
-    help: "Used to derive amps from reported watts.",
-    width: 80,
+    label: "Phases",
+    help: "Used to derive amps from reported watts when the charger does " +
+      "not report current.",
+    options: [
+      { value: "1", label: "Single phase" },
+      { value: "3", label: "Three phase" },
+    ],
   },
   {
     key: "ocppMeterTimeoutSeconds",

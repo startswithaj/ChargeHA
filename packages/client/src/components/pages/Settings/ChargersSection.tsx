@@ -1,5 +1,5 @@
-import { Button, Dialog, Select, Switch, Text } from "@radix-ui/themes";
-import { Plug } from "lucide-react";
+import { Button, Dialog, DropdownMenu, Switch, Text } from "@radix-ui/themes";
+import { ChevronDown, Plug, Plus } from "lucide-react";
 import { chargerPluginOptions } from "@chargeha/plugins/componentRegistry";
 import { SettingsRow, SettingsSection } from "./SettingsLayout.tsx";
 import {
@@ -100,7 +100,7 @@ function ChargerList(
             <Text size="2" weight="bold">New {labelFor(editing.typeId)}</Text>
             <ChargerEditForm
               typeId={editing.typeId}
-              submitLabel="Add charger"
+              submitLabel="Add"
               error={settings.error}
               busy={settings.busy}
               onSubmit={settings.submitEdit}
@@ -155,20 +155,26 @@ function ChargerListItem(
 function AddChargerSelect({ onChoose }: { onChoose: (id: string) => void }) {
   const disabledIds = demoMode.blockedPlugins(chargerPluginOptions);
   return (
-    <Select.Root value="" onValueChange={onChoose}>
-      <Select.Trigger placeholder="Add charger" variant="soft" />
-      <Select.Content>
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger>
+        <Button size="1" variant="soft">
+          <Plus size={14} />
+          Add charger
+          <ChevronDown size={14} />
+        </Button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Content>
         {chargerPluginOptions.map((option) => (
-          <Select.Item
+          <DropdownMenu.Item
             key={option.id}
-            value={option.id}
             disabled={disabledIds.has(option.id)}
+            onSelect={() => onChoose(option.id)}
           >
             {option.label}
-          </Select.Item>
+          </DropdownMenu.Item>
         ))}
-      </Select.Content>
-    </Select.Root>
+      </DropdownMenu.Content>
+    </DropdownMenu.Root>
   );
 }
 

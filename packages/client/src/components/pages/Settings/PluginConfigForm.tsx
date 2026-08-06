@@ -3,9 +3,10 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from "react";
-import { TextField } from "@radix-ui/themes";
+import { Select, TextField } from "@radix-ui/themes";
 import { SettingsRow } from "./SettingsLayout.tsx";
 import { useSaveStatus } from "../../../hooks/useSectionConfig.ts";
 import { usePluginSettingsHost } from "./pluginSettingsHost.ts";
@@ -16,6 +17,8 @@ export interface PluginConfigField {
   help?: string;
   secret?: boolean;
   width?: number;
+  /** Renders a select rather than a free-text box. */
+  options?: Array<{ value: string; label: string }>;
   /** Rendered directly beneath this field's row, so a control that fills the
    *  field in (network discovery, say) sits with it rather than orphaned at
    *  the end of the form. Receives a setter for this field's draft value. */
@@ -23,6 +26,38 @@ export interface PluginConfigField {
 }
 
 type SaveOpts = { onSuccess: () => void; onError: (err: unknown) => void };
+
+function FieldControl(
+  { field, value, onChange }: {
+    field: PluginConfigField;
+    value: string;
+    onChange: (value: string) => void;
+  },
+) {
+  if (field.options) {
+    return (
+      <Select.Root size="2" value={value} onValueChange={onChange}>
+        <Select.Trigger />
+        <Select.Content>
+          {field.options.map((option) => (
+            <Select.Item key={option.value} value={option.value}>
+              {option.label}
+            </Select.Item>
+          ))}
+        </Select.Content>
+      </Select.Root>
+    );
+  }
+  return (
+    <TextField.Root
+      size="2"
+      type={field.secret ? "password" : undefined}
+      value={value}
+      onChange={(e: { target: { value: string } }) => onChange(e.target.value)}
+      style={{ width: field.width ?? 100 }}
+    />
+  );
+}
 
 /**
  * Drop-in settings form for a plugin's config. Renders `fields` as editable
@@ -48,17 +83,26 @@ export function PluginConfigForm({
   const { saveStatus, onMutate, onSuccess, onError } = useSaveStatus();
 
   const isDirty = Object.keys(draft).length > 0;
+
+  // Panels pass `onSave` as an inline arrow, so its identity changes on every
+  // render. Reading it from a ref keeps `save` stable — otherwise reporting it
+  // to the host re-renders this component, which mints another `onSave`, and
+  // the report effect loops forever.
+  const latest = useRef({ onSave, draft, isDirty });
+  latest.current = { onSave, draft, isDirty };
+
   const save = useCallback(() => {
-    if (!isDirty) return;
+    const current = latest.current;
+    if (!current.isDirty) return;
     onMutate();
-    onSave(draft, {
+    current.onSave(current.draft, {
       onSuccess: () => {
         onSuccess();
         setDraft({});
       },
       onError,
     });
-  }, [isDirty, draft, onSave, onMutate, onSuccess, onError]);
+  }, [onMutate, onSuccess, onError]);
 
   const report = usePluginSettingsHost();
   useEffect(() => {
@@ -79,13 +123,10 @@ export function PluginConfigForm({
       {fields.map((field) => (
         <Fragment key={field.key}>
           <SettingsRow label={field.label} help={field.help}>
-            <TextField.Root
-              size="2"
-              type={field.secret ? "password" : undefined}
+            <FieldControl
+              field={field}
               value={values[field.key]}
-              onChange={(e: { target: { value: string } }) =>
-                setValue(field.key)(e.target.value)}
-              style={{ width: field.width ?? 100 }}
+              onChange={setValue(field.key)}
             />
           </SettingsRow>
           {field.after?.(setValue(field.key))}
