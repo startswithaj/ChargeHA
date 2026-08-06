@@ -17,6 +17,9 @@ export interface PluginConfigField {
   help?: string;
   secret?: boolean;
   width?: number;
+  placeholder?: string;
+  /** Flagged red while empty — the form cannot do its job without it. */
+  required?: boolean;
   /** Renders a select rather than a free-text box. */
   options?: Array<{ value: string; label: string }>;
   /** Tagged "Advanced" in the row label. Still always shown — the tag marks
@@ -31,11 +34,12 @@ export interface PluginConfigField {
 type SaveOpts = { onSuccess: () => void; onError: (err: unknown) => void };
 
 function FieldControl(
-  { field, value, onChange, onCommit }: {
+  { field, value, onChange, onCommit, autoFocus }: {
     field: PluginConfigField;
     value: string;
     onChange: (value: string) => void;
     onCommit?: () => void;
+    autoFocus?: boolean;
   },
 ) {
   if (field.options) {
@@ -63,6 +67,9 @@ function FieldControl(
     <TextField.Root
       size="2"
       type={field.secret ? "password" : undefined}
+      placeholder={field.placeholder}
+      color={field.required && value === "" ? "red" : undefined}
+      autoFocus={autoFocus}
       value={value}
       onChange={(e: { target: { value: string } }) => onChange(e.target.value)}
       onBlur={onCommit}
@@ -86,23 +93,27 @@ function FieldLabel({ field }: { field: PluginConfigField }) {
  * labels, help, widgets and grouping cannot drift between them.
  */
 export function PluginFieldInputs(
-  { fields, values, onChange, onCommit }: {
+  { fields, values, onChange, onCommit, autoFocus }: {
     fields: PluginConfigField[];
     values: Record<string, string>;
     onChange: (key: string, value: string) => void;
     /** Fired when a field is done being edited (blur, or a select choice) —
      *  for hosts that persist per-field rather than on an explicit Save. */
     onCommit?: (key: string) => void;
+    /** Focus the first field on mount — for a freshly opened add form. */
+    autoFocus?: boolean;
   },
 ) {
-  const row = (field: PluginConfigField) => (
+  const row = (field: PluginConfigField, index: number) => (
     <Fragment key={field.key}>
       <SettingsRow label={<FieldLabel field={field} />} help={field.help}>
         <FieldControl
           field={field}
           value={values[field.key] ?? ""}
-          onChange={(v) => onChange(field.key, v)}
+          onChange={(v) =>
+            onChange(field.key, v)}
           onCommit={onCommit ? () => onCommit(field.key) : undefined}
+          autoFocus={autoFocus && index === 0}
         />
       </SettingsRow>
       {field.after?.((v) => {
@@ -127,6 +138,7 @@ export function PluginConfigForm({
   fields,
   onSave,
   renderFooter,
+  autoFocus,
 }: {
   data: Record<string, unknown> | undefined;
   fields: PluginConfigField[];
@@ -134,6 +146,7 @@ export function PluginConfigForm({
   /** Trailing content that needs the live edited values rather than the saved
    *  ones — a connection test, for instance. */
   renderFooter?: (values: Record<string, string>) => ReactNode;
+  autoFocus?: boolean;
 }) {
   const [draft, setDraft] = useState<Record<string, string>>({});
   const { saveStatus, onMutate, onSuccess, onError } = useSaveStatus();
@@ -180,6 +193,7 @@ export function PluginConfigForm({
         fields={fields}
         values={values}
         onChange={(key, value) => setValue(key)(value)}
+        autoFocus={autoFocus}
       />
       {renderFooter?.(values)}
     </>

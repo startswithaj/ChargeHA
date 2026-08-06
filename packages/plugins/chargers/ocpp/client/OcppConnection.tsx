@@ -1,5 +1,6 @@
 import { Code, Text } from "@radix-ui/themes";
 import { SettingsRow } from "../../../hostUi.ts";
+import { CHARGER_ID_PLACEHOLDER } from "./fields.ts";
 
 /** Base URL the charger connects to. The charge point id is a separate field
  *  on most chargers, so it is shown separately rather than only baked into a
@@ -14,7 +15,7 @@ export function OcppConnectionDetails(
   { chargerId }: { chargerId: string },
 ) {
   const base = ocppServerUrl();
-  const id = chargerId || "<charger-id>";
+  const id = chargerId || CHARGER_ID_PLACEHOLDER;
   return (
     <>
       <Text size="2">

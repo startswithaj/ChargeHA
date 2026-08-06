@@ -62,7 +62,7 @@ function useAddSimulatedVehicleMutation(
       return id;
     },
     onSuccess: (id) => {
-      // Cache refresh is driven by the server's vehicles_changed event in RealtimeSync.
+      // Cache refresh is handled centrally by the MutationCache in trpcSetup.
       setRecentlyAddedVins(new Set([id]));
       setTimeout(() => setRecentlyAddedVins(new Set()), 4000);
     },
@@ -89,7 +89,9 @@ export function useVehicleSettings() {
 
   // --- Mutations ---
 
-  // No onSuccess cache work: RealtimeSync handles vehicles_changed invalidation.
+  // No onSuccess cache work: the MutationCache in trpcSetup invalidates on
+  // every successful mutation, so the vehicle list refetches without waiting
+  // for the server's vehicles_changed SSE round-trip.
   const deleteMutation = trpc.vehicle.delete.useMutation();
 
   const addSimMutation = useAddSimulatedVehicleMutation({

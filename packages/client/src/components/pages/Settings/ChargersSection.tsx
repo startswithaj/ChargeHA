@@ -99,6 +99,7 @@ function ChargerList(
           >
             <Text size="2" weight="bold">New {labelFor(editing.typeId)}</Text>
             <ChargerEditForm
+              autoFocus
               typeId={editing.typeId}
               submitLabel="Add"
               error={settings.error}

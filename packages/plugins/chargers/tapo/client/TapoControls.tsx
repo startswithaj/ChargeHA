@@ -70,20 +70,23 @@ export function TapoDiscoverySection(
         >
           {discover.isPending ? "Scanning..." : "Search Network"}
         </Button>
-        <Text size="1" color="gray">or enter subnet:</Text>
+        {/* Not an alternative to the button — it narrows the same scan. */}
+        <Text size="1" color="gray">limit to subnet (optional):</Text>
         <TextField.Root
           size="1"
           placeholder="e.g. 192.168.0"
           value={subnet}
           onChange={(e: { target: { value: string } }) =>
             setSubnet(e.target.value)}
-          style={{ width: 100 }}
+          style={{ width: 110 }}
+          aria-label="Subnet"
         />
       </div>
 
       {searched && found.length === 0 && (
         <Text size="2" color="orange">
-          No Tapo devices found. Try entering your subnet above.
+          No Tapo devices found. If the plug is on a different network, set the
+          subnet above and search again.
         </Text>
       )}
 
@@ -109,7 +112,8 @@ export function TapoDiscoverySection(
         <Text size="1" color="orange">
           A plug marked “Local control off” is refusing local commands. In the
           Tapo app open Me → Third-Party Services → Third-Party Compatibility
-          and turn it on, then power-cycle the plug and search again.
+          and turn it on, then search again — it should take effect straight
+          away. Otherwise power-cycle the plug.
         </Text>
       )}
     </div>

@@ -8,12 +8,15 @@ export const TAPO_FIELDS: PluginConfigField[] = [
     key: "tapoHost",
     label: "Plug IP address",
     help: "Local IP of your Tapo plug. Use Search to auto-detect it.",
+    placeholder: "192.168.1.60",
+    required: true,
     width: 150,
     after: (setHost) => <TapoDiscoverySection onUse={setHost} />,
   },
   {
     key: "tapoEmail",
     label: "Tapo account email",
+    required: true,
     width: 220,
   },
   {
@@ -21,6 +24,7 @@ export const TAPO_FIELDS: PluginConfigField[] = [
     label: "Tapo account password",
     help: "Stored encrypted. Only used locally to authenticate with the plug.",
     secret: true,
+    required: true,
     width: 220,
   },
   {

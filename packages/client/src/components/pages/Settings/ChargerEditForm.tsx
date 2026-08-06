@@ -1,4 +1,4 @@
-import { type ComponentType, useState } from "react";
+import { type ComponentType, useEffect, useRef, useState } from "react";
 import { Button, Text } from "@radix-ui/themes";
 import { pluginSettingsComponents } from "@chargeha/plugins/componentRegistry";
 import { ErrorBoundary } from "../../ui/ErrorBoundary.tsx";
@@ -32,17 +32,38 @@ function FormFields(
 /** The plugin's own fields plus Cancel/Save, rendered inside the charger's
  *  row band so the two read as one block. */
 export function ChargerEditForm(
-  { typeId, submitLabel, error, busy, onSubmit, onCancel }: {
+  { typeId, submitLabel, error, busy, autoFocus, onSubmit, onCancel }: {
     typeId: string;
     submitLabel: string;
     error: string | null;
     busy: boolean;
+    /** Put the cursor in the first field — for a freshly opened add form. */
+    autoFocus?: boolean;
     onSubmit: () => void;
     onCancel: () => void;
   },
 ) {
   const [panel, setPanel] = useState<PluginSettingsState | null>(null);
   const Panel = pluginSettingsComponents[`${typeId}-settings`];
+  const container = useRef<HTMLDivElement>(null);
+
+  // The plugin panel renders nothing until its config query resolves, so the
+  // first input may not exist yet on mount. Retry for a few frames, then
+  // give up quietly — a missed focus is not worth more machinery.
+  const frames = useRef(0);
+  const raf = useRef(0);
+  useEffect(() => {
+    if (!autoFocus) return;
+    frames.current = 0;
+    const tryFocus = () => {
+      const input = container.current?.querySelector("input");
+      if (input) return input.focus();
+      frames.current += 1;
+      if (frames.current < 20) raf.current = requestAnimationFrame(tryFocus);
+    };
+    tryFocus();
+    return () => cancelAnimationFrame(raf.current);
+  }, [autoFocus]);
 
   const submit = () => {
     panel?.save();
@@ -51,6 +72,7 @@ export function ChargerEditForm(
 
   return (
     <div
+      ref={container}
       style={{
         display: "flex",
         flexDirection: "column",

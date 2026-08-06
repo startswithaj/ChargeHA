@@ -10,7 +10,7 @@ import type {
 import { PollingChargerMiddleware } from "../../PollingChargerMiddleware.ts";
 import { TAPO_SECRET_KEYS, tapoConfigDef } from "./config.ts";
 import { KlapClient } from "./KlapClient.ts";
-import { TapoAuthError } from "./errors.ts";
+import { TapoAuthError, TapoLockedError } from "./errors.ts";
 import {
   TapoChargerAdapter,
   type TapoEnergyUsage,
@@ -26,6 +26,11 @@ const describeTapoError = (error: unknown): string => {
   if (error instanceof TapoAuthError) {
     return "Tapo credentials rejected — check email and password";
   }
+  // A firmware update can re-lock a plug that was working, so this reaches the
+  // health check, not just first-time setup.
+  if (error instanceof TapoLockedError) {
+    return error.message;
+  }
   if (error instanceof Error) {
     return error.message;
   }
@@ -36,7 +41,7 @@ const describeTapoError = (error: unknown): string => {
  *  the local KLAP protocol. */
 export class TapoChargerPlugin implements ChargerPlugin {
   readonly id = "tapo";
-  readonly displayName = "Tapo Smart Plug";
+  readonly displayName = "Tapo P110/115 Smart Plug";
   readonly vendor = "TP-Link";
   readonly settingsComponentKey = "tapo-settings";
   readonly configDef = tapoConfigDef;

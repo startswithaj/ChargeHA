@@ -1,5 +1,9 @@
 import type { PluginConfigField } from "../../../hostUi.ts";
 
+/** Shown in the Charger ID box and as the stand-in inside the connection
+ *  URL, so the two obviously refer to the same value. */
+export const CHARGER_ID_PLACEHOLDER = "my-wallbox";
+
 /** The one definition of OCPP's config. Rendered by both the wizard step and
  *  the settings panel, so labels, help and grouping cannot drift apart. */
 export const OCPP_FIELDS: PluginConfigField[] = [
@@ -9,6 +13,8 @@ export const OCPP_FIELDS: PluginConfigField[] = [
     help: "Any name you choose. You must enter this same value in your " +
       "charger as its charge point id. Letters, numbers, dots, dashes and " +
       "underscores only.",
+    placeholder: CHARGER_ID_PLACEHOLDER,
+    required: true,
     width: 180,
   },
   {

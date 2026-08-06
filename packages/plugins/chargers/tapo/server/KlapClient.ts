@@ -1,6 +1,12 @@
 import type { Logger } from "@chargeha/server/lib/Logger";
 import { KlapCrypto, type KlapSessionKeys } from "./KlapCrypto.ts";
-import { TapoApiError, TapoAuthError, TapoConnectionError } from "./errors.ts";
+import { KlapHttp, type KlapHttpResponse } from "./KlapHttp.ts";
+import {
+  TapoApiError,
+  TapoAuthError,
+  TapoConnectionError,
+  TapoLockedError,
+} from "./errors.ts";
 
 interface KlapSession {
   keys: KlapSessionKeys;
@@ -36,20 +42,22 @@ export class KlapClient {
     const localSeed = crypto.getRandomValues(new Uint8Array(16));
 
     const h1 = await this.post("/app/handshake1", localSeed, null);
-    const h1Body = new Uint8Array(await h1.arrayBuffer());
-    if (!h1.ok || h1Body.length !== 48) {
+    // 403 before any credential is exchanged means local control is switched
+    // off at the device, not that the account details are wrong.
+    if (h1.status === 403) throw new TapoLockedError(this.host);
+    if (!h1.ok || h1.body.length !== 48) {
       throw new TapoConnectionError(
-        `handshake1 failed (HTTP ${h1.status}, ${h1Body.length} bytes)`,
+        `handshake1 failed (HTTP ${h1.status}, ${h1.body.length} bytes)`,
       );
     }
-    const cookie = extractSessionCookie(h1.headers.get("set-cookie"));
-    const remoteSeed = h1Body.slice(0, 16);
+    const cookie = extractSessionCookie(h1.setCookie);
+    const remoteSeed = h1.body.slice(0, 16);
     const expected = await KlapCrypto.serverHash(
       localSeed,
       remoteSeed,
       authHash,
     );
-    if (!KlapCrypto.bytesEqual(h1Body.slice(16), expected)) {
+    if (!KlapCrypto.bytesEqual(h1.body.slice(16), expected)) {
       throw new TapoAuthError();
     }
 
@@ -59,7 +67,6 @@ export class KlapClient {
       authHash,
     );
     const h2 = await this.post("/app/handshake2", h2Body, cookie);
-    await h2.body?.cancel();
     if (!h2.ok) {
       throw new TapoConnectionError(`handshake2 failed (HTTP ${h2.status})`);
     }
@@ -107,19 +114,16 @@ export class KlapClient {
       session.cookie,
     );
     if (res.status === 403) {
-      await res.body?.cancel();
       throw new SessionExpiredError();
     }
     if (!res.ok) {
-      await res.body?.cancel();
       throw new TapoConnectionError(`${method} failed (HTTP ${res.status})`);
     }
 
-    const encrypted = new Uint8Array(await res.arrayBuffer());
     const plaintext = await KlapCrypto.decryptPayload(
       session.keys,
       seq,
-      encrypted,
+      res.body,
     );
     const parsed: TapoResponse<T> = JSON.parse(
       new TextDecoder().decode(plaintext),
@@ -133,24 +137,12 @@ export class KlapClient {
     return parsed.result;
   }
 
-  private async post(
+  private post(
     path: string,
     body: Uint8Array<ArrayBuffer>,
     cookie: string | null,
-  ): Promise<Response> {
-    try {
-      return await fetch(`http://${this.host}${path}`, {
-        method: "POST",
-        body,
-        headers: cookie ? { Cookie: cookie } : {},
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      });
-    } catch (error) {
-      throw new TapoConnectionError(
-        `Cannot reach Tapo device at ${this.host}`,
-        error instanceof Error ? error : undefined,
-      );
-    }
+  ): Promise<KlapHttpResponse> {
+    return KlapHttp.post(this.host, path, body, cookie, REQUEST_TIMEOUT_MS);
   }
 }
 

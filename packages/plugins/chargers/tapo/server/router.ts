@@ -6,7 +6,7 @@ import { createPluginConfigProcedures } from "../../../createPluginConfigProcedu
 import { TAPO_SECRET_KEYS, tapoConfigDef } from "./config.ts";
 import { discoverTapo } from "./TapoDiscovery.ts";
 import { KlapClient } from "./KlapClient.ts";
-import { TapoApiError, TapoAuthError } from "./errors.ts";
+import { TapoApiError, TapoAuthError, TapoLockedError } from "./errors.ts";
 import type { TapoDeviceInfo, TapoEnergyUsage } from "./TapoChargerAdapter.ts";
 
 const discoverInput = z.object({
@@ -38,6 +38,10 @@ async function savedClient(deps: PluginDependencies): Promise<KlapClient> {
 function testFailure(err: unknown) {
   if (err instanceof TapoAuthError) {
     return { success: false as const, error: "Wrong Tapo email or password" };
+  }
+  // Carries its own remedy — the credentials are irrelevant to this failure.
+  if (err instanceof TapoLockedError) {
+    return { success: false as const, error: err.message };
   }
   return {
     success: false as const,
