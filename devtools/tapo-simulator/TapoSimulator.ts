@@ -16,6 +16,9 @@ export interface SimulatedDevice {
   unreachable: boolean;
   /** Simulate a P100/P105: get_energy_usage returns an error. */
   meterless: boolean;
+  /** Simulate firmware 1.4.x with Third-Party Compatibility off: handshake1
+   *  is refused with a 403 before any credential is exchanged. */
+  locked: boolean;
   todayEnergyWh: number;
   model: string;
 }
@@ -34,6 +37,7 @@ const defaultDevice = (): SimulatedDevice => ({
   overheated: false,
   unreachable: false,
   meterless: false,
+  locked: false,
   todayEnergyWh: 0,
   model: "P110",
 });
@@ -87,6 +91,9 @@ export class TapoSimulator {
   private async handshake1(
     localSeed: Uint8Array<ArrayBuffer>,
   ): Promise<Response> {
+    if (this.device.locked) {
+      return new Response(null, { status: 403 });
+    }
     if (localSeed.length !== 16) {
       return new Response("Bad seed", { status: 400 });
     }

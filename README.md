@@ -75,16 +75,17 @@ ChargeHA is not affiliated with, endorsed by, or associated with ChargeHQ.
 
 ## Supported Integrations
 
-| Category      | Integration           | Details                                                                                                         |
-| ------------- | --------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Vehicles      | **Tesla**             | Fleet API with virtual key pairing, charge control, wake, and location tracking                                 |
-| Vehicles      | **Simulated**         | Demo/dev adapter with adjustable SOC and plug state                                                             |
-| Energy        | **Fronius (local)**   | Direct HTTP polling of inverters on your LAN, with auto-discovery                                               |
-| Energy        | **Fronius (cloud)**   | Remote monitoring via the Fronius Solar API                                                                     |
-| Energy        | **Sigenergy (local)** | Direct Modbus TCP integration on your LAN, with auto-discovery; requires Modbus to be enabled by your installer |
-| Energy        | **Enphase (local)**   | Direct HTTPS polling of the Envoy / IQ Gateway on your LAN (firmware 7+), with auto-discovery and token renewal |
-| Notifications | **Telegram**          | Alerts for charging events, errors, and energy outages                                                          |
-| Auth          | **OIDC**              | Single sign-on via any OpenID Connect provider                                                                  |
+| Category      | Integration           | Details                                                                                                                                                                                                                                                                              |
+| ------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Vehicles      | **Tesla**             | Fleet API with virtual key pairing, charge control, wake, and location tracking                                                                                                                                                                                                      |
+| Vehicles      | **Simulated**         | Demo/dev adapter with adjustable SOC and plug state                                                                                                                                                                                                                                  |
+| Energy        | **Fronius (local)**   | Direct HTTP polling of inverters on your LAN, with auto-discovery                                                                                                                                                                                                                    |
+| Energy        | **Fronius (cloud)**   | Remote monitoring via the Fronius Solar API                                                                                                                                                                                                                                          |
+| Energy        | **Sigenergy (local)** | Direct Modbus TCP integration on your LAN, with auto-discovery; requires Modbus to be enabled by your installer                                                                                                                                                                      |
+| Energy        | **Enphase (local)**   | Direct HTTPS polling of the Envoy / IQ Gateway on your LAN (firmware 7+), with auto-discovery and token renewal                                                                                                                                                                      |
+| Chargers      | **Tapo P110/115**     | Switches a standard EVSE on and off via a TP-Link smart plug on your LAN, with auto-discovery; requires "Third-Party Compatibility" to be enabled in the Tapo app (Me → Third-Party Services), and an energy-monitoring model — the plug's power reading is how charging is detected |
+| Notifications | **Telegram**          | Alerts for charging events, errors, and energy outages                                                                                                                                                                                                                               |
+| Auth          | **OIDC**              | Single sign-on via any OpenID Connect provider                                                                                                                                                                                                                                       |
 
 ### Coming Soon
 

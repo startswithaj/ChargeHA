@@ -35,6 +35,10 @@ export { useSaveStatus } from "../client/src/hooks/useSectionConfig.ts";
 // Shared UI primitives.
 export { Spinner } from "../client/src/components/ui/Spinner.tsx";
 export { ErrorBanner } from "../client/src/components/ui/ErrorBanner.tsx";
+export {
+  NetworkDeviceSearch,
+  type NetworkSearchResult,
+} from "./NetworkDeviceSearch.tsx";
 export { default as dialogStyles } from "../client/src/components/ScheduleDialog/ScheduleDialog.module.css";
 
 // Hooks.

@@ -55,6 +55,6 @@ export const chargerCapableVehicleAdapters: readonly string[] = [
 
 export const demoChargerDisplayNames: Record<string, string> = {
   simulated_charger: "Simulated Charger",
-  tapo: "Tapo Smart Plug",
+  tapo: "Tapo P110/115 Smart Plug",
   ocpp: "OCPP Charger",
 };

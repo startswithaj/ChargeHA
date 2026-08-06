@@ -1,90 +1,7 @@
 import { useState } from "react";
 import { Badge, Button, Code, Text, TextField } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
-import { SettingsRow } from "../../../hostUi.ts";
-
-function SearchControls(
-  { subnet, setSubnet, searchMutation }: {
-    subnet: string;
-    setSubnet: (v: string) => void;
-    searchMutation: ReturnType<
-      typeof trpc.plugin.energy.fronius_local.discover.useMutation
-    >;
-  },
-) {
-  return (
-    <>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <Button
-          size="1"
-          variant="soft"
-          disabled={searchMutation.isPending}
-          onClick={() => searchMutation.mutate({ subnet: subnet || undefined })}
-        >
-          {searchMutation.isPending ? "Scanning..." : "Search Network"}
-        </Button>
-        <Text size="1" color="gray">or enter subnet:</Text>
-        <TextField.Root
-          size="1"
-          placeholder="e.g. 192.168.0"
-          value={subnet}
-          onChange={(e: { target: { value: string } }) =>
-            setSubnet(e.target.value)}
-          style={{ width: 100 }}
-        />
-      </div>
-      {searchMutation.isPending && (
-        <Text size="1" color="gray">
-          Scanning {subnet ? `subnet ${subnet}.*` : "your local network"}{" "}
-          for Fronius inverters...
-        </Text>
-      )}
-    </>
-  );
-}
-
-function SearchResults(
-  { searchResults, onUse }: {
-    searchResults: { host: string; name: string }[];
-    onUse: (host: string) => void;
-  },
-) {
-  if (searchResults.length === 0) {
-    return (
-      <Text size="2" color="orange">
-        No Fronius inverters found. Try entering your subnet above (check your
-        router settings or run <Code size="1">ifconfig</Code>).
-      </Text>
-    );
-  }
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      {searchResults.map((d) => (
-        <div
-          key={d.host}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "6px 10px",
-            borderRadius: 6,
-            background: "var(--gray-a2)",
-          }}
-        >
-          <div>
-            <Text size="2" weight="medium">{d.name}</Text>
-            <Text size="1" color="gray" style={{ display: "block" }}>
-              {d.host}
-            </Text>
-          </div>
-          <Button size="1" variant="soft" onClick={() => onUse(d.host)}>
-            Use
-          </Button>
-        </div>
-      ))}
-    </div>
-  );
-}
+import { NetworkDeviceSearch, SettingsRow } from "../../../hostUi.ts";
 
 function TestSection(
   { config, testMutation, testSuccess }: {
@@ -226,25 +143,29 @@ export function FroniusLocalConfig(): JSX.Element | null {
         />
       </SettingsRow>
 
-      <SearchControls
+      <NetworkDeviceSearch
+        deviceNoun="Fronius inverters"
         subnet={subnet}
-        setSubnet={setSubnet}
-        searchMutation={searchMutation}
+        onSubnetChange={setSubnet}
+        onSearch={() => searchMutation.mutate({ subnet: subnet || undefined })}
+        isPending={searchMutation.isPending}
+        searched={searchDone}
+        results={searchResults}
+        onUse={(d) => {
+          configMutation.mutate({ froniusHost: d.host });
+          searchMutation.reset();
+          testMutation.mutate({
+            host: d.host,
+            meterDeviceId: parseInt(config.froniusMeterDeviceId || "0"),
+          });
+        }}
+        emptyMessage={
+          <>
+            No Fronius inverters found. Try entering your subnet above (check
+            your router settings or run <Code size="1">ifconfig</Code>).
+          </>
+        }
       />
-
-      {searchDone && (
-        <SearchResults
-          searchResults={searchResults}
-          onUse={(host) => {
-            configMutation.mutate({ froniusHost: host });
-            searchMutation.reset();
-            testMutation.mutate({
-              host,
-              meterDeviceId: parseInt(config.froniusMeterDeviceId || "0"),
-            });
-          }}
-        />
-      )}
 
       <SettingsRow
         label="Meter device ID"
