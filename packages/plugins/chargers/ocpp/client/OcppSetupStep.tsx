@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Badge, Code, Text } from "@radix-ui/themes";
+import { Badge } from "@radix-ui/themes";
 import {
   PluginFieldInputs,
   type PluginStepDef,
@@ -8,6 +8,7 @@ import {
 } from "../../../hostUi.ts";
 import { trpc } from "./trpc.ts";
 import { OCPP_DEFAULTS, OCPP_FIELDS } from "./fields.ts";
+import { OcppConnectionDetails } from "./OcppConnection.tsx";
 
 function ocppNext(connected: boolean): WizardNext {
   if (!connected) {
@@ -45,11 +46,6 @@ export const ocppSetupStep: PluginStepDef = {
     const [draft, setDraft] = useState<Record<string, string>>({});
 
     const values = { ...OCPP_DEFAULTS, ...(config ?? {}), ...draft };
-    const chargerId = values.ocppChargerId;
-    // location.port is "" on default ports (80/443) — omit the colon then.
-    const wsUrl = `ws://${globalThis.location.hostname}${
-      globalThis.location.port ? `:${globalThis.location.port}` : ""
-    }/api/charger/ocpp/${chargerId || "<charger-id>"}`;
     const connected = status.data?.connected === true;
 
     // Committed on blur, not per keystroke — the id gates the WS route
@@ -71,11 +67,7 @@ export const ocppSetupStep: PluginStepDef = {
             onChange={(key, value) => setDraft((d) => ({ ...d, [key]: value }))}
             onCommit={commit}
           />
-          <Text size="2">
-            Enter this URL in your charger's OCPP settings (its app or web
-            portal), then wait — the charger connects to ChargeHA:
-          </Text>
-          <Code size="2">{wsUrl}</Code>
+          <OcppConnectionDetails chargerId={values.ocppChargerId} />
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {connectionBadge(connected, status.data?.info)}
           </div>

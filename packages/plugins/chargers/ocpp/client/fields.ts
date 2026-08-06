@@ -6,8 +6,8 @@ export const OCPP_FIELDS: PluginConfigField[] = [
   {
     key: "ocppChargerId",
     label: "Charger ID",
-    help: "Any name you choose — it becomes part of the charger URL below " +
-      "and identifies your charger. Letters, numbers, dots, dashes and " +
+    help: "Any name you choose. You must enter this same value in your " +
+      "charger as its charge point id. Letters, numbers, dots, dashes and " +
       "underscores only.",
     width: 180,
   },

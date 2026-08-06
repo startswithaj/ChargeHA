@@ -1,7 +1,8 @@
-import { Badge, Button, Code, Text } from "@radix-ui/themes";
+import { Badge, Button, Text } from "@radix-ui/themes";
 import { PluginConfigForm, SettingsRow } from "../../../hostUi.ts";
 import { trpc } from "./trpc.ts";
 import { OCPP_FIELDS } from "./fields.ts";
+import { OcppConnectionDetails } from "./OcppConnection.tsx";
 
 function connectionBadge(
   data: {
@@ -32,23 +33,16 @@ export function OcppSettings(): JSX.Element | null {
 
   if (!config) return null;
 
-  const wsUrl = `ws://${globalThis.location.hostname}${
-    globalThis.location.port ? `:${globalThis.location.port}` : ""
-  }${status.data?.wsPath ?? ""}`;
-
   return (
     <>
       <PluginConfigForm
         data={config}
         fields={OCPP_FIELDS}
         onSave={(draft, opts) => configMutation.mutate(draft, opts)}
+        renderFooter={(values) => (
+          <OcppConnectionDetails chargerId={values.ocppChargerId} />
+        )}
       />
-      <SettingsRow
-        label="Charger URL"
-        help="Enter this in your charger's OCPP settings. The charger connects to ChargeHA over your LAN."
-      >
-        <Code size="2">{wsUrl}</Code>
-      </SettingsRow>
       <SettingsRow label="Connection">
         {connectionBadge(status.data)}
       </SettingsRow>
