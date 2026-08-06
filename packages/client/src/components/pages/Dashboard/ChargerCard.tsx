@@ -4,6 +4,7 @@ import {
   BatteryCharging,
   Plug,
   PlugZap,
+  Settings,
   Sun,
   TriangleAlert,
   Unplug,
@@ -24,6 +25,7 @@ const STATUS_LABELS: Record<ChargerState["status"], string> = {
   faulted: "Faulted",
   finishing: "Finishing",
   no_draw: "No draw",
+  unconfigured: "Setup needed",
 };
 
 const STATUS_BADGE_COLORS: Record<
@@ -37,6 +39,7 @@ const STATUS_BADGE_COLORS: Record<
   faulted: "red",
   finishing: "gray",
   no_draw: "gray",
+  unconfigured: "red",
 };
 
 const MODE_BUTTONS: {
@@ -81,6 +84,15 @@ export function NoDrawNotice(
   );
 }
 
+/** Nothing will charge until someone intervenes: red card, warning icon. */
+const ALARM_STATUSES = new Set<ChargerState["status"]>([
+  "faulted",
+  "unconfigured",
+]);
+
+const isAlarm = (state: ChargerState | null): boolean =>
+  state !== null && ALARM_STATUSES.has(state.status);
+
 /** Adapters phrase their detail as a sentence fragment ("off", "overheated"),
  *  but it leads its own line here. */
 const sentenceCase = (text: string) =>
@@ -91,6 +103,8 @@ const sentenceCase = (text: string) =>
  *  this is the hardware talking, not the controller. */
 function DeviceStatusRow({ state }: { state: ChargerState | null }) {
   if (!state) return null;
+  // The status line already carries the unconfigured reason in full.
+  if (state.status === "unconfigured") return null;
   if (state.status === "no_draw") {
     return <NoDrawNotice statusDetail={state.statusDetail} />;
   }
@@ -102,10 +116,9 @@ function DeviceStatusRow({ state }: { state: ChargerState | null }) {
 
 function StatusIcon({ state }: { state: ChargerState | null }) {
   const iconStyle = (color: string) => ({ color, flexShrink: 0 });
-  if (!state) {
-    return <Plug size={14} style={iconStyle("var(--color-disconnected)")} />;
-  }
-  if (state.status === "faulted") {
+  // No state = first poll still in flight, not a device reporting blank.
+  if (!state) return <Spinner />;
+  if (isAlarm(state)) {
     return <TriangleAlert size={14} style={iconStyle("var(--red-11)")} />;
   }
   if (state.isCharging) {
@@ -125,7 +138,13 @@ function getStatusText(
   mode: ChargingPointMode,
 ): string {
   const label = MODE_LABELS[mode];
-  if (!state) return `${label} - Waiting for data`;
+  if (!state) return `${label} - Connecting to the charger…`;
+  // The badge already names the state; this line carries only the reason.
+  if (state.status === "unconfigured") {
+    return state.statusDetail
+      ? sentenceCase(state.statusDetail)
+      : STATUS_LABELS.unconfigured;
+  }
   if (state.isCharging) {
     return `${label} - Charging at ${
       kwValue((state.chargePowerKw ?? 0) * 1000)
@@ -146,13 +165,14 @@ export function ChargerCard(
   },
 ) {
   const { commandPending, changeMode } = useChargerCommands(id);
-  const faulted = state?.status === "faulted";
+  const unconfigured = state?.status === "unconfigured";
+  const alarm = isAlarm(state);
 
   return (
     <Card
       className={layout.card}
       style={{
-        "--accent": faulted ? "var(--red-a7)" : "var(--color-charging)",
+        "--accent": alarm ? "var(--red-a7)" : "var(--color-charging)",
       } as React.CSSProperties}
     >
       <div className={layout.header}>
@@ -164,7 +184,7 @@ export function ChargerCard(
           variant="soft"
           color={state ? STATUS_BADGE_COLORS[state.status] : "gray"}
         >
-          {state ? STATUS_LABELS[state.status] : "Waiting for data"}
+          {state ? STATUS_LABELS[state.status] : "Connecting"}
         </Badge>
       </div>
 
@@ -175,7 +195,8 @@ export function ChargerCard(
             variant={mode === btn.value ? "solid" : "outline"}
             color={mode === btn.value ? btn.color : "gray"}
             size="1"
-            disabled={commandPending !== false}
+            // No adapter, nothing to command.
+            disabled={commandPending !== false || unconfigured}
             onClick={() => changeMode(btn.value)}
           >
             {commandPending === `mode:${btn.value}` ? <Spinner /> : null}
@@ -190,11 +211,19 @@ export function ChargerCard(
       </div>
 
       <div className={layout.details}>
-        <DetailRow icon={Zap}>
-          {state?.isCharging
-            ? `${state.chargeAmps ?? 0}A / ${state.chargeAmpsMax}A max`
-            : "Not charging"}
-        </DetailRow>
+        {unconfigured && (
+          <DetailRow icon={Settings}>
+            Open charger settings to finish setup
+          </DetailRow>
+        )}
+        {/* Nothing has reported yet, so "not charging" would be a guess. */}
+        {state && !unconfigured && (
+          <DetailRow icon={Zap}>
+            {state.isCharging
+              ? `${state.chargeAmps ?? 0}A / ${state.chargeAmpsMax}A max`
+              : "Not charging"}
+          </DetailRow>
+        )}
         {state?.isCharging && solarW + gridW > 0 && (
           <DetailRow icon={Sun}>
             {kwValue(solarW)} solar, {kwValue(gridW)} grid

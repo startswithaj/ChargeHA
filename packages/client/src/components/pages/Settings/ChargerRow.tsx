@@ -21,6 +21,7 @@ export const STATUS_LABELS: Record<ChargerStatus, string> = {
   faulted: "Fault",
   finishing: "Finishing",
   no_draw: "No draw",
+  unconfigured: "Setup needed",
 };
 
 const STATUS_COLORS: Record<ChargerStatus, "green" | "red" | "gray" | "amber"> =
@@ -32,6 +33,7 @@ const STATUS_COLORS: Record<ChargerStatus, "green" | "red" | "gray" | "amber"> =
     faulted: "red",
     finishing: "green",
     no_draw: "gray",
+    unconfigured: "red",
   };
 
 const labelFor = (map: Record<string, string>, key: string): string =>
@@ -49,7 +51,7 @@ export function ChargerRow(
   },
 ) {
   const smart = isSmartCharger(charger);
-  const status = charger.state?.status as ChargerStatus | undefined;
+  const status = charger.state?.status;
   return (
     <div
       style={{

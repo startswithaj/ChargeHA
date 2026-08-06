@@ -17,6 +17,7 @@ import type {
   ChargerPlugin,
 } from "@chargeha/shared/plugins";
 import type { ChargerPluginRegistry } from "../bootstrap/ChargerPluginRegistry.ts";
+import { UnconfiguredChargerMiddleware } from "./UnconfiguredChargerMiddleware.ts";
 
 const MAX_COMMAND_BACKOFF_SEC = 900;
 
@@ -70,7 +71,6 @@ export class ChargingPointManager {
     }
     // A misconfigured charger must not crash boot; retried on config change.
     const middleware = await this.tryCreateMiddleware(plugin, row);
-    if (!middleware) return;
     this.chargers.set(row.id, {
       row,
       middleware,
@@ -81,19 +81,20 @@ export class ChargingPointManager {
     this.eventEmitter.emit("chargers_changed", {});
   }
 
+  /** Never throws: a charger whose adapter cannot be built still registers
+   *  and reports "unconfigured", so the dashboard can say what is wrong. */
   private async tryCreateMiddleware(
     plugin: ChargerPlugin,
     row: ChargerRow,
-  ): Promise<ChargerMiddleware | null> {
+  ): Promise<ChargerMiddleware> {
     try {
       return await plugin.createChargerMiddleware(row);
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(
-        `Charger ${row.name} (${row.id}) not started: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        `Charger ${row.name} (${row.id}) not started: ${message}`,
       );
-      return null;
+      return new UnconfiguredChargerMiddleware(row.id, message);
     }
   }
 
@@ -199,6 +200,14 @@ export class ChargingPointManager {
     if (!unplugged || entry.row.mode === "auto") return;
     this.logger.info(`Unplugged: resetting ${entry.row.id} to auto`);
     await this.setMode(entry.row.id, "auto", ctx);
+  }
+
+  /** A point with no adapter still has a row and a card, but nothing to
+   *  drive. Reads the cache directly — enrich() derives amps we never use. */
+  isControllable(id: string): boolean {
+    const entry = this.chargers.get(id);
+    return entry !== undefined &&
+      entry.middleware.getCachedState()?.status !== "unconfigured";
   }
 
   getState(id: string): ChargerState | null {
@@ -317,7 +326,8 @@ export class ChargingPointManager {
       (chain, entry) =>
         chain.then(async () => {
           await entry.middleware.shutdown();
-          entry.middleware = await plugin.createChargerMiddleware(entry.row);
+          // Config may still be wrong; must not throw out of the handler.
+          entry.middleware = await this.tryCreateMiddleware(plugin, entry.row);
           this.logger.info(`Rebuilt middleware for ${entry.row.id}`);
         }),
       Promise.resolve(),
@@ -347,7 +357,6 @@ export class ChargingPointManager {
     if (this.isBackedOff(id).backedOff && !force) {
       return { success: false, error: "Command backoff active" };
     }
-
     try {
       const info = await entry.middleware.getChargerInfo(ctx);
       const clamped = Math.max(

@@ -77,6 +77,14 @@ export const subscriptionsRouter = router({
         (data) => queue.push({ type: "controller_status", data }),
         { replay: true },
       ),
+      ctx.eventEmitter.subscribe(
+        "charger_update",
+        (data) => queue.push({ type: "charger_update", data }),
+      ),
+      ctx.eventEmitter.subscribe(
+        "chargers_changed",
+        (data) => queue.push({ type: "chargers_changed", data }),
+      ),
     ];
 
     try {

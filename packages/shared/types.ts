@@ -169,7 +169,10 @@ export type ChargerStatus =
   | "suspended"
   | "faulted"
   | "finishing"
-  | "no_draw";
+  | "no_draw"
+  /** No adapter was ever created for this charging point — its config is
+   *  missing or was rejected. Nothing behind it to report on. */
+  | "unconfigured";
 
 export interface ChargerState {
   chargerId: string;

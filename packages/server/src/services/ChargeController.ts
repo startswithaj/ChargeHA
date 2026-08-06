@@ -133,7 +133,9 @@ export class ChargeController {
   async runOnce(): Promise<ControllerConfig> {
     const traceId = createTraceId();
     const config = await this.loadConfig();
-    const chargerRows = (await this.db.getChargers()).filter((r) => r.active);
+    const chargerRows = (await this.db.getChargers()).filter((r) =>
+      r.active && this.chargingPointManager.isControllable(r.id)
+    );
     const targets = this.buildChargerTargets(chargerRows);
     const schedules = await this.db.getSchedules();
     const energySnapshot = this.poller.tryGetRealtimeSnapshot();

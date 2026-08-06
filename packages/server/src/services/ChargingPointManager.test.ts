@@ -313,6 +313,47 @@ describe("ChargingPointManager", () => {
         emitter.events.some((e) => e.type === "chargers_changed"),
       ).toBe(false);
     });
+
+    // A charger whose config is missing still has a row and a dashboard card,
+    // so it registers and reports why instead of reporting nothing.
+    it("registers a charger whose middleware cannot be built, carrying the reason", async () => {
+      registry.register(throwingMock<ChargerPlugin>("ChargerPlugin", {
+        id: "broken",
+        displayName: "Broken Charger",
+        createChargerMiddleware: () =>
+          Promise.reject(new Error("Tapo host not configured")),
+      }));
+      const row = {
+        ...ROW,
+        id: "charger-broken",
+        chargerAdapterType: "broken",
+      };
+
+      await manager.addCharger(row);
+
+      const state = manager.getState(row.id);
+      expect(state?.status).toBe("unconfigured");
+      expect(state?.statusDetail).toBe("Tapo host not configured");
+    });
+
+    it("keeps an unbuildable charger out of the controller's targets", async () => {
+      registry.register(throwingMock<ChargerPlugin>("ChargerPlugin", {
+        id: "broken",
+        displayName: "Broken Charger",
+        createChargerMiddleware: () => Promise.reject(new Error("no host")),
+      }));
+      const row = {
+        ...ROW,
+        id: "charger-broken",
+        chargerAdapterType: "broken",
+      };
+
+      await manager.addCharger(row);
+      await manager.addCharger(ROW);
+
+      expect(manager.isControllable(row.id)).toBe(false);
+      expect(manager.isControllable(ROW.id)).toBe(true);
+    });
   });
 
   describe("deleteCharger", () => {

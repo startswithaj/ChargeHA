@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { TRPCClientError } from "@trpc/client";
 import {
   handleAuthError,
-  invalidateConfigOnMutation,
+  invalidateAllOnMutation,
   isUnauthorizedError,
   queryClient,
   shouldRetry,
@@ -104,13 +104,11 @@ describe("trpcSetup", () => {
     });
   });
 
-  describe("invalidateConfigOnMutation", () => {
-    it("invalidates config queries", () => {
+  describe("invalidateAllOnMutation", () => {
+    it("invalidates every query, not just one key", () => {
       const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
-      invalidateConfigOnMutation();
-      expect(invalidateSpy).toHaveBeenCalledWith({
-        queryKey: [["config", "getAll"]],
-      });
+      invalidateAllOnMutation();
+      expect(invalidateSpy).toHaveBeenCalledWith();
       invalidateSpy.mockRestore();
     });
   });
