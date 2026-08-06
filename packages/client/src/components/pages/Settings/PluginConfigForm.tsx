@@ -6,8 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Button, Select, TextField } from "@radix-ui/themes";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { Badge, Select, TextField } from "@radix-ui/themes";
 import { SettingsRow } from "./SettingsLayout.tsx";
 import { useSaveStatus } from "../../../hooks/useSectionConfig.ts";
 import { usePluginSettingsHost } from "./pluginSettingsHost.ts";
@@ -20,9 +19,8 @@ export interface PluginConfigField {
   width?: number;
   /** Renders a select rather than a free-text box. */
   options?: Array<{ value: string; label: string }>;
-  /** Tucked behind the Advanced disclosure. The field list is shared by the
-   *  wizard step and the settings panel, so this is a declared decision
-   *  rather than an artefact of which file someone edited. */
+  /** Tagged "Advanced" in the row label. Still always shown — the tag marks
+   *  it as tuning you can usually leave alone. */
   advanced?: boolean;
   /** Rendered directly beneath this field's row, so a control that fills the
    *  field in (network discovery, say) sits with it rather than orphaned at
@@ -73,6 +71,15 @@ function FieldControl(
   );
 }
 
+function FieldLabel({ field }: { field: PluginConfigField }) {
+  if (!field.advanced) return <>{field.label}</>;
+  return (
+    <>
+      {field.label} <Badge size="1" variant="soft" color="gray">Advanced</Badge>
+    </>
+  );
+}
+
 /**
  * The one renderer for a plugin's config fields. Both the settings panel and
  * the plugin's wizard step render through this off the same field list, so
@@ -88,13 +95,9 @@ export function PluginFieldInputs(
     onCommit?: (key: string) => void;
   },
 ) {
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const basic = fields.filter((f) => !f.advanced);
-  const advanced = fields.filter((f) => f.advanced);
-
   const row = (field: PluginConfigField) => (
     <Fragment key={field.key}>
-      <SettingsRow label={field.label} help={field.help}>
+      <SettingsRow label={<FieldLabel field={field} />} help={field.help}>
         <FieldControl
           field={field}
           value={values[field.key] ?? ""}
@@ -109,50 +112,7 @@ export function PluginFieldInputs(
     </Fragment>
   );
 
-  return (
-    <>
-      {basic.map(row)}
-      {advanced.length > 0 && (
-        <div
-          style={{
-            marginTop: 4,
-            paddingTop: 8,
-            borderTop: "1px solid var(--gray-a4)",
-          }}
-        >
-          <Button
-            size="1"
-            variant="ghost"
-            color="gray"
-            onClick={() => setShowAdvanced((v) => !v)}
-            // Ghost buttons outdent themselves; zero the inline margin so the
-            // chevron starts on the same column as the field labels.
-            style={{ marginLeft: 0, marginRight: 0 }}
-          >
-            {showAdvanced
-              ? <ChevronDown size={14} />
-              : <ChevronRight size={14} />}
-            Advanced
-          </Button>
-        </div>
-      )}
-      {showAdvanced && (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 12,
-            padding: "10px 12px",
-            borderRadius: 6,
-            background: "var(--gray-a2)",
-            border: "1px solid var(--gray-a5)",
-          }}
-        >
-          {advanced.map(row)}
-        </div>
-      )}
-    </>
-  );
+  return <>{fields.map(row)}</>;
 }
 
 /**

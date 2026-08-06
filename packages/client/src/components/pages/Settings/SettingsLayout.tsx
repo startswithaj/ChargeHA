@@ -9,7 +9,7 @@ export { Section as SettingsSection };
 export type { SectionProps };
 
 export interface SettingsRowProps {
-  label: string;
+  label: ReactNode;
   help?: string;
   children: ReactNode;
 }
