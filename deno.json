@@ -3,7 +3,8 @@
     "./packages/shared",
     "./packages/server",
     "./packages/client",
-    "./packages/plugins"
+    "./packages/plugins",
+    "./packages/app"
   ],
   "nodeModulesDir": "auto",
   "minimumDependencyAge": "P14D",
@@ -17,12 +18,12 @@
   ],
   "tasks": {
     "dev": "deno task dev:server & deno task dev:client & wait",
-    "dev:server": "deno run --watch --unsafely-ignore-certificate-errors=localhost --allow-net --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-sys=networkInterfaces --unstable-ffi packages/server/src/main.ts",
+    "dev:server": "deno run --watch --unsafely-ignore-certificate-errors=localhost --allow-net --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-sys=networkInterfaces --unstable-ffi packages/app/main.ts",
     "dev:client": "deno task --filter client dev",
     "dev:demo": "deno task --filter client dev:demo",
     "build": "deno task --filter client build",
     "build:demo": "deno task --filter client build:demo",
-    "start": "deno run --allow-net --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-sys=networkInterfaces --unstable-ffi --unsafely-ignore-certificate-errors=localhost packages/server/src/main.ts",
+    "start": "deno run --allow-net --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-sys=networkInterfaces --unstable-ffi --unsafely-ignore-certificate-errors=localhost packages/app/main.ts",
     "test": "deno check && deno task test:server && deno task test:client",
     "test:server": "deno test --allow-net --allow-read --allow-write --allow-env --allow-ffi --unstable-ffi --ignore='**/client/**,**/*.test.tsx' packages/server/ packages/plugins/ devtools/ packages/shared/",
     "test:server:coverage": "deno test --coverage=coverage/ --allow-net --allow-read --allow-write --allow-env --allow-ffi --unstable-ffi --ignore='**/client/**,**/*.test.tsx' packages/server/ packages/plugins/ devtools/ packages/shared/",

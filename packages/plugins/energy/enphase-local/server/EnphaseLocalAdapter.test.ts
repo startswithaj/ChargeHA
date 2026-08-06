@@ -1,7 +1,7 @@
 import { beforeEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { Logger } from "@chargeha/server/lib/Logger";
-import { PluginDbLogger } from "../../../PluginDbLogger.ts";
+import { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import { EnphaseClient } from "./EnphaseClient.ts";
 import { EnphaseLocalAdapter } from "./EnphaseLocalAdapter.ts";
 import { FakeEnvoyHttp } from "./test-helpers/enphaseHttpHarness.ts";

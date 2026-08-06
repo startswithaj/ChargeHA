@@ -5,7 +5,7 @@ import type {
   VehicleAdapter,
 } from "@chargeha/shared";
 import type { Logger } from "@chargeha/server/lib/Logger";
-import type { PluginDbLogger } from "../../../PluginDbLogger.ts";
+import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 
 export interface SimulatedVehicleConfig {
   batteryCapacityKwh?: number;

@@ -1,13 +1,13 @@
 import type { AnyRouter } from "@trpc/server";
 import { defineSection } from "@chargeha/shared/configSections";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
-import type { ChargerRow } from "@chargeha/server/db/types";
+import type { ChargerRow } from "@chargeha/shared";
 import type {
   ChargerMiddleware,
   ChargerPlugin,
   PluginHealthCheck,
   PluginHttpRoutes,
-} from "@chargeha/plugins/types";
+} from "@chargeha/shared/plugins";
 import { PollingChargerMiddleware } from "../../PollingChargerMiddleware.ts";
 import { SimulatedChargerAdapter } from "./SimulatedChargerAdapter.ts";
 import { createSimulatedChargerRouter } from "./router.ts";

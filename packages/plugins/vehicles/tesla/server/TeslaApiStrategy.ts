@@ -1,5 +1,5 @@
 import type { AdapterVehicleChargeState } from "@chargeha/shared";
-import type { VehicleRequestContext } from "../../../types.ts";
+import type { VehicleRequestContext } from "@chargeha/shared/plugins";
 
 // Cache freshness — tuned for Tesla Fleet API cost model ($10/month credit)
 //

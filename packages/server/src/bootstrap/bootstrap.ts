@@ -40,7 +40,7 @@ import { ChargingPointManager } from "../services/ChargingPointManager.ts";
 import { VehiclePluginRegistry } from "./VehiclePluginRegistry.ts";
 import { EnergyPluginRegistry } from "./EnergyPluginRegistry.ts";
 import { ChargerPluginRegistry } from "./ChargerPluginRegistry.ts";
-import { registerPlugins } from "@chargeha/plugins/registerPlugins";
+import type { PluginDependenciesInit } from "./PluginDependencies.ts";
 
 import {
   createAuthMiddleware,
@@ -524,7 +524,19 @@ function setupTrpcEndpoint(
   });
 }
 
-export async function bootstrap(): Promise<
+/** Supplied by the entrypoint rather than imported here: naming the plugin set
+ *  is the composition root's job, and the host must not depend on the package
+ *  that depends on it. */
+export type RegisterPlugins = (
+  host: Omit<PluginDependenciesInit, "pluginId">,
+  vehicleRegistry: VehiclePluginRegistry,
+  energyRegistry: EnergyPluginRegistry,
+  chargerRegistry: ChargerPluginRegistry,
+) => void;
+
+export async function bootstrap(
+  registerPlugins: RegisterPlugins,
+): Promise<
   { shutdown: () => Promise<void> }
 > {
   // ── Infrastructure ────────────────────────────────────────────────────

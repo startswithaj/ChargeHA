@@ -12,7 +12,10 @@ import type { VehicleManager } from "./VehicleManager.ts";
 import type { EnergyPoller } from "./EnergyPoller.ts";
 import type { ConfigService } from "./ConfigService.ts";
 import type { Logger } from "../lib/Logger.ts";
-import type { ChargerMiddleware, ChargerPlugin } from "@chargeha/plugins/types";
+import type {
+  ChargerMiddleware,
+  ChargerPlugin,
+} from "@chargeha/shared/plugins";
 import type { ChargerPluginRegistry } from "../bootstrap/ChargerPluginRegistry.ts";
 
 const MAX_COMMAND_BACKOFF_SEC = 900;

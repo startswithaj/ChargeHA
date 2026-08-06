@@ -1,6 +1,6 @@
 import type { AnyRouter } from "@trpc/server";
 import { defineSection } from "@chargeha/shared/configSections";
-import type { ChargerRow, VehicleRow } from "@chargeha/server/db/types";
+import type { ChargerRow, VehicleRow } from "@chargeha/shared";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import type {
   ChargerMiddleware,
@@ -11,7 +11,7 @@ import type {
   PluginTunnelRoute,
   VehicleMiddleware,
   VehiclePlugin,
-} from "../../../types.ts";
+} from "@chargeha/shared/plugins";
 import {
   SimulatedVehicleAdapter,
   type SimulatedVehicleConfig,

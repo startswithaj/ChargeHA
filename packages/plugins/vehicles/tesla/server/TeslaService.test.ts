@@ -5,7 +5,7 @@ import type { TeslaServiceIo } from "./TeslaService.ts";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import type { TeslaTokenManager } from "./TeslaTokenManager.ts";
 import type { Logger } from "@chargeha/server/lib/Logger";
-import type { VehicleRow } from "@chargeha/server/db/types";
+import type { VehicleRow } from "@chargeha/shared";
 
 describe("TeslaService", () => {
   const VEHICLE_ROW: VehicleRow = {

@@ -1,5 +1,5 @@
 import type { PluginStepDef } from "../../../hostUi.ts";
-import type { EnergyPluginOption } from "../../../componentRegistry.ts";
+import type { EnergyPluginOption } from "../../../pluginOptions.ts";
 import { enphaseLocalSetupStep } from "./EnphaseLocalSetupStep.tsx";
 
 /** Enphase wizard steps, in order. */

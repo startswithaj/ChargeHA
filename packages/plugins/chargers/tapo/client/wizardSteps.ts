@@ -1,5 +1,5 @@
 import type { PluginStepDef } from "../../../hostUi.ts";
-import type { ChargerPluginOption } from "../../../componentRegistry.ts";
+import type { ChargerPluginOption } from "../../../pluginOptions.ts";
 import { tapoSetupStep } from "./TapoSetupStep.tsx";
 import { tapoVerifyStep } from "./TapoVerifyStep.tsx";
 

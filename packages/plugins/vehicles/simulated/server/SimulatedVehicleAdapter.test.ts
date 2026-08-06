@@ -3,7 +3,7 @@ import { expect } from "@std/expect";
 import type { CallContext } from "@chargeha/shared";
 import { SimulatedVehicleAdapter } from "./SimulatedVehicleAdapter.ts";
 import { Logger } from "@chargeha/server/lib/Logger";
-import { PluginDbLogger } from "../../../PluginDbLogger.ts";
+import { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 
 describe("SimulatedVehicleAdapter", () => {
   const testLogger = new Logger("SimVehicle", "error");

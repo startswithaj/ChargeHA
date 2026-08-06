@@ -1,6 +1,9 @@
 import type { AnyRouter } from "@trpc/server";
-import type { ChargerPlugin, PluginHealthCheck } from "@chargeha/plugins/types";
-import { resolveHttpRoutes } from "@chargeha/plugins/types";
+import type {
+  ChargerPlugin,
+  PluginHealthCheck,
+} from "@chargeha/shared/plugins";
+import { resolveHttpRoutes } from "@chargeha/shared/plugins";
 
 export class ChargerPluginRegistry {
   private readonly plugins = new Map<string, ChargerPlugin>();

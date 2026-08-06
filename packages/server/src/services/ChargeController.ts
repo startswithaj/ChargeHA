@@ -7,7 +7,7 @@ import {
   type VehicleChargeState,
   type VehicleMode,
 } from "@chargeha/shared";
-import type { VehicleRequestContext } from "@chargeha/plugins/types";
+import type { VehicleRequestContext } from "@chargeha/shared/plugins";
 import {
   ControllerEngine,
   DecisionChecks,

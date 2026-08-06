@@ -57,7 +57,7 @@ COPY --from=client-builder /app/packages/server/dist packages/server/dist/
 
 # Install deps and cache compilation
 RUN deno install
-RUN deno cache packages/server/src/main.ts
+RUN deno cache packages/app/main.ts
 
 # Create data directory
 RUN mkdir -p /app/data

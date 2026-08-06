@@ -17,16 +17,10 @@ export interface SystemAlert {
   vehicleName: string;
 }
 
-export interface VehicleRow {
-  id: string;
-  name: string;
-  adapterType: VehicleAdapterType;
-  priority: number;
-  config: string;
-  mode: VehicleMode;
-  createdAt: string;
-  updatedAt: string;
-}
+// The row shapes themselves live in shared: plugins receive them through the
+// plugin contract, and the host must not import the plugin package to describe
+// its own data.
+export type { ChargerRow, VehicleRow } from "@chargeha/shared";
 
 export interface UpsertVehicleInput {
   id: string;
@@ -35,21 +29,6 @@ export interface UpsertVehicleInput {
   priority: number;
   config: string;
   mode: VehicleMode;
-}
-
-export interface ChargerRow {
-  id: string;
-  name: string;
-  chargerAdapterType: string;
-  chargerConfig: string;
-  mode: ChargingPointMode;
-  priority: number;
-  vehicleId: string | null;
-  kind: ChargerKind;
-  /** Inactive points keep their row (and schedules) but are not controlled. */
-  active: boolean;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface UpsertChargerInput {

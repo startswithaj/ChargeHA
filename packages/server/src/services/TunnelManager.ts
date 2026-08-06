@@ -1,6 +1,6 @@
 /// <reference lib="deno.ns" />
 import type { Logger } from "../lib/Logger.ts";
-import type { PluginTunnelRoute } from "@chargeha/plugins/types";
+import type { PluginTunnelRoute } from "@chargeha/shared/plugins";
 
 /** How a tunnel process is spawned and its public URL recognised. */
 export interface TunnelProvider {

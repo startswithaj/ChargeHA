@@ -2,7 +2,7 @@ import type { AdapterVehicleChargeState, CallContext } from "@chargeha/shared";
 import type {
   VehicleMiddleware,
   VehicleRequestContext,
-} from "../../../types.ts";
+} from "@chargeha/shared/plugins";
 import type { Logger } from "@chargeha/server/lib/Logger";
 import type { TeslaAdapter } from "./TeslaAdapter.ts";
 import { TeslaApiStrategy } from "./TeslaApiStrategy.ts";

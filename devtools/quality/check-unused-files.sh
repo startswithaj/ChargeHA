@@ -9,7 +9,7 @@ cd "$REPO_ROOT"
 
 # Known entry points (run directly, not imported)
 ENTRY_POINTS="
-packages/server/src/main.ts
+packages/app/main.ts
 packages/client/src/main.tsx
 devtools/db/db-cli.ts
 packages/server/src/healthcheck.ts

@@ -1,5 +1,5 @@
 import type { PluginStepDef } from "../../../hostUi.ts";
-import type { EnergyPluginOption } from "../../../componentRegistry.ts";
+import type { EnergyPluginOption } from "../../../pluginOptions.ts";
 
 /** Simulated energy has no setup step — it works with sensible defaults. */
 export const simulatedEnergyWizardSteps: PluginStepDef[] = [];

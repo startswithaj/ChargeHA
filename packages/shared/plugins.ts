@@ -1,14 +1,15 @@
 import type { AnyRouter } from "@trpc/server";
 import type { Hono } from "hono";
-import type { SectionDef } from "@chargeha/shared/configSections";
+import type { SectionDef } from "./configSections.ts";
 import type {
   AdapterVehicleChargeState,
   CallContext,
   ChargerInfo,
+  ChargerRow,
   ChargerState,
   EnergySourceAdapter,
-} from "@chargeha/shared";
-import type { ChargerRow, VehicleRow } from "@chargeha/server/db/types";
+  VehicleRow,
+} from "./types.ts";
 
 // ── Health Check Types ──────────────────────────────────────────────────────
 

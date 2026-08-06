@@ -4,14 +4,14 @@ import type { UpsertVehicleInput, VehicleRow } from "../db/types.ts";
 import type { VehicleManager } from "../services/VehicleManager.ts";
 import type { ChargingPointManager } from "../services/ChargingPointManager.ts";
 import type { VehicleChargeState } from "@chargeha/shared";
-import type { VehicleRequestContext } from "@chargeha/plugins/types";
+import type { VehicleRequestContext } from "@chargeha/shared/plugins";
 import type { EnergyAdapterManager } from "../services/EnergyAdapterManager.ts";
 import {
   enrichVehicleRows,
   type VehicleWithLiveState,
 } from "../services/VehicleService.ts";
 import { createLogger, Logger } from "../lib/Logger.ts";
-import { PluginDbLogger } from "@chargeha/plugins/PluginDbLogger";
+import { PluginDbLogger } from "../lib/PluginDbLogger.ts";
 
 /** Tunnel lifecycle exposed to plugins. URLs are live state, never persisted
  *  — quick-tunnel URLs change on every start. */

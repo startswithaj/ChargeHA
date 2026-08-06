@@ -2,8 +2,8 @@ import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import type { AdapterVehicleChargeState, CallContext } from "@chargeha/shared";
 import { buildVehicleChargeState } from "@chargeha/shared/test-factories";
-import type { ChargerRow } from "@chargeha/server/db/types";
-import type { VehicleRequestContext } from "../../../types.ts";
+import type { ChargerRow } from "@chargeha/shared";
+import type { VehicleRequestContext } from "@chargeha/shared/plugins";
 import { SimulatedChargerMiddleware } from "./SimulatedChargerMiddleware.ts";
 import type { SimulatedVehicleMiddleware } from "./SimulatedVehicleMiddleware.ts";
 

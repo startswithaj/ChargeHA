@@ -515,3 +515,32 @@ export interface WizardNavState {
    *  Migration writes "vehicle" once for existing installs. */
   controlPath: "charger" | "vehicle" | null;
 }
+
+/** Persisted vehicle. Lives here rather than in the db layer because plugins
+ *  receive it through the plugin contract. */
+export interface VehicleRow {
+  id: string;
+  name: string;
+  adapterType: VehicleAdapterType;
+  priority: number;
+  config: string;
+  mode: VehicleMode;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Persisted charging point. Handed to charger plugins, hence shared. */
+export interface ChargerRow {
+  id: string;
+  name: string;
+  chargerAdapterType: string;
+  chargerConfig: string;
+  mode: ChargingPointMode;
+  priority: number;
+  vehicleId: string | null;
+  kind: ChargerKind;
+  /** Inactive points keep their row (and schedules) but are not controlled. */
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}

@@ -3,7 +3,7 @@ import { expect } from "@std/expect";
 import { assertExists } from "@std/assert";
 import { FakeTime } from "@std/testing/time";
 import { PINGGY_PROVIDER, TunnelManager } from "./TunnelManager.ts";
-import type { PluginTunnelRoute } from "@chargeha/plugins/types";
+import type { PluginTunnelRoute } from "@chargeha/shared/plugins";
 
 describe("TunnelManager", () => {
   // ── Test Helpers ────────────────────────────────────────────────────────────

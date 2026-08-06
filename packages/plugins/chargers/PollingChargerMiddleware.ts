@@ -4,7 +4,7 @@ import type {
   ChargerInfo,
   ChargerState,
 } from "@chargeha/shared";
-import type { ChargerMiddleware } from "../types.ts";
+import type { ChargerMiddleware } from "@chargeha/shared/plugins";
 import type { Logger } from "@chargeha/server/lib/Logger";
 
 /** Default middleware for free local-API chargers (Tapo, OCPP): caches

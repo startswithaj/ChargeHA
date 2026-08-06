@@ -1,6 +1,6 @@
 /// <reference lib="deno.ns" />
 import { TRPCError } from "@trpc/server";
-import type { ChargerRow, VehicleRow } from "@chargeha/server/db/types";
+import type { ChargerRow, VehicleRow } from "@chargeha/shared";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import { generateEcKeyPair } from "@chargeha/server/lib/Encryption";
 import type {
@@ -13,7 +13,7 @@ import type {
   PluginTunnelRoute,
   VehicleMiddleware,
   VehiclePlugin,
-} from "../../../types.ts";
+} from "@chargeha/shared/plugins";
 import { TeslaAdapter } from "./TeslaAdapter.ts";
 import { TeslaChargerMiddleware } from "./TeslaChargerMiddleware.ts";
 import { TeslaVehicleMiddleware } from "./TeslaVehicleMiddleware.ts";

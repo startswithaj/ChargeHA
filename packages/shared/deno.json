@@ -5,6 +5,7 @@
     ".": "./types.ts",
     "./schemas": "./schemas.ts",
     "./configSections": "./configSections.ts",
+    "./plugins": "./plugins.ts",
     "./test-factories": "./test-factories.ts",
     "./database-driver": "./database-driver.ts",
     "./wasm-database": "./wasm-database.ts",
@@ -16,5 +17,9 @@
     "./solarAttribution": "./solarAttribution.ts",
     "./geocode": "./geocode.ts",
     "./notifications": "./notificationProviders.ts"
+  },
+  "imports": {
+    "hono": "jsr:@hono/hono@^4",
+    "@trpc/server": "npm:@trpc/server@^11"
   }
 }

@@ -1,5 +1,5 @@
 import type { AnyRouter } from "@trpc/server";
-import type { EnergyPlugin, PluginHealthCheck } from "@chargeha/plugins/types";
+import type { EnergyPlugin, PluginHealthCheck } from "@chargeha/shared/plugins";
 
 /**
  * Thin container for energy plugins. Starts empty; plugins are constructed

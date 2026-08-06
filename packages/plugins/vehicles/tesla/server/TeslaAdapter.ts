@@ -6,7 +6,7 @@ import type {
 import { sleep } from "@chargeha/shared/async";
 import type { TeslaTokenManager } from "./TeslaTokenManager.ts";
 import type { Logger } from "@chargeha/server/lib/Logger";
-import type { PluginDbLogger } from "../../../PluginDbLogger.ts";
+import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 
 /** Execute fn, and if shouldRetry returns true, wait delayMs and try once more. */
 async function retryOn(

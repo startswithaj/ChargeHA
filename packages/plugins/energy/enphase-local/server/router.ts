@@ -8,7 +8,7 @@ import { discoverEnphase } from "./EnphaseDiscovery.ts";
 import { ENPHASE_LOCAL_SECRET_KEYS, enphaseLocalConfigDef } from "./config.ts";
 import { createPluginConfigProcedures } from "../../../createPluginConfigProcedures.ts";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
-import { PluginDbLogger } from "../../../PluginDbLogger.ts";
+import { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 
 // ── Typed Zod schemas for the Enphase plugin procedures ─────────────────────
 

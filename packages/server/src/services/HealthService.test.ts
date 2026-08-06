@@ -4,7 +4,7 @@ import { HealthService } from "./HealthService.ts";
 import type { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
 import { EnergyPluginRegistry } from "@chargeha/server/bootstrap/EnergyPluginRegistry";
 import { ChargerPluginRegistry } from "@chargeha/server/bootstrap/ChargerPluginRegistry";
-import type { PluginHealthCheck } from "@chargeha/plugins/types";
+import type { PluginHealthCheck } from "@chargeha/shared/plugins";
 import { throwingMock } from "../test-helpers/throwingMock.ts";
 
 describe("HealthService", () => {

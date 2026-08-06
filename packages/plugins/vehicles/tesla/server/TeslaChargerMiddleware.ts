@@ -5,8 +5,8 @@ import type {
   ChargerStatus,
 } from "@chargeha/shared";
 import type { AdapterVehicleChargeState } from "@chargeha/shared";
-import type { ChargerMiddleware } from "../../../types.ts";
-import type { ChargerRow } from "@chargeha/server/db/types";
+import type { ChargerMiddleware } from "@chargeha/shared/plugins";
+import type { ChargerRow } from "@chargeha/shared";
 import type { TeslaVehicleMiddleware } from "./TeslaVehicleMiddleware.ts";
 
 /** ChargerMiddleware view over the shared per-VIN TeslaVehicleMiddleware.

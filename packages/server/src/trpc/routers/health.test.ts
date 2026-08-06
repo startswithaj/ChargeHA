@@ -8,7 +8,7 @@ import { HealthService } from "../../services/HealthService.ts";
 import { appRouter } from "../root.ts";
 import { createCallerFactory } from "../trpc.ts";
 import type { TrpcContext } from "../trpc.ts";
-import type { VehiclePlugin } from "@chargeha/plugins/types";
+import type { VehiclePlugin } from "@chargeha/shared/plugins";
 import { throwingMock } from "../../test-helpers/throwingMock.ts";
 
 describe("Health tRPC Router", () => {

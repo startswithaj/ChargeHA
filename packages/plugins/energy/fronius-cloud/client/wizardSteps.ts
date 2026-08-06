@@ -1,5 +1,5 @@
 import type { PluginStepDef } from "../../../hostUi.ts";
-import type { EnergyPluginOption } from "../../../componentRegistry.ts";
+import type { EnergyPluginOption } from "../../../pluginOptions.ts";
 import { froniusCloudSetupStep } from "./FroniusCloudSetupStep.tsx";
 
 /** Fronius Cloud wizard steps, in order. */

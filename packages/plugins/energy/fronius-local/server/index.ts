@@ -1,7 +1,7 @@
 import type { AnyRouter } from "@trpc/server";
 import type { EnergySourceAdapter } from "@chargeha/shared";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
-import type { EnergyPlugin, PluginHealthCheck } from "@chargeha/plugins/types";
+import type { EnergyPlugin, PluginHealthCheck } from "@chargeha/shared/plugins";
 import { froniusLocalConfigDef } from "./config.ts";
 import { FroniusLocalAdapter } from "./FroniusLocalAdapter.ts";
 import { createFroniusLocalRouter } from "./router.ts";

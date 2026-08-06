@@ -10,7 +10,10 @@ import type {
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { ChargerRow, VehicleRow } from "../db/types.ts";
 import { ChargerPluginRegistry } from "@chargeha/server/bootstrap/ChargerPluginRegistry";
-import type { ChargerMiddleware, ChargerPlugin } from "@chargeha/plugins/types";
+import type {
+  ChargerMiddleware,
+  ChargerPlugin,
+} from "@chargeha/shared/plugins";
 import type { VehicleManager } from "./VehicleManager.ts";
 import type { EnergyPoller } from "./EnergyPoller.ts";
 import type { ConfigService } from "./ConfigService.ts";

@@ -4,7 +4,7 @@ import type { ChargerPluginRegistry } from "@chargeha/server/bootstrap/ChargerPl
 import type {
   HealthCheckResult,
   PluginHealthCheck,
-} from "@chargeha/plugins/types";
+} from "@chargeha/shared/plugins";
 
 const DEFAULT_TIMEOUT_MS = 5000;
 

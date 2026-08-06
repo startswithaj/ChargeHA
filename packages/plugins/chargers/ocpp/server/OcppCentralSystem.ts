@@ -1,5 +1,5 @@
 import type { Logger } from "@chargeha/server/lib/Logger";
-import type { PluginDbLogger } from "@chargeha/plugins/PluginDbLogger";
+import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import { type OcppFrame, OcppFraming, PendingCalls } from "./OcppFraming.ts";
 import {
   authorizeReq,

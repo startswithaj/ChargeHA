@@ -1,7 +1,7 @@
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { type PersistLogFn, PluginDbLogger } from "./PluginDbLogger.ts";
-import { Logger } from "@chargeha/server/lib/Logger";
+import { Logger } from "./Logger.ts";
 
 describe("PluginDbLogger", () => {
   const testLogger = new Logger("PluginDbLogger", "error");

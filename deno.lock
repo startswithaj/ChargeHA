@@ -3907,6 +3907,12 @@
           "jsr:@std/dotenv@0.225",
           "npm:@trpc/server@11"
         ]
+      },
+      "packages/shared": {
+        "dependencies": [
+          "jsr:@hono/hono@4",
+          "npm:@trpc/server@11"
+        ]
       }
     }
   }

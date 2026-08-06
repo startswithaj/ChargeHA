@@ -7,7 +7,7 @@ import type {
 } from "@chargeha/shared";
 import { EnergyAdapterManager } from "./EnergyAdapterManager.ts";
 import { EnergyPluginRegistry } from "@chargeha/server/bootstrap/EnergyPluginRegistry";
-import type { EnergyPlugin } from "@chargeha/plugins/types";
+import type { EnergyPlugin } from "@chargeha/shared/plugins";
 import { Logger } from "../lib/Logger.ts";
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import { throwingMock } from "../test-helpers/throwingMock.ts";

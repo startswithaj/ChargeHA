@@ -6,7 +6,7 @@ import type { TeslaTokenManager } from "./TeslaTokenManager.ts";
 import { TeslaAdapter, TeslaApiError } from "./TeslaAdapter.ts";
 import { Logger } from "@chargeha/server/lib/Logger";
 import type { CallContext } from "@chargeha/shared";
-import { PluginDbLogger } from "../../../PluginDbLogger.ts";
+import { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import { MockTokenManager } from "./test-helpers/MockTokenManager.ts";
 
 describe("TeslaAdapter", () => {

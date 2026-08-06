@@ -45,6 +45,12 @@ interface DrawSession {
 export class TapoChargerAdapter implements ChargerAdapter {
   private lastState: ChargerState | null = null;
   private lastGoodAt: number | null = null;
+  // Starts the stale window when no poll has ever succeeded, so a plug that
+  // was already offline at boot still gets the same grace period.
+  private firstAttemptAt: number | null = null;
+  // Start of the current unreachable spell. Core emits charger_update on a
+  // lastUpdated change, so a fault that persists must not restamp itself.
+  private unreachableAt: string | null = null;
   private session: DrawSession = {
     active: false,
     belowCount: 0,
@@ -84,6 +90,7 @@ export class TapoChargerAdapter implements ChargerAdapter {
   }
 
   async getChargerState(_ctx: CallContext): Promise<ChargerState> {
+    this.firstAttemptAt ??= Date.now();
     try {
       // Sequential on purpose: one in-flight request per plug — the KLAP
       // session is strictly sequenced and embedded servers handle
@@ -95,6 +102,7 @@ export class TapoChargerAdapter implements ChargerAdapter {
       const state = this.buildState(info, energy);
       this.lastState = state;
       this.lastGoodAt = Date.now();
+      this.unreachableAt = null;
       return state;
     } catch (error) {
       return this.staleState(error);
@@ -188,21 +196,57 @@ export class TapoChargerAdapter implements ChargerAdapter {
   }
 
   /** A failed poll is not "stopped drawing": retain the last state, flip to
-   *  faulted only after the stale timeout. */
+   *  faulted only after the stale timeout. A plug that has never answered has
+   *  no state to retain, so the fault is built from config instead — the
+   *  dashboard must be able to say "unreachable" rather than sit on
+   *  "waiting for data" against a device that will never report. */
   private staleState(error: unknown): ChargerState {
-    const last = this.lastState;
-    if (!last || this.lastGoodAt === null) {
-      throw error instanceof Error
-        ? error
-        : new TapoConnectionError(String(error));
-    }
+    const since = this.lastGoodAt ?? this.firstAttemptAt ?? Date.now();
     const staleMs = this.config.staleTimeoutSeconds * 1000;
-    const isStale = Date.now() - this.lastGoodAt >= staleMs;
+    const isStale = Date.now() - since >= staleMs;
     this.logger.warn(
-      `Poll failed (${error}); serving ${isStale ? "stale" : "last"} state`,
+      `Poll failed (${error}); ${
+        isStale ? "reporting the plug unreachable" : "serving last state"
+      }`,
     );
-    if (!isStale) return last;
-    return { ...last, status: "faulted", statusDetail: "unreachable" };
+    if (!isStale) {
+      // Inside the grace window with nothing cached: there is no state to
+      // report yet, only a failure.
+      if (!this.lastState) {
+        throw error instanceof Error
+          ? error
+          : new TapoConnectionError(String(error));
+      }
+      return this.lastState;
+    }
+    this.unreachableAt ??= new Date().toISOString();
+    return {
+      ...(this.lastState ?? this.unknownState()),
+      status: "faulted",
+      statusDetail: "unreachable",
+      lastUpdated: this.unreachableAt,
+    };
+  }
+
+  /** Nothing has ever been measured, so every observed field stays null — the
+   *  dashboard must never read an invented zero. Amp limits are configuration,
+   *  known without the device. */
+  private unknownState(): ChargerState {
+    return {
+      chargerId: this.config.chargerId,
+      isCharging: false,
+      isPluggedIn: null,
+      chargeAmps: null,
+      chargeAmpsMax: this.config.fixedDrawAmps,
+      chargeAmpsMin: this.config.fixedDrawAmps,
+      chargePowerKw: null,
+      chargerVoltage: null,
+      chargerPhases: 1,
+      energyAddedKwh: 0,
+      status: "faulted",
+      statusDetail: "unreachable",
+      lastUpdated: new Date().toISOString(),
+    };
   }
 
   private async setDeviceOn(on: boolean): Promise<boolean> {

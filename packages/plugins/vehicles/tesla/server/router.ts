@@ -7,12 +7,27 @@ import {
 } from "@chargeha/shared/schemas";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
-import type { TeslaVehiclePlugin } from "./index.ts";
+import type { PluginHealthCheck } from "@chargeha/shared/plugins";
+import type { TeslaTokenManager } from "./TeslaTokenManager.ts";
+import type { TeslaService } from "./TeslaService.ts";
 import { TESLA_SECRET_KEYS, teslaConfigDef } from "./config.ts";
 import { createPluginConfigProcedures } from "../../../createPluginConfigProcedures.ts";
 
+/** The slice of the plugin this router calls. Declared here rather than
+ *  imported from index.ts, which imports this module — the class satisfies it
+ *  structurally. */
+interface TeslaRouterPlugin {
+  readonly teslaTokenManager: TeslaTokenManager;
+  readonly teslaService: TeslaService;
+  generateKeys(): Promise<{ success: true; publicKey: string }>;
+  importKeys(
+    input: { publicKeyPem: string; privateKeyPem: string },
+  ): Promise<{ success: true; publicKey: string }>;
+  getHealthChecks(): PluginHealthCheck[];
+}
+
 async function collectProxyWarnings(
-  plugin: TeslaVehiclePlugin,
+  plugin: TeslaRouterPlugin,
 ): Promise<string[]> {
   const checks = plugin.getHealthChecks();
   const results = await Promise.all(checks.map(async (c) => ({
@@ -27,7 +42,7 @@ async function collectProxyWarnings(
 }
 
 export function createTeslaRouter(
-  plugin: TeslaVehiclePlugin,
+  plugin: TeslaRouterPlugin,
   deps: PluginDependencies,
 ) {
   return router({

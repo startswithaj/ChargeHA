@@ -1,5 +1,5 @@
 import type { PluginStepDef } from "../../../hostUi.ts";
-import type { EnergyPluginOption } from "../../../componentRegistry.ts";
+import type { EnergyPluginOption } from "../../../pluginOptions.ts";
 import { froniusLocalSetupStep } from "./FroniusLocalSetupStep.tsx";
 
 /** Fronius Local wizard steps, in order. */

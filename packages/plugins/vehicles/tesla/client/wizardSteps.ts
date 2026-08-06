@@ -2,7 +2,7 @@ import type { PluginStepDef } from "../../../hostUi.ts";
 import type {
   PluginScheduleNote,
   VehiclePluginOption,
-} from "../../../componentRegistry.ts";
+} from "../../../pluginOptions.ts";
 import { keyGenerationStep } from "./KeyGenerationStep.tsx";
 import { publicKeyHostingStep } from "./PublicKeyHostingStep.tsx";
 import { teslaCredentialsStep } from "./TeslaCredentialsStep.tsx";

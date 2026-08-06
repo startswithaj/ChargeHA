@@ -1,4 +1,4 @@
-import type { Logger } from "@chargeha/server/lib/Logger";
+import type { Logger } from "./Logger.ts";
 
 /**
  * Callback signature for persisting a log entry.

@@ -42,7 +42,7 @@ import { TeslaChargerMiddleware } from "@chargeha/plugins/vehicles/tesla/server/
 import type { TeslaAdapter } from "@chargeha/plugins/vehicles/tesla/server/TeslaAdapter";
 import type { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
 import type { ChargerPluginRegistry } from "@chargeha/server/bootstrap/ChargerPluginRegistry";
-import type { ChargerPlugin, VehiclePlugin } from "@chargeha/plugins/types";
+import type { ChargerPlugin, VehiclePlugin } from "@chargeha/shared/plugins";
 import type { ChargerRow } from "../db/types.ts";
 import { throwingMock } from "./throwingMock.ts";
 

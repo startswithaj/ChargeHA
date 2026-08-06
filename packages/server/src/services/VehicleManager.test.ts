@@ -7,7 +7,7 @@ import { AppDatabase } from "../db/AppDatabase.ts";
 import { TypedEventEmitter } from "./TypedEventEmitter.ts";
 import { VehicleManager } from "./VehicleManager.ts";
 import type { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
-import type { VehicleRequestContext } from "@chargeha/plugins/types";
+import type { VehicleRequestContext } from "@chargeha/shared/plugins";
 import { Logger } from "../lib/Logger.ts";
 import { MockMiddleware } from "../test-helpers/MockMiddleware.ts";
 import { MockEventEmitter } from "../test-helpers/MockEventEmitter.ts";

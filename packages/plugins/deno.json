@@ -2,8 +2,6 @@
   "name": "@chargeha/plugins",
   "version": "0.0.1",
   "exports": {
-    "./types": "./types.ts",
-    "./PluginDbLogger": "./PluginDbLogger.ts",
     "./registerPlugins": "./registerPlugins.ts",
     "./chargers/PollingChargerMiddleware": "./chargers/PollingChargerMiddleware.ts",
     "./chargers/tapo/server": "./chargers/tapo/server/index.ts",

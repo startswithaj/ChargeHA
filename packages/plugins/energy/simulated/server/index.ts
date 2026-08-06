@@ -1,7 +1,7 @@
 import type { AnyRouter } from "@trpc/server";
 import type { EnergySourceAdapter } from "@chargeha/shared";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
-import type { EnergyPlugin, PluginHealthCheck } from "@chargeha/plugins/types";
+import type { EnergyPlugin, PluginHealthCheck } from "@chargeha/shared/plugins";
 import { simulatedEnergyConfigDef } from "./config.ts";
 import { SimulatedEnergyAdapter } from "./SimulatedEnergyAdapter.ts";
 import { createSimulatedEnergyRouter } from "./router.ts";

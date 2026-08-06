@@ -223,4 +223,64 @@ describe("TapoChargerAdapter", () => {
       expect(faulted.statusDetail).toBe("unreachable");
     });
   });
+
+  // A plug that is already offline when the server starts has no last good
+  // state to fall back on — the dashboard still has to say why it is blank.
+  describe("poll failure with no successful poll ever", () => {
+    const offlineClient = () =>
+      new SpyKlapClient({
+        get_device_info: () => Promise.reject(new Error("device offline")),
+      }, logger);
+
+    it("throws inside the grace window, leaving the card on 'waiting for data'", async () => {
+      const adapter = new TapoChargerAdapter(CONFIG, offlineClient(), logger);
+
+      await expect(adapter.getChargerState(ctx)).rejects.toThrow(
+        "device offline",
+      );
+    });
+
+    it("reports unreachable once the stale window elapses", async () => {
+      using fakeTime = new FakeTime();
+      const adapter = new TapoChargerAdapter(CONFIG, offlineClient(), logger);
+
+      // First attempt starts the stale window; it can only throw.
+      await expect(adapter.getChargerState(ctx)).rejects.toThrow();
+      await fakeTime.tickAsync(CONFIG.staleTimeoutSeconds * 1000);
+      const faulted = await adapter.getChargerState(ctx);
+
+      expect(faulted.status).toBe("faulted");
+      expect(faulted.statusDetail).toBe("unreachable");
+      expect(faulted.chargerId).toBe(CONFIG.chargerId);
+      expect(faulted.isCharging).toBe(false);
+      expect(faulted.chargeAmpsMax).toBe(CONFIG.fixedDrawAmps);
+    });
+
+    it("reports nothing measured rather than zeroes", async () => {
+      using fakeTime = new FakeTime();
+      const adapter = new TapoChargerAdapter(CONFIG, offlineClient(), logger);
+
+      await expect(adapter.getChargerState(ctx)).rejects.toThrow();
+      await fakeTime.tickAsync(CONFIG.staleTimeoutSeconds * 1000);
+      const faulted = await adapter.getChargerState(ctx);
+
+      expect(faulted.chargeAmps).toBeNull();
+      expect(faulted.chargePowerKw).toBeNull();
+      expect(faulted.chargerVoltage).toBeNull();
+      expect(faulted.isPluggedIn).toBeNull();
+    });
+
+    it("keeps one timestamp across the outage so core emits the fault once", async () => {
+      using fakeTime = new FakeTime();
+      const adapter = new TapoChargerAdapter(CONFIG, offlineClient(), logger);
+
+      await expect(adapter.getChargerState(ctx)).rejects.toThrow();
+      await fakeTime.tickAsync(CONFIG.staleTimeoutSeconds * 1000);
+      const first = await adapter.getChargerState(ctx);
+      await fakeTime.tickAsync(CONFIG.pollSeconds * 1000);
+      const second = await adapter.getChargerState(ctx);
+
+      expect(second.lastUpdated).toBe(first.lastUpdated);
+    });
+  });
 });

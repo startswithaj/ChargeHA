@@ -2,7 +2,7 @@ import type { VehicleChargeState } from "@chargeha/shared";
 import type {
   VehicleMiddleware,
   VehicleRequestContext,
-} from "@chargeha/plugins/types";
+} from "@chargeha/shared/plugins";
 
 /**
  * Controllable middleware stub used by VehicleManager tests. Tracks calls and

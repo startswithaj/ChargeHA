@@ -1,12 +1,12 @@
 import type { AnyRouter } from "@trpc/server";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
-import type { ChargerRow } from "@chargeha/server/db/types";
+import type { ChargerRow } from "@chargeha/shared";
 import type {
   ChargerMiddleware,
   ChargerPlugin,
   PluginHealthCheck,
   PluginHttpRoutes,
-} from "@chargeha/plugins/types";
+} from "@chargeha/shared/plugins";
 import { PollingChargerMiddleware } from "../../PollingChargerMiddleware.ts";
 import { TAPO_SECRET_KEYS, tapoConfigDef } from "./config.ts";
 import { KlapClient } from "./KlapClient.ts";

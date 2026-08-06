@@ -12,7 +12,7 @@ import type { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePl
 import type {
   VehicleMiddleware,
   VehicleRequestContext,
-} from "@chargeha/plugins/types";
+} from "@chargeha/shared/plugins";
 import { parseDecisionInputs } from "../db/Serialization.ts";
 import { isHome, parseHomeCoords } from "@chargeha/shared/geo";
 

@@ -1,10 +1,11 @@
-import { loadEnv } from "./lib/loadEnv.ts";
-import { bootstrap } from "./bootstrap/bootstrap.ts";
+import { loadEnv } from "@chargeha/server/lib/loadEnv";
+import { bootstrap } from "@chargeha/server/bootstrap";
+import { registerPlugins } from "@chargeha/plugins/registerPlugins";
 
 // Load .env into the environment before bootstrap reads it.
 await loadEnv();
 
-const { shutdown } = await bootstrap();
+const { shutdown } = await bootstrap(registerPlugins);
 
 Deno.addSignalListener("SIGINT", async () => {
   console.log("\n[Server] Shutting down...");
