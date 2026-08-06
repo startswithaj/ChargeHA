@@ -67,15 +67,17 @@ export class OcppChargerPlugin implements ChargerPlugin {
 
   async createChargerMiddleware(row: ChargerRow): Promise<ChargerMiddleware> {
     await this.restorePersistedTransaction();
+    // Scoped to this charger row, falling back to the plugin-wide value when
+    // nothing has been saved for it — so a charger set up before per-charger
+    // storage existed still resolves.
+    const config = this.deps.forCharger(row.id);
     const [timeoutRaw, maxRaw, minRaw, phasesRaw, chargePointId] = await Promise
       .all([
-        this.deps.getConfig("meter_timeout_seconds"),
-        this.deps.getConfig("max_amps"),
-        this.deps.getConfig("min_amps"),
-        this.deps.getConfig("phases"),
-        // Which charge point this row drives. Still plugin-wide, so all rows
-        // resolve to the same one until per-row config lands.
-        this.deps.getConfig("charger_id"),
+        config.getConfig("meter_timeout_seconds"),
+        config.getConfig("max_amps"),
+        config.getConfig("min_amps"),
+        config.getConfig("phases"),
+        config.getConfig("charger_id"),
       ]);
     const adapter = new OcppChargerAdapter(
       {

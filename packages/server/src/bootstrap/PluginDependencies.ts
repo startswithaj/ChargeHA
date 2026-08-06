@@ -1,6 +1,10 @@
 import type { GeocodeResult } from "@chargeha/shared/geocode";
 import type { AppDatabase } from "../db/AppDatabase.ts";
-import type { UpsertVehicleInput, VehicleRow } from "../db/types.ts";
+import type {
+  ChargerRow,
+  UpsertVehicleInput,
+  VehicleRow,
+} from "../db/types.ts";
 import type { VehicleManager } from "../services/VehicleManager.ts";
 import type { ChargingPointManager } from "../services/ChargingPointManager.ts";
 import type { VehicleChargeState } from "@chargeha/shared";
@@ -21,6 +25,14 @@ export interface PluginTunnelApi {
   stop(): Promise<void>;
   /** Free-tier session limit of the tunnel provider, if any. */
   getExpiryMinutes(): number | null;
+}
+
+/** Config and secrets for one charger row — see `forCharger`. */
+export interface ChargerScopedConfig<K extends string = string> {
+  getConfig(key: K): Promise<string | null>;
+  setConfig(key: K, value: string | null): Promise<void>;
+  getSecret(key: K): Promise<string | null>;
+  setSecret(key: K, value: string | null): Promise<void>;
 }
 
 /** Everything a PluginDependencies instance is built from. */
@@ -108,6 +120,43 @@ export class PluginDependencies<K extends string = string> {
 
   setSecret(key: K, value: string | null): Promise<void> {
     return this.db.storeSecret(`${this.prefix}${key}`, value);
+  }
+
+  // ── Charger rows + per-charger config ────────────────────────────────
+
+  /** This plugin's charger rows. Filtered by adapter type for the same reason
+   *  vehicles are: a plugin must never see another plugin's hardware. */
+  async getChargerRows(): Promise<ChargerRow[]> {
+    const all = await this.db.getChargers();
+    return all.filter((c) => c.chargerAdapterType === this.pluginId);
+  }
+
+  /**
+   * Config scoped to one charger row, for plugins that drive more than one
+   * device. Keys become `{pluginId}.charger.{rowId}.{key}`.
+   *
+   * Deliberately layered over the existing config/secret store rather than
+   * `ChargerRow.chargerConfig`: that column is plain text, and a plugin's
+   * credentials must stay in the encrypted secret path.
+   *
+   * Reads fall back to the plugin-global key when nothing scoped is stored, so
+   * a charger configured before per-charger storage existed keeps working and
+   * no migration is needed. Writes always go to the scoped key, so a charger
+   * migrates itself the first time it is saved. The fallback can be dropped
+   * once no install predates this.
+   */
+  forCharger(chargerRowId: string): ChargerScopedConfig<K> {
+    const scoped = (key: K) => `${this.prefix}charger.${chargerRowId}.${key}`;
+    return {
+      getConfig: async (key) =>
+        await this.db.getPluginConfig(scoped(key)) ??
+          await this.db.getPluginConfig(`${this.prefix}${key}`),
+      setConfig: (key, value) => this.db.setPluginConfig(scoped(key), value),
+      getSecret: async (key) =>
+        await this.db.readSecret(scoped(key)) ??
+          await this.db.readSecret(`${this.prefix}${key}`),
+      setSecret: (key, value) => this.db.storeSecret(scoped(key), value),
+    };
   }
 
   // ── Vehicle rows (filtered to this plugin's adapter type) ────────────
