@@ -40,7 +40,10 @@ export function OcppSettings(): JSX.Element | null {
         fields={OCPP_FIELDS}
         onSave={(draft, opts) => configMutation.mutate(draft, opts)}
         renderFooter={(values) => (
-          <OcppConnectionDetails chargerId={values.ocppChargerId} />
+          <>
+            <OcppConnectionDetails chargerId={values.ocppChargerId} />
+            <OcppTestButton chargerId={values.ocppChargerId} />
+          </>
         )}
       />
       <SettingsRow label="Connection">
@@ -51,24 +54,32 @@ export function OcppSettings(): JSX.Element | null {
           <Text size="2">{status.data.status}</Text>
         </SettingsRow>
       )}
-      <OcppTestButton />
     </>
   );
 }
 
-function OcppTestButton(): JSX.Element {
+function OcppTestButton({ chargerId }: { chargerId: string }): JSX.Element {
   const test = trpc.plugin.charger.ocpp.testConnection.useMutation();
   const result = test.data;
+  // Without an id there is no route for the charger to have connected to, so
+  // the test can only ever fail — say why rather than reporting a timeout.
+  const missingId = chargerId.trim() === "";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <Button
         size="2"
         variant="soft"
-        disabled={test.isPending}
+        disabled={test.isPending || missingId}
         onClick={() => test.mutate()}
       >
         {test.isPending ? "Testing..." : "Test Connection"}
       </Button>
+      {missingId && (
+        <Text size="2" color="red">
+          Enter a Charger ID first — the charger connects to a URL built from
+          it.
+        </Text>
+      )}
       {result?.success === true && (
         <Badge color="green" size="1">
           Responding ({result.latencyMs} ms)

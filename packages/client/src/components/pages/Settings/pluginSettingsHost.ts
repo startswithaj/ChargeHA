@@ -19,3 +19,11 @@ export const PluginSettingsHostProvider = PluginSettingsHostContext.Provider;
 /** Used by PluginConfigForm to report its state up to the host. */
 export const usePluginSettingsHost = () =>
   useContext(PluginSettingsHostContext);
+
+/** Plugin settings components are resolved from a registry and take no props,
+ *  so a host that wants the cursor in the first field asks through here. */
+const PluginAutoFocusContext = createContext(false);
+
+export const PluginAutoFocusProvider = PluginAutoFocusContext.Provider;
+
+export const usePluginAutoFocus = () => useContext(PluginAutoFocusContext);

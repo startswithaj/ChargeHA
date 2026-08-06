@@ -1,16 +1,18 @@
-import { type ComponentType, useEffect, useRef, useState } from "react";
+import { type ComponentType, useState } from "react";
 import { Button, Text } from "@radix-ui/themes";
 import { pluginSettingsComponents } from "@chargeha/plugins/componentRegistry";
 import { ErrorBoundary } from "../../ui/ErrorBoundary.tsx";
 import {
+  PluginAutoFocusProvider,
   PluginSettingsHostProvider,
   type PluginSettingsState,
 } from "./pluginSettingsHost.ts";
 
 function FormFields(
-  { Panel, onReport }: {
+  { Panel, onReport, autoFocus }: {
     Panel: ComponentType | undefined;
     onReport: (state: PluginSettingsState | null) => void;
+    autoFocus: boolean;
   },
 ) {
   if (!Panel) {
@@ -21,11 +23,13 @@ function FormFields(
     );
   }
   return (
-    <PluginSettingsHostProvider value={onReport}>
-      <ErrorBoundary label="Plugin Settings">
-        <Panel />
-      </ErrorBoundary>
-    </PluginSettingsHostProvider>
+    <PluginAutoFocusProvider value={autoFocus}>
+      <PluginSettingsHostProvider value={onReport}>
+        <ErrorBoundary label="Plugin Settings">
+          <Panel />
+        </ErrorBoundary>
+      </PluginSettingsHostProvider>
+    </PluginAutoFocusProvider>
   );
 }
 
@@ -45,25 +49,6 @@ export function ChargerEditForm(
 ) {
   const [panel, setPanel] = useState<PluginSettingsState | null>(null);
   const Panel = pluginSettingsComponents[`${typeId}-settings`];
-  const container = useRef<HTMLDivElement>(null);
-
-  // The plugin panel renders nothing until its config query resolves, so the
-  // first input may not exist yet on mount. Retry for a few frames, then
-  // give up quietly — a missed focus is not worth more machinery.
-  const frames = useRef(0);
-  const raf = useRef(0);
-  useEffect(() => {
-    if (!autoFocus) return;
-    frames.current = 0;
-    const tryFocus = () => {
-      const input = container.current?.querySelector("input");
-      if (input) return input.focus();
-      frames.current += 1;
-      if (frames.current < 20) raf.current = requestAnimationFrame(tryFocus);
-    };
-    tryFocus();
-    return () => cancelAnimationFrame(raf.current);
-  }, [autoFocus]);
 
   const submit = () => {
     panel?.save();
@@ -72,7 +57,6 @@ export function ChargerEditForm(
 
   return (
     <div
-      ref={container}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -80,7 +64,11 @@ export function ChargerEditForm(
         padding: "4px 10px 10px",
       }}
     >
-      <FormFields Panel={Panel} onReport={setPanel} />
+      <FormFields
+        Panel={Panel}
+        onReport={setPanel}
+        autoFocus={autoFocus === true}
+      />
 
       {error && <Text size="2" color="red">{error}</Text>}
 

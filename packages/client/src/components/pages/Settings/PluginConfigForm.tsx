@@ -9,7 +9,10 @@ import {
 import { Badge, Select, TextField } from "@radix-ui/themes";
 import { SettingsRow } from "./SettingsLayout.tsx";
 import { useSaveStatus } from "../../../hooks/useSectionConfig.ts";
-import { usePluginSettingsHost } from "./pluginSettingsHost.ts";
+import {
+  usePluginAutoFocus,
+  usePluginSettingsHost,
+} from "./pluginSettingsHost.ts";
 
 export interface PluginConfigField {
   key: string;
@@ -150,6 +153,7 @@ export function PluginConfigForm({
 }) {
   const [draft, setDraft] = useState<Record<string, string>>({});
   const { saveStatus, onMutate, onSuccess, onError } = useSaveStatus();
+  const hostAutoFocus = usePluginAutoFocus();
 
   const isDirty = Object.keys(draft).length > 0;
 
@@ -193,7 +197,7 @@ export function PluginConfigForm({
         fields={fields}
         values={values}
         onChange={(key, value) => setValue(key)(value)}
-        autoFocus={autoFocus}
+        autoFocus={autoFocus ?? hostAutoFocus}
       />
       {renderFooter?.(values)}
     </>
