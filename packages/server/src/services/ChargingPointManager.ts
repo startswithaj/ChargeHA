@@ -282,14 +282,16 @@ export class ChargingPointManager {
     );
   }
 
-  /** Gives a newly added vehicle its own charging point, unless a smart
-   *  charger already owns control or its plugin has no charger role. */
+  /** Gives a newly added vehicle its own charging point, unless its plugin
+   *  has no charger role. Created inactive when a smart charger already owns
+   *  control, so the vehicle still has something for the API-control toggle
+   *  to show and switch, in either setup order. */
   async ensureVehicleChargingPoint(vehicle: VehicleRow): Promise<void> {
     if (!this.chargerPlugins.get(vehicle.adapterType)) return;
     const rows = await this.db.getChargers();
-    if (rows.some((r) => r.kind === "smart")) return;
     const id = linkedChargingPointId(vehicle.id);
     if (rows.some((r) => r.id === id)) return;
+    const active = !rows.some((r) => r.kind === "smart");
     const now = new Date().toISOString();
     const row: ChargerRow = {
       id,
@@ -300,13 +302,17 @@ export class ChargingPointManager {
       priority: vehicle.priority,
       vehicleId: vehicle.id,
       kind: "vehicle_api",
-      active: true,
+      active,
       createdAt: now,
       updatedAt: now,
     };
     await this.db.upsertCharger(row);
-    await this.addCharger(row);
-    this.logger.info(`Charging point created for vehicle ${vehicle.name}`);
+    if (active) await this.addCharger(row);
+    this.logger.info(
+      `Charging point created for vehicle ${vehicle.name}${
+        active ? "" : " (inactive, smart charger active)"
+      }`,
+    );
   }
 
   /** Per-vehicle control-path switch: whether this car is driven by its own
