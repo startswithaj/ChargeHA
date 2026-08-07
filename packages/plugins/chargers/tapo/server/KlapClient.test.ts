@@ -9,6 +9,7 @@
 // exist.
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
+import { FakeTime } from "@std/testing/time";
 import { Logger } from "@chargeha/server/lib/Logger";
 import {
   type PersistLogFn,
@@ -16,7 +17,7 @@ import {
 } from "@chargeha/server/lib/PluginDbLogger";
 import { startTapoSimulator } from "../../../../../devtools/tapo-simulator/main.ts";
 import { KlapClient } from "./KlapClient.ts";
-import { TapoAuthError, TapoLockedError } from "./errors.ts";
+import { TapoApiError, TapoAuthError, TapoLockedError } from "./errors.ts";
 import type { TapoDeviceInfo } from "./TapoChargerAdapter.ts";
 
 describe("KlapClient handshake", () => {
@@ -122,5 +123,165 @@ describe("KlapClient handshake", () => {
       expect(serialized).not.toContain(CREDS.password);
       expect(serialized).not.toContain("nope");
     });
+  });
+});
+
+describe("KlapClient success-log throttling", () => {
+  const CREDS = { email: "user@example.com", password: "example-password" };
+  const testLogger = new Logger("TapoTest", "error");
+  const FIVE_MINUTES_MS = 5 * 60 * 1000;
+
+  const withSimulator = async (
+    run: (
+      client: KlapClient,
+      sim: ReturnType<typeof startTapoSimulator>,
+      successLogCalls: () => Array<{ level: string; message: string }>,
+    ) => Promise<void>,
+  ): Promise<void> => {
+    const sim = startTapoSimulator();
+    const dbLogCalls: Array<{ level: string; message: string }> = [];
+    const persist: PersistLogFn = (entry) => {
+      dbLogCalls.push(entry);
+      return Promise.resolve();
+    };
+    const client = new KlapClient(
+      `127.0.0.1:${sim.devicePort}`,
+      CREDS.email,
+      CREDS.password,
+      new Logger("TapoTest", "error"),
+      new PluginDbLogger(persist, testLogger),
+      "charger-1",
+    );
+    try {
+      await run(
+        client,
+        sim,
+        () =>
+          dbLogCalls.filter((c) =>
+            c.level === "debug" && c.message.startsWith("get_")
+          ),
+      );
+    } finally {
+      await sim.stop();
+    }
+  };
+
+  it("logs only one success row for a burst of calls inside the window", async () => {
+    await withSimulator(async (client, _sim, successLogCalls) => {
+      await client.request<TapoDeviceInfo>("get_device_info");
+      await client.request<TapoDeviceInfo>("get_device_info");
+      await client.request<TapoDeviceInfo>("get_device_info");
+      expect(successLogCalls().length).toBe(1);
+    });
+  });
+
+  it("logs another success row once the throttle window elapses", async () => {
+    await withSimulator(async (client, _sim, successLogCalls) => {
+      using fakeTime = new FakeTime();
+      await client.request<TapoDeviceInfo>("get_device_info");
+      expect(successLogCalls().length).toBe(1);
+      fakeTime.tick(FIVE_MINUTES_MS);
+      await client.request<TapoDeviceInfo>("get_device_info");
+      expect(successLogCalls().length).toBe(2);
+    });
+  });
+
+  it("logs every failure even inside the throttle window", async () => {
+    const sim = startTapoSimulator();
+    const dbLogCalls: Array<{ level: string; message: string }> = [];
+    const persist: PersistLogFn = (entry) => {
+      dbLogCalls.push(entry);
+      return Promise.resolve();
+    };
+    const client = new KlapClient(
+      `127.0.0.1:${sim.devicePort}`,
+      CREDS.email,
+      CREDS.password,
+      new Logger("TapoTest", "error"),
+      new PluginDbLogger(persist, testLogger),
+      "charger-1",
+    );
+    try {
+      // The success-log throttle applies only to the debug-level success
+      // path; two rejections back to back, well inside the 5-minute window,
+      // must both still land as warn rows — no throttling on failure.
+      sim.sim.applyPatch({ meterless: true });
+      await expect(client.request<TapoDeviceInfo>("get_energy_usage"))
+        .rejects.toBeInstanceOf(TapoApiError);
+      await expect(client.request<TapoDeviceInfo>("get_energy_usage"))
+        .rejects.toBeInstanceOf(TapoApiError);
+      const warnRows = dbLogCalls.filter((c) => c.level === "warn");
+      expect(warnRows.length).toBe(2);
+    } finally {
+      await sim.stop();
+    }
+  });
+
+  it("logs the first success after a failure immediately, not at the next window", async () => {
+    await withSimulator(async (client, sim, successLogCalls) => {
+      await client.request<TapoDeviceInfo>("get_device_info");
+      expect(successLogCalls().length).toBe(1);
+
+      sim.sim.applyPatch({ meterless: true });
+      await expect(client.request<TapoDeviceInfo>("get_energy_usage"))
+        .rejects.toBeInstanceOf(TapoApiError);
+
+      sim.sim.applyPatch({ meterless: false });
+      // Immediately after the failure, well inside the 5-minute window —
+      // this success must still log because the failure reset the throttle.
+      await client.request<TapoDeviceInfo>("get_energy_usage");
+      expect(successLogCalls().length).toBe(2);
+    });
+  });
+
+  it("throttles two chargers independently", async () => {
+    const sim = startTapoSimulator();
+    const logsA: Array<{ level: string; message: string }> = [];
+    const logsB: Array<{ level: string; message: string }> = [];
+    const persistA: PersistLogFn = (entry) => {
+      logsA.push(entry);
+      return Promise.resolve();
+    };
+    const persistB: PersistLogFn = (entry) => {
+      logsB.push(entry);
+      return Promise.resolve();
+    };
+    const clientA = new KlapClient(
+      `127.0.0.1:${sim.devicePort}`,
+      CREDS.email,
+      CREDS.password,
+      new Logger("TapoTest", "error"),
+      new PluginDbLogger(persistA, testLogger),
+      "charger-a",
+    );
+    const clientB = new KlapClient(
+      `127.0.0.1:${sim.devicePort}`,
+      CREDS.email,
+      CREDS.password,
+      new Logger("TapoTest", "error"),
+      new PluginDbLogger(persistB, testLogger),
+      "charger-b",
+    );
+    try {
+      using fakeTime = new FakeTime();
+      // Charger A logs its first success, then goes quiet within the window.
+      await clientA.request<TapoDeviceInfo>("get_device_info");
+      fakeTime.tick(FIVE_MINUTES_MS / 2);
+      await clientA.request<TapoDeviceInfo>("get_device_info");
+      // Charger B starts its own window later — its first call still logs,
+      // independent of A's window position.
+      await clientB.request<TapoDeviceInfo>("get_device_info");
+
+      const successA = logsA.filter((c) =>
+        c.level === "debug" && c.message.startsWith("get_")
+      );
+      const successB = logsB.filter((c) =>
+        c.level === "debug" && c.message.startsWith("get_")
+      );
+      expect(successA.length).toBe(1);
+      expect(successB.length).toBe(1);
+    } finally {
+      await sim.stop();
+    }
   });
 });

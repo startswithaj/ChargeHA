@@ -22,11 +22,21 @@ interface TapoResponse<T> {
 
 const REQUEST_TIMEOUT_MS = 5000;
 
+// Tapo's default 10s poll makes two device calls each time; logging every
+// success would write ~12 rows/minute/charger for "the poll worked". One row
+// per window still proves the poll loop is alive without drowning real faults.
+const SUCCESS_LOG_THROTTLE_MS = 5 * 60 * 1000;
+
 /** Speaks KLAP v2 to one device: two-stage seed handshake, then AES-CBC
  *  encrypted JSON requests with per-request sequence numbers. Re-handshakes
  *  once on session expiry (403). */
 export class KlapClient {
   private session: KlapSession | null = null;
+  // Instance-scoped so two Tapo plugs (two KlapClient instances, one per
+  // charger row) throttle independently. Timestamp of the last logged
+  // success, or null if the next success should log immediately — either
+  // because none has logged yet or because a failure just reset it.
+  private lastSuccessLogAt: number | null = null;
 
   constructor(
     private readonly host: string,
@@ -181,8 +191,10 @@ export class KlapClient {
       );
       const durationMs = Date.now() - start;
       if (parsed.error_code !== 0) {
-        // Device-level rejection (not a transport failure) — worth a warn,
-        // one row per occurrence rather than every routine poll.
+        // Device-level rejection (not a transport failure) — always logged,
+        // and it also opens the throttle so the next success logs
+        // immediately rather than waiting out the window.
+        this.lastSuccessLogAt = null;
         this.dbLog.warn(`${method} rejected (${this.chargerId})`, {
           payload: {
             chargerId: this.chargerId,
@@ -196,10 +208,20 @@ export class KlapClient {
       if (parsed.result === undefined) {
         throw new TapoConnectionError(`${method} returned no result`);
       }
-      // Routine, high-frequency traffic (every poll) — debug only.
-      this.dbLog.debug(`${method} (${this.chargerId})`, {
-        payload: { chargerId: this.chargerId, method, durationMs },
-      });
+      // Routine, high-frequency traffic (every poll) — throttled to at most
+      // one row per SUCCESS_LOG_THROTTLE_MS per charger, except the first
+      // success after a failure (lastSuccessLogAt reset to null), which
+      // always logs immediately since a recovery line is the useful one.
+      const now = Date.now();
+      if (
+        this.lastSuccessLogAt === null ||
+        now - this.lastSuccessLogAt >= SUCCESS_LOG_THROTTLE_MS
+      ) {
+        this.dbLog.debug(`${method} (${this.chargerId})`, {
+          payload: { chargerId: this.chargerId, method, durationMs },
+        });
+        this.lastSuccessLogAt = now;
+      }
       return parsed.result;
     } catch (error) {
       if (
@@ -211,6 +233,9 @@ export class KlapClient {
       const errorMessage = error instanceof Error
         ? error.message
         : String(error);
+      // Every failure is logged, always — no throttling — and it opens the
+      // throttle for the next success (see above).
+      this.lastSuccessLogAt = null;
       this.dbLog.error(`${method} failed (${this.chargerId})`, {
         payload: {
           chargerId: this.chargerId,
