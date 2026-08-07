@@ -621,6 +621,7 @@ export class ChargeController {
       gridPowerW: energy.gridPowerW,
       homeConsumptionW: energy.homeConsumptionW,
       batterySoc: energy.batterySoc,
+      batteryPowerW: energy.batteryPowerW,
     };
   }
 

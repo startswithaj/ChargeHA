@@ -294,6 +294,9 @@ export interface DecisionInputs {
     gridPowerW: number;
     homeConsumptionW: number;
     batterySoc: number | null;
+    // Absent (undefined) on rows written before this field was added — treat
+    // missing the same as null, not as "no battery power right now".
+    batteryPowerW?: number | null;
   } | null;
   vehicleState: {
     isPluggedIn: boolean;
