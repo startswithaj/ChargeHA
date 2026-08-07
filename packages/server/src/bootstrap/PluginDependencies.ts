@@ -7,8 +7,12 @@ import type {
 } from "../db/types.ts";
 import type { VehicleManager } from "../services/VehicleManager.ts";
 import type { ChargingPointManager } from "../services/ChargingPointManager.ts";
-import type { VehicleChargeState } from "@chargeha/shared";
-import type { VehicleRequestContext } from "@chargeha/shared/plugins";
+import type { ChargerConfigPatch, VehicleChargeState } from "@chargeha/shared";
+import type {
+  ChargerRowConfig,
+  ResolvedChargerRow,
+  VehicleRequestContext,
+} from "@chargeha/shared/plugins";
 import type { EnergyAdapterManager } from "../services/EnergyAdapterManager.ts";
 import {
   enrichVehicleRows,
@@ -25,14 +29,6 @@ export interface PluginTunnelApi {
   stop(): Promise<void>;
   /** Free-tier session limit of the tunnel provider, if any. */
   getExpiryMinutes(): number | null;
-}
-
-/** Config and secrets for one charger row — see `forCharger`. */
-export interface ChargerScopedConfig<K extends string = string> {
-  getConfig(key: K): Promise<string | null>;
-  setConfig(key: K, value: string | null): Promise<void>;
-  getSecret(key: K): Promise<string | null>;
-  setSecret(key: K, value: string | null): Promise<void>;
 }
 
 /** Everything a PluginDependencies instance is built from. */
@@ -122,7 +118,11 @@ export class PluginDependencies<K extends string = string> {
     return this.db.storeSecret(`${this.prefix}${key}`, value);
   }
 
-  // ── Charger rows + per-charger config ────────────────────────────────
+  // ── Charger rows + row-scoped config ─────────────────────────────────
+  //
+  // There is no plugin-wide charger config any more. Every charger value —
+  // host, credentials, charge point id, amp limits — belongs to one charger
+  // row, so two chargers of one adapter type control two different devices.
 
   /** This plugin's charger rows. Filtered by adapter type for the same reason
    *  vehicles are: a plugin must never see another plugin's hardware. */
@@ -131,32 +131,73 @@ export class PluginDependencies<K extends string = string> {
     return all.filter((c) => c.chargerAdapterType === this.pluginId);
   }
 
-  /**
-   * Config scoped to one charger row, for plugins that drive more than one
-   * device. Keys become `{pluginId}.charger.{rowId}.{key}`.
+  /** One of this plugin's charger rows, or throws. Same ownership check as
+   *  `requestVehicleState` and `deleteVehicle`: a plugin must not be able to
+   *  read or write another plugin's credentials by guessing a row id. */
+  private async ownedChargerRow(chargerRowId: string): Promise<ChargerRow> {
+    const row = await this.db.getCharger(chargerRowId);
+    if (!row || row.chargerAdapterType !== this.pluginId) {
+      throw new Error(
+        `Charger ${chargerRowId} does not belong to plugin ${this.pluginId}`,
+      );
+    }
+    return row;
+  }
+
+  /** Row-scoped config plus decrypted secrets for one of this plugin's
+   *  chargers. The only route a plugin has to per-charger credentials.
    *
-   * Deliberately layered over the existing config/secret store rather than
-   * `ChargerRow.chargerConfig`: that column is plain text, and a plugin's
-   * credentials must stay in the encrypted secret path.
+   *  Throws when the row is missing, belongs to another plugin, or its
+   *  secrets are encrypted with no ENCRYPTION_KEY set — callers on the
+   *  middleware-construction path have that turned into an "unconfigured"
+   *  charger by ChargingPointManager. */
+  async resolveChargerConfig(chargerRowId: string): Promise<ChargerRowConfig> {
+    await this.ownedChargerRow(chargerRowId);
+    const [config, secrets] = await Promise.all([
+      this.db.getChargerConfig(chargerRowId),
+      this.db.getChargerSecrets(chargerRowId),
+    ]);
+    return { config, secrets };
+  }
+
+  /** Every charger row of this plugin with its config and secrets resolved.
    *
-   * Reads fall back to the plugin-global key when nothing scoped is stored, so
-   * a charger configured before per-charger storage existed keeps working and
-   * no migration is needed. Writes always go to the scoped key, so a charger
-   * migrates itself the first time it is saved. The fallback can be dropped
-   * once no install predates this.
-   */
-  forCharger(chargerRowId: string): ChargerScopedConfig<K> {
-    const scoped = (key: K) => `${this.prefix}charger.${chargerRowId}.${key}`;
-    return {
-      getConfig: async (key) =>
-        await this.db.getPluginConfig(scoped(key)) ??
-          await this.db.getPluginConfig(`${this.prefix}${key}`),
-      setConfig: (key, value) => this.db.setPluginConfig(scoped(key), value),
-      getSecret: async (key) =>
-        await this.db.readSecret(scoped(key)) ??
-          await this.db.readSecret(`${this.prefix}${key}`),
-      setSecret: (key, value) => this.db.storeSecret(scoped(key), value),
-    };
+   *  Health checks, OCPP pairing and the OCPP websocket route all have to work
+   *  across every charger of the type rather than one privileged instance;
+   *  this is the shape that question needs. Ownership is guaranteed by
+   *  `getChargerRows`, so no per-row re-check is done. */
+  async resolveChargerConfigs(): Promise<ResolvedChargerRow[]> {
+    const rows = await this.getChargerRows();
+    return await Promise.all(rows.map(async (row) => {
+      const [config, secrets] = await Promise.all([
+        this.db.getChargerConfig(row.id),
+        this.db.getChargerSecrets(row.id),
+      ]);
+      return { row, config, secrets };
+    }));
+  }
+
+  /** Set or remove non-secret keys on one of this plugin's charger rows.
+   *  `null` deletes the key rather than storing "" (code.md). Untouched keys
+   *  are preserved. */
+  async patchChargerConfig(
+    chargerRowId: string,
+    patch: ChargerConfigPatch,
+  ): Promise<void> {
+    await this.ownedChargerRow(chargerRowId);
+    await this.db.patchChargerConfig(chargerRowId, patch);
+  }
+
+  /** Set or remove secret keys on one of this plugin's charger rows.
+   *  Encryption is a storage concern — AppDatabase owns the key and this
+   *  method takes and returns plaintext, exactly like `setSecret` does for
+   *  plugin-wide values. */
+  async patchChargerSecrets(
+    chargerRowId: string,
+    patch: ChargerConfigPatch,
+  ): Promise<void> {
+    await this.ownedChargerRow(chargerRowId);
+    await this.db.patchChargerSecrets(chargerRowId, patch);
   }
 
   // ── Vehicle rows (filtered to this plugin's adapter type) ────────────

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { skipToken } from "@tanstack/react-query";
 import { Badge, Button, Text } from "@radix-ui/themes";
 import {
   type PluginStepDef,
@@ -6,6 +7,7 @@ import {
   type WizardNext,
 } from "../../../hostUi.ts";
 import { trpc } from "./trpc.ts";
+import { useTapoChargerId } from "./useTapoChargerId.ts";
 
 function verifyNext(toggled: boolean): WizardNext {
   if (!toggled) {
@@ -18,9 +20,11 @@ export const tapoVerifyStep: PluginStepDef = {
   id: "tapo-verify",
   label: "Verify Plug Control",
   useStep: () => {
-    const status = trpc.plugin.charger.tapo.status.useQuery(undefined, {
-      refetchInterval: 3000,
-    });
+    const chargerRowId = useTapoChargerId();
+    const status = trpc.plugin.charger.tapo.status.useQuery(
+      chargerRowId === undefined ? skipToken : { chargerRowId },
+      { refetchInterval: 3000 },
+    );
     const setPower = trpc.plugin.charger.tapo.setPower.useMutation({
       onSuccess: () => {
         setToggled(true);
@@ -40,8 +44,10 @@ export const tapoVerifyStep: PluginStepDef = {
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <Button
               size="2"
-              disabled={setPower.isPending}
-              onClick={() => setPower.mutate({ on: !(status.data?.on) })}
+              disabled={setPower.isPending || chargerRowId === undefined}
+              onClick={() =>
+                chargerRowId !== undefined &&
+                setPower.mutate({ chargerRowId, on: !(status.data?.on) })}
             >
               Turn {status.data?.on ? "Off" : "On"}
             </Button>

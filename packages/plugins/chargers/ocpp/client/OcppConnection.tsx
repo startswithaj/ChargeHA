@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { skipToken } from "@tanstack/react-query";
 import { Badge, Button, Code, Link, Text, TextField } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
+import { useOcppChargerId } from "./useOcppChargerId.ts";
 
 /** Fallback only, for the moment before the server reports its own addresses.
  *  The browser's location is the wrong answer — it is the address *you* typed,
@@ -246,14 +248,18 @@ export function OcppConnectBlock(
     onDetected: (id: string) => void;
   },
 ) {
+  const chargerRowId = useOcppChargerId();
   const [now, setNow] = useState(() => Date.now());
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const begin = trpc.plugin.charger.ocpp.beginPairing.useMutation();
   const stop = trpc.plugin.charger.ocpp.cancelPairing.useMutation();
-  const urls = trpc.plugin.charger.ocpp.connectionUrls.useQuery();
-  const status = trpc.plugin.charger.ocpp.status.useQuery(undefined, {
-    refetchInterval: 2000,
-  });
+  const urls = trpc.plugin.charger.ocpp.connectionUrls.useQuery(
+    chargerRowId === undefined ? skipToken : { chargerRowId },
+  );
+  const status = trpc.plugin.charger.ocpp.status.useQuery(
+    chargerRowId === undefined ? skipToken : { chargerRowId },
+    { refetchInterval: 2000 },
+  );
 
   const pairing = status.data?.pairing;
   const listening = pairing?.armed === true;

@@ -4,8 +4,10 @@ import type { SectionDef } from "./configSections.ts";
 import type {
   AdapterVehicleChargeState,
   CallContext,
+  ChargerConfigMap,
   ChargerInfo,
   ChargerRow,
+  ChargerSecretsMap,
   ChargerState,
   EnergySourceAdapter,
   VehicleRow,
@@ -70,6 +72,10 @@ export interface BasePlugin {
   readonly id: string;
   readonly displayName: string;
   readonly configDef: SectionDef;
+  /** Which of `configDef`'s keys hold credentials. A pure classification,
+   *  independent of where the value is stored: for plugin-wide config it
+   *  selects the encrypted `config` rows, and for a charger row it selects
+   *  the encrypted `charger_secrets` column over plain `charger_config`. */
   readonly secretKeys: readonly string[];
   getRouter(): AnyRouter | null;
   /** Health checks surfaced as dashboard warnings when they fail. Checks
@@ -181,10 +187,57 @@ export interface ChargerMiddleware {
 
 // ── Charger Plugin ──────────────────────────────────────────────────────────
 
+/**
+ * One charger row's plugin config, resolved by the host before the plugin is
+ * called.
+ *
+ * `config` is the row's plain `charger_config`; `secrets` is the row's
+ * `charger_secrets`, already decrypted — the plugin never sees ciphertext and
+ * never holds the encryption key. Both are scoped to a single charger row, so
+ * two chargers of one adapter type cannot collide on the same credentials.
+ *
+ * Absence of a key is `undefined`, never `""` — the storage layer converts at
+ * the boundary.
+ *
+ * Which keys arrive in which half is decided by the plugin's own
+ * `secretKeys` allowlist. See `BasePlugin.secretKeys`.
+ */
+export interface ChargerRowConfig {
+  readonly config: ChargerConfigMap;
+  readonly secrets: ChargerSecretsMap;
+}
+
+/**
+ * A charger row together with its resolved config, from
+ * `PluginDependencies.resolveChargerConfigs()`.
+ *
+ * For the cases that must answer "which of my chargers is this?" — health
+ * checks, OCPP pairing, and the OCPP websocket route — where there is no
+ * longer a single answer.
+ */
+export interface ResolvedChargerRow extends ChargerRowConfig {
+  readonly row: ChargerRow;
+}
+
 export interface ChargerPlugin extends BasePlugin {
   readonly vendor: string;
   readonly settingsComponentKey: string | null;
-  /** row carries the charger's config — plugins never query the DB. */
-  createChargerMiddleware(row: ChargerRow): Promise<ChargerMiddleware>;
+  /**
+   * Build the middleware for one charger row.
+   *
+   * `row` identifies the charger and carries its non-plugin fields; `resolved`
+   * carries the row's plugin config and decrypted secrets, read from the
+   * database by ChargingPointManager immediately before this call. Plugins
+   * never query the DB here — everything needed is already an argument.
+   *
+   * Throwing is the correct response to missing or invalid config: the host
+   * catches it and registers an UnconfiguredChargerMiddleware carrying the
+   * message, so the dashboard says what is wrong instead of the charger
+   * silently doing nothing.
+   */
+  createChargerMiddleware(
+    row: ChargerRow,
+    resolved: ChargerRowConfig,
+  ): Promise<ChargerMiddleware>;
   getChargerHttpRoutes(): PluginHttpRoutes | null;
 }

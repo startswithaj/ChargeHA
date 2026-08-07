@@ -19,16 +19,26 @@ const testConnectionInput = z.object({
   password: z.string(),
 });
 
+/** Which charger row to act on. `chargerRowId`, not `chargerId`, because a
+ *  Tapo row has no device-side id and the two would be easy to confuse. */
+const chargerInput = z.object({
+  chargerRowId: z.string(),
+});
+
 const setPowerInput = z.object({
+  chargerRowId: z.string(),
   on: z.boolean(),
 });
 
-async function savedClient(deps: PluginDependencies): Promise<KlapClient> {
-  const [host, email, password] = await Promise.all([
-    deps.getConfig("host"),
-    deps.getConfig("email"),
-    deps.getSecret("password"),
-  ]);
+/** A client for the plug configured on ONE charger row. Two Tapo rows resolve
+ *  to two different plugs; there is no "the" saved plug any more. */
+async function savedClient(
+  deps: PluginDependencies,
+  chargerRowId: string,
+): Promise<KlapClient> {
+  const { config, secrets } = await deps.resolveChargerConfig(chargerRowId);
+  const { host, email } = config;
+  const password = secrets.password;
   if (!host || !email || !password) {
     throw new Error("Tapo plug not configured");
   }
@@ -102,21 +112,25 @@ export function createTapoRouter(deps: PluginDependencies) {
     setPower: publicProcedure
       .input(setPowerInput)
       .mutation(async ({ input }) => {
-        const client = await savedClient(deps);
+        const client = await savedClient(deps, input.chargerRowId);
         await client.request("set_device_info", { device_on: input.on });
         return { on: input.on };
       }),
 
-    status: publicProcedure.query(async () => {
-      const client = await savedClient(deps);
-      // Sequential — same one-request-at-a-time rule as the adapter.
-      const info = await client.request<TapoDeviceInfo>("get_device_info");
-      const energy = await client.request<TapoEnergyUsage>("get_energy_usage");
-      return {
-        on: info.device_on,
-        powerW: energy.current_power / 1000,
-        model: info.model,
-      };
-    }),
+    status: publicProcedure
+      .input(chargerInput)
+      .query(async ({ input }) => {
+        const client = await savedClient(deps, input.chargerRowId);
+        // Sequential — same one-request-at-a-time rule as the adapter.
+        const info = await client.request<TapoDeviceInfo>("get_device_info");
+        const energy = await client.request<TapoEnergyUsage>(
+          "get_energy_usage",
+        );
+        return {
+          on: info.device_on,
+          powerW: energy.current_power / 1000,
+          model: info.model,
+        };
+      }),
   });
 }

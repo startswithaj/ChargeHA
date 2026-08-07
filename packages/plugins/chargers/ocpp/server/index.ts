@@ -4,8 +4,10 @@ import type { ChargerRow } from "@chargeha/shared";
 import type {
   ChargerMiddleware,
   ChargerPlugin,
+  ChargerRowConfig,
   PluginHealthCheck,
   PluginHttpRoutes,
+  ResolvedChargerRow,
 } from "@chargeha/shared/plugins";
 import { PollingChargerMiddleware } from "../../PollingChargerMiddleware.ts";
 import { OCPP_SECRET_KEYS, ocppConfigDef } from "./config.ts";
@@ -16,6 +18,9 @@ import {
 import { OcppChargerAdapter } from "./OcppChargerAdapter.ts";
 import { createOcppWsRoutes } from "./wsRoutes.ts";
 import { createOcppRouter } from "./router.ts";
+
+const intConfig = (raw: string | undefined, fallback: number): number =>
+  parseInt(raw ?? "", 10) || fallback;
 
 export class OcppChargerPlugin implements ChargerPlugin {
   readonly id = "ocpp";
@@ -36,28 +41,58 @@ export class OcppChargerPlugin implements ChargerPlugin {
     deps.log.info("OCPP plugin initialized");
   }
 
-  /** setConfig(key, null) clears — data-layer null boundary (code.md).
-   *  Still one key while the plugin drives a single charger; the charge point
-   *  id is threaded through so per-charger storage is a change of key, not a
-   *  change of shape. */
-  private async persistTransaction(
-    _chargePointId: string,
-    tx: ActiveTransaction | null,
-  ): Promise<void> {
-    await this.deps.setConfig(
-      "active_transaction",
-      tx === null ? null : JSON.stringify(tx),
-    );
+  /**
+   * The charger row that owns a given OCPP charge point id, or null.
+   *
+   * The central system speaks charge point ids (what the device announces);
+   * storage speaks charger row ids. This is the only translation between them,
+   * and it replaces every former plugin-wide `charger_id` read.
+   */
+  private async rowForChargePoint(
+    chargePointId: string,
+  ): Promise<ResolvedChargerRow | null> {
+    const entries = await this.deps.resolveChargerConfigs();
+    return entries.find((e) => e.config.charger_id === chargePointId) ?? null;
   }
 
-  private async restorePersistedTransaction(): Promise<void> {
-    const raw = await this.deps.getConfig("active_transaction");
-    if (!raw) return;
+  /**
+   * Persist the active transaction on the charger ROW that owns this charge
+   * point. `null` clears the key rather than storing "" — data-layer null
+   * boundary (code.md).
+   *
+   * Row-scoped, so two OCPP chargers keep separate sessions. This replaces the
+   * single plugin-wide `active_transaction` key that the old docstring here
+   * called out as the remaining single-charger assumption.
+   */
+  private async persistTransaction(
+    chargePointId: string,
+    tx: ActiveTransaction | null,
+  ): Promise<void> {
+    const entry = await this.rowForChargePoint(chargePointId);
+    if (entry === null) {
+      // A provisional pairing socket has no row yet, and cannot open a
+      // transaction anyway (PAIRING_ACTIONS). Log rather than throw: the
+      // central system treats persistence failures as non-fatal.
+      this.deps.log.warn(
+        `No charger row for charge point ${chargePointId}; ` +
+          "active transaction not persisted",
+      );
+      return;
+    }
+    await this.deps.patchChargerConfig(entry.row.id, {
+      active_transaction: tx === null ? null : JSON.stringify(tx),
+    });
+  }
+
+  /** Seed a mid-charge session saved before a restart, from THIS row's config.
+   *  Synchronous: the values are already in hand. */
+  private restorePersistedTransaction(resolved: ChargerRowConfig): void {
+    const raw = resolved.config.active_transaction;
+    const chargePointId = resolved.config.charger_id;
+    if (!raw || !chargePointId) return;
     try {
-      const configuredId = await this.deps.getConfig("charger_id");
-      if (!configuredId) return;
       this.centralSystem.restoreTransaction(
-        configuredId,
+        chargePointId,
         JSON.parse(raw) as ActiveTransaction,
       );
     } catch (error) {
@@ -65,29 +100,31 @@ export class OcppChargerPlugin implements ChargerPlugin {
     }
   }
 
-  async createChargerMiddleware(row: ChargerRow): Promise<ChargerMiddleware> {
-    await this.restorePersistedTransaction();
-    // Scoped to this charger row, falling back to the plugin-wide value when
-    // nothing has been saved for it — so a charger set up before per-charger
-    // storage existed still resolves.
-    const config = this.deps.forCharger(row.id);
-    const [timeoutRaw, maxRaw, minRaw, phasesRaw, chargePointId] = await Promise
-      .all([
-        config.getConfig("meter_timeout_seconds"),
-        config.getConfig("max_amps"),
-        config.getConfig("min_amps"),
-        config.getConfig("phases"),
-        config.getConfig("charger_id"),
-      ]);
+  /** Nothing is awaited: every value this needs arrives as an argument. */
+  // deno-lint-ignore require-await
+  async createChargerMiddleware(
+    row: ChargerRow,
+    resolved: ChargerRowConfig,
+  ): Promise<ChargerMiddleware> {
+    const { config } = resolved;
+    const chargePointId = config.charger_id;
+    // Previously this fell back to "", binding an unconfigured row to a
+    // phantom charge point that looked live but could never connect. Throwing
+    // registers an UnconfiguredChargerMiddleware whose message names the
+    // problem on the dashboard.
+    if (!chargePointId) {
+      throw new Error("OCPP charge point id not configured");
+    }
+    this.restorePersistedTransaction(resolved);
     const adapter = new OcppChargerAdapter(
       {
         chargerId: row.id,
-        meterTimeoutSeconds: parseInt(timeoutRaw ?? "300", 10) || 300,
-        maxAmps: parseInt(maxRaw ?? "32", 10) || 32,
-        minAmps: parseInt(minRaw ?? "6", 10) || 6,
-        phases: phasesRaw === "3" ? 3 : 1,
+        meterTimeoutSeconds: intConfig(config.meter_timeout_seconds, 300),
+        maxAmps: intConfig(config.max_amps, 32),
+        minAmps: intConfig(config.min_amps, 6),
+        phases: config.phases === "3" ? 3 : 1,
       },
-      this.centralSystem.forCharger(chargePointId ?? ""),
+      this.centralSystem.forCharger(chargePointId),
     );
     return new PollingChargerMiddleware(adapter, this.deps.log);
   }
@@ -104,6 +141,8 @@ export class OcppChargerPlugin implements ChargerPlugin {
   }
 
   getHealthChecks(): PluginHealthCheck[] {
+    // One check across every OCPP row. Rows with no charge point id yet are
+    // unconfigured and stay silent.
     return [{
       name: "ocpp-connection",
       timeoutMs: 2000,
@@ -112,11 +151,24 @@ export class OcppChargerPlugin implements ChargerPlugin {
         "The charger is not connected to ChargeHA. Check the charger's OCPP " +
         "server URL and network connection.",
       run: async () => {
-        const chargerId = await this.deps.getConfig("charger_id");
-        if (!chargerId) return { status: "ok" }; // unconfigured — silent
-        return this.centralSystem.getData(chargerId).connected
-          ? { status: "ok" }
-          : { status: "error", message: "Charger not connected" };
+        const entries = await this.deps.resolveChargerConfigs();
+        const configured = entries
+          .map((e) => ({
+            name: e.row.name,
+            chargePointId: e.config.charger_id,
+          }))
+          .filter(
+            (p): p is { name: string; chargePointId: string } =>
+              p.chargePointId !== undefined && p.chargePointId !== "",
+          );
+        const disconnected = configured
+          .filter((p) => !this.centralSystem.getData(p.chargePointId).connected)
+          .map((p) => p.name);
+        if (disconnected.length === 0) return { status: "ok" };
+        return {
+          status: "error",
+          message: `Not connected: ${disconnected.join(", ")}`,
+        };
       },
     }];
   }

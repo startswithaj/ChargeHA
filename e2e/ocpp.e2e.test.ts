@@ -6,6 +6,26 @@ import { meterValuesPayload, ocppTrpc, vcpSend } from "./ocppHelpers.ts";
 describe("OCPP e2e", () => {
   const CP_ID = "vcp-test";
 
+  // Row-scoped procedures (change set 02) need the charger row id, and the
+  // row is only created partway through this suite (`charger.create`,
+  // below) — same interim assumption as the client's useOcppChargerId hook:
+  // the single OCPP row, valid while ensureCharger allows only one per
+  // adapter type. Looked up lazily rather than once in beforeAll because it
+  // does not exist yet for the first tests in file order.
+  //
+  // NOTE: per change set 02's spec (§8, sequencing risk #1), no OCPP charger
+  // is actually configurable end-to-end until change set 03 lands the
+  // row-scoped write path — createPluginConfigProcedures.setConfig here still
+  // writes the now-unread plugin-wide `charger_id` key. This suite is
+  // expected to stay red until 03 ships; it is kept compiling in the
+  // meantime.
+  async function ocppRowId(): Promise<string> {
+    const list = await trpc.charger.list.query();
+    const row = list.find((c) => c.chargerAdapterType === "ocpp");
+    if (!row) throw new Error("No OCPP charger row found for e2e setup");
+    return row.id;
+  }
+
   beforeAll(async () => {
     // 5s loop: the suites otherwise idle on the 30s default for most
     // of their runtime. Config is per-stack (fresh DB every run).
@@ -18,7 +38,9 @@ describe("OCPP e2e", () => {
 
   it("charger connects and reports boot info", async () => {
     const status = await waitFor(async () => {
-      const s = await ocppTrpc.plugin.charger.ocpp.status.query();
+      const s = await ocppTrpc.plugin.charger.ocpp.status.query({
+        chargerRowId: await ocppRowId(),
+      });
       return s.connected ? s : null;
     }, { label: "vcp connected", timeoutMs: 60_000 });
     expect(status.info?.vendor).toBe("Solidstudio");
@@ -27,7 +49,9 @@ describe("OCPP e2e", () => {
   });
 
   it("test connection round-trips a call to the charger", async () => {
-    const result = await ocppTrpc.plugin.charger.ocpp.testConnection.mutate();
+    const result = await ocppTrpc.plugin.charger.ocpp.testConnection.mutate({
+      chargerRowId: await ocppRowId(),
+    });
     expect(result.success).toBe(true);
     expect(result.success === true && result.latencyMs >= 0).toBe(true);
   });

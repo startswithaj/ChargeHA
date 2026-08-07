@@ -82,13 +82,24 @@ export class ChargingPointManager {
   }
 
   /** Never throws: a charger whose adapter cannot be built still registers
-   *  and reports "unconfigured", so the dashboard can say what is wrong. */
+   *  and reports "unconfigured", so the dashboard can say what is wrong.
+   *
+   *  Reading the row's config and secrets happens INSIDE the try. A row whose
+   *  secrets were encrypted under an ENCRYPTION_KEY that is no longer set
+   *  makes `getChargerSecrets` throw; that must show up as one unconfigured
+   *  charger on the dashboard, not as a failed boot. */
   private async tryCreateMiddleware(
     plugin: ChargerPlugin,
     row: ChargerRow,
   ): Promise<ChargerMiddleware> {
     try {
-      return await plugin.createChargerMiddleware(row);
+      // The host reads storage so the plugin never has to — see
+      // ChargerPlugin.createChargerMiddleware.
+      const [config, secrets] = await Promise.all([
+        this.db.getChargerConfig(row.id),
+        this.db.getChargerSecrets(row.id),
+      ]);
+      return await plugin.createChargerMiddleware(row, { config, secrets });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(

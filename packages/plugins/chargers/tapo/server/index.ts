@@ -4,8 +4,10 @@ import type { ChargerRow } from "@chargeha/shared";
 import type {
   ChargerMiddleware,
   ChargerPlugin,
+  ChargerRowConfig,
   PluginHealthCheck,
   PluginHttpRoutes,
+  ResolvedChargerRow,
 } from "@chargeha/shared/plugins";
 import { PollingChargerMiddleware } from "../../PollingChargerMiddleware.ts";
 import { TAPO_SECRET_KEYS, tapoConfigDef } from "./config.ts";
@@ -17,7 +19,7 @@ import {
 } from "./TapoChargerAdapter.ts";
 import { createTapoRouter } from "./router.ts";
 
-const numberConfig = (raw: string | null, fallback: number): number => {
+const numberConfig = (raw: string | undefined, fallback: number): number => {
   const parsed = parseInt(raw ?? "", 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
@@ -37,6 +39,31 @@ const describeTapoError = (error: unknown): string => {
   return String(error);
 };
 
+interface TapoCredentials {
+  host: string;
+  email: string;
+  password: string;
+}
+
+/**
+ * One charger row's plug credentials, or a message naming what is missing.
+ *
+ * Row-scoped: `host`/`email` come from the row's plain config and `password`
+ * from its encrypted secrets, so two Tapo rows address two different plugs.
+ * The plugin-wide `tapo.host` / `tapo.email` / `tapo.password` keys are gone.
+ */
+export function tapoCredentials(
+  { config, secrets }: ChargerRowConfig,
+): TapoCredentials | { error: string } {
+  const { host, email } = config;
+  const password = secrets.password;
+  if (!host) return { error: "Tapo host not configured" };
+  if (!email || !password) {
+    return { error: "Tapo account credentials not configured" };
+  }
+  return { host, email, password };
+}
+
 /** Tapo smart plug charger plugin — switch-only control of a dumb EVSE via
  *  the local KLAP protocol. */
 export class TapoChargerPlugin implements ChargerPlugin {
@@ -51,31 +78,29 @@ export class TapoChargerPlugin implements ChargerPlugin {
     deps.log.info("Tapo plugin initialized");
   }
 
-  async createChargerMiddleware(row: ChargerRow): Promise<ChargerMiddleware> {
-    const [host, email, password] = await Promise.all([
-      this.deps.getConfig("host"),
-      this.deps.getConfig("email"),
-      this.deps.getSecret("password"),
-    ]);
-    if (!host) throw new Error("Tapo host not configured");
-    if (!email || !password) {
-      throw new Error("Tapo account credentials not configured");
-    }
-    const [amps, threshold, poll, stale] = await Promise.all([
-      this.deps.getConfig("fixed_draw_amps"),
-      this.deps.getConfig("detection_threshold_w"),
-      this.deps.getConfig("poll_interval_seconds"),
-      this.deps.getConfig("stale_timeout_seconds"),
-    ]);
+  /** Nothing is awaited: every value this needs arrives as an argument. */
+  // deno-lint-ignore require-await
+  async createChargerMiddleware(
+    row: ChargerRow,
+    resolved: ChargerRowConfig,
+  ): Promise<ChargerMiddleware> {
+    const credentials = tapoCredentials(resolved);
+    if ("error" in credentials) throw new Error(credentials.error);
+    const { config } = resolved;
     const adapter = new TapoChargerAdapter(
       {
         chargerId: row.id,
-        fixedDrawAmps: numberConfig(amps, 10),
-        detectionThresholdW: numberConfig(threshold, 100),
-        pollSeconds: numberConfig(poll, 10),
-        staleTimeoutSeconds: numberConfig(stale, 60),
+        fixedDrawAmps: numberConfig(config.fixed_draw_amps, 10),
+        detectionThresholdW: numberConfig(config.detection_threshold_w, 100),
+        pollSeconds: numberConfig(config.poll_interval_seconds, 10),
+        staleTimeoutSeconds: numberConfig(config.stale_timeout_seconds, 60),
       },
-      new KlapClient(host, email, password, this.deps.log),
+      new KlapClient(
+        credentials.host,
+        credentials.email,
+        credentials.password,
+        this.deps.log,
+      ),
       this.deps.log,
     );
     return new PollingChargerMiddleware(adapter, this.deps.log);
@@ -89,7 +114,37 @@ export class TapoChargerPlugin implements ChargerPlugin {
     return null;
   }
 
+  /** null = healthy, or unconfigured and therefore deliberately silent. */
+  private async checkRow(entry: ResolvedChargerRow): Promise<string | null> {
+    const credentials = tapoCredentials(entry);
+    if ("error" in credentials) {
+      // No host at all means the row was never set up — stay silent rather
+      // than nag about a charger the user has not finished adding. A host
+      // with missing credentials IS worth reporting.
+      return entry.config.host
+        ? `${entry.row.name}: ${credentials.error}`
+        : null;
+    }
+    try {
+      const client = new KlapClient(
+        credentials.host,
+        credentials.email,
+        credentials.password,
+        this.deps.log,
+      );
+      await client.handshake();
+      await client.request<TapoEnergyUsage>("get_energy_usage");
+      return null;
+    } catch (error) {
+      return `${entry.row.name}: ${describeTapoError(error)}`;
+    }
+  }
+
   getHealthChecks(): PluginHealthCheck[] {
+    // One check covering every Tapo row rather than one check per row: the
+    // check list is built once at boot and its `name` is a stable identifier,
+    // so it cannot grow and shrink as chargers are added. Failures are named
+    // in the message instead.
     return [{
       name: "tapo-connection",
       timeoutMs: 8000,
@@ -98,26 +153,14 @@ export class TapoChargerPlugin implements ChargerPlugin {
         "ChargeHA cannot reach the Tapo smart plug. Charging cannot be " +
         "controlled until it is back online.",
       run: async () => {
-        const host = await this.deps.getConfig("host");
-        if (!host) return { status: "ok" }; // unconfigured — stay silent
-        const [email, password] = await Promise.all([
-          this.deps.getConfig("email"),
-          this.deps.getSecret("password"),
-        ]);
-        if (!email || !password) {
-          return {
-            status: "error",
-            message: "Tapo credentials not configured",
-          };
-        }
-        try {
-          const client = new KlapClient(host, email, password, this.deps.log);
-          await client.handshake();
-          await client.request<TapoEnergyUsage>("get_energy_usage");
-          return { status: "ok" };
-        } catch (error) {
-          return { status: "error", message: describeTapoError(error) };
-        }
+        const entries = await this.deps.resolveChargerConfigs();
+        const results = await Promise.all(
+          entries.map((entry) => this.checkRow(entry)),
+        );
+        const failures = results.filter((r): r is string => r !== null);
+        return failures.length === 0
+          ? { status: "ok" }
+          : { status: "error", message: failures.join("; ") };
       },
     }];
   }

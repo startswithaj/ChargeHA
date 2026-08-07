@@ -3,8 +3,12 @@ import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDepend
 import type { OcppCentralSystem } from "./OcppCentralSystem.ts";
 
 /** The public: true mount. Path (relative to /api/charger/ocpp):
- *  GET /:chargerId — WS upgrade. Validates the configured charger id, then upgrades and hands the
- *  socket to the central system. */
+ *  GET /:chargerId — WS upgrade. `:chargerId` is the OCPP charge point id the
+ *  device announces, which is what makes this route multi-charger capable:
+ *  every charger dials its own URL, and OcppCentralSystem keys every socket,
+ *  pending call and transaction counter by that id. Validates the id against
+ *  the charge point ids configured across ALL OCPP charger rows, then upgrades
+ *  and hands the socket to the central system. */
 export function createOcppWsRoutes(
   deps: PluginDependencies,
   centralSystem: OcppCentralSystem,
@@ -13,8 +17,13 @@ export function createOcppWsRoutes(
 
   app.get("/:chargerId", async (c) => {
     const chargerId = c.req.param("chargerId");
-    const configuredId = await deps.getConfig("charger_id");
-    const adopted = configuredId !== null && chargerId === configuredId;
+    // Any OCPP charger row configured with this charge point id adopts the
+    // connection. Previously a single plugin-wide charger_id was consulted,
+    // so a second charger could never be adopted no matter how it was
+    // configured — that was the one and only blocker to multiple OCPP
+    // chargers.
+    const entries = await deps.resolveChargerConfigs();
+    const adopted = entries.some((e) => e.config.charger_id === chargerId);
     // Pairing accepts an id we have never seen, so the panel can prove the
     // charger reaches us before the user commits an id. The connection is
     // provisional: OcppCentralSystem refuses everything outside the pairing

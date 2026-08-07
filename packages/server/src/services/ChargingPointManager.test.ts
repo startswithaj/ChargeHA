@@ -13,6 +13,7 @@ import { ChargerPluginRegistry } from "@chargeha/server/bootstrap/ChargerPluginR
 import type {
   ChargerMiddleware,
   ChargerPlugin,
+  ChargerRowConfig,
 } from "@chargeha/shared/plugins";
 import type { VehicleManager } from "./VehicleManager.ts";
 import type { EnergyPoller } from "./EnergyPoller.ts";
@@ -91,11 +92,16 @@ describe("ChargingPointManager", () => {
     type: string,
     displayName: string,
     info: ChargerInfo,
+    onCreate?: (row: ChargerRow, resolved: ChargerRowConfig) => void,
   ): void => {
     registry.register(throwingMock<ChargerPlugin>("ChargerPlugin", {
       id: type,
       displayName,
-      createChargerMiddleware: (row: ChargerRow) => {
+      createChargerMiddleware: (
+        row: ChargerRow,
+        resolved: ChargerRowConfig,
+      ) => {
+        onCreate?.(row, resolved);
         const mw = new StubChargerMiddleware(null, info);
         middlewares.set(row.id, mw);
         return Promise.resolve(mw);
@@ -196,6 +202,8 @@ describe("ChargingPointManager", () => {
   let db: AppDatabase;
   let chargerRows: ChargerRow[];
   let vehicleRows: VehicleRow[];
+  let chargerConfigs: Map<string, Record<string, string>>;
+  let chargerSecrets: Map<string, Record<string, string>>;
   let deletedIds: string[];
   let resequenceCallCount: number;
   let registry: ChargerPluginRegistry;
@@ -211,11 +219,17 @@ describe("ChargingPointManager", () => {
   beforeEach(() => {
     chargerRows = [];
     vehicleRows = [];
+    chargerConfigs = new Map();
+    chargerSecrets = new Map();
     deletedIds = [];
     resequenceCallCount = 0;
     db = throwingMock<AppDatabase>("AppDatabase", {
       getChargers: () => Promise.resolve(chargerRows),
       getVehicles: () => Promise.resolve(vehicleRows),
+      getChargerConfig: (id: string) =>
+        Promise.resolve(chargerConfigs.get(id) ?? {}),
+      getChargerSecrets: (id: string) =>
+        Promise.resolve(chargerSecrets.get(id) ?? {}),
       upsertCharger: (input) => {
         chargerRows = [
           ...chargerRows.filter((r) => r.id !== input.id),
@@ -353,6 +367,99 @@ describe("ChargingPointManager", () => {
 
       expect(manager.isControllable(row.id)).toBe(false);
       expect(manager.isControllable(ROW.id)).toBe(true);
+    });
+
+    it("passes the row's resolved config and secrets as the second argument", async () => {
+      chargerConfigs.set(ROW.id, { host: "10.0.0.1" });
+      chargerSecrets.set(ROW.id, { password: "hunter2" });
+      let seen: ChargerRowConfig | undefined;
+      registry = new ChargerPluginRegistry();
+      registerChargerPlugin(
+        registry,
+        middlewares,
+        CHARGER_TYPE,
+        "Simulated Charger",
+        INFO,
+        (_row, resolved) => {
+          seen = resolved;
+        },
+      );
+      manager = new ChargingPointManager(
+        db,
+        registry,
+        vehicleManager,
+        poller,
+        configService,
+        emitter as unknown as TypedEventEmitter,
+        testLogger,
+      );
+
+      await manager.addCharger(ROW);
+
+      expect(seen?.config.host).toBe("10.0.0.1");
+      expect(seen?.secrets.password).toBe("hunter2");
+    });
+
+    it("gives two rows of the same adapter type their own distinct config", async () => {
+      const rowA = { ...ROW, id: "charger-a" };
+      const rowB = { ...ROW, id: "charger-b" };
+      chargerConfigs.set(rowA.id, { host: "10.0.0.1" });
+      chargerConfigs.set(rowB.id, { host: "10.0.0.2" });
+      const seen: ChargerRowConfig[] = [];
+      registry = new ChargerPluginRegistry();
+      registerChargerPlugin(
+        registry,
+        middlewares,
+        CHARGER_TYPE,
+        "Simulated Charger",
+        INFO,
+        (_row, resolved) => {
+          seen.push(resolved);
+        },
+      );
+      manager = new ChargingPointManager(
+        db,
+        registry,
+        vehicleManager,
+        poller,
+        configService,
+        emitter as unknown as TypedEventEmitter,
+        testLogger,
+      );
+
+      await manager.addCharger(rowA);
+      await manager.addCharger(rowB);
+
+      expect(seen.map((c) => c.config.host)).toEqual([
+        "10.0.0.1",
+        "10.0.0.2",
+      ]);
+    });
+
+    it("registers as unconfigured, without throwing, when getChargerConfig rejects", async () => {
+      db = throwingMock<AppDatabase>("AppDatabase", {
+        getChargers: () => Promise.resolve(chargerRows),
+        getVehicles: () => Promise.resolve(vehicleRows),
+        getChargerConfig: () =>
+          Promise.reject(new Error("ENCRYPTION_KEY not set")),
+        getChargerSecrets: () =>
+          Promise.reject(new Error("ENCRYPTION_KEY not set")),
+      });
+      manager = new ChargingPointManager(
+        db,
+        registry,
+        vehicleManager,
+        poller,
+        configService,
+        emitter as unknown as TypedEventEmitter,
+        testLogger,
+      );
+
+      await manager.addCharger(ROW);
+
+      const state = manager.getState(ROW.id);
+      expect(state?.status).toBe("unconfigured");
+      expect(state?.statusDetail).toBe("ENCRYPTION_KEY not set");
     });
   });
 
@@ -626,6 +733,42 @@ describe("ChargingPointManager", () => {
       await tick();
       expect(originalMw.shutdownCalls).toBe(1);
       expect(middlewares.get(ROW.id)).not.toBe(originalMw);
+    });
+
+    it("re-resolves config on rebuild rather than reusing a stale bundle", async () => {
+      chargerRows = [ROW];
+      chargerConfigs.set(ROW.id, { host: "10.0.0.1" });
+      const seen: ChargerRowConfig[] = [];
+      registry = new ChargerPluginRegistry();
+      registerChargerPlugin(
+        registry,
+        middlewares,
+        CHARGER_TYPE,
+        "Simulated Charger",
+        INFO,
+        (_row, resolved) => {
+          seen.push(resolved);
+        },
+      );
+      manager = new ChargingPointManager(
+        db,
+        registry,
+        vehicleManager,
+        poller,
+        configService,
+        emitter as unknown as TypedEventEmitter,
+        testLogger,
+      );
+      await manager.init();
+      expect(seen).toHaveLength(1);
+      expect(seen[0].config.host).toBe("10.0.0.1");
+
+      chargerConfigs.set(ROW.id, { host: "10.0.0.99" });
+      emitter.emit("config_changed", { key: `${CHARGER_TYPE}.some_key` });
+      await tick();
+
+      expect(seen).toHaveLength(2);
+      expect(seen[1].config.host).toBe("10.0.0.99");
     });
   });
 

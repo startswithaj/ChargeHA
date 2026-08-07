@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { skipToken } from "@tanstack/react-query";
 import {
   PluginFieldInputs,
   type PluginStepDef,
@@ -8,6 +9,7 @@ import {
 import { trpc } from "./trpc.ts";
 import { OCPP_DEFAULTS, OCPP_FIELDS } from "./fields.ts";
 import { OcppConnectBlock } from "./OcppConnection.tsx";
+import { useOcppChargerId } from "./useOcppChargerId.ts";
 
 function ocppNext(connected: boolean): WizardNext {
   if (!connected) {
@@ -20,14 +22,16 @@ export const ocppSetupStep: PluginStepDef = {
   id: "ocpp-setup",
   label: "OCPP Charger",
   useStep: () => {
+    const chargerRowId = useOcppChargerId();
     const { data: config } = trpc.plugin.charger.ocpp.getConfig.useQuery();
     const utils = trpc.useUtils();
     const saveMutation = trpc.plugin.charger.ocpp.setConfig.useMutation({
       onSuccess: () => utils.plugin.charger.ocpp.getConfig.invalidate(),
     });
-    const status = trpc.plugin.charger.ocpp.status.useQuery(undefined, {
-      refetchInterval: 2000,
-    });
+    const status = trpc.plugin.charger.ocpp.status.useQuery(
+      chargerRowId === undefined ? skipToken : { chargerRowId },
+      { refetchInterval: 2000 },
+    );
     const promote = trpc.plugin.charger.ocpp.promotePairing.useMutation();
     const [draft, setDraft] = useState<Record<string, string>>({});
     // Same pairing affordance as the settings panel, so first-run and later
@@ -49,7 +53,9 @@ export const ocppSetupStep: PluginStepDef = {
       saveMutation.mutate({ [key]: value });
       // Adopting the id the charger announced keeps its live socket rather
       // than forcing a reconnect.
-      if (key === "ocppChargerId") promote.mutate();
+      if (key === "ocppChargerId" && chargerRowId !== undefined) {
+        promote.mutate({ chargerRowId });
+      }
     };
 
     return {
@@ -61,7 +67,7 @@ export const ocppSetupStep: PluginStepDef = {
             onDetected={(id) => {
               setDraft((d) => ({ ...d, ocppChargerId: id }));
               saveMutation.mutate({ ocppChargerId: id });
-              promote.mutate();
+              if (chargerRowId !== undefined) promote.mutate({ chargerRowId });
             }}
           />
           <PluginFieldInputs
