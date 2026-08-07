@@ -31,10 +31,21 @@ export interface UpsertVehicleInput {
   mode: VehicleMode;
 }
 
+/**
+ * Upsert payload for a charger row.
+ *
+ * Deliberately carries NO secrets field. Secrets live in the encrypted
+ * `charger_secrets` column and are written only through
+ * `AppDatabase.setChargerSecrets` / `patchChargerSecrets`, so a plain upsert
+ * (rename, reorder, mode change) can never clobber them and no caller can
+ * accidentally log a payload containing credentials.
+ */
 export interface UpsertChargerInput {
   id: string;
   name: string;
   chargerAdapterType: string;
+  /** Serialized `ChargerConfigMap`. Omitted leaves the stored value alone on
+   *  update, and defaults to `"{}"` on insert. */
   chargerConfig?: string;
   mode?: ChargingPointMode;
   priority?: number;

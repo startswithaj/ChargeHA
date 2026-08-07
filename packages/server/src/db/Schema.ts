@@ -190,7 +190,20 @@ export const chargers = sqliteTable("chargers", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   chargerAdapterType: text("charger_adapter_type").notNull(),
+  /** Non-secret, plugin-defined config for THIS row. JSON object of
+   *  string values. Row-scoped so two chargers of one adapter type
+   *  cannot collide. */
   chargerConfig: text("charger_config").notNull().default("{}"),
+  /** Secret, plugin-defined config for THIS row. Either plaintext JSON
+   *  or a single AES-256-GCM ciphertext of that JSON — see
+   *  `chargerSecretsEncrypted`. Never included in `ChargerRow`, which is
+   *  shared with the client. */
+  chargerSecrets: text("charger_secrets").notNull().default("{}"),
+  /** 1 when `chargerSecrets` is ciphertext. 0 when ENCRYPTION_KEY was
+   *  unset at write time and it is plaintext — same degradation as
+   *  `config.is_encrypted` and `auth_oidc.is_encrypted`. */
+  chargerSecretsEncrypted: integer("charger_secrets_encrypted").notNull()
+    .default(0),
   mode: text("mode").notNull().default("auto"),
   priority: integer("priority").notNull().default(1),
   vehicleId: text("vehicle_id"),

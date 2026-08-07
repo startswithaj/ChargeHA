@@ -547,3 +547,16 @@ export interface ChargerRow {
   createdAt: string;
   updatedAt: string;
 }
+
+/** Non-secret, row-scoped plugin config. Values are strings so the shape
+ *  matches the plugin config store's `string | null` contract; absence of a
+ *  key means "not set" — never `""`. */
+export type ChargerConfigMap = Readonly<Record<string, string>>;
+
+/** Secret, row-scoped plugin config. Same shape as `ChargerConfigMap`, but
+ *  persisted to the encrypted `charger_secrets` column and never placed on
+ *  `ChargerRow`. */
+export type ChargerSecretsMap = Readonly<Record<string, string>>;
+
+/** A patch applied to a row's config or secrets. `null` deletes the key. */
+export type ChargerConfigPatch = Readonly<Record<string, string | null>>;

@@ -146,4 +146,110 @@ describe("ChargerRepository", () => {
       expect(chargers.map((c) => c.priority)).toEqual([1, 2]);
     });
   });
+
+  describe("toChargerRow shape stability", () => {
+    it("never carries chargerSecrets/chargerSecretsEncrypted keys", async () => {
+      await db.chargers.upsertCharger(baseCharger);
+      await db.setChargerSecrets("CHG1", { password: "hunter2" });
+
+      const charger = await db.chargers.getCharger("CHG1");
+      assertExists(charger);
+      expect(Object.keys(charger)).not.toContain("chargerSecrets");
+      expect(Object.keys(charger)).not.toContain("chargerSecretsEncrypted");
+      expect(JSON.stringify(charger)).not.toContain("hunter2");
+    });
+  });
+
+  describe("getChargerConfigJson", () => {
+    it("defaults to '{}' for a freshly upserted row", async () => {
+      await db.chargers.upsertCharger(baseCharger);
+      expect(await db.chargers.getChargerConfigJson("CHG1")).toBe("{}");
+    });
+
+    it("returns null for an unknown id", async () => {
+      expect(await db.chargers.getChargerConfigJson("MISSING")).toBeNull();
+    });
+  });
+
+  describe("setChargerConfigJson", () => {
+    it("round-trips and bumps updatedAt", async () => {
+      const fakeTime = new FakeTime();
+      try {
+        await db.chargers.upsertCharger(baseCharger);
+        const before = await db.chargers.getCharger("CHG1");
+        assertExists(before);
+
+        fakeTime.tick(1000);
+        await db.chargers.setChargerConfigJson("CHG1", '{"max_amps":"32"}');
+
+        expect(await db.chargers.getChargerConfigJson("CHG1")).toBe(
+          '{"max_amps":"32"}',
+        );
+        const after = await db.chargers.getCharger("CHG1");
+        assertExists(after);
+        expect(after.updatedAt).not.toBe(before.updatedAt);
+      } finally {
+        fakeTime.restore();
+      }
+    });
+  });
+
+  describe("getChargerSecretsRecord", () => {
+    it("returns { value: '{}', isEncrypted: false } for a fresh row", async () => {
+      await db.chargers.upsertCharger(baseCharger);
+      expect(await db.chargers.getChargerSecretsRecord("CHG1")).toEqual({
+        value: "{}",
+        isEncrypted: false,
+      });
+    });
+
+    it("returns null for an unknown id", async () => {
+      expect(await db.chargers.getChargerSecretsRecord("MISSING")).toBeNull();
+    });
+  });
+
+  describe("setChargerSecretsRecord", () => {
+    it("round-trips value and flag in both directions", async () => {
+      await db.chargers.upsertCharger(baseCharger);
+
+      await db.chargers.setChargerSecretsRecord("CHG1", "ciphertext", true);
+      expect(await db.chargers.getChargerSecretsRecord("CHG1")).toEqual({
+        value: "ciphertext",
+        isEncrypted: true,
+      });
+
+      await db.chargers.setChargerSecretsRecord(
+        "CHG1",
+        '{"password":"x"}',
+        false,
+      );
+      expect(await db.chargers.getChargerSecretsRecord("CHG1")).toEqual({
+        value: '{"password":"x"}',
+        isEncrypted: false,
+      });
+    });
+  });
+
+  describe("upsertCharger does not clobber secrets", () => {
+    it("leaves secrets unchanged after a plain upsert", async () => {
+      await db.chargers.upsertCharger(baseCharger);
+      await db.chargers.setChargerSecretsRecord("CHG1", "ciphertext", true);
+
+      await db.chargers.upsertCharger({ ...baseCharger, name: "Renamed" });
+
+      expect(await db.chargers.getChargerSecretsRecord("CHG1")).toEqual({
+        value: "ciphertext",
+        isEncrypted: true,
+      });
+    });
+  });
+
+  describe("deleteCharger", () => {
+    it("removes the secrets record along with the row", async () => {
+      await db.chargers.upsertCharger(baseCharger);
+      await db.chargers.deleteCharger("CHG1");
+
+      expect(await db.chargers.getChargerSecretsRecord("CHG1")).toBeNull();
+    });
+  });
 });

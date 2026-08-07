@@ -1,1 +1,0 @@
-ALTER TABLE `schedules` ADD `charger_id` text;

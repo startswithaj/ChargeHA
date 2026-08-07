@@ -5,13 +5,22 @@ import {
 import type { DatabaseDriver } from "@chargeha/shared/database-driver";
 import { CompatDatabase } from "./SqliteCompat.ts";
 import type {
+  ChargerConfigMap,
+  ChargerConfigPatch,
+  ChargerSecretsMap,
   ChargingPointMode,
   EnergyData,
   VehicleMode,
 } from "@chargeha/shared";
+import { chargerConfigMapSchema } from "@chargeha/shared/schemas";
 import type { CoreConfigKey } from "@chargeha/shared/configSections";
 import { Logger } from "../lib/Logger.ts";
-import { readSecret, storeSecret } from "../lib/Encryption.ts";
+import {
+  decrypt,
+  maybeEncrypt,
+  readSecret,
+  storeSecret,
+} from "../lib/Encryption.ts";
 import type { TypedEventEmitter } from "../services/TypedEventEmitter.ts";
 import { runMigrations } from "./MigrationRunner.ts";
 import { ChargerRepository } from "./repositories/ChargerRepository.ts";
@@ -47,6 +56,32 @@ import type {
   VehiclePollLogInput,
   VehicleRow,
 } from "./types.ts";
+
+/** Parse a stored config/secrets object. A row written by a previous version,
+ *  or hand-edited, must not take the process down — treat unparseable content
+ *  as "no keys" and let the caller's missing-config path handle it. */
+function parseChargerMap(json: string): Record<string, string> {
+  try {
+    const parsed = chargerConfigMapSchema.safeParse(JSON.parse(json));
+    return parsed.success ? parsed.data : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Apply a patch: `null` removes the key, a string sets it. Never stores "". */
+function applyPatch(
+  current: Record<string, string>,
+  patch: ChargerConfigPatch,
+): Record<string, string> {
+  return Object.entries(patch).reduce<Record<string, string>>(
+    (acc, [key, value]) => {
+      const { [key]: _removed, ...rest } = acc;
+      return value === null ? rest : { ...rest, [key]: value };
+    },
+    current,
+  );
+}
 
 export class AppDatabase {
   private sqlite: DatabaseDriver;
@@ -245,6 +280,80 @@ export class AppDatabase {
   async resequenceChargerPriorities(): Promise<void> {
     await this.chargers.resequencePriorities();
   }
+
+  // ---- Charger row-scoped config ----
+
+  /**
+   * Non-secret config for one charger row. Returns `{}` for a row with
+   * nothing stored; throws when the row does not exist, because a caller
+   * asking for a missing charger's config has a bug it should hear about.
+   */
+  async getChargerConfig(id: string): Promise<ChargerConfigMap> {
+    const json = await this.chargers.getChargerConfigJson(id);
+    if (json === null) throw new Error(`Charger not found: ${id}`);
+    return parseChargerMap(json);
+  }
+
+  /** Replace a row's non-secret config wholesale. */
+  async setChargerConfig(id: string, config: ChargerConfigMap): Promise<void> {
+    await this.chargers.setChargerConfigJson(id, JSON.stringify(config));
+  }
+
+  /** Set/remove individual non-secret keys, leaving the rest intact. */
+  async patchChargerConfig(
+    id: string,
+    patch: ChargerConfigPatch,
+  ): Promise<void> {
+    const current = await this.getChargerConfig(id);
+    await this.setChargerConfig(id, applyPatch({ ...current }, patch));
+  }
+
+  // ---- Charger row-scoped secrets ----
+
+  /**
+   * Secrets for one charger row, decrypted.
+   *
+   * Throws when the stored value is marked encrypted but ENCRYPTION_KEY is
+   * not set — the same contract as `Encryption.readSecret`. Returning the
+   * ciphertext would hand a plugin a "password" that silently fails against
+   * the device.
+   */
+  async getChargerSecrets(id: string): Promise<ChargerSecretsMap> {
+    const record = await this.chargers.getChargerSecretsRecord(id);
+    if (record === null) throw new Error(`Charger not found: ${id}`);
+    if (!record.isEncrypted) return parseChargerMap(record.value);
+    if (!this.encryptionKey) {
+      throw new Error(
+        `Cannot decrypt secrets for charger ${id}: ENCRYPTION_KEY is not set`,
+      );
+    }
+    return parseChargerMap(await decrypt(record.value, this.encryptionKey));
+  }
+
+  /**
+   * Replace a row's secrets wholesale. Encrypts when a key is configured,
+   * stores plaintext with the flag at 0 when it is not — the same
+   * degradation as `Encryption.storeSecret`, so the app still runs without
+   * ENCRYPTION_KEY.
+   */
+  async setChargerSecrets(
+    id: string,
+    secrets: ChargerSecretsMap,
+  ): Promise<void> {
+    const json = JSON.stringify(secrets);
+    const { value, isEncrypted } = await maybeEncrypt(json, this.encryptionKey);
+    await this.chargers.setChargerSecretsRecord(id, value, isEncrypted);
+  }
+
+  /** Set/remove individual secret keys, leaving the rest intact. */
+  async patchChargerSecrets(
+    id: string,
+    patch: ChargerConfigPatch,
+  ): Promise<void> {
+    const current = await this.getChargerSecrets(id);
+    await this.setChargerSecrets(id, applyPatch({ ...current }, patch));
+  }
+
   // ---- Schedules ----
   async getSchedules(): Promise<ScheduleRow[]> {
     return await this.schedules.getSchedules();
