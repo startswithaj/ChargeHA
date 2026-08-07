@@ -42,7 +42,14 @@ async function savedClient(
   if (!host || !email || !password) {
     throw new Error("Tapo plug not configured");
   }
-  return new KlapClient(host, email, password, new Logger("Tapo", "error"));
+  return new KlapClient(
+    host,
+    email,
+    password,
+    new Logger("Tapo", "error"),
+    deps.dbLog,
+    chargerRowId,
+  );
 }
 
 function testFailure(err: unknown) {
@@ -78,6 +85,10 @@ export function createTapoRouter(deps: PluginDependencies) {
           input.email,
           input.password,
           new Logger("Tapo", "error"),
+          deps.dbLog,
+          // No charger row exists yet during wizard setup — a stable label
+          // instead of an id keeps this call distinguishable in the log.
+          "wizard-test-connection",
         );
         try {
           await client.handshake();

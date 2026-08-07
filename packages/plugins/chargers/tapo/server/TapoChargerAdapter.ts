@@ -6,6 +6,7 @@ import type {
   ChargerStatus,
 } from "@chargeha/shared";
 import type { Logger } from "@chargeha/server/lib/Logger";
+import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import { KlapClient } from "./KlapClient.ts";
 import { TapoConnectionError } from "./errors.ts";
 
@@ -60,6 +61,7 @@ export class TapoChargerAdapter implements ChargerAdapter {
     private readonly config: TapoAdapterConfig,
     private readonly client: KlapClient,
     private readonly logger: Logger,
+    private readonly dbLog: PluginDbLogger,
   ) {}
 
   pollIntervalSeconds(): number {
@@ -214,6 +216,16 @@ export class TapoChargerAdapter implements ChargerAdapter {
       }
       return this.lastState;
     }
+    // Log only the transition into "unreachable", not every subsequent poll
+    // while it stays down — a dead plug would otherwise flood the table.
+    if (this.unreachableAt === null) {
+      this.dbLog.warn(`Plug unreachable (${this.config.chargerId})`, {
+        payload: {
+          chargerId: this.config.chargerId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+    }
     this.unreachableAt ??= new Date().toISOString();
     return {
       ...(this.lastState ?? this.unknownDevice()),
@@ -248,6 +260,13 @@ export class TapoChargerAdapter implements ChargerAdapter {
     if (info.device_on === on) return true;
     await this.client.request("set_device_info", { device_on: on });
     this.logger.info(`Plug switched ${on ? "on" : "off"}`);
+    // State change, not routine polling — worth an info row.
+    this.dbLog.info(
+      `Plug switched ${on ? "on" : "off"} (${this.config.chargerId})`,
+      {
+        payload: { chargerId: this.config.chargerId, on },
+      },
+    );
     return true;
   }
 }

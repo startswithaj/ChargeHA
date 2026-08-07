@@ -6,6 +6,7 @@ import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { FakeTime } from "@std/testing/time";
 import { Logger } from "@chargeha/server/lib/Logger";
+import { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import type { CallContext } from "@chargeha/shared";
 import { KlapClient } from "./KlapClient.ts";
 import {
@@ -31,7 +32,14 @@ class SpyKlapClient extends KlapClient {
     private readonly handlers: Partial<Handlers>,
     logger: Logger,
   ) {
-    super("192.0.2.10", "user@example.com", "example-password", logger);
+    super(
+      "192.0.2.10",
+      "user@example.com",
+      "example-password",
+      logger,
+      new PluginDbLogger(() => Promise.resolve(), logger),
+      "charger-1",
+    );
   }
 
   private static notStubbed(name: string): () => never {
@@ -71,6 +79,7 @@ class SpyKlapClient extends KlapClient {
 describe("TapoChargerAdapter", () => {
   const ctx: CallContext = { origin: "test", traceId: "test-trace" };
   const logger = new Logger("TapoTest", "error");
+  const dbLog = new PluginDbLogger(() => Promise.resolve(), logger);
 
   const CONFIG: TapoAdapterConfig = {
     chargerId: "charger-1",
@@ -108,7 +117,7 @@ describe("TapoChargerAdapter", () => {
         get_device_info: () => deviceInfoGate.promise,
         get_energy_usage: () => Promise.resolve(buildEnergyUsage()),
       }, logger);
-      const adapter = new TapoChargerAdapter(CONFIG, client, logger);
+      const adapter = new TapoChargerAdapter(CONFIG, client, logger, dbLog);
 
       const statePromise = adapter.getChargerState(ctx);
 
@@ -133,7 +142,7 @@ describe("TapoChargerAdapter", () => {
         get_energy_usage: () =>
           Promise.resolve(buildEnergyUsage({ current_power: 500_000 })), // 500 W, well above threshold
       }, logger);
-      const adapter = new TapoChargerAdapter(CONFIG, client, logger);
+      const adapter = new TapoChargerAdapter(CONFIG, client, logger, dbLog);
 
       const state = await adapter.getChargerState(ctx);
 
@@ -151,7 +160,7 @@ describe("TapoChargerAdapter", () => {
             buildEnergyUsage({ current_power: 2_000_000, today_energy: 500 }),
           ),
       }, logger);
-      const adapter = new TapoChargerAdapter(CONFIG, client, logger);
+      const adapter = new TapoChargerAdapter(CONFIG, client, logger, dbLog);
 
       const charging = await adapter.getChargerState(ctx);
       expect(charging.isCharging).toBe(true);
@@ -178,7 +187,7 @@ describe("TapoChargerAdapter", () => {
             }),
           ),
       }, logger);
-      const adapter = new TapoChargerAdapter(CONFIG, client, logger);
+      const adapter = new TapoChargerAdapter(CONFIG, client, logger, dbLog);
 
       const above = await adapter.getChargerState(ctx);
       expect(above.isCharging).toBe(true);
@@ -207,7 +216,7 @@ describe("TapoChargerAdapter", () => {
             : Promise.reject(new Error("device offline")),
         get_energy_usage: () => Promise.resolve(goodEnergy),
       }, logger);
-      const adapter = new TapoChargerAdapter(CONFIG, client, logger);
+      const adapter = new TapoChargerAdapter(CONFIG, client, logger, dbLog);
 
       const good = await adapter.getChargerState(ctx);
       expect(good.status).toBe("charging");
@@ -233,7 +242,12 @@ describe("TapoChargerAdapter", () => {
       }, logger);
 
     it("throws inside the grace window, leaving the card on 'waiting for data'", async () => {
-      const adapter = new TapoChargerAdapter(CONFIG, offlineClient(), logger);
+      const adapter = new TapoChargerAdapter(
+        CONFIG,
+        offlineClient(),
+        logger,
+        dbLog,
+      );
 
       await expect(adapter.getChargerState(ctx)).rejects.toThrow(
         "device offline",
@@ -242,7 +256,12 @@ describe("TapoChargerAdapter", () => {
 
     it("reports unreachable once the stale window elapses", async () => {
       using fakeTime = new FakeTime();
-      const adapter = new TapoChargerAdapter(CONFIG, offlineClient(), logger);
+      const adapter = new TapoChargerAdapter(
+        CONFIG,
+        offlineClient(),
+        logger,
+        dbLog,
+      );
 
       // First attempt starts the stale window; it can only throw.
       await expect(adapter.getChargerState(ctx)).rejects.toThrow();
@@ -258,7 +277,12 @@ describe("TapoChargerAdapter", () => {
 
     it("reports nothing measured rather than zeroes", async () => {
       using fakeTime = new FakeTime();
-      const adapter = new TapoChargerAdapter(CONFIG, offlineClient(), logger);
+      const adapter = new TapoChargerAdapter(
+        CONFIG,
+        offlineClient(),
+        logger,
+        dbLog,
+      );
 
       await expect(adapter.getChargerState(ctx)).rejects.toThrow();
       await fakeTime.tickAsync(CONFIG.staleTimeoutSeconds * 1000);
@@ -272,7 +296,12 @@ describe("TapoChargerAdapter", () => {
 
     it("keeps one timestamp across the outage so core emits the fault once", async () => {
       using fakeTime = new FakeTime();
-      const adapter = new TapoChargerAdapter(CONFIG, offlineClient(), logger);
+      const adapter = new TapoChargerAdapter(
+        CONFIG,
+        offlineClient(),
+        logger,
+        dbLog,
+      );
 
       await expect(adapter.getChargerState(ctx)).rejects.toThrow();
       await fakeTime.tickAsync(CONFIG.staleTimeoutSeconds * 1000);

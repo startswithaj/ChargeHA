@@ -77,6 +77,7 @@ export class OcppChargerPlugin implements ChargerPlugin {
         phases: config.phases === "3" ? 3 : 1,
       },
       this.centralSystem.forCharger(chargePointId),
+      this.deps.dbLog,
     );
     return new PollingChargerMiddleware(adapter, this.deps.log);
   }

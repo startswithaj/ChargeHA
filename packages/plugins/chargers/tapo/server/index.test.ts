@@ -3,6 +3,7 @@ import { assertRejects } from "@std/assert";
 import { expect } from "@std/expect";
 import { AppDatabase } from "@chargeha/server/db";
 import { Logger } from "@chargeha/server/lib/Logger";
+import { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import type { ChargerRow } from "@chargeha/shared";
 import type { ResolvedChargerRow } from "@chargeha/shared/plugins";
@@ -12,6 +13,9 @@ import { TapoChargerPlugin, tapoCredentials } from "./index.ts";
 
 describe("Tapo charger plugin", () => {
   const log = new Logger("TapoTest", "error");
+  // Every charger-device call now writes through dbLog too — a no-op
+  // persist keeps these tests focused on what they actually assert.
+  const dbLog = new PluginDbLogger(() => Promise.resolve(), log);
 
   const ROW: ChargerRow = {
     id: "row-1",
@@ -68,7 +72,7 @@ describe("Tapo charger plugin", () => {
 
   describe("createChargerMiddleware", () => {
     const deps = () =>
-      throwingMock<PluginDependencies>("PluginDependencies", { log });
+      throwingMock<PluginDependencies>("PluginDependencies", { log, dbLog });
 
     it("throws 'Tapo host not configured' when config.host is absent", async () => {
       const plugin = new TapoChargerPlugin(deps());
@@ -174,7 +178,7 @@ describe("Tapo charger plugin", () => {
       // without throwing — proving construction is per-row, not shared
       // global state left over from a previous row.
       const plugin = new TapoChargerPlugin(
-        throwingMock<PluginDependencies>("PluginDependencies", { log }),
+        throwingMock<PluginDependencies>("PluginDependencies", { log, dbLog }),
       );
       const mwA = await plugin.createChargerMiddleware(rowA, {
         config: configA,
@@ -197,6 +201,7 @@ describe("Tapo charger plugin", () => {
       const plugin = new TapoChargerPlugin(
         throwingMock<PluginDependencies>("PluginDependencies", {
           log,
+          dbLog,
           resolveChargerConfigs: () =>
             Promise.resolve([
               { row: ROW, config: {}, secrets: {} } as ResolvedChargerRow,
@@ -224,6 +229,7 @@ describe("Tapo charger plugin", () => {
         const plugin = new TapoChargerPlugin(
           throwingMock<PluginDependencies>("PluginDependencies", {
             log,
+            dbLog,
             resolveChargerConfigs: () =>
               Promise.resolve([
                 {

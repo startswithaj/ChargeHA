@@ -286,7 +286,9 @@ export class OcppCentralSystem {
       connectorId: 1,
       idTag: "chargeha",
     });
-    return isAccepted(res);
+    const accepted = isAccepted(res);
+    this.logOutcome(chargePointId, "RemoteStartTransaction", accepted, res);
+    return accepted;
   }
 
   async remoteStop(chargePointId: string): Promise<boolean> {
@@ -295,7 +297,25 @@ export class OcppCentralSystem {
     const res = await this.send(chargePointId, "RemoteStopTransaction", {
       transactionId,
     });
-    return isAccepted(res);
+    const accepted = isAccepted(res);
+    this.logOutcome(chargePointId, "RemoteStopTransaction", accepted, res);
+    return accepted;
+  }
+
+  /** Command outcomes (not the raw frame, already logged by `send`) — a
+   *  rare, user- or controller-triggered event, so info/warn is safe volume. */
+  private logOutcome(
+    chargePointId: string,
+    action: string,
+    accepted: boolean,
+    res: unknown,
+  ): void {
+    const payload = { chargePointId, action, result: res };
+    if (accepted) {
+      this.dbLog.info(`${action} accepted (${chargePointId})`, { payload });
+    } else {
+      this.dbLog.warn(`${action} rejected (${chargePointId})`, { payload });
+    }
   }
 
   /** No transaction id to stop with — a reconnect after a restart never got
@@ -322,7 +342,9 @@ export class OcppCentralSystem {
     const results = await Promise.all(
       payloads.map((p) => this.send(chargePointId, "SetChargingProfile", p)),
     );
-    return results.every(isAccepted);
+    const accepted = results.every(isAccepted);
+    this.logOutcome(chargePointId, "SetChargingProfile", accepted, results);
+    return accepted;
   }
 
   // GetConfiguration round trip: proves the charger answers calls.
@@ -331,7 +353,12 @@ export class OcppCentralSystem {
     await this.send(chargePointId, "GetConfiguration", {
       key: ["HeartbeatInterval"],
     });
-    return { latencyMs: Math.round(performance.now() - startedAt) };
+    const latencyMs = Math.round(performance.now() - startedAt);
+    // User-triggered (testConnection), not a poll — safe at debug.
+    this.dbLog.debug(`Ping round trip (${chargePointId})`, {
+      payload: { chargePointId, latencyMs },
+    });
+    return { latencyMs };
   }
 
   // ── Incoming ─────────────────────────────────────────────────────────
@@ -389,6 +416,9 @@ export class OcppCentralSystem {
       this.logger.warn(
         `OCPP ${action} refused: no charger row for ${chargePointId}`,
       );
+      this.dbLog.warn(`${action} refused, no charger row (${chargePointId})`, {
+        payload: { chargePointId, action },
+      });
       return null;
     }
     return this.handleAction(chargePointId, action, payload);
@@ -400,7 +430,11 @@ export class OcppCentralSystem {
     action: string,
     payload: unknown,
   ): unknown | null {
-    this.dbLog.debug(`← ${action}`, { payload: { raw: payload } });
+    // PluginDbLogger only scopes by plugin id — chargePointId distinguishes
+    // two OCPP chargers in the log table.
+    this.dbLog.debug(`← ${action} (${chargePointId})`, {
+      payload: { chargePointId, raw: payload },
+    });
     switch (action) {
       case "BootNotification": {
         const boot = bootNotificationReq.parse(payload);
@@ -498,6 +532,10 @@ export class OcppCentralSystem {
     this.logger.info(
       `Adopted transaction ${transactionId} for ${chargePointId} from MeterValues`,
     );
+    // Once per reconnect that lost its StartTransaction, not per MeterValues.
+    this.dbLog.info(`Adopted transaction ${transactionId} (${chargePointId})`, {
+      payload: { chargePointId, transactionId },
+    });
     return {
       transactionId,
       // A real StartTransaction baseline must never be overwritten — only
@@ -561,6 +599,9 @@ export class OcppCentralSystem {
     connection.pending.rejectAll("Charger disconnected");
     this.connections.delete(chargePointId);
     this.logger.warn(`Charger ${chargePointId} disconnected`);
+    this.dbLog.warn(`Charger ${chargePointId} disconnected`, {
+      payload: { chargePointId },
+    });
   }
 
   private async send(
@@ -576,7 +617,9 @@ export class OcppCentralSystem {
       throw new Error(`Charger ${chargePointId} not connected`);
     }
     const id = crypto.randomUUID();
-    this.dbLog.debug(`→ ${action}`, { payload: { raw: payload } });
+    this.dbLog.debug(`→ ${action} (${chargePointId})`, {
+      payload: { chargePointId, raw: payload },
+    });
     connection.socket.send(OcppFraming.call(id, action, payload));
     return await connection.pending.wait(id);
   }

@@ -5,6 +5,7 @@ import type {
   ChargerState,
   ChargerStatus,
 } from "@chargeha/shared";
+import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import type { OcppChargerHandle, OcppLiveData } from "./OcppCentralSystem.ts";
 import { chargingProfilePayload } from "./OcppMessages.ts";
 import type { ChargePointStatus } from "./OcppMessages.ts";
@@ -43,10 +44,15 @@ export interface OcppAdapterConfig {
 
 /** Push-based adapter: all reads come from the central system's cache. */
 export class OcppChargerAdapter implements ChargerAdapter {
+  // Tracks whether the last computed state was stale, so the dashboard's
+  // frequent polling only writes a log row on the transition, not every poll.
+  private wasStale = false;
+
   constructor(
     private readonly config: OcppAdapterConfig,
     /** Bound to this charger, so the adapter cannot command another one. */
     private readonly cs: OcppChargerHandle,
+    private readonly dbLog: PluginDbLogger,
   ) {}
 
   pollIntervalSeconds(): null {
@@ -103,6 +109,22 @@ export class OcppChargerAdapter implements ChargerAdapter {
       : Date.now() - data.lastMeterValuesAt;
     const meterStale = meterAgeMs !== null &&
       meterAgeMs > this.config.meterTimeoutSeconds * 1000;
+    // Log only the transition into/out of staleness — this is read on every
+    // dashboard poll, and a stuck charger would otherwise flood the table.
+    if (meterStale && !this.wasStale) {
+      this.dbLog.warn(`Meter values stale (${this.config.chargerId})`, {
+        payload: {
+          chargerId: this.config.chargerId,
+          meterAgeMs,
+          timeoutSeconds: this.config.meterTimeoutSeconds,
+        },
+      });
+    } else if (!meterStale && this.wasStale) {
+      this.dbLog.info(`Meter values fresh again (${this.config.chargerId})`, {
+        payload: { chargerId: this.config.chargerId },
+      });
+    }
+    this.wasStale = meterStale;
     const disconnected = !data.connected || meterStale;
     const status = resolveStatus(disconnected, data.status);
 

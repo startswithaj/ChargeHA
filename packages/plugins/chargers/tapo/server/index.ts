@@ -100,8 +100,11 @@ export class TapoChargerPlugin implements ChargerPlugin {
         credentials.email,
         credentials.password,
         this.deps.log,
+        this.deps.dbLog,
+        row.id,
       ),
       this.deps.log,
+      this.deps.dbLog,
     );
     return new PollingChargerMiddleware(adapter, this.deps.log);
   }
@@ -131,6 +134,8 @@ export class TapoChargerPlugin implements ChargerPlugin {
         credentials.email,
         credentials.password,
         this.deps.log,
+        this.deps.dbLog,
+        entry.row.id,
       );
       await client.handshake();
       await client.request<TapoEnergyUsage>("get_energy_usage");

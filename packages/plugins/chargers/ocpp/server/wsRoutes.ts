@@ -34,6 +34,9 @@ export function createOcppWsRoutes(
       // user pressed Listen retries every couple of seconds indefinitely.
       if (centralSystem.shouldLogRejection(chargerId)) {
         deps.log.warn(`OCPP connect rejected: unknown charger id ${chargerId}`);
+        deps.dbLog.warn(`Connect rejected, unknown charger id (${chargerId})`, {
+          payload: { chargePointId: chargerId },
+        });
       }
       centralSystem.noteRejected(chargerId);
       return c.text("Unknown charger", 404);

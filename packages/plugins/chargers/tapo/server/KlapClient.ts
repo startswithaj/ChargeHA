@@ -1,4 +1,5 @@
 import type { Logger } from "@chargeha/server/lib/Logger";
+import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import { KlapCrypto, type KlapSessionKeys } from "./KlapCrypto.ts";
 import { KlapHttp, type KlapHttpResponse } from "./KlapHttp.ts";
 import {
@@ -32,52 +33,95 @@ export class KlapClient {
     private readonly email: string,
     private readonly password: string,
     private readonly logger: Logger,
+    private readonly dbLog: PluginDbLogger,
+    // Identifies which charger row this client belongs to — PluginDbLogger
+    // only scopes by plugin id, and two Tapo plugs would otherwise be
+    // indistinguishable in the log table.
+    private readonly chargerId: string,
   ) {}
 
   async handshake(): Promise<void> {
+    const start = Date.now();
+    // Never log authHash-derived material or the raw email/password —
+    // only host and charger identity below.
     const authHash = await KlapCrypto.computeAuthHash(
       this.email,
       this.password,
     );
     const localSeed = crypto.getRandomValues(new Uint8Array(16));
 
-    const h1 = await this.post("/app/handshake1", localSeed, null);
-    // 403 before any credential is exchanged means local control is switched
-    // off at the device, not that the account details are wrong.
-    if (h1.status === 403) throw new TapoLockedError(this.host);
-    if (!h1.ok || h1.body.length !== 48) {
-      throw new TapoConnectionError(
-        `handshake1 failed (HTTP ${h1.status}, ${h1.body.length} bytes)`,
+    try {
+      const h1 = await this.post("/app/handshake1", localSeed, null);
+      // 403 before any credential is exchanged means local control is switched
+      // off at the device, not that the account details are wrong.
+      if (h1.status === 403) {
+        const error = new TapoLockedError(this.host);
+        this.dbLog.warn(`Handshake locked out (${this.chargerId})`, {
+          payload: { chargerId: this.chargerId, host: this.host },
+        });
+        throw error;
+      }
+      if (!h1.ok || h1.body.length !== 48) {
+        throw new TapoConnectionError(
+          `handshake1 failed (HTTP ${h1.status}, ${h1.body.length} bytes)`,
+        );
+      }
+      const cookie = extractSessionCookie(h1.setCookie);
+      const remoteSeed = h1.body.slice(0, 16);
+      const expected = await KlapCrypto.serverHash(
+        localSeed,
+        remoteSeed,
+        authHash,
       );
-    }
-    const cookie = extractSessionCookie(h1.setCookie);
-    const remoteSeed = h1.body.slice(0, 16);
-    const expected = await KlapCrypto.serverHash(
-      localSeed,
-      remoteSeed,
-      authHash,
-    );
-    if (!KlapCrypto.bytesEqual(h1.body.slice(16), expected)) {
-      throw new TapoAuthError();
-    }
+      if (!KlapCrypto.bytesEqual(h1.body.slice(16), expected)) {
+        const error = new TapoAuthError();
+        this.dbLog.error(`Handshake auth rejected (${this.chargerId})`, {
+          payload: { chargerId: this.chargerId, host: this.host },
+        });
+        throw error;
+      }
 
-    const h2Body = await KlapCrypto.handshake2Hash(
-      localSeed,
-      remoteSeed,
-      authHash,
-    );
-    const h2 = await this.post("/app/handshake2", h2Body, cookie);
-    if (!h2.ok) {
-      throw new TapoConnectionError(`handshake2 failed (HTTP ${h2.status})`);
-    }
+      const h2Body = await KlapCrypto.handshake2Hash(
+        localSeed,
+        remoteSeed,
+        authHash,
+      );
+      const h2 = await this.post("/app/handshake2", h2Body, cookie);
+      if (!h2.ok) {
+        throw new TapoConnectionError(`handshake2 failed (HTTP ${h2.status})`);
+      }
 
-    const keys = await KlapCrypto.deriveSessionKeys(
-      localSeed,
-      remoteSeed,
-      authHash,
-    );
-    this.session = { keys, seq: keys.initialSeq, cookie };
-    this.logger.debug(`KLAP session established with ${this.host}`);
+      const keys = await KlapCrypto.deriveSessionKeys(
+        localSeed,
+        remoteSeed,
+        authHash,
+      );
+      this.session = { keys, seq: keys.initialSeq, cookie };
+      this.logger.debug(`KLAP session established with ${this.host}`);
+      this.dbLog.debug(`Handshake established (${this.chargerId})`, {
+        payload: {
+          chargerId: this.chargerId,
+          host: this.host,
+          durationMs: Date.now() - start,
+        },
+      });
+    } catch (error) {
+      if (error instanceof TapoLockedError || error instanceof TapoAuthError) {
+        throw error;
+      }
+      const errorMessage = error instanceof Error
+        ? error.message
+        : String(error);
+      this.dbLog.error(`Handshake failed (${this.chargerId})`, {
+        payload: {
+          chargerId: this.chargerId,
+          host: this.host,
+          durationMs: Date.now() - start,
+          error: errorMessage,
+        },
+      });
+      throw error;
+    }
   }
 
   async request<T>(
@@ -90,6 +134,9 @@ export class KlapClient {
     } catch (error) {
       if (!isSessionExpiry(error)) throw error;
       this.logger.debug(`Session expired for ${this.host}, re-handshaking`);
+      this.dbLog.debug(`Session expired (${this.chargerId}), re-handshaking`, {
+        payload: { chargerId: this.chargerId, host: this.host, method },
+      });
       await this.handshake();
       return await this.send<T>(method, params);
     }
@@ -103,38 +150,77 @@ export class KlapClient {
     if (!session) throw new TapoConnectionError("No KLAP session");
     const seq = session.seq + 1;
     this.session = { ...session, seq };
+    const start = Date.now();
 
-    const payload = new TextEncoder().encode(
-      JSON.stringify(params === undefined ? { method } : { method, params }),
-    );
-    const body = await KlapCrypto.encryptPayload(session.keys, seq, payload);
-    const res = await this.post(
-      `/app/request?seq=${seq}`,
-      body,
-      session.cookie,
-    );
-    if (res.status === 403) {
-      throw new SessionExpiredError();
-    }
-    if (!res.ok) {
-      throw new TapoConnectionError(`${method} failed (HTTP ${res.status})`);
-    }
+    try {
+      const payload = new TextEncoder().encode(
+        JSON.stringify(
+          params === undefined ? { method } : { method, params },
+        ),
+      );
+      const body = await KlapCrypto.encryptPayload(session.keys, seq, payload);
+      const res = await this.post(
+        `/app/request?seq=${seq}`,
+        body,
+        session.cookie,
+      );
+      if (res.status === 403) {
+        throw new SessionExpiredError();
+      }
+      if (!res.ok) {
+        throw new TapoConnectionError(`${method} failed (HTTP ${res.status})`);
+      }
 
-    const plaintext = await KlapCrypto.decryptPayload(
-      session.keys,
-      seq,
-      res.body,
-    );
-    const parsed: TapoResponse<T> = JSON.parse(
-      new TextDecoder().decode(plaintext),
-    );
-    if (parsed.error_code !== 0) {
-      throw new TapoApiError(parsed.error_code, method);
+      const plaintext = await KlapCrypto.decryptPayload(
+        session.keys,
+        seq,
+        res.body,
+      );
+      const parsed: TapoResponse<T> = JSON.parse(
+        new TextDecoder().decode(plaintext),
+      );
+      const durationMs = Date.now() - start;
+      if (parsed.error_code !== 0) {
+        // Device-level rejection (not a transport failure) — worth a warn,
+        // one row per occurrence rather than every routine poll.
+        this.dbLog.warn(`${method} rejected (${this.chargerId})`, {
+          payload: {
+            chargerId: this.chargerId,
+            method,
+            durationMs,
+            errorCode: parsed.error_code,
+          },
+        });
+        throw new TapoApiError(parsed.error_code, method);
+      }
+      if (parsed.result === undefined) {
+        throw new TapoConnectionError(`${method} returned no result`);
+      }
+      // Routine, high-frequency traffic (every poll) — debug only.
+      this.dbLog.debug(`${method} (${this.chargerId})`, {
+        payload: { chargerId: this.chargerId, method, durationMs },
+      });
+      return parsed.result;
+    } catch (error) {
+      if (
+        error instanceof SessionExpiredError || error instanceof TapoApiError
+      ) {
+        throw error;
+      }
+      const durationMs = Date.now() - start;
+      const errorMessage = error instanceof Error
+        ? error.message
+        : String(error);
+      this.dbLog.error(`${method} failed (${this.chargerId})`, {
+        payload: {
+          chargerId: this.chargerId,
+          method,
+          durationMs,
+          error: errorMessage,
+        },
+      });
+      throw error;
     }
-    if (parsed.result === undefined) {
-      throw new TapoConnectionError(`${method} returned no result`);
-    }
-    return parsed.result;
   }
 
   private post(
