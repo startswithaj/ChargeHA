@@ -6,6 +6,7 @@ export interface VehicleConfig {
   priority: number;
   batteryStart: number;
   chargeLimit: number;
+  chargeAmpsMin: number;
   chargeAmpsMax: number;
   batteryCapacityKwh: number;
 }
@@ -22,7 +23,7 @@ export interface SolarConfig {
 
 export interface SimulationOptions {
   seed: number;
-  vehicleCount: number;
+  vehicles: VehicleConfig[];
   waterfall: boolean;
   minGenKw: string;
   graceMin: string;
@@ -34,12 +35,24 @@ export interface SimulationOptions {
   homeLoad: number;
   sunrise: number;
   sunset: number;
-  ev1Start: number;
-  ev2Start: number;
-  ev1CapacityKwh: number;
-  ev2CapacityKwh: number;
   ampDebounceThreshold?: number;
   ampDebounceSettleMinutes?: number;
+}
+
+/** A charging point with a fixed default configuration, used to seed the
+ *  simulator UI and CLI/browser devtools with a sensible starting point. */
+export function makeDefaultVehicleConfig(
+  overrides: Partial<VehicleConfig> & { id: string; name: string },
+): VehicleConfig {
+  return {
+    priority: 1,
+    batteryStart: 40,
+    chargeLimit: 100,
+    chargeAmpsMin: 5,
+    chargeAmpsMax: 32,
+    batteryCapacityKwh: 75,
+    ...overrides,
+  };
 }
 
 // ---- Results ----

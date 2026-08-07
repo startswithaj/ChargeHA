@@ -4,6 +4,7 @@
 
 import {
   DEFAULT_SOLAR_CONFIG,
+  makeDefaultVehicleConfig,
   runSimulation,
 } from "@chargeha/shared/simulation";
 import type { SimulationOptions } from "@chargeha/shared/simulation";
@@ -43,7 +44,6 @@ interface DayProfile {
   storms: number;
   homeLoad: number;
   ev1Start: number;
-  ev2Start: number;
   away: boolean[];
 }
 
@@ -67,14 +67,22 @@ const dayProfile = (offset: number): DayProfile => {
     // Vary the daily start SoC so charging amount differs day-to-day: a nearly
     // full car barely charges, a low one pulls from grid when solar is short.
     ev1Start: Math.round(35 + rand(offset, 5) * 55),
-    ev2Start: Math.round(30 + rand(offset, 6) * 60),
     away: DEMO_VEHICLES.map((_, i) => rand(offset, 10 + i) < 0.18),
   };
 };
 
 const simOptions = (profile: DayProfile): SimulationOptions => ({
   seed: profile.seed,
-  vehicleCount: 1,
+  vehicles: [
+    makeDefaultVehicleConfig({
+      id: "SIM_V1",
+      name: DEMO_VEHICLES[0].name,
+      priority: DEMO_VEHICLES[0].priority,
+      batteryStart: profile.ev1Start,
+      chargeLimit: DEMO_VEHICLES[0].limit,
+      batteryCapacityKwh: DEMO_VEHICLES[0].capacityKwh,
+    }),
+  ],
   waterfall: false,
   minGenKw: "1",
   graceMin: "6",
@@ -86,11 +94,6 @@ const simOptions = (profile: DayProfile): SimulationOptions => ({
   homeLoad: profile.homeLoad,
   sunrise: DEFAULT_SOLAR_CONFIG.sunrise,
   sunset: DEFAULT_SOLAR_CONFIG.sunset,
-  ev1Start: profile.ev1Start,
-  ev2Start: profile.ev2Start,
-  ev1CapacityKwh: DEMO_VEHICLES[0].capacityKwh,
-  // Unused at vehicleCount 1 (the engine slices to SIM_V1) but type-required.
-  ev2CapacityKwh: DEMO_VEHICLES[0].capacityKwh,
 });
 
 interface ChargingVehicle {

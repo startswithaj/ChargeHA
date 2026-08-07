@@ -11,6 +11,7 @@
 
 import {
   computeVehicleStats,
+  makeDefaultVehicleConfig,
   runSimulation,
 } from "../../packages/shared/simulation/mod.ts";
 import type { SimResult } from "../../packages/shared/simulation/mod.ts";
@@ -23,9 +24,24 @@ const seed = seedArg ? parseInt(seedArg.split("=")[1]) : 42;
 
 const VEHICLE_NAMES = ["EV 1", "EV 2"].slice(0, vehicleCount);
 
+const vehicles = [
+  makeDefaultVehicleConfig({
+    id: "SIM_V1",
+    name: "EV 1",
+    priority: 1,
+    batteryStart: 40,
+  }),
+  makeDefaultVehicleConfig({
+    id: "SIM_V2",
+    name: "EV 2",
+    priority: 2,
+    batteryStart: 60,
+  }),
+].slice(0, vehicleCount);
+
 const { results } = runSimulation({
   seed,
-  vehicleCount,
+  vehicles,
   waterfall,
   minGenKw: "1",
   graceMin: "6",
@@ -37,10 +53,6 @@ const { results } = runSimulation({
   homeLoad: 1500,
   sunrise: 6.5,
   sunset: 18,
-  ev1Start: 40,
-  ev2Start: 60,
-  ev1CapacityKwh: 75,
-  ev2CapacityKwh: 75,
 });
 
 function printCsv(results: SimResult[]): void {

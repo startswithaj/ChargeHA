@@ -17,29 +17,6 @@ const VOLTAGE = 230;
 /** Run a full-day charge controller simulation using the pure decision engine.
  *  No database, no adapters, no service classes — just plain objects and the
  *  engine's decide() method. */
-function buildVehicleConfigs(opts: SimulationOptions): VehicleConfig[] {
-  return [
-    {
-      id: "SIM_V1",
-      name: "EV 1",
-      priority: 1,
-      batteryStart: opts.ev1Start,
-      chargeLimit: 100,
-      chargeAmpsMax: 32,
-      batteryCapacityKwh: opts.ev1CapacityKwh,
-    },
-    {
-      id: "SIM_V2",
-      name: "EV 2",
-      priority: 2,
-      batteryStart: opts.ev2Start,
-      chargeLimit: 100,
-      chargeAmpsMax: 32,
-      batteryCapacityKwh: opts.ev2CapacityKwh,
-    },
-  ].slice(0, opts.vehicleCount);
-}
-
 function buildControllerConfig(opts: SimulationOptions): ControllerConfig {
   return {
     chargingEnabled: true,
@@ -77,7 +54,7 @@ function initVehicleStates(
       isOnline: true,
       chargeAmps: 0,
       chargeAmpsMax: vc.chargeAmpsMax,
-      chargeAmpsMin: 5,
+      chargeAmpsMin: vc.chargeAmpsMin,
       chargePowerKw: 0,
       chargerVoltage: VOLTAGE,
       chargerPhases: 1,
@@ -187,7 +164,7 @@ function snapshotVehicleResults(
 export function runSimulation(
   opts: SimulationOptions,
 ): SimulationOutput {
-  const vehicleConfigs = buildVehicleConfigs(opts);
+  const vehicleConfigs = opts.vehicles;
   const config = buildControllerConfig(opts);
   const vehicleStates = initVehicleStates(vehicleConfigs);
   const engine = new ControllerEngine();

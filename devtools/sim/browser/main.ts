@@ -1,5 +1,6 @@
 import {
   computeVehicleStats,
+  makeDefaultVehicleConfig,
   runSimulation,
 } from "@chargeha/shared/simulation";
 import type { SimResult } from "@chargeha/shared/simulation";
@@ -181,10 +182,27 @@ setTimeout(() => (window as any).runSim(), 100);
     const ampDebounceThreshold = intVal("ampDebounceThreshold", 2);
     const ampDebounceSettleMinutes = intVal("ampDebounceSettleMinutes", 3);
 
+    const vehicles = [
+      makeDefaultVehicleConfig({
+        id: "SIM_V1",
+        name: "EV 1",
+        priority: 1,
+        batteryStart: ev1Start,
+        batteryCapacityKwh: ev1CapacityKwh,
+      }),
+      makeDefaultVehicleConfig({
+        id: "SIM_V2",
+        name: "EV 2",
+        priority: 2,
+        batteryStart: ev2Start,
+        batteryCapacityKwh: ev2CapacityKwh,
+      }),
+    ].slice(0, vehicleCount);
+
     const start = performance.now();
     const { results } = runSimulation({
       seed,
-      vehicleCount,
+      vehicles,
       waterfall,
       minGenKw,
       graceMin,
@@ -196,10 +214,6 @@ setTimeout(() => (window as any).runSim(), 100);
       homeLoad,
       sunrise,
       sunset,
-      ev1Start,
-      ev2Start,
-      ev1CapacityKwh,
-      ev2CapacityKwh,
       ampDebounceThreshold,
       ampDebounceSettleMinutes,
     });
