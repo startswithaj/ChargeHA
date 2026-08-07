@@ -5,6 +5,7 @@ import {
   authorizeReq,
   bootNotificationReq,
   type ChargePointStatus,
+  chargingProfilePayload,
   meterValuesReq,
   startTransactionReq,
   statusNotificationReq,
@@ -14,12 +15,6 @@ export interface OcppChargerInfo {
   vendor: string;
   model: string;
   firmwareVersion: string;
-}
-
-/** The persisted mid-charge state — id + session meter baseline. */
-export interface ActiveTransaction {
-  transactionId: number;
-  meterStartWh: number;
 }
 
 /** A charger that reached us during a pairing window but whose id is not the
@@ -124,7 +119,6 @@ export interface OcppChargerHandle {
     boolean
   >;
   ping(): Promise<{ latencyMs: number }>;
-  restoreTransaction(tx: ActiveTransaction): void;
 }
 
 /** Plugin-internal OCPP 1.6J central system for a single charger.
@@ -141,14 +135,6 @@ export class OcppCentralSystem {
   constructor(
     private readonly logger: Logger,
     private readonly dbLog: PluginDbLogger,
-    /** Persists the active transaction (null = cleared) so a mid-charge
-     *  restart keeps stop-control. Failures are logged, never thrown. */
-    /** Scoped by charge point id so a mid-charge restart restores each
-     *  charger's own session rather than one shared row. */
-    private readonly persistTransaction: (
-      chargePointId: string,
-      tx: ActiveTransaction | null,
-    ) => Promise<void>,
     /** The honest source of truth for whether a charge point id may act: does
      *  any charger row exist for it? Async because it is a DB-backed lookup —
      *  saving a row must take effect on an already-open socket's very next
@@ -160,18 +146,6 @@ export class OcppCentralSystem {
    *  never have to special-case "no connection yet". */
   getData(chargePointId: string): OcppLiveData {
     return this.connections.get(chargePointId)?.data ?? freshData();
-  }
-
-  /** Seed a persisted mid-charge transaction on boot. No-op once live. */
-  restoreTransaction(chargePointId: string, tx: ActiveTransaction): void {
-    const connection = this.connections.get(chargePointId);
-    if (connection === undefined) return;
-    if (connection.data.transactionId !== null) return;
-    connection.transactionCounter = tx.transactionId;
-    this.patch(chargePointId, {
-      transactionId: tx.transactionId,
-      meterStartWh: tx.meterStartWh,
-    });
   }
 
   // ── Pairing ──────────────────────────────────────────────────────────
@@ -263,7 +237,6 @@ export class OcppCentralSystem {
       setChargingProfiles: (payloads) =>
         this.setChargingProfiles(chargePointId, payloads),
       ping: () => this.ping(chargePointId),
-      restoreTransaction: (tx) => this.restoreTransaction(chargePointId, tx),
     };
   }
 
@@ -321,10 +294,27 @@ export class OcppCentralSystem {
 
   async remoteStop(chargePointId: string): Promise<boolean> {
     const transactionId = this.getData(chargePointId).transactionId;
-    if (transactionId === null) return false;
+    if (transactionId === null) return this.suspendCharging(chargePointId);
     const res = await this.send(chargePointId, "RemoteStopTransaction", {
       transactionId,
     });
+    return isAccepted(res);
+  }
+
+  /** No transaction id to stop with — a reconnect after a restart never got
+   *  one via StartTransaction, and MeterValues has not adopted one yet.
+   *  Cap the draw at 0 A instead of failing into the command backoff. The
+   *  cap is lifted by the setChargeAmps that precedes any later start. */
+  private async suspendCharging(chargePointId: string): Promise<boolean> {
+    this.logger.warn(
+      `No transaction id for ${chargePointId}; suspending via a 0A ` +
+        "ChargePointMaxProfile instead of RemoteStopTransaction",
+    );
+    const res = await this.send(
+      chargePointId,
+      "SetChargingProfile",
+      chargingProfilePayload("ChargePointMaxProfile", 0),
+    );
     return isAccepted(res);
   }
 
@@ -448,11 +438,15 @@ export class OcppCentralSystem {
         return {};
       }
       case "MeterValues": {
+        const mv = meterValuesReq.parse(payload);
+        const readings = this.readMeterValues(chargePointId, mv);
         this.patch(chargePointId, {
-          ...this.readMeterValues(
+          ...this.adoptTransaction(
             chargePointId,
-            meterValuesReq.parse(payload),
+            mv.transactionId,
+            readings.energyRegisterWh ?? null,
           ),
+          ...readings,
           lastMeterValuesAt: Date.now(),
         });
         return {};
@@ -466,12 +460,6 @@ export class OcppCentralSystem {
           transactionId: connection.transactionCounter,
           meterStartWh: start.meterStart,
         });
-        this.persistTransaction(chargePointId, {
-          transactionId: connection.transactionCounter,
-          meterStartWh: start.meterStart,
-        }).catch((error) =>
-          this.logger.error("Persist transaction failed:", error)
-        );
         return {
           transactionId: connection.transactionCounter,
           idTagInfo: { status: "Accepted" },
@@ -479,9 +467,6 @@ export class OcppCentralSystem {
       }
       case "StopTransaction": {
         this.patch(chargePointId, { transactionId: null, meterStartWh: null });
-        this.persistTransaction(chargePointId, null).catch((error) =>
-          this.logger.error("Persist transaction failed:", error)
-        );
         return { idTagInfo: { status: "Accepted" } };
       }
       case "Authorize":
@@ -490,6 +475,38 @@ export class OcppCentralSystem {
       default:
         return null;
     }
+  }
+
+  /** Adopt a transaction id carried on a MeterValues sample. OCPP 1.6
+   *  chargers include `transactionId` on every in-transaction MeterValues
+   *  (~once a minute), so a reconnect after a restart — which never gets a
+   *  fresh StartTransaction — regains stop-control within a minute instead
+   *  of never. No-op when there is nothing to adopt: no id sent, no
+   *  connection, or the live id already matches. */
+  private adoptTransaction(
+    chargePointId: string,
+    transactionId: number | undefined,
+    energyRegisterWh: number | null,
+  ): Partial<OcppLiveData> {
+    if (transactionId === undefined) return {};
+    const connection = this.connections.get(chargePointId);
+    if (connection === undefined) return {};
+    if (connection.data.transactionId === transactionId) return {};
+    // Keep the counter ahead so a later StartTransaction cannot hand back an
+    // id the charger already considers in use.
+    connection.transactionCounter = Math.max(
+      connection.transactionCounter,
+      transactionId,
+    );
+    this.logger.info(
+      `Adopted transaction ${transactionId} for ${chargePointId} from MeterValues`,
+    );
+    return {
+      transactionId,
+      // A real StartTransaction baseline must never be overwritten — only
+      // fall back to the current register reading when there is none.
+      meterStartWh: connection.data.meterStartWh ?? energyRegisterWh,
+    };
   }
 
   private readMeterValues(

@@ -42,14 +42,6 @@ export const ocppConfigDef = defineSection({
     schema: z.enum(["1", "3"]),
     default: "1",
   },
-  // Internal — active transaction {transactionId, meterStartWh} as JSON,
-  // persisted so a mid-charge restart keeps stop-control. Never shown in
-  // settings UI; cleared (setConfig null) on StopTransaction.
-  ocppActiveTransaction: {
-    key: "active_transaction",
-    schema: z.string().nullable(),
-    default: null,
-  },
 });
 
 export type OcppConfig = SectionType<typeof ocppConfigDef>;

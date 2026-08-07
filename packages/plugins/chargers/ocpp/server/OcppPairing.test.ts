@@ -48,18 +48,13 @@ describe("OCPP pairing", () => {
    *  A test can add to it mid-flow to simulate Save creating a row on an
    *  already-open socket. */
   const build = (rowsFor: Set<string> = new Set()) => {
-    const persisted: Array<{ chargePointId: string; tx: unknown }> = [];
     const logger = new Logger("OcppTest", "error");
     const cs = new OcppCentralSystem(
       logger,
       new PluginDbLogger(() => Promise.resolve(), logger),
-      (chargePointId, tx) => {
-        persisted.push({ chargePointId, tx });
-        return Promise.resolve();
-      },
       (chargePointId) => Promise.resolve(rowsFor.has(chargePointId)),
     );
-    return { cs, persisted, rowsFor };
+    return { cs, rowsFor };
   };
 
   /** Deliver a charger-initiated CALL and return what we replied. Message
@@ -113,8 +108,8 @@ describe("OCPP pairing", () => {
     expect(cs.pairingState().info?.model).toBe("Wallbox9000");
   });
 
-  it("refuses StartTransaction from an id with no charger row and persists nothing", async () => {
-    const { cs, persisted } = build();
+  it("refuses StartTransaction from an id with no charger row", async () => {
+    const { cs } = build();
     cs.armPairing(60_000);
     const socket = fakeSocket();
     cs.attach(socket as unknown as WebSocket, { chargerId: CP });
@@ -129,7 +124,6 @@ describe("OCPP pairing", () => {
     expect(reply.messageTypeId).toBe(4); // CALLERROR, not a silent drop
     expect(reply.payloadOrCode).toBe("NotImplemented");
     expect(cs.getData(CP).transactionId).toBeNull();
-    expect(persisted).toEqual([]);
   });
 
   it("refuses MeterValues from an id with no charger row", async () => {
@@ -168,7 +162,7 @@ describe("OCPP pairing", () => {
   });
 
   it("handles the same calls normally once a charger row exists — no reconnect needed", async () => {
-    const { cs, persisted, rowsFor } = build();
+    const { cs, rowsFor } = build();
     cs.armPairing(60_000);
     const socket = fakeSocket();
     cs.notePairedCharger(CP);
@@ -187,12 +181,10 @@ describe("OCPP pairing", () => {
 
     expect(reply.messageTypeId).toBe(3);
     expect(cs.getData(CP).transactionId).not.toBeNull();
-    expect(persisted.length).toBe(1);
-    expect(persisted[0].chargePointId).toBe(CP);
   });
 
   it("keeps two chargers independent — ids, state and disconnects", async () => {
-    const { cs, persisted, rowsFor } = build();
+    const { cs, rowsFor } = build();
     rowsFor.add("charger-a");
     rowsFor.add("charger-b");
     cs.armPairing(60_000);
@@ -220,10 +212,6 @@ describe("OCPP pairing", () => {
     // Separate counters: a shared one would give the second charger id 2.
     expect(cs.getData("charger-a").transactionId).toBe(1);
     expect(cs.getData("charger-b").transactionId).toBe(1);
-    expect(persisted.map((p) => p.chargePointId)).toEqual([
-      "charger-a",
-      "charger-b",
-    ]);
 
     // One disconnecting leaves the other alone.
     a.onclose();

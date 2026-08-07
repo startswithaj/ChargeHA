@@ -11,10 +11,7 @@ import type {
 } from "@chargeha/shared/plugins";
 import { PollingChargerMiddleware } from "../../PollingChargerMiddleware.ts";
 import { OCPP_SECRET_KEYS, ocppConfigDef } from "./config.ts";
-import {
-  type ActiveTransaction,
-  OcppCentralSystem,
-} from "./OcppCentralSystem.ts";
+import { OcppCentralSystem } from "./OcppCentralSystem.ts";
 import { OcppChargerAdapter } from "./OcppChargerAdapter.ts";
 import { createOcppWsRoutes } from "./wsRoutes.ts";
 import { createOcppRouter } from "./router.ts";
@@ -36,7 +33,6 @@ export class OcppChargerPlugin implements ChargerPlugin {
     this.centralSystem = new OcppCentralSystem(
       deps.log,
       deps.dbLog,
-      (chargePointId, tx) => this.persistTransaction(chargePointId, tx),
       (chargePointId) =>
         this.rowForChargePoint(chargePointId).then((entry) => entry !== null),
     );
@@ -57,51 +53,6 @@ export class OcppChargerPlugin implements ChargerPlugin {
     return entries.find((e) => e.config.charger_id === chargePointId) ?? null;
   }
 
-  /**
-   * Persist the active transaction on the charger ROW that owns this charge
-   * point. `null` clears the key rather than storing "" — data-layer null
-   * boundary (code.md).
-   *
-   * Row-scoped, so two OCPP chargers keep separate sessions. This replaces the
-   * single plugin-wide `active_transaction` key that the old docstring here
-   * called out as the remaining single-charger assumption.
-   */
-  private async persistTransaction(
-    chargePointId: string,
-    tx: ActiveTransaction | null,
-  ): Promise<void> {
-    const entry = await this.rowForChargePoint(chargePointId);
-    if (entry === null) {
-      // A provisional pairing socket has no row yet, and cannot open a
-      // transaction anyway (PAIRING_ACTIONS). Log rather than throw: the
-      // central system treats persistence failures as non-fatal.
-      this.deps.log.warn(
-        `No charger row for charge point ${chargePointId}; ` +
-          "active transaction not persisted",
-      );
-      return;
-    }
-    await this.deps.patchChargerConfig(entry.row.id, {
-      active_transaction: tx === null ? null : JSON.stringify(tx),
-    });
-  }
-
-  /** Seed a mid-charge session saved before a restart, from THIS row's config.
-   *  Synchronous: the values are already in hand. */
-  private restorePersistedTransaction(resolved: ChargerRowConfig): void {
-    const raw = resolved.config.active_transaction;
-    const chargePointId = resolved.config.charger_id;
-    if (!raw || !chargePointId) return;
-    try {
-      this.centralSystem.restoreTransaction(
-        chargePointId,
-        JSON.parse(raw) as ActiveTransaction,
-      );
-    } catch (error) {
-      this.deps.log.warn(`Discarding bad persisted transaction: ${error}`);
-    }
-  }
-
   /** Nothing is awaited: every value this needs arrives as an argument. */
   // deno-lint-ignore require-await
   async createChargerMiddleware(
@@ -117,7 +68,6 @@ export class OcppChargerPlugin implements ChargerPlugin {
     if (chargePointId === undefined) {
       throw new Error("OCPP charge point id not configured");
     }
-    this.restorePersistedTransaction(resolved);
     const adapter = new OcppChargerAdapter(
       {
         chargerId: row.id,
