@@ -5,6 +5,8 @@ import { PluginDependencies } from "./PluginDependencies.ts";
 import { AppDatabase } from "../db/AppDatabase.ts";
 import type { AppDatabase as AppDatabaseType } from "../db/AppDatabase.ts";
 import type { ChargerRow, UpsertChargerInput } from "../db/types.ts";
+import type { ChargingPointManager } from "../services/ChargingPointManager.ts";
+import { throwingMock } from "../test-helpers/throwingMock.ts";
 
 describe("PluginDependencies charger scoping", () => {
   const charger = (id: string, adapterType: string): ChargerRow => ({
@@ -192,5 +194,100 @@ describe("PluginDependencies row-scoped config/secrets (real AppDatabase)", () =
     ]);
     expect(a.config.host).toBe("10.0.0.1");
     expect(b.config.host).toBe("10.0.0.2");
+  });
+
+  it("rebuildCharger delegates to chargingPoints.rebuildMiddlewareFor for an owned row", async () => {
+    let rebuiltId: string | null = null;
+    const deps = PluginDependencies.create({
+      db,
+      vehicleManager: {} as never,
+      chargingPoints: throwingMock<ChargingPointManager>(
+        "ChargingPointManager",
+        {
+          rebuildMiddlewareFor: (id: string) => {
+            rebuiltId = id;
+            return Promise.resolve();
+          },
+        },
+      ),
+      energyManager: {} as never,
+      tunnel: {} as never,
+      geocode: () => Promise.resolve({} as never),
+      encryptionConfigured: () => true,
+      pluginId: "tapo",
+    });
+
+    await deps.rebuildCharger("row-a");
+
+    expect(rebuiltId).toBe("row-a");
+  });
+
+  it("rebuildCharger throws for a row of another plugin, without rebuilding", async () => {
+    let rebuilt = false;
+    const deps = PluginDependencies.create({
+      db,
+      vehicleManager: {} as never,
+      chargingPoints: throwingMock<ChargingPointManager>(
+        "ChargingPointManager",
+        {
+          rebuildMiddlewareFor: () => {
+            rebuilt = true;
+            return Promise.resolve();
+          },
+        },
+      ),
+      energyManager: {} as never,
+      tunnel: {} as never,
+      geocode: () => Promise.resolve({} as never),
+      encryptionConfigured: () => true,
+      pluginId: "tapo",
+    });
+
+    await assertRejects(
+      () => deps.rebuildCharger("row-other"),
+      Error,
+      "does not belong to plugin",
+    );
+    expect(rebuilt).toBe(false);
+  });
+
+  it("createChargerRow delegates to chargingPoints.ensureCharger, stamped with this plugin's id", async () => {
+    let seenAdapterType: string | null = null;
+    const createdRow: ChargerRow = {
+      id: "row-new",
+      name: "New Tapo",
+      chargerAdapterType: "tapo",
+      chargerConfig: "{}",
+      mode: "auto",
+      priority: 1,
+      vehicleId: null,
+      kind: "smart",
+      active: true,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    const deps = PluginDependencies.create({
+      db,
+      vehicleManager: {} as never,
+      chargingPoints: throwingMock<ChargingPointManager>(
+        "ChargingPointManager",
+        {
+          ensureCharger: (adapterType: string) => {
+            seenAdapterType = adapterType;
+            return Promise.resolve(createdRow);
+          },
+        },
+      ),
+      energyManager: {} as never,
+      tunnel: {} as never,
+      geocode: () => Promise.resolve({} as never),
+      encryptionConfigured: () => true,
+      pluginId: "tapo",
+    });
+
+    const row = await deps.createChargerRow();
+
+    expect(seenAdapterType).toBe("tapo");
+    expect(row.id).toBe("row-new");
   });
 });

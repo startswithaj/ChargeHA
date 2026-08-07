@@ -6,19 +6,11 @@ import { meterValuesPayload, ocppTrpc, vcpSend } from "./ocppHelpers.ts";
 describe("OCPP e2e", () => {
   const CP_ID = "vcp-test";
 
-  // Row-scoped procedures (change set 02) need the charger row id, and the
-  // row is only created partway through this suite (`charger.create`,
-  // below) — same interim assumption as the client's useOcppChargerId hook:
-  // the single OCPP row, valid while ensureCharger allows only one per
-  // adapter type. Looked up lazily rather than once in beforeAll because it
-  // does not exist yet for the first tests in file order.
-  //
-  // NOTE: per change set 02's spec (§8, sequencing risk #1), no OCPP charger
-  // is actually configurable end-to-end until change set 03 lands the
-  // row-scoped write path — createPluginConfigProcedures.setConfig here still
-  // writes the now-unread plugin-wide `charger_id` key. This suite is
-  // expected to stay red until 03 ships; it is kept compiling in the
-  // meantime.
+  // Row-scoped procedures (change set 03) need the charger row id. There is
+  // no row until the first setConfig call below, which creates one by
+  // passing chargerRowId: null — the same "one write creates it" shape the
+  // client uses. Looked up lazily rather than captured once because a couple
+  // of tests further down create their own row via `charger.create`.
   async function ocppRowId(): Promise<string> {
     const list = await trpc.charger.list.query();
     const row = list.find((c) => c.chargerAdapterType === "ocpp");
@@ -31,7 +23,8 @@ describe("OCPP e2e", () => {
     // of their runtime. Config is per-stack (fresh DB every run).
     await trpc.config.system.set.mutate({ controllerLoopSeconds: 5 });
     await ocppTrpc.plugin.charger.ocpp.setConfig.mutate({
-      ocppChargerId: CP_ID,
+      chargerRowId: null,
+      values: { ocppChargerId: CP_ID },
     });
     // vcp retries via compose restart until the mount accepts it.
   });
@@ -208,7 +201,8 @@ describe("OCPP e2e", () => {
     // Deterministic, in-band: shrink the meter timeout, send one reading,
     // then stop sending. State must go faulted with the stale detail.
     await ocppTrpc.plugin.charger.ocpp.setConfig.mutate({
-      ocppMeterTimeoutSeconds: "5",
+      chargerRowId: await ocppRowId(),
+      values: { ocppMeterTimeoutSeconds: "5" },
     });
     await vcpSend("MeterValues", meterValuesPayload(7200, 2000));
     const state = await waitFor(async () => {
@@ -218,7 +212,8 @@ describe("OCPP e2e", () => {
     }, { label: "stale → faulted", timeoutMs: 30_000 });
     expect(state.statusDetail).toBe("stale (no MeterValues)");
     await ocppTrpc.plugin.charger.ocpp.setConfig.mutate({
-      ocppMeterTimeoutSeconds: "300",
+      chargerRowId: await ocppRowId(),
+      values: { ocppMeterTimeoutSeconds: "300" },
     });
   });
 });

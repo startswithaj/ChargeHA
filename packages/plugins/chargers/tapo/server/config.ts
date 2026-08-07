@@ -6,7 +6,6 @@ import {
 } from "@chargeha/shared/configSections";
 
 // ── Tapo plugin config section ──────────────────────────────────────────────
-// Keys are relative — PluginDependencies prefixes them with the plugin id.
 // Only the password is a secret (matching fronius-cloud); email is plain.
 
 export const tapoConfigDef = defineSection({

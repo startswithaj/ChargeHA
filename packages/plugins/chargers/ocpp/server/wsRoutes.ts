@@ -57,8 +57,7 @@ export function createOcppWsRoutes(
       deps.log.info(`OCPP pairing: charger announced id ${chargerId}`);
       centralSystem.notePairedCharger(chargerId);
     }
-    socket.onopen = () =>
-      centralSystem.attach(socket, { provisional: pairing, chargerId });
+    socket.onopen = () => centralSystem.attach(socket, { chargerId });
     return response;
   });
 

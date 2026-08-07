@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button, Text } from "@radix-ui/themes";
 import { X } from "lucide-react";
 import { useRouter } from "../../hooks/useRouter.ts";
@@ -121,6 +121,12 @@ export function WizardShell(
   const currentStep = resolveStepIndex(flow, store.state);
   const stepConfig = active[currentStep];
 
+  // Not persisted: a charger plugin step's save reports its row id here so a
+  // later step in the same run (e.g. a verify step) can address it. Lost on
+  // reload between save and that later step — the step blocks with a message
+  // rather than silently acting on the wrong row.
+  const [chargerId, setChargerId] = useState<string | null>(null);
+
   const {
     goToStep,
     handleBack,
@@ -156,6 +162,8 @@ export function WizardShell(
     onBack: handleBack,
     onSkipTo: goToStep,
     onSkipToEnd: handleSkipToEnd,
+    chargerId,
+    setChargerId,
   };
 
   const isFirstStep = currentStep === 0;

@@ -46,9 +46,6 @@ export interface OcppPairingState {
 
 export interface OcppLiveData {
   connected: boolean;
-  /** True while the live socket is a pairing connection: proven reachable but
-   *  not yet adopted, so it must not drive charging or write any state. */
-  provisional: boolean;
   status: ChargePointStatus | null;
   errorCode: string | null;
   info: OcppChargerInfo | null;
@@ -63,16 +60,6 @@ export interface OcppLiveData {
   lastMeterValuesAt: number | null;
   lastUpdated: string;
 }
-
-/** Charger-initiated actions a provisional connection may use. Enough to
- *  prove the charger is real and reachable and to show what it is; everything
- *  else is refused until the user adopts it, so an unadopted charger can never
- *  open a transaction or write meter state. */
-const PAIRING_ACTIONS = new Set([
-  "BootNotification",
-  "Heartbeat",
-  "StatusNotification",
-]);
 
 /** A socket that reached us without a charge point id — should not happen,
  *  but keys the map rather than silently sharing one entry. */
@@ -101,7 +88,6 @@ function withCharger(
 
 const freshData = (): OcppLiveData => ({
   connected: false,
-  provisional: false,
   status: null,
   errorCode: null,
   info: null,
@@ -163,6 +149,11 @@ export class OcppCentralSystem {
       chargePointId: string,
       tx: ActiveTransaction | null,
     ) => Promise<void>,
+    /** The honest source of truth for whether a charge point id may act: does
+     *  any charger row exist for it? Async because it is a DB-backed lookup —
+     *  saving a row must take effect on an already-open socket's very next
+     *  message, with no reconnect. */
+    private readonly hasChargerRow: (chargePointId: string) => Promise<boolean>,
   ) {}
 
   /** Disconnected chargers report fresh state rather than nothing, so callers
@@ -197,22 +188,25 @@ export class OcppCentralSystem {
     this.pairing = {
       armed: true,
       expiresAt: Date.now() + ttlMs,
-      announcedId: this.hasProvisional() ? this.pairing.announcedId : null,
-      info: this.hasProvisional() ? this.pairing.info : null,
-      // Keep the list across a renewal — the panel renews every minute while
-      // open, and forgetting what was found would empty the picker.
+      // Keep across a renewal — the panel renews every minute while open, and
+      // forgetting what was found would empty the picker.
+      announcedId: this.pairing.armed ? this.pairing.announcedId : null,
+      info: this.pairing.armed ? this.pairing.info : null,
       seen: this.pairing.armed ? this.pairing.seen : [],
     };
     this.logger.info(`OCPP pairing armed for ${Math.round(ttlMs / 1000)}s`);
   }
 
-  cancelPairing(): void {
+  /** Sockets tolerated only because pairing was open must not outlive it. A
+   *  connection whose charge point id now has a charger row is adopted and
+   *  left alone; everything else is a pairing-only socket. */
+  async cancelPairing(): Promise<void> {
     this.pairing = idlePairing();
-    // Sockets tolerated only because pairing was open must not outlive it.
-    // An adopted charger's connection is untouched.
-    this.connections.forEach((connection) => {
-      if (connection.data.provisional) connection.socket.close();
-    });
+    await Promise.all(
+      [...this.connections.entries()].map(async ([id, connection]) => {
+        if (!(await this.hasChargerRow(id))) connection.socket.close();
+      }),
+    );
   }
 
   /** Expired windows report themselves closed without needing a timer. */
@@ -232,27 +226,12 @@ export class OcppCentralSystem {
     return this.pairingState().armed;
   }
 
-  /** The user adopted the paired charger, so the live socket graduates to a
-   *  full connection — no reconnect wait. */
-  promotePairing(): void {
-    this.pairing = idlePairing();
-    this.connections.forEach((connection, id) => {
-      if (connection.data.provisional) this.patch(id, { provisional: false });
-    });
-  }
-
-  /** Any connection still awaiting adoption. */
-  private hasProvisional(): boolean {
-    return [...this.connections.values()].some((c) => c.data.provisional);
-  }
-
   /** Adopt an upgraded socket (from wsRoutes). A reconnect replaces the old
-   *  socket; state is retained (PRD: reconnection restores state).
-   *  `provisional` marks a pairing connection — see OcppLiveData. */
-  attach(
-    socket: WebSocket,
-    opts: { provisional?: boolean; chargerId?: string } = {},
-  ): void {
+   *  socket; state is retained (PRD: reconnection restores state). Whether
+   *  this id may act beyond BootNotification is decided fresh on every
+   *  message via `hasChargerRow`, not cached here — so once Save creates the
+   *  row, this same socket's next message is handled normally. */
+  attach(socket: WebSocket, opts: { chargerId?: string } = {}): void {
     const id = opts.chargerId ?? UNKNOWN_CHARGER;
     // Close only the previous socket for THIS charge point — that is a
     // reconnect. A different id is a different charger and must be left
@@ -260,11 +239,7 @@ export class OcppCentralSystem {
     this.connections.get(id)?.socket.close();
     const connection: OcppConnection = {
       socket,
-      data: {
-        ...freshData(),
-        connected: true,
-        provisional: opts.provisional === true,
-      },
+      data: { ...freshData(), connected: true },
       pending: new PendingCalls(),
       transactionCounter: 0,
     };
@@ -275,11 +250,7 @@ export class OcppCentralSystem {
     socket.onclose = () => this.onClose(id, socket);
     // deno-lint-ignore custom-no-param-mutation/no-param-mutation -- WebSocket handler wiring
     socket.onerror = (event) => this.logger.warn(`OCPP socket error: ${event}`);
-    this.logger.info(
-      opts.provisional
-        ? `Charger ${id} connected (pairing)`
-        : `Charger ${id} connected`,
-    );
+    this.logger.info(`Charger ${id} connected`);
   }
 
   /** A bound view for one charge point. Adapters take this so they cannot
@@ -391,13 +362,13 @@ export class OcppCentralSystem {
     }
   }
 
-  private reply(
+  private async reply(
     chargePointId: string,
     frame: OcppFrame & { kind: "call" },
-  ): void {
+  ): Promise<void> {
     const socket = this.connections.get(chargePointId)?.socket;
     try {
-      const payload = this.handleAction(
+      const payload = await this.resolveAction(
         chargePointId,
         frame.action,
         frame.payload,
@@ -416,6 +387,26 @@ export class OcppCentralSystem {
     }
   }
 
+  /** Gates on the honest source of truth — a charger row — before handing off
+   *  to `handleAction`. A message from an id with no row is refused, except
+   *  BootNotification: needed to display vendor/model during pairing. */
+  private async resolveAction(
+    chargePointId: string,
+    action: string,
+    payload: unknown,
+  ): Promise<unknown | null> {
+    if (
+      action !== "BootNotification" &&
+      !(await this.hasChargerRow(chargePointId))
+    ) {
+      this.logger.warn(
+        `OCPP ${action} refused: no charger row for ${chargePointId}`,
+      );
+      return null;
+    }
+    return this.handleAction(chargePointId, action, payload);
+  }
+
   /** Returns the CALLRESULT payload, or null for unsupported actions. */
   private handleAction(
     chargePointId: string,
@@ -423,15 +414,6 @@ export class OcppCentralSystem {
     payload: unknown,
   ): unknown | null {
     this.dbLog.debug(`← ${action}`, { payload: { raw: payload } });
-    // An unadopted charger gets a NotImplemented CALLERROR for anything
-    // outside the pairing set — a targeted refusal rather than a silent drop,
-    // and nothing it sends can reach the database.
-    if (
-      this.getData(chargePointId).provisional && !PAIRING_ACTIONS.has(action)
-    ) {
-      this.logger.warn(`OCPP ${action} refused: charger not adopted yet`);
-      return null;
-    }
     switch (action) {
       case "BootNotification": {
         const boot = bootNotificationReq.parse(payload);

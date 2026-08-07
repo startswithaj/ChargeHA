@@ -34,7 +34,10 @@ export const chargersRouter = router({
 
   ensure: publicProcedure.input(ensureInput).mutation(
     async ({ ctx, input }) => {
-      await ctx.chargingPointManager.ensureCharger(input.chargerAdapterType);
+      const row = await ctx.chargingPointManager.ensureCharger(
+        input.chargerAdapterType,
+      );
+      return { id: row.id };
     },
   ),
 

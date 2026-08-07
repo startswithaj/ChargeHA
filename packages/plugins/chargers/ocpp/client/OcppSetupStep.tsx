@@ -9,30 +9,41 @@ import {
 import { trpc } from "./trpc.ts";
 import { OCPP_DEFAULTS, OCPP_FIELDS } from "./fields.ts";
 import { OcppConnectBlock } from "./OcppConnection.tsx";
-import { useOcppChargerId } from "./useOcppChargerId.ts";
 
-function ocppNext(connected: boolean): WizardNext {
-  if (!connected) {
-    return { kind: "blocked", reason: "Waiting for the charger to connect" };
+function ocppNext(
+  // No charger row exists yet at this step (the whole point of the wizard),
+  // so "connected" can never be true here — gate on the pairing window
+  // having actually seen a charger, plus the user having picked one, instead.
+  seenAny: boolean,
+  idChosen: boolean,
+  save: () => Promise<void>,
+): WizardNext {
+  if (!seenAny) {
+    return { kind: "blocked", reason: "Waiting for a charger to answer" };
   }
-  return { kind: "ready", hint: null, onNext: () => Promise.resolve() };
+  if (!idChosen) {
+    return { kind: "blocked", reason: "Choose a charger" };
+  }
+  return {
+    kind: "ready",
+    hint: "Next saves your OCPP settings",
+    onNext: save,
+  };
 }
 
 export const ocppSetupStep: PluginStepDef = {
   id: "ocpp-setup",
   label: "OCPP Charger",
-  useStep: () => {
-    const chargerRowId = useOcppChargerId();
-    const { data: config } = trpc.plugin.charger.ocpp.getConfig.useQuery();
-    const utils = trpc.useUtils();
-    const saveMutation = trpc.plugin.charger.ocpp.setConfig.useMutation({
-      onSuccess: () => utils.plugin.charger.ocpp.getConfig.invalidate(),
-    });
-    const status = trpc.plugin.charger.ocpp.status.useQuery(
-      chargerRowId === undefined ? skipToken : { chargerRowId },
+  useStep: ({ chargerId, setChargerId }) => {
+    const configQuery = trpc.plugin.charger.ocpp.getConfig.useQuery(
+      chargerId === null ? skipToken : { chargerRowId: chargerId },
+    );
+    const saveMutation = trpc.plugin.charger.ocpp.setConfig.useMutation();
+    // Row-independent — no charger row exists yet at this step.
+    const pairingStatus = trpc.plugin.charger.ocpp.pairingStatus.useQuery(
+      undefined,
       { refetchInterval: 2000 },
     );
-    const promote = trpc.plugin.charger.ocpp.promotePairing.useMutation();
     const [draft, setDraft] = useState<Record<string, string>>({});
     // Same pairing affordance as the settings panel, so first-run and later
     // edits behave identically.
@@ -41,40 +52,34 @@ export const ocppSetupStep: PluginStepDef = {
       [],
     );
 
-    const values = { ...OCPP_DEFAULTS, ...(config ?? {}), ...draft };
-    const connected = status.data?.connected === true;
+    const values = { ...OCPP_DEFAULTS, ...(configQuery.data ?? {}), ...draft };
+    const seenAny = (pairingStatus.data?.pairing.seen.length ?? 0) > 0;
+    const idChosen = (values.ocppChargerId ?? "") !== "";
 
-    // Committed on blur, not per keystroke — the id gates the WS route
-    // allowlist and half-typed ids must never hit the DB.
-    const commit = (key: string) => {
-      const value = (draft[key] ?? "").trim();
-      if (draft[key] === undefined) return;
-      if (value === String((config ?? {})[key] ?? "")) return;
-      saveMutation.mutate({ [key]: value });
-      // Adopting the id the charger announced keeps its live socket rather
-      // than forcing a reconnect.
-      if (key === "ocppChargerId" && chargerRowId !== undefined) {
-        promote.mutate({ chargerRowId });
-      }
+    // One save, on Next — selecting a discovered charger and editing fields
+    // above only touch local draft state.
+    const save = async () => {
+      const result = await saveMutation.mutateAsync({
+        chargerRowId: chargerId,
+        values,
+      });
+      setChargerId(result.chargerRowId);
     };
 
     return {
-      next: ocppNext(connected),
+      next: ocppNext(seenAny, idChosen, save),
       view: (
         <div className={styles.stepContainer}>
           <OcppConnectBlock
             chargerId={values.ocppChargerId ?? ""}
-            onDetected={(id) => {
-              setDraft((d) => ({ ...d, ocppChargerId: id }));
-              saveMutation.mutate({ ocppChargerId: id });
-              if (chargerRowId !== undefined) promote.mutate({ chargerRowId });
-            }}
+            connected={null}
+            info={null}
+            onDetected={(id) => setDraft((d) => ({ ...d, ocppChargerId: id }))}
           />
           <PluginFieldInputs
             fields={fields}
             values={values}
             onChange={(key, value) => setDraft((d) => ({ ...d, [key]: value }))}
-            onCommit={commit}
           />
         </div>
       ),

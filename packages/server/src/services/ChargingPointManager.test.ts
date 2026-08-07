@@ -719,58 +719,23 @@ describe("ChargingPointManager", () => {
       expect(manager.getState(ROW.id)?.chargeAmps).toBe(10);
     });
 
-    it("rebuilds middlewares for the matching plugin prefix only", async () => {
+    it("config_changed rebuilds nothing charger-related — row-scoped writes emit nothing", async () => {
       chargerRows = [ROW];
       await manager.init();
       const originalMw = middlewares.get(ROW.id);
       assertExists(originalMw);
 
-      emitter.emit("config_changed", { key: "other-plugin.some_key" });
+      emitter.emit("config_changed", { key: "tapo.host" });
       await tick();
+
       expect(originalMw.shutdownCalls).toBe(0);
-
-      emitter.emit("config_changed", { key: `${CHARGER_TYPE}.some_key` });
-      await tick();
-      expect(originalMw.shutdownCalls).toBe(1);
-      expect(middlewares.get(ROW.id)).not.toBe(originalMw);
-    });
-
-    it("re-resolves config on rebuild rather than reusing a stale bundle", async () => {
-      chargerRows = [ROW];
-      chargerConfigs.set(ROW.id, { host: "10.0.0.1" });
-      const seen: ChargerRowConfig[] = [];
-      registry = new ChargerPluginRegistry();
-      registerChargerPlugin(
-        registry,
-        middlewares,
-        CHARGER_TYPE,
-        "Simulated Charger",
-        INFO,
-        (_row, resolved) => {
-          seen.push(resolved);
-        },
-      );
-      manager = new ChargingPointManager(
-        db,
-        registry,
-        vehicleManager,
-        poller,
-        configService,
-        emitter as unknown as TypedEventEmitter,
-        testLogger,
-      );
-      await manager.init();
-      expect(seen).toHaveLength(1);
-      expect(seen[0].config.host).toBe("10.0.0.1");
-
-      chargerConfigs.set(ROW.id, { host: "10.0.0.99" });
-      emitter.emit("config_changed", { key: `${CHARGER_TYPE}.some_key` });
-      await tick();
-
-      expect(seen).toHaveLength(2);
-      expect(seen[1].config.host).toBe("10.0.0.99");
+      expect(middlewares.get(ROW.id)).toBe(originalMw);
     });
   });
+
+  // rebuildMiddlewareFor has its own file — see
+  // ChargingPointManager.rebuildMiddlewareFor.test.ts — to keep this file
+  // under the test-file-length limit.
 
   describe("ensureVehicleChargingPoint", () => {
     const vehicle = (id: string, adapterType: string): VehicleRow => ({

@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
-import { skipToken } from "@tanstack/react-query";
 import { Badge, Button, Code, Link, Text, TextField } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
-import { useOcppChargerId } from "./useOcppChargerId.ts";
 
 /** Fallback only, for the moment before the server reports its own addresses.
  *  The browser's location is the wrong answer — it is the address *you* typed,
@@ -44,7 +42,7 @@ const mmss = (ms: number): string => {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 };
 
-interface ChargerInfo {
+export interface ChargerInfo {
   vendor: string;
   model: string;
   firmwareVersion: string;
@@ -243,29 +241,33 @@ function ListenStep(
  * than demanding one up front.
  */
 export function OcppConnectBlock(
-  { chargerId, onDetected }: {
+  { chargerId, connected, info, onDetected }: {
     chargerId: string;
+    /** null means "nothing saved yet, so not knowable" — add mode / the
+     *  first-run wizard has no row to have connected. Whichever host DOES
+     *  have a saved row (the settings panel) passes its own `status` query
+     *  data through instead. */
+    connected: boolean | null;
+    info: ChargerInfo | null;
     onDetected: (id: string) => void;
   },
 ) {
-  const chargerRowId = useOcppChargerId();
   const [now, setNow] = useState(() => Date.now());
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const begin = trpc.plugin.charger.ocpp.beginPairing.useMutation();
   const stop = trpc.plugin.charger.ocpp.cancelPairing.useMutation();
-  const urls = trpc.plugin.charger.ocpp.connectionUrls.useQuery(
-    chargerRowId === undefined ? skipToken : { chargerRowId },
-  );
-  const status = trpc.plugin.charger.ocpp.status.useQuery(
-    chargerRowId === undefined ? skipToken : { chargerRowId },
+  // Pairing is a property of the listener, not of any charger row, so this
+  // query takes no input and works identically with or without a saved row.
+  const pairingStatus = trpc.plugin.charger.ocpp.pairingStatus.useQuery(
+    undefined,
     { refetchInterval: 2000 },
   );
 
-  const pairing = status.data?.pairing;
+  const pairing = pairingStatus.data?.pairing;
   const listening = pairing?.armed === true;
   const seen: SeenCharger[] = pairing?.seen ?? [];
-  const candidates = urls.data?.candidates ?? [];
-  const base = candidates[0]?.base ?? browserGuessUrl();
+  const baseUrls = pairingStatus.data?.baseUrls ?? [];
+  const base = baseUrls[0] ?? browserGuessUrl();
   const port = base.split(":")[2]?.split("/")[0] ?? "";
   const expiresAt = pairing?.expiresAt ?? null;
 
@@ -292,7 +294,7 @@ export function OcppConnectBlock(
   }, [seen.length, chargerId]);
 
   const quiet = listening && startedAt !== null && seen.length === 0 &&
-    status.data?.connected !== true && now - startedAt > QUIET_MS;
+    connected !== true && now - startedAt > QUIET_MS;
 
   return (
     <div style={block}>
@@ -320,7 +322,7 @@ export function OcppConnectBlock(
       <Step n={2} title="Put this address into your charger">
         <AddressStep
           base={base}
-          others={candidates.slice(1).map((c) => c.base)}
+          others={baseUrls.slice(1)}
         />
       </Step>
 
@@ -328,8 +330,8 @@ export function OcppConnectBlock(
         <ResultStep
           seen={seen}
           chargerId={chargerId}
-          connected={status.data?.connected === true}
-          info={status.data?.info ?? null}
+          connected={connected === true}
+          info={info}
           onDetected={onDetected}
         />
       </Step>

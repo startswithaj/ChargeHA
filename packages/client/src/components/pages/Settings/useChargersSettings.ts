@@ -8,7 +8,10 @@ import {
 } from "../../../hooks/useChargers.ts";
 
 export type ChargerConfirm =
-  | { kind: "add"; typeId: string }
+  // `commit` is what actually creates the charger — a type with no settings
+  // panel via `addCharger`, a type with one via its panel's own save. Held
+  // here rather than run immediately so declining the dialog runs nothing.
+  | { kind: "add"; typeId: string; commit: () => void }
   | { kind: "removeLast"; chargerId: string };
 
 /** Editing an existing charger, or configuring one before it is created. */
@@ -60,22 +63,32 @@ export function useChargersSettings() {
 
   // A charger type with nothing to configure skips straight to creation.
   const choose = (typeId: string) => {
-    if (hasSettingsPanel(typeId)) setEditing({ mode: "add", typeId });
-    else if (needsAddConfirm) setConfirm({ kind: "add", typeId });
-    else addCharger(typeId);
+    if (hasSettingsPanel(typeId)) {
+      setEditing({ mode: "add", typeId });
+      return;
+    }
+    if (needsAddConfirm) {
+      setConfirm({ kind: "add", typeId, commit: () => addCharger(typeId) });
+    } else {
+      addCharger(typeId);
+    }
   };
 
-  const submitEdit = () => {
+  // The panel's own save is what creates/configures the charger; this only
+  // decides whether it may run yet (control-path confirm) and closes the form.
+  const submitEdit = (commit: () => void) => {
     if (editing?.mode !== "add") {
+      commit();
       setEditing(null);
       return;
     }
     if (needsAddConfirm) {
-      setConfirm({ kind: "add", typeId: editing.typeId });
+      setConfirm({ kind: "add", typeId: editing.typeId, commit });
       setEditing(null);
-    } else {
-      addCharger(editing.typeId);
+      return;
     }
+    commit();
+    setEditing(null);
   };
 
   const requestRemove = (chargerId: string) => {
@@ -88,7 +101,7 @@ export function useChargersSettings() {
 
   const acceptConfirm = () => {
     if (!confirm) return;
-    if (confirm.kind === "add") addCharger(confirm.typeId);
+    if (confirm.kind === "add") confirm.commit();
     else removeMutation.mutate({ id: confirm.chargerId });
     setConfirm(null);
   };

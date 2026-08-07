@@ -200,6 +200,22 @@ export class PluginDependencies<K extends string = string> {
     await this.db.patchChargerSecrets(chargerRowId, patch);
   }
 
+  /** Rebuild the running middleware for one of this plugin's chargers, after
+   *  a row-scoped config write. Ownership-guarded like every other charger
+   *  method — a plugin cannot rebuild another plugin's charger. */
+  async rebuildCharger(chargerRowId: string): Promise<void> {
+    await this.ownedChargerRow(chargerRowId);
+    await this.chargingPoints.rebuildMiddlewareFor(chargerRowId);
+  }
+
+  /** Create a new charger row for this plugin. The adapter type is stamped
+   *  with the plugin's own id — a plugin cannot create another plugin's
+   *  charger. Used by the row-scoped config path's add-mode: `setConfig`
+   *  creates the row on first save, not before. */
+  createChargerRow(): Promise<ChargerRow> {
+    return this.chargingPoints.ensureCharger(this.pluginId);
+  }
+
   // ── Vehicle rows (filtered to this plugin's adapter type) ────────────
 
   async getVehicleRows(): Promise<VehicleRow[]> {

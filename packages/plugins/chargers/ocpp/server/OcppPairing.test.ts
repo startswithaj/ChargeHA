@@ -1,15 +1,17 @@
-// Pairing exists to break a deadlock in first-time setup: the websocket route
-// rejects any charge point id that is not the configured one, but the user
-// cannot know the URL and id are right until a charger actually connects. A
-// pairing window accepts an unknown id for a few minutes so the panel can
-// prove reachability before anything is committed.
+// Pairing exists to break a deadlock in first-time setup: a charge point id
+// with no charger row is refused, but the user cannot know the URL and id are
+// right until a charger actually connects. A pairing window accepts an
+// unknown id for a few minutes so the panel can prove reachability before
+// anything is committed.
 //
-// The load-bearing property is that a paired-but-unadopted charger is inert.
-// It may say what it is and that it is alive; it may not open a transaction or
-// push meter readings, because no user has yet agreed that this charger is
-// theirs. These tests drive the real message handler over a fake socket rather
-// than asserting on internal flags, so a regression that lets StartTransaction
-// through fails here rather than in production.
+// The load-bearing property is that a connection with no charger row is
+// inert. It may say what it is (BootNotification, for vendor/model display);
+// it may not open a transaction or push meter readings, because no charger
+// row exists for it yet. Once Save creates the row, the same open socket's
+// very next message is handled normally — no promote, no reconnect. These
+// tests drive the real message handler over a fake socket and a fake row
+// lookup rather than asserting on internal flags, so a regression that lets
+// StartTransaction through fails here rather than in production.
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { Logger } from "@chargeha/server/lib/Logger";
@@ -42,7 +44,10 @@ describe("OCPP pairing", () => {
     return socket;
   };
 
-  const build = () => {
+  /** A fake row lookup: which charge point ids currently have a charger row.
+   *  A test can add to it mid-flow to simulate Save creating a row on an
+   *  already-open socket. */
+  const build = (rowsFor: Set<string> = new Set()) => {
     const persisted: Array<{ chargePointId: string; tx: unknown }> = [];
     const logger = new Logger("OcppTest", "error");
     const cs = new OcppCentralSystem(
@@ -52,20 +57,23 @@ describe("OCPP pairing", () => {
         persisted.push({ chargePointId, tx });
         return Promise.resolve();
       },
+      (chargePointId) => Promise.resolve(rowsFor.has(chargePointId)),
     );
-    return { cs, persisted };
+    return { cs, persisted, rowsFor };
   };
 
-  /** Deliver a charger-initiated CALL and return what we replied. */
-  const call = (
+  /** Deliver a charger-initiated CALL and return what we replied. Message
+   *  handling is async now (the row lookup is), so tests await a tick. */
+  const call = async (
     socket: ReturnType<typeof fakeSocket>,
     action: string,
     payload: Record<string, unknown>,
-  ): SentFrame => {
+  ): Promise<SentFrame> => {
     const before = socket.sent.length;
     socket.onmessage({
       data: JSON.stringify([2, `id-${action}`, action, payload]),
     });
+    await new Promise((resolve) => setTimeout(resolve, 0));
     return socket.sent[before];
   };
 
@@ -84,27 +92,20 @@ describe("OCPP pairing", () => {
 
     const socket = fakeSocket();
     cs.notePairedCharger(CP);
-    cs.attach(socket as unknown as WebSocket, {
-      provisional: true,
-      chargerId: CP,
-    });
+    cs.attach(socket as unknown as WebSocket, { chargerId: CP });
 
     expect(cs.getData(CP).connected).toBe(true);
-    expect(cs.getData(CP).provisional).toBe(true);
     expect(cs.pairingState().announcedId).toBe(CP);
   });
 
-  it("surfaces vendor and model from BootNotification for the panel", () => {
+  it("surfaces vendor and model from BootNotification even with no charger row", async () => {
     const { cs } = build();
     cs.armPairing(60_000);
     const socket = fakeSocket();
     cs.notePairedCharger(CP);
-    cs.attach(socket as unknown as WebSocket, {
-      provisional: true,
-      chargerId: CP,
-    });
+    cs.attach(socket as unknown as WebSocket, { chargerId: CP });
 
-    const reply = call(socket, "BootNotification", BOOT);
+    const reply = await call(socket, "BootNotification", BOOT);
 
     expect(reply.messageTypeId).toBe(3); // CALLRESULT
     expect((reply.payloadOrCode as { status: string }).status).toBe("Accepted");
@@ -112,16 +113,13 @@ describe("OCPP pairing", () => {
     expect(cs.pairingState().info?.model).toBe("Wallbox9000");
   });
 
-  it("refuses StartTransaction from an unadopted charger and persists nothing", () => {
+  it("refuses StartTransaction from an id with no charger row and persists nothing", async () => {
     const { cs, persisted } = build();
     cs.armPairing(60_000);
     const socket = fakeSocket();
-    cs.attach(socket as unknown as WebSocket, {
-      provisional: true,
-      chargerId: CP,
-    });
+    cs.attach(socket as unknown as WebSocket, { chargerId: CP });
 
-    const reply = call(socket, "StartTransaction", {
+    const reply = await call(socket, "StartTransaction", {
       connectorId: 1,
       idTag: "tag",
       meterStart: 1000,
@@ -134,16 +132,13 @@ describe("OCPP pairing", () => {
     expect(persisted).toEqual([]);
   });
 
-  it("refuses MeterValues from an unadopted charger", () => {
+  it("refuses MeterValues from an id with no charger row", async () => {
     const { cs } = build();
     cs.armPairing(60_000);
     const socket = fakeSocket();
-    cs.attach(socket as unknown as WebSocket, {
-      provisional: true,
-      chargerId: CP,
-    });
+    cs.attach(socket as unknown as WebSocket, { chargerId: CP });
 
-    const reply = call(socket, "MeterValues", {
+    const reply = await call(socket, "MeterValues", {
       connectorId: 1,
       meterValue: [{
         timestamp: new Date().toISOString(),
@@ -155,22 +150,35 @@ describe("OCPP pairing", () => {
     expect(cs.getData(CP).powerW).toBeNull();
   });
 
-  it("accepts the same calls once the charger is adopted", () => {
-    const { cs, persisted } = build();
+  it("refuses Heartbeat and StatusNotification too — only BootNotification is excepted", async () => {
+    const { cs } = build();
+    cs.armPairing(60_000);
+    const socket = fakeSocket();
+    cs.attach(socket as unknown as WebSocket, { chargerId: CP });
+
+    const heartbeat = await call(socket, "Heartbeat", {});
+    expect(heartbeat.messageTypeId).toBe(4);
+
+    const status = await call(socket, "StatusNotification", {
+      connectorId: 1,
+      status: "Available",
+      errorCode: "NoError",
+    });
+    expect(status.messageTypeId).toBe(4);
+  });
+
+  it("handles the same calls normally once a charger row exists — no reconnect needed", async () => {
+    const { cs, persisted, rowsFor } = build();
     cs.armPairing(60_000);
     const socket = fakeSocket();
     cs.notePairedCharger(CP);
-    cs.attach(socket as unknown as WebSocket, {
-      provisional: true,
-      chargerId: CP,
-    });
+    cs.attach(socket as unknown as WebSocket, { chargerId: CP });
 
-    cs.promotePairing();
+    // The user saved the row on the wizard/settings side — the already-open
+    // socket's next message must be handled normally, no reconnect.
+    rowsFor.add(CP);
 
-    expect(cs.getData(CP).provisional).toBe(false);
-    expect(cs.pairingState().armed).toBe(false);
-
-    const reply = call(socket, "StartTransaction", {
+    const reply = await call(socket, "StartTransaction", {
       connectorId: 1,
       idTag: "tag",
       meterStart: 1000,
@@ -183,8 +191,10 @@ describe("OCPP pairing", () => {
     expect(persisted[0].chargePointId).toBe(CP);
   });
 
-  it("keeps two chargers independent — ids, state and disconnects", () => {
-    const { cs, persisted } = build();
+  it("keeps two chargers independent — ids, state and disconnects", async () => {
+    const { cs, persisted, rowsFor } = build();
+    rowsFor.add("charger-a");
+    rowsFor.add("charger-b");
     cs.armPairing(60_000);
     const a = fakeSocket();
     const b = fakeSocket();
@@ -204,8 +214,8 @@ describe("OCPP pairing", () => {
         meterStart: 1000,
         timestamp: new Date().toISOString(),
       });
-    startTx(a);
-    startTx(b);
+    await startTx(a);
+    await startTx(b);
 
     // Separate counters: a shared one would give the second charger id 2.
     expect(cs.getData("charger-a").transactionId).toBe(1);
@@ -228,28 +238,29 @@ describe("OCPP pairing", () => {
     expect(cs.acceptsPairing()).toBe(false);
   });
 
-  it("clears provisional when the charger disconnects", () => {
-    const { cs } = build();
+  it("cancelling closes sockets with no charger row and leaves adopted ones alone", async () => {
+    const { cs, rowsFor } = build();
+    rowsFor.add("charger-adopted");
     cs.armPairing(60_000);
-    const socket = fakeSocket();
-    cs.attach(socket as unknown as WebSocket, {
-      provisional: true,
-      chargerId: CP,
+    const pairingOnly = fakeSocket();
+    const adopted = fakeSocket();
+    let pairingClosed = false;
+    let adoptedClosed = false;
+    pairingOnly.close = () => {
+      pairingClosed = true;
+    };
+    adopted.close = () => {
+      adoptedClosed = true;
+    };
+    cs.attach(pairingOnly as unknown as WebSocket, { chargerId: CP });
+    cs.attach(adopted as unknown as WebSocket, {
+      chargerId: "charger-adopted",
     });
-    expect(cs.getData(CP).provisional).toBe(true);
 
-    socket.onclose();
+    await cs.cancelPairing();
 
-    // A disconnected charger reporting itself as mid-pairing would leave the
-    // panel showing a charger that is no longer there.
-    expect(cs.getData(CP).connected).toBe(false);
-    expect(cs.getData(CP).provisional).toBe(false);
-  });
-
-  it("cancelling closes the window", () => {
-    const { cs } = build();
-    cs.armPairing(60_000);
-    cs.cancelPairing();
     expect(cs.acceptsPairing()).toBe(false);
+    expect(pairingClosed).toBe(true);
+    expect(adoptedClosed).toBe(false);
   });
 });

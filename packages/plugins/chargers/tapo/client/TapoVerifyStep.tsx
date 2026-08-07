@@ -7,7 +7,6 @@ import {
   type WizardNext,
 } from "../../../hostUi.ts";
 import { trpc } from "./trpc.ts";
-import { useTapoChargerId } from "./useTapoChargerId.ts";
 
 function verifyNext(toggled: boolean): WizardNext {
   if (!toggled) {
@@ -19,10 +18,9 @@ function verifyNext(toggled: boolean): WizardNext {
 export const tapoVerifyStep: PluginStepDef = {
   id: "tapo-verify",
   label: "Verify Plug Control",
-  useStep: () => {
-    const chargerRowId = useTapoChargerId();
+  useStep: ({ chargerId }) => {
     const status = trpc.plugin.charger.tapo.status.useQuery(
-      chargerRowId === undefined ? skipToken : { chargerRowId },
+      chargerId === null ? skipToken : { chargerRowId: chargerId },
       { refetchInterval: 3000 },
     );
     const setPower = trpc.plugin.charger.tapo.setPower.useMutation({
@@ -44,10 +42,13 @@ export const tapoVerifyStep: PluginStepDef = {
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <Button
               size="2"
-              disabled={setPower.isPending || chargerRowId === undefined}
+              disabled={setPower.isPending || chargerId === null}
               onClick={() =>
-                chargerRowId !== undefined &&
-                setPower.mutate({ chargerRowId, on: !(status.data?.on) })}
+                chargerId !== null &&
+                setPower.mutate({
+                  chargerRowId: chargerId,
+                  on: !(status.data?.on),
+                })}
             >
               Turn {status.data?.on ? "Off" : "On"}
             </Button>

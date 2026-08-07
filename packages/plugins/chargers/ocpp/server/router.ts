@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
-import { createPluginConfigProcedures } from "../../../createPluginConfigProcedures.ts";
+import { createChargerConfigProcedures } from "../../../createPluginConfigProcedures.ts";
 import { OCPP_SECRET_KEYS, ocppConfigDef } from "./config.ts";
 import type { OcppCentralSystem } from "./OcppCentralSystem.ts";
 
@@ -63,10 +63,7 @@ function lanBaseUrls(
 /** The pairing lifecycle, grouped so the main router stays readable.
  *  Session-authenticated: the whole /trpc mount sits behind
  *  createAuthMiddleware — only the charger websocket itself is public. */
-function pairingProcedures(
-  deps: PluginDependencies,
-  centralSystem: OcppCentralSystem,
-) {
+function pairingProcedures(centralSystem: OcppCentralSystem) {
   return {
     /** Open a window in which a charger announcing any id may connect
      *  provisionally, so it can prove it reaches us before an id is saved.
@@ -77,32 +74,34 @@ function pairingProcedures(
       return { expiresInMs: PAIRING_TTL_MS };
     }),
 
-    cancelPairing: publicProcedure.mutation(() => {
-      centralSystem.cancelPairing();
+    cancelPairing: publicProcedure.mutation(async () => {
+      await centralSystem.cancelPairing();
       return { armed: false as const };
     }),
 
-    /** Called after a charger id is saved ON A ROW: the live pairing socket
-     *  becomes a full connection instead of forcing the charger to reconnect.
-     *  Row-scoped so "pair charger row B" is expressible — previously the one
-     *  saved plugin-wide id was the only possible pairing target. */
-    promotePairing: publicProcedure
-      .input(chargerInput)
-      .mutation(async ({ input }) => {
-        const chargePointId = await chargePointIdFor(
-          deps,
-          input.chargerRowId,
-        );
-        const announced = centralSystem.pairingState().announcedId;
-        if (chargePointId === null || chargePointId !== announced) {
-          return {
-            success: false as const,
-            error: "Saved charger id does not match the charger that connected",
-          };
-        }
-        centralSystem.promotePairing();
-        return { success: true as const };
-      }),
+    /** The pairing window's facts, row-independent by nature — this is what
+     *  add mode / the first-run wizard reads, since no charger row exists yet
+     *  for them to scope a query to. */
+    pairingStatus: publicProcedure.query(() => {
+      const pairing = centralSystem.pairingState();
+      return {
+        pairing: {
+          armed: pairing.armed,
+          // Epoch ms so the panel can show its own countdown without needing
+          // a second endpoint or guessing the TTL.
+          expiresAt: pairing.expiresAt,
+          announcedId: pairing.announcedId,
+          info: pairing.info,
+          // Every charger seen this window, so the panel can offer a choice
+          // rather than silently keeping whichever connected last.
+          seen: pairing.seen,
+        },
+        // A charger is dialling in but being turned away — almost always
+        // because it was set up before the user pressed Listen.
+        knocking: centralSystem.knockingCharger(),
+        baseUrls: lanBaseUrls(),
+      };
+    }),
   };
 }
 
@@ -111,7 +110,7 @@ export function createOcppRouter(
   centralSystem: OcppCentralSystem,
 ) {
   return router({
-    ...createPluginConfigProcedures(deps, ocppConfigDef, OCPP_SECRET_KEYS),
+    ...createChargerConfigProcedures(deps, ocppConfigDef, OCPP_SECRET_KEYS),
 
     /** Connection status + charger info for settings/wizard live display,
      *  for ONE charger row. */
@@ -124,13 +123,8 @@ export function createOcppRouter(
         const data = chargePointId === null
           ? null
           : centralSystem.getData(chargePointId);
-        const pairing = centralSystem.pairingState();
         return {
           connected: data?.connected ?? false,
-          provisional: data?.provisional ?? false,
-          // A charger is dialling in but being turned away — almost always
-          // because it was set up before the user pressed Listen.
-          knocking: centralSystem.knockingCharger(),
           info: data?.info ?? null,
           status: data?.status ?? null,
           // Client composes ws://<location.hostname>:<port> + this path.
@@ -139,37 +133,10 @@ export function createOcppRouter(
           wsPath: chargePointId === null
             ? null
             : `/api/charger/ocpp/${chargePointId}`,
-          // Non-null once a charger has reached us during a pairing window.
-          pairing: {
-            armed: pairing.armed,
-            // Epoch ms so the panel can show its own countdown without needing
-            // a second endpoint or guessing the TTL.
-            expiresAt: pairing.expiresAt,
-            announcedId: pairing.announcedId,
-            info: pairing.info,
-            // Every charger seen this window, so the panel can offer a choice
-            // rather than silently keeping whichever connected last.
-            seen: pairing.seen,
-          },
         };
       }),
 
-    /** URLs a charger can actually reach, so the panel stops guessing from
-     *  window.location — which yields the browser's loopback and, on the dev
-     *  server, the wrong port entirely. */
-    connectionUrls: publicProcedure
-      .input(chargerInput)
-      .query(async ({ input }) => {
-        const chargePointId = await chargePointIdFor(deps, input.chargerRowId);
-        return {
-          candidates: lanBaseUrls().map((base) => ({
-            base,
-            full: chargePointId === null ? null : `${base}/${chargePointId}`,
-          })),
-        };
-      }),
-
-    ...pairingProcedures(deps, centralSystem),
+    ...pairingProcedures(centralSystem),
 
     testConnection: publicProcedure
       .input(chargerInput)

@@ -57,10 +57,10 @@ const chargingForMode = (mode: DemoVehicleMode, current: boolean): boolean => {
 
 export const chargerMutations: ChargerMutations = {
   "charger.ensure": (input) => {
-    const exists = getDemoState().chargers.some(
+    const existing = getDemoState().chargers.find(
       (c) => c.chargerAdapterType === input.chargerAdapterType,
     );
-    if (exists) return;
+    if (existing) return { id: existing.id };
     const charger: DemoCharger = {
       id: crypto.randomUUID(),
       name: demoChargerDisplayNames[input.chargerAdapterType] ??
@@ -72,6 +72,7 @@ export const chargerMutations: ChargerMutations = {
     };
     updateDemoState((m) => ({ ...m, chargers: [...m.chargers, charger] }));
     emitDemoEvent({ type: "chargers_changed", data: {} });
+    return { id: charger.id };
   },
 
   "charger.create": (input) => {

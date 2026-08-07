@@ -14,6 +14,16 @@ export interface EnergyPluginOption {
   demoAvailable?: boolean;
 }
 
+/** Props every component in `pluginSettingsComponents` receives. Charger
+ *  panels use `chargerId` to scope their config to one row — null in add
+ *  mode (no row yet), undefined for panels outside the charger settings
+ *  path. Lives here rather than `componentRegistry.ts` because that module
+ *  imports every plugin's panel — a panel importing this type back out of it
+ *  would close a cycle. */
+export interface PluginSettingsProps {
+  chargerId?: string | null;
+}
+
 /** A schedule-related note contributed by a vehicle plugin. */
 export interface PluginScheduleNote {
   adapterType: string;

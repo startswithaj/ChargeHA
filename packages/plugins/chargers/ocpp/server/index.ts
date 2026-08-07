@@ -37,6 +37,8 @@ export class OcppChargerPlugin implements ChargerPlugin {
       deps.log,
       deps.dbLog,
       (chargePointId, tx) => this.persistTransaction(chargePointId, tx),
+      (chargePointId) =>
+        this.rowForChargePoint(chargePointId).then((entry) => entry !== null),
     );
     deps.log.info("OCPP plugin initialized");
   }
@@ -112,7 +114,7 @@ export class OcppChargerPlugin implements ChargerPlugin {
     // phantom charge point that looked live but could never connect. Throwing
     // registers an UnconfiguredChargerMiddleware whose message names the
     // problem on the dashboard.
-    if (!chargePointId) {
+    if (chargePointId === undefined) {
       throw new Error("OCPP charge point id not configured");
     }
     this.restorePersistedTransaction(resolved);
@@ -159,7 +161,7 @@ export class OcppChargerPlugin implements ChargerPlugin {
           }))
           .filter(
             (p): p is { name: string; chargePointId: string } =>
-              p.chargePointId !== undefined && p.chargePointId !== "",
+              p.chargePointId !== undefined,
           );
         const disconnected = configured
           .filter((p) => !this.centralSystem.getData(p.chargePointId).connected)

@@ -101,6 +101,7 @@ function ChargerList(
             <ChargerEditForm
               autoFocus
               typeId={editing.typeId}
+              chargerId={null}
               submitLabel="Add"
               error={settings.error}
               busy={settings.busy}
@@ -142,6 +143,7 @@ function ChargerListItem(
       {expanded && (
         <ChargerEditForm
           typeId={charger.chargerAdapterType}
+          chargerId={charger.id}
           submitLabel="Save"
           error={settings.error}
           busy={settings.busy}

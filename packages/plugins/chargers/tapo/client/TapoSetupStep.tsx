@@ -27,7 +27,7 @@ function tapoNext(
 export const tapoSetupStep: PluginStepDef = {
   id: "tapo-setup",
   label: "Tapo P110/115 Smart Plug",
-  useStep: () => {
+  useStep: ({ chargerId, setChargerId }) => {
     const saveMutation = trpc.plugin.charger.tapo.setConfig.useMutation();
     const [form, setForm] = useState<Record<string, string>>(TAPO_DEFAULTS);
     const [validated, setValidated] = useState(false);
@@ -37,8 +37,13 @@ export const tapoSetupStep: PluginStepDef = {
       setValidated(false);
     };
 
+    // One save, on Next — nothing is written while the user is still typing.
     const save = async () => {
-      await saveMutation.mutateAsync(form);
+      const result = await saveMutation.mutateAsync({
+        chargerRowId: chargerId,
+        values: form,
+      });
+      setChargerId(result.chargerRowId);
     };
 
     return {

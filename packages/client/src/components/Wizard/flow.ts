@@ -21,6 +21,13 @@ export interface StepProps {
    *  means something different depending on which plugins are selected. */
   onSkipTo: (id: string) => void;
   onSkipToEnd: () => void;
+  /** The charger row a charger plugin's steps act on this run, or null before
+   *  its setup step has saved. Not persisted — a reload between that save and
+   *  a later step in the same run loses it (see the wizard shell). */
+  chargerId: string | null;
+  /** Reports the id a charger step's save created, so later steps in the same
+   *  run (e.g. a verify step) can address the same row. */
+  setChargerId: (id: string) => void;
 }
 
 /** Runs when Next is clicked. Resolve to advance; throw to stay on the step —

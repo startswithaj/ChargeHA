@@ -10,11 +10,13 @@ export const ocppConfigDef = defineSection({
     key: "charger_id",
     // Goes into the websocket URL path, which OCPP-J requires to be
     // percent-encoded per RFC3986 — restricting the charset avoids needing to.
+    // Nullable: the id is compared for equality against what a charge point
+    // announces, so a stored "" would look configured and match nothing.
     schema: z.string().regex(
-      /^[A-Za-z0-9._~-]*$/,
+      /^[A-Za-z0-9._~-]+$/,
       "Letters, numbers, dots, dashes and underscores only",
-    ),
-    default: "",
+    ).nullable(),
+    default: null,
   },
   ocppMeterTimeoutSeconds: {
     key: "meter_timeout_seconds",

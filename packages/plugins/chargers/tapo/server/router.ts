@@ -2,7 +2,7 @@ import { z } from "zod";
 import { Logger } from "@chargeha/server/lib/Logger";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
-import { createPluginConfigProcedures } from "../../../createPluginConfigProcedures.ts";
+import { createChargerConfigProcedures } from "../../../createPluginConfigProcedures.ts";
 import { TAPO_SECRET_KEYS, tapoConfigDef } from "./config.ts";
 import { discoverTapo } from "./TapoDiscovery.ts";
 import { KlapClient } from "./KlapClient.ts";
@@ -61,7 +61,7 @@ function testFailure(err: unknown) {
 
 export function createTapoRouter(deps: PluginDependencies) {
   return router({
-    ...createPluginConfigProcedures(deps, tapoConfigDef, TAPO_SECRET_KEYS),
+    ...createChargerConfigProcedures(deps, tapoConfigDef, TAPO_SECRET_KEYS),
 
     discover: publicProcedure
       .input(discoverInput)

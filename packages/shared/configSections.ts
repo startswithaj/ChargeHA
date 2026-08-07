@@ -425,6 +425,29 @@ export function serializeSection<T extends SectionDef>(
 }
 
 /**
+ * Serialize a partial typed config object into DB key → string|null pairs,
+ * for the row-scoped charger write path. `null` means "delete this key" —
+ * a cleared field is unsetting it, not storing "".
+ */
+export function serializeSectionPatch<T extends SectionDef>(
+  sectionDef: T,
+  values: Partial<SectionType<T>>,
+): Record<SectionKeys<T>, string | null> {
+  const result = Object.fromEntries(
+    Object.entries(sectionDef)
+      .filter(([propName]) => propName in values)
+      .map(([propName, field]) => {
+        const value = (values as Record<string, unknown>)[propName];
+        if (value === null || value === undefined) return [field.key, null];
+        const serialized = serializeValue(value, field.schema);
+        // A user who cleared a field is unsetting it, not storing "".
+        return [field.key, serialized === "" ? null : serialized];
+      }),
+  );
+  return result as Record<SectionKeys<T>, string | null>;
+}
+
+/**
  * Get the DB keys for a section definition, typed as the literal union.
  */
 export function sectionDbKeys<T extends SectionDef>(

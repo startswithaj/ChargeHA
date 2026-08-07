@@ -13,13 +13,18 @@ describe("Tapo e2e", () => {
     // of their runtime. Config is per-stack (fresh DB every run).
     await trpc.config.system.set.mutate({ controllerLoopSeconds: 5 });
     await tapoControl({ deviceOn: false, drawWhenOnW: 0, unreachable: false });
+    // No row exists yet — chargerRowId: null creates it in this one write,
+    // the same shape the client's add-mode panel uses.
     await trpc.plugin.charger.tapo.setConfig.mutate({
-      tapoHost: SIM_HOST,
-      tapoEmail: CREDS.email,
-      tapoPassword: CREDS.password,
-      tapoFixedDrawAmps: "10",
-      tapoDetectionThresholdW: "100",
-      tapoPollIntervalSeconds: "2",
+      chargerRowId: null,
+      values: {
+        tapoHost: SIM_HOST,
+        tapoEmail: CREDS.email,
+        tapoPassword: CREDS.password,
+        tapoFixedDrawAmps: "10",
+        tapoDetectionThresholdW: "100",
+        tapoPollIntervalSeconds: "2",
+      },
     });
   });
 

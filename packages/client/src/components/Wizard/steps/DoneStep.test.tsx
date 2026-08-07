@@ -99,6 +99,8 @@ describe("DoneStep", () => {
     onBack: vi.fn(),
     onSkipTo: vi.fn(),
     onSkipToEnd: vi.fn(),
+    chargerId: null,
+    setChargerId: vi.fn(),
     ...overrides,
   });
 

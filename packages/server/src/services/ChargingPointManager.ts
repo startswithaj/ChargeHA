@@ -248,14 +248,12 @@ export class ChargingPointManager {
   async init(): Promise<void> {
     const solar = await this.configService.getSolar();
     this.cachedGridVoltage = solar.gridVoltage;
-    this.eventEmitter.subscribe("config_changed", async ({ key }) => {
+    this.eventEmitter.subscribe("config_changed", async () => {
+      // The only remaining consumer here: charger config is row-scoped now
+      // (see rebuildMiddlewareFor) and this event carries no row id, so it
+      // rebuilds nothing charger-related — just the cached grid voltage.
       const updated = await this.configService.getSolar();
       this.cachedGridVoltage = updated.gridVoltage;
-      // Charger plugin keys arrive prefixed "<pluginId>."
-      const pluginId = key.split(".")[0];
-      if (this.chargerPlugins.get(pluginId)) {
-        await this.rebuildMiddlewaresFor(pluginId);
-      }
     });
     this.eventEmitter.subscribe("vehicles_changed", async () => {
       await this.syncVehicleChargingPoints();
@@ -328,30 +326,27 @@ export class ChargingPointManager {
     this.eventEmitter.emit("chargers_changed", {});
   }
 
-  private async rebuildMiddlewaresFor(pluginId: string): Promise<void> {
-    const plugin = this.chargerPlugins.get(pluginId);
+  /** Rebuild the running middleware for ONE charger row after a row-scoped
+   *  config write. Never throws: a still-wrong config becomes an
+   *  UnconfiguredChargerMiddleware, so a bad Save still resolves. Registers
+   *  the row if it is not yet in the map — the first save on a fresh
+   *  charger — and clears `lastCommandedAmps`, since amps commanded against
+   *  the old adapter mean nothing against the new one. */
+  async rebuildMiddlewareFor(chargerRowId: string): Promise<void> {
+    const entry = this.chargers.get(chargerRowId);
+    if (entry === undefined) {
+      const rows = await this.db.getChargers();
+      const row = rows.find((r) => r.id === chargerRowId);
+      if (row) await this.addCharger(row);
+      return;
+    }
+    const plugin = this.chargerPlugins.get(entry.row.chargerAdapterType);
     if (!plugin) return;
-    const entries = [...this.chargers.values()]
-      .filter((e) => e.row.chargerAdapterType === pluginId);
-    await entries.reduce(
-      (chain, entry) =>
-        chain.then(async () => {
-          await entry.middleware.shutdown();
-          // Config may still be wrong; must not throw out of the handler.
-          entry.middleware = await this.tryCreateMiddleware(plugin, entry.row);
-          this.logger.info(`Rebuilt middleware for ${entry.row.id}`);
-        }),
-      Promise.resolve(),
-    );
-    const rows = await this.db.getChargers();
-    await rows
-      .filter((row) =>
-        row.chargerAdapterType === pluginId && !this.chargers.has(row.id)
-      )
-      .reduce(
-        (chain, row) => chain.then(() => this.addCharger(row)),
-        Promise.resolve(),
-      );
+    await entry.middleware.shutdown();
+    entry.lastCommandedAmps = null;
+    entry.middleware = await this.tryCreateMiddleware(plugin, entry.row);
+    this.logger.info(`Rebuilt middleware for ${entry.row.id}`);
+    this.eventEmitter.emit("chargers_changed", {});
   }
 
   // ── Commands ─────────────────────────────────────────────────────────
@@ -533,13 +528,14 @@ export class ChargingPointManager {
     return row;
   }
 
-  async ensureCharger(chargerAdapterType: string): Promise<void> {
+  async ensureCharger(chargerAdapterType: string): Promise<ChargerRow> {
     const rows = await this.db.getChargers();
-    if (rows.some((row) => row.chargerAdapterType === chargerAdapterType)) {
-      return;
-    }
+    const existing = rows.find((row) =>
+      row.chargerAdapterType === chargerAdapterType
+    );
+    if (existing) return existing;
     const plugin = this.chargerPlugins.get(chargerAdapterType);
-    await this.createCharger({
+    return await this.createCharger({
       name: plugin?.displayName ?? chargerAdapterType,
       chargerAdapterType,
     });

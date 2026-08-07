@@ -22,6 +22,8 @@ export function StepNextHarness(
         onBack: () => {},
         onSkipTo: () => {},
         onSkipToEnd: () => {},
+        chargerId: null,
+        setChargerId: () => {},
         ...stepProps,
       }}
       nav={{

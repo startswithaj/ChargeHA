@@ -4,6 +4,7 @@ import type {
   ChargerPluginOption,
   EnergyPluginOption,
   PluginScheduleNote,
+  PluginSettingsProps,
   VehiclePluginOption,
 } from "./pluginOptions.ts";
 
@@ -11,6 +12,7 @@ export type {
   ChargerPluginOption,
   EnergyPluginOption,
   PluginScheduleNote,
+  PluginSettingsProps,
   VehiclePluginOption,
 };
 
@@ -151,7 +153,10 @@ export const chargerPluginSteps: Record<string, PluginStepDef[]> = {
  * Maps settingsComponentKey strings (from EnergyPlugin) to React components.
  * Used by the settings page to render plugin-provided config forms dynamically.
  */
-export const pluginSettingsComponents: Record<string, ComponentType> = {
+export const pluginSettingsComponents: Record<
+  string,
+  ComponentType<PluginSettingsProps>
+> = {
   "tesla-settings": TeslaSettings,
   "simulated-settings": SimulatedVehicleSettings,
   "fronius-local-config": FroniusLocalConfig,

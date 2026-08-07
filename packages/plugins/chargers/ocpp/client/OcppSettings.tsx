@@ -2,10 +2,10 @@ import { useMemo } from "react";
 import { skipToken } from "@tanstack/react-query";
 import { Badge } from "@radix-ui/themes";
 import { PluginConfigForm, PluginTestRow } from "../../../hostUi.ts";
+import type { PluginSettingsProps } from "../../../pluginOptions.ts";
 import { trpc } from "./trpc.ts";
-import { OCPP_FIELDS } from "./fields.ts";
+import { OCPP_DEFAULTS, OCPP_FIELDS } from "./fields.ts";
 import { OcppConnectBlock } from "./OcppConnection.tsx";
-import { useOcppChargerId } from "./useOcppChargerId.ts";
 
 type OcppStatus = {
   connected: boolean;
@@ -28,17 +28,21 @@ function chargerDetail(data: OcppStatus): string | null {
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
-export function OcppSettings(): JSX.Element | null {
-  const chargerRowId = useOcppChargerId();
-  const { data: config } = trpc.plugin.charger.ocpp.getConfig.useQuery();
+export function OcppSettings(
+  { chargerId }: PluginSettingsProps,
+): JSX.Element | null {
+  const rowId = chargerId ?? null;
+  const configQuery = trpc.plugin.charger.ocpp.getConfig.useQuery(
+    rowId === null ? skipToken : { chargerRowId: rowId },
+  );
   const utils = trpc.useUtils();
-  const promote = trpc.plugin.charger.ocpp.promotePairing.useMutation();
   const configMutation = trpc.plugin.charger.ocpp.setConfig.useMutation({
-    onSuccess: () => {
-      utils.plugin.charger.ocpp.getConfig.invalidate();
-      // The paired socket is already open — promote it rather than making the
-      // charger reconnect just because we saved its id.
-      if (chargerRowId !== undefined) promote.mutate({ chargerRowId });
+    onSuccess: (data) => {
+      // The charger list itself (add mode's new row included) is kept fresh
+      // by the chargers_changed SSE event server-side rebuild emits.
+      utils.plugin.charger.ocpp.getConfig.invalidate({
+        chargerRowId: data.chargerRowId,
+      });
     },
   });
   // Pairing sits under the Charger ID row so "Use this ID" is beside the field
@@ -49,27 +53,33 @@ export function OcppSettings(): JSX.Element | null {
     [],
   );
   const status = trpc.plugin.charger.ocpp.status.useQuery(
-    chargerRowId === undefined ? skipToken : { chargerRowId },
+    rowId === null ? skipToken : { chargerRowId: rowId },
     { refetchInterval: 5000 },
   );
 
+  // No row yet in add mode — show the field defaults; setConfig creates the
+  // row on save.
+  const config = rowId === null ? OCPP_DEFAULTS : configQuery.data;
   if (!config) return null;
 
   return (
     <PluginConfigForm
       data={config}
       fields={fields}
-      onSave={(draft, opts) => configMutation.mutate(draft, opts)}
+      onSave={(draft, opts) =>
+        configMutation.mutate({ chargerRowId: rowId, values: draft }, opts)}
       renderHeader={(values, setValue) => (
         <OcppConnectBlock
           chargerId={values.ocppChargerId ?? ""}
+          connected={rowId === null ? null : status.data?.connected ?? false}
+          info={rowId === null ? null : status.data?.info ?? null}
           onDetected={(id) => setValue("ocppChargerId", id)}
         />
       )}
       renderFooter={(values) => (
         <ConnectionRow
           chargerId={values.ocppChargerId ?? ""}
-          chargerRowId={chargerRowId}
+          chargerRowId={rowId}
           status={status.data}
         />
       )}
@@ -80,7 +90,7 @@ export function OcppSettings(): JSX.Element | null {
 function ConnectionRow(
   { chargerId, chargerRowId, status }: {
     chargerId: string;
-    chargerRowId: string | undefined;
+    chargerRowId: string | null;
     status: OcppStatus;
   },
 ) {
@@ -88,7 +98,7 @@ function ConnectionRow(
   const result = test.data;
   // Without an id there is no route for the charger to have connected to, so
   // the test can only ever fail — say why rather than reporting a timeout.
-  const missingId = chargerId.trim() === "" || chargerRowId === undefined;
+  const missingId = chargerId.trim() === "" || chargerRowId === null;
 
   const message = (() => {
     if (missingId) return "Enter a Charger ID above before testing.";
@@ -104,7 +114,7 @@ function ConnectionRow(
       status={connectionBadge(status)}
       message={message}
       tone={missingId || result?.success === false ? "red" : "gray"}
-      onTest={() => chargerRowId !== undefined && test.mutate({ chargerRowId })}
+      onTest={() => chargerRowId !== null && test.mutate({ chargerRowId })}
     />
   );
 }
