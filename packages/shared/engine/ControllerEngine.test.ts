@@ -534,29 +534,8 @@ describe("ControllerEngine", () => {
     });
   });
 
-  describe("min solar generation — edge cases", () => {
-    it("stops immediately with zero solar while charging (no grace)", () => {
-      const engine = new ControllerEngine();
-      const output = engine.decide(makeInput({
-        vehicle: { state: { isCharging: true, chargeAmps: 10 } },
-        energyOverrides: { solarProductionW: 0, gridPowerW: 2000 },
-      }));
-      const d = output.decisions.get("V1");
-      expect(d?.action).toBe("stop");
-      expect(d?.detail).toContain("no solar generation");
-    });
-
-    it("falls through to tracking when some solar exists and charging", () => {
-      const engine = new ControllerEngine();
-      const output = engine.decide(makeInput({
-        vehicle: { state: { isCharging: true, chargeAmps: 5 } },
-        energyOverrides: { solarProductionW: 500, gridPowerW: 1000 },
-      }));
-      expect(output.decisions.get("V1")?.detail).not.toContain(
-        "below minimum solar generation",
-      );
-    });
-  });
+  // Min solar generation cases live in
+  // ControllerEngine.test/solar-battery.test.ts
 
   describe("grace period — adjust to min amps", () => {
     it("adjusts to min amps during grace when charging above minimum", () => {

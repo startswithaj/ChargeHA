@@ -43,13 +43,66 @@ export class SolarAllocator {
     return config.threePhaseCharger ? 3 : state.chargerPhases;
   }
 
-  /** Calculate available solar power in watts for a single vehicle's charging.
+  /** Surplus solar in watts, before the safety margin.
    *
-   *  When the meter includes EV load in consumption (the default), we add back
-   *  the vehicle's charge power to get true available solar. We use
-   *  state.chargeAmps (kept current by VehicleManager.startChargingAt after
-   *  confirmed commands) rather than the vehicle-reported chargePowerKw which
-   *  can lag. */
+   *  Starts from grid export, then:
+   *  - Subtracts home battery discharge. Power leaving the battery is not
+   *    solar. Without this, a battery operating in self-consumption won't be
+   *    drawing from the grid, and would makes the EV's own draw reappear as 
+   *    "available solar" through the add-back below, and the car would charge
+   *    off the home battery.
+   *  - Adds back the EV's charge power when the meter includes EV load in
+   *    consumption (the default), since the car's own draw suppresses export.
+   *  - Caps at solar production: surplus can never exceed what the panels are
+   *    making right now.
+   *
+   *  `addBackW` is the charge power to add back — 0 when the meter excludes EV
+   *  load or nothing is charging. */
+  static surplusW(
+    energy: EnergyData,
+    addBackW: number,
+  ): number {
+    const batteryDischargeW = Math.max(0, energy.batteryPowerW ?? 0);
+    const exportW = -energy.gridPowerW - batteryDischargeW;
+    return Math.min(exportW + addBackW, energy.solarProductionW);
+  }
+
+  /** Charge power to add back for one vehicle — zero when the meter already
+   *  excludes EV load, or the vehicle isn't drawing anything.
+   *
+   *  Uses state.chargeAmps (kept current by VehicleManager.startChargingAt
+   *  after confirmed commands) rather than the vehicle-reported chargePowerKw,
+   *  which can lag. */
+  static addBackW(
+    config: ControllerConfig,
+    state: VehicleChargeState,
+    voltage: number,
+    phases: number,
+  ): number {
+    if (config.consumptionExcludesCharging || !state.isCharging) return 0;
+    return state.chargeAmps * voltage * phases;
+  }
+
+  /** Available watts after the reference mode and safety margin are applied.
+   *  `addBackW` is the total charge power to add back across all vehicles
+   *  being considered. */
+  static resolveAvailableW(
+    config: ControllerConfig,
+    energy: EnergyData,
+    addBackW: number,
+  ): number {
+    const marginW = config.solarMarginKw * 1000;
+
+    // Gross mode: total panel output, as-is. No add-back — panel output never
+    // had the car's draw subtracted from it, so adding it would double-count.
+    if (config.solarReference === "gross") {
+      return Math.max(0, energy.solarProductionW - marginW);
+    }
+
+    return Math.max(0, SolarAllocator.surplusW(energy, addBackW) - marginW);
+  }
+
+  /** Calculate available solar power in watts for a single vehicle's charging. */
   static calculateAvailableSolar(
     config: ControllerConfig,
     energy: EnergyData,
@@ -57,23 +110,11 @@ export class SolarAllocator {
     voltage: number,
     phases: number,
   ): number {
-    // Gross mode: use total solar production. Excess mode: solar being exported.
-    const baseW = config.solarReference === "gross"
-      ? energy.solarProductionW
-      : -energy.gridPowerW;
-    const marginW = config.solarMarginKw * 1000;
-
-    // When consumption_excludes_charging is ON, the meter doesn't see the EV
-    // so the grid export already reflects true available — no adjustment needed.
-    if (config.consumptionExcludesCharging || !state.isCharging) {
-      return Math.max(0, baseW - marginW);
-    }
-
-    // When the meter INCLUDES EV charging in consumption (the default/common
-    // case), the grid export is suppressed by the car's own load. Add back the
-    // current charging power to get the true available solar.
-    const currentChargingW = state.chargeAmps * voltage * phases;
-    return Math.max(0, baseW + currentChargingW - marginW);
+    return SolarAllocator.resolveAvailableW(
+      config,
+      energy,
+      SolarAllocator.addBackW(config, state, voltage, phases),
+    );
   }
 
   /** Top-level allocation dispatcher: waterfall or equal based on config. */
@@ -203,21 +244,18 @@ export class SolarAllocator {
 
     if (eligible.length < 2) return null;
 
-    // Base available watts: total solar (gross) or grid export (excess mode)
-    const baseW = config.solarReference === "gross"
-      ? energy.solarProductionW
-      : -energy.gridPowerW;
-
-    // When the meter includes EV load in consumption (default), grid export
-    // is suppressed by charging vehicles' draw. Add back ALL charging
-    // vehicles' power to recover the true available solar.
-    const chargingAddBackW = config.consumptionExcludesCharging ? 0 : eligible
-      .filter((e) => e.state.isCharging)
-      .reduce((sum, e) => sum + e.state.chargeAmps * e.voltage * e.phases, 0);
-
-    const availableW = Math.max(
+    // Add back ALL charging vehicles' power — in excess mode the grid export
+    // is suppressed by every car's draw, not just one.
+    const chargingAddBackW = eligible.reduce(
+      (sum, e) =>
+        sum + SolarAllocator.addBackW(config, e.state, e.voltage, e.phases),
       0,
-      baseW + chargingAddBackW - config.solarMarginKw * 1000,
+    );
+
+    const availableW = SolarAllocator.resolveAvailableW(
+      config,
+      energy,
+      chargingAddBackW,
     );
 
     const { voltage: refV, phases: refP } = eligible[0];

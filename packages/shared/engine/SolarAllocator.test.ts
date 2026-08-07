@@ -165,6 +165,99 @@ describe("SolarAllocator", () => {
       expect(result).toBe(4000);
     });
 
+    it("does not add back charging load in gross mode", () => {
+      // Panel output never had the car's draw subtracted from it, so adding it
+      // back would double-count and let the car ramp itself up indefinitely.
+      const config = { ...BASE_CONFIG, solarReference: "gross" as const };
+      const energy = { ...BASE_ENERGY, solarProductionW: 4000 };
+      const state = { ...BASE_STATE, isCharging: true, chargeAmps: 10 };
+      const result = SolarAllocator.calculateAvailableSolar(
+        config,
+        energy,
+        state,
+        230,
+        1,
+      );
+      expect(result).toBe(4000);
+    });
+
+    it("subtracts home battery discharge from surplus", () => {
+      const energy = {
+        ...BASE_ENERGY,
+        solarProductionW: 3000,
+        gridPowerW: 0,
+        batteryPowerW: 1000,
+      };
+      const result = SolarAllocator.calculateAvailableSolar(
+        BASE_CONFIG,
+        energy,
+        BASE_STATE,
+        230,
+        1,
+      );
+      // Grid neutral, but 1000W is coming out of the battery — not solar.
+      expect(result).toBe(0);
+    });
+
+    it("counts battery charging as unavailable, not as surplus", () => {
+      const energy = {
+        ...BASE_ENERGY,
+        solarProductionW: 5000,
+        gridPowerW: -1000,
+        batteryPowerW: -2000,
+      };
+      const result = SolarAllocator.calculateAvailableSolar(
+        BASE_CONFIG,
+        energy,
+        BASE_STATE,
+        230,
+        1,
+      );
+      // Battery charging already suppressed export; it keeps first claim on
+      // the surplus, so only the 1000W actually exported is available.
+      expect(result).toBe(1000);
+    });
+
+    it("does not let an ESS holding the grid at zero fabricate surplus", () => {
+      // Regression: real-world log — 144W production, grid pinned at ~0 by a
+      // 2kW battery discharge, car pulling 8A. The add-back previously
+      // resurfaced the car's own draw as 1886W of "available solar".
+      const energy = {
+        ...BASE_ENERGY,
+        solarProductionW: 144,
+        gridPowerW: 2,
+        homeConsumptionW: 2212,
+        batteryPowerW: 2066,
+      };
+      const state = { ...BASE_STATE, isCharging: true, chargeAmps: 8 };
+      const result = SolarAllocator.calculateAvailableSolar(
+        BASE_CONFIG,
+        energy,
+        state,
+        236,
+        1,
+      );
+      expect(result).toBe(0);
+    });
+
+    it("caps surplus at current solar production", () => {
+      const energy = {
+        ...BASE_ENERGY,
+        solarProductionW: 1000,
+        gridPowerW: -500,
+      };
+      const state = { ...BASE_STATE, isCharging: true, chargeAmps: 10 };
+      const result = SolarAllocator.calculateAvailableSolar(
+        BASE_CONFIG,
+        energy,
+        state,
+        230,
+        1,
+      );
+      // 500 + 2300 = 2800 claimed, but the panels are only making 1000W.
+      expect(result).toBe(1000);
+    });
+
     it("adds back charging load when meter includes EV consumption", () => {
       const config = { ...BASE_CONFIG, consumptionExcludesCharging: false };
       const energy = { ...BASE_ENERGY, gridPowerW: -1000 };
@@ -236,7 +329,13 @@ describe("SolarAllocator", () => {
 
     it("accounts for three-phase charging", () => {
       const config = { ...BASE_CONFIG, consumptionExcludesCharging: false };
-      const energy = { ...BASE_ENERGY, gridPowerW: -1000 };
+      // Production must cover export + add-back, else the production ceiling
+      // (not the phase math) is what's under test.
+      const energy = {
+        ...BASE_ENERGY,
+        solarProductionW: 9000,
+        gridPowerW: -1000,
+      };
       const state = { ...BASE_STATE, isCharging: true, chargeAmps: 10 };
       const result = SolarAllocator.calculateAvailableSolar(
         config,
@@ -294,7 +393,13 @@ describe("SolarAllocator", () => {
     });
 
     it("handles three vehicles in priority order", () => {
-      const energy = { ...BASE_ENERGY, gridPowerW: -6900 };
+      // Production must cover the export being split, else the production
+      // ceiling caps the total below 30A.
+      const energy = {
+        ...BASE_ENERGY,
+        solarProductionW: 7000,
+        gridPowerW: -6900,
+      };
       const vehicles = [
         makeVehicle("v1", 1, { chargeAmpsMax: 15 }),
         makeVehicle("v2", 2, { chargeAmpsMax: 10 }),

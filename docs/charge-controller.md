@@ -106,10 +106,11 @@ Solar tracking dynamically adjusts charging amps based on available solar power.
 Before calculating available solar, two threshold checks run:
 
 - **Min solar generation** — If solar production is below
-  `minSolarGenerationKw`, stop (or skip). Exception: if production is above zero
-  and the vehicle is already charging, the check passes to let the normal grace
-  period handle the dip instead of stopping immediately (prevents rapid cycling
-  at sunrise/sunset).
+  `minSolarGenerationKw`, stop (or skip). Two exceptions when the vehicle is
+  already charging: zero production stops immediately (nighttime — nothing to
+  ride out), while production above zero routes into the grace period (drop to
+  min amps, then stop if it doesn't go back up). This prevents rapid cycling at
+  sunrise/sunset without letting a sustained drop charge on indefinitely.
 - **Min excess solar** — If configured and excess solar is below
   `minExcessSolarKw`, don't start charging. Already-charging vehicles pass
   through to let grace period handle it.
@@ -118,17 +119,33 @@ Before calculating available solar, two threshold checks run:
 
 Two reference modes:
 
-- **Excess mode** (default): Uses the grid export value (`-gridPowerW`). This
-  represents solar that would otherwise be exported.
-- **Gross mode**: Uses total solar production. Charges from all solar regardless
-  of home consumption.
+- **Excess mode** (default): Starts from the grid export value (`-gridPowerW`).
+  This represents solar that would otherwise be exported.
+- **Gross mode**: Uses total solar production, regardless of home consumption.
 
-An adjustment is applied when the energy meter includes EV charging in its
-consumption reading (the common case): the vehicle's current charge power is
-added back to get the "true" available solar. This is skipped if
-`consumptionExcludesCharging` is enabled.
+In excess mode two adjustments are applied to `-gridPowerW`:
+
+- **Battery discharge is subtracted.** Power leaving the home battery
+  (`batteryPowerW > 0`) is not solar. Without this, a battery that is operating
+  in self-consumption mode and not drawing from the grid makes the vehicle's own 
+  draw reappear as available solar through the add-back below, and the car charges 
+  off the house battery - probably not what you want!. Battery _charging_ is not 
+  added back — we'll try to charge a home battery first from any solar surplus 
+  (see battery priority for SoC-based control).
+- **The vehicle's charge power is added back** when the energy meter includes EV
+  charging in its consumption reading (that's the most common setup), since the car's own
+  draw suppresses export. Skipped if `consumptionExcludesCharging` is enabled.
+
+The result is capped at current solar production — obviously a solar surplus can never 
+exceed what the panels are making. Gross mode takes production directly and applies no
+add-back, since panel output never had the vehicle's draw subtracted from it.
 
 A configurable safety margin (`solarMarginKw`) is subtracted from the result.
+
+> Note: the simulator replays recorded `solarW` / `gridW` but passes
+> `batteryPowerW: null`, so it does not simulate a home battery in self consumption mode. 
+> Simulated results with a battery are a little optimistic relative to how a real home
+> setup would behave.
 
 ### Amps conversion
 

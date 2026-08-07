@@ -538,10 +538,17 @@ export class ControllerEngine {
       state.chargeAmpsMax,
     ));
 
-    if (targetAmps < state.chargeAmpsMin) {
-      const reason = `insufficient solar (${
-        Math.round(availableW)
-      }W == ${targetAmps}A < min ${state.chargeAmpsMin}A)`;
+    // Production below the minimum generation threshold. Reaching here means
+    // the vehicle is charging and production is above zero — checkMinSolarGeneration
+    // handles every other case — so put the dip through the grace period
+    // (drop to min amps, then stop) instead of charging on through it.
+    const solarKw = energy.solarProductionW / 1000;
+    const belowMinGeneration = solarKw < config.minSolarGenerationKw;
+
+    if (belowMinGeneration || targetAmps < state.chargeAmpsMin) {
+      const reason = belowMinGeneration
+        ? belowMinGenerationReason(solarKw, config.minSolarGenerationKw)
+        : insufficientSolarReason(availableW, targetAmps, state.chargeAmpsMin);
       const result = this.handleInsufficientSolar(
         state,
         controlState,
@@ -867,19 +874,18 @@ export class ControllerEngine {
     config: ControllerConfig,
     energy: EnergyData,
   ): number {
-    // Grid export already reflects true excess — either the meter doesn't
-    // see EV load, or the vehicle isn't charging so there's nothing to add back.
-    if (config.consumptionExcludesCharging || !state.isCharging) {
-      return -energy.gridPowerW / 1000;
-    }
+    // The early return for `consumptionExcludesCharging || !isCharging` is no
+    // longer needed: SolarAllocator.addBackW returns 0 in exactly those cases,
+    // and surplusW additionally nets off battery discharge and caps at panel
+    // output — which the raw grid-export shortcut skipped.
     const voltage = SolarAllocator.resolveVoltage(
       state.chargerVoltage,
       energy,
       config.gridVoltage,
     );
     const phases = SolarAllocator.resolvePhases(state, config);
-    const currentChargingW = state.chargeAmps * voltage * phases;
-    return (-energy.gridPowerW + currentChargingW) / 1000;
+    const addBackW = SolarAllocator.addBackW(config, state, voltage, phases);
+    return SolarAllocator.surplusW(energy, addBackW) / 1000;
   }
 
   // ---- Amp debouncing ----
@@ -930,4 +936,22 @@ export class ControllerEngine {
       pendingSince: controlState.pendingSince,
     };
   }
+}
+
+/** Reason text when solar production is under the configured minimum. */
+function belowMinGenerationReason(solarKw: number, minKw: number): string {
+  return `solar generation below minimum (${
+    solarKw.toFixed(2)
+  } kW < ${minKw} kW)`;
+}
+
+/** Reason text when available solar can't sustain the vehicle's minimum amps. */
+function insufficientSolarReason(
+  availableW: number,
+  targetAmps: number,
+  minAmps: number,
+): string {
+  return `insufficient solar (${
+    Math.round(availableW)
+  }W → ${targetAmps}A < min ${minAmps}A)`;
 }

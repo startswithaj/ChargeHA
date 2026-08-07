@@ -98,7 +98,7 @@ function SolarMainRows(
       </SettingsRow>
       <SettingsRow
         label="Reference"
-        help="Excess Solar calculates available power from your grid export (surplus after home use). Gross Solar uses total panel output and subtracts home consumption — better when your meter doesn't report export separately."
+        help="Excess Solar calculates available power from your grid export (surplus after home use), ignoring anything coming out of a home battery. Gross Solar uses total panel output and ignores home consumption entirely — only pick it when your meter doesn't report export separately."
       >
         <Select.Root
           value={fields.solarReference}
