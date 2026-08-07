@@ -599,9 +599,9 @@ export function SolarSimulation(props: SolarSimulationProps) {
           </Button>
         </div>
         <Text size="1" color="gray">
-          Preview how your settings would affect charging — adjusting these
-          knobs has no real effect, it's only for understanding the settings.
-          For a full day-by-day simulation, visit the{" "}
+          Preview how your settings would affect charging — adjusting the
+          controls below lets you simulate a range of conditions. For a full
+          day-by-day simulation, visit the{" "}
           <Link
             onClick={() => navigate({ type: "app", page: "simulator" })}
             style={{ cursor: "pointer" }}
