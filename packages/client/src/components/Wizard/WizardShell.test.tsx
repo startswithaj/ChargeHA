@@ -594,6 +594,52 @@ describe("WizardShell", () => {
       expect(mockPatch).not.toHaveBeenCalled();
       expect(screen.getByRole("button", { name: "Next" })).toBeEnabled();
     });
+
+    it("Enter advances while Next is enabled", async () => {
+      renderNext({ kind: "ready", hint: null, onNext: advanceOnly });
+
+      fireEvent.keyDown(document.body, { key: "Enter" });
+
+      // Enter runs the step's handler first, so the patch lands a tick later.
+      await waitFor(() =>
+        expect(mockPatch).toHaveBeenCalledWith({ stepId: "timezone" })
+      );
+    });
+
+    it("Enter does nothing while Next is blocked", async () => {
+      renderNext({ kind: "blocked", reason: "Pick something first" });
+
+      fireEvent.keyDown(document.body, { key: "Enter" });
+
+      // Nothing is queued, so a flush is enough to prove nothing advanced.
+      await waitFor(() => expect(mockPatch).not.toHaveBeenCalled());
+    });
+
+    it("Enter in a textarea is left to the textarea", async () => {
+      const withTextarea = (s: StepDef): StepDef => {
+        if (s.id !== "welcome") return s;
+        return {
+          ...s,
+          useStep: () => ({
+            next: { kind: "ready", hint: null, onNext: advanceOnly },
+            view: <textarea aria-label="notes" />,
+          }),
+        };
+      };
+
+      setStepId("welcome");
+      renderWithProviders(
+        <WizardShell
+          flow={makeFlow().map(withTextarea)}
+          store={makeStore()}
+          basePath="/wizard"
+        />,
+      );
+
+      fireEvent.keyDown(screen.getByLabelText("notes"), { key: "Enter" });
+
+      await waitFor(() => expect(mockPatch).not.toHaveBeenCalled());
+    });
   });
 
   // ---- Advance ----

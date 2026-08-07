@@ -6,8 +6,30 @@
 // here would close a cycle. Spinner therefore comes from Radix rather than
 // the client's own, and JSX.Element is used instead of importing React's
 // ReactNode. See the dependency rules in docs/code.md.
+import { useEffect, useRef } from "react";
 import { Badge, Button, Spinner, Text, TextField } from "@radix-ui/themes";
 import { Search } from "lucide-react";
+
+/** Defaults `subnet` to the first server-detected LAN subnet, once, the
+ *  first time detection results arrive with the field still untouched. Every
+ *  discovery form calls this instead of guessing from the browser's own
+ *  hostname — `lanSubnets` reads ChargeHA's actual network interfaces, which
+ *  is where the hardware almost always is. Still fully editable afterwards:
+ *  this only ever fires once. */
+export function useDefaultSubnet(
+  detectedSubnets: string[] | undefined,
+  subnet: string,
+  onSubnetChange: (value: string) => void,
+): void {
+  const applied = useRef(false);
+  useEffect(() => {
+    if (applied.current) return;
+    if (!detectedSubnets || detectedSubnets.length === 0) return;
+    if (subnet !== "") return;
+    applied.current = true;
+    onSubnetChange(detectedSubnets[0]);
+  }, [detectedSubnets, subnet, onSubnetChange]);
+}
 
 export interface NetworkSearchResult {
   host: string;
@@ -79,6 +101,7 @@ export function NetworkDeviceSearch<T extends NetworkSearchResult>(
     onUse,
     emptyMessage,
     footer,
+    detectedSubnets,
   }: {
     /** Plural, e.g. "Fronius inverters" — reads as "...for Fronius inverters". */
     deviceNoun: string;
@@ -94,8 +117,14 @@ export function NetworkDeviceSearch<T extends NetworkSearchResult>(
     emptyMessage: JSX.Element | string;
     /** Extra guidance below the results, e.g. Tapo's locked-plug fix. */
     footer?: JSX.Element | false;
+    /** Subnets ChargeHA itself was detected on. The caller already defaults
+     *  `subnet` to the first candidate — this only offers the rest when a
+     *  machine sits on more than one LAN, so the user can pick instead of
+     *  being stuck with a silent guess. */
+    detectedSubnets?: string[];
   },
 ) {
+  const alternateSubnets = (detectedSubnets ?? []).filter((s) => s !== subnet);
   return (
     <div style={styles.section}>
       <div style={styles.searchRow}>
@@ -115,6 +144,26 @@ export function NetworkDeviceSearch<T extends NetworkSearchResult>(
           aria-label="Subnet"
         />
       </div>
+
+      {
+        /* ChargeHA is reachable on more than one LAN — offer the others
+       *  rather than silently picking one for the user. */
+      }
+      {alternateSubnets.length > 0 && (
+        <div style={styles.searchRow}>
+          <Text size="1" color="gray">also detected:</Text>
+          {alternateSubnets.map((s) => (
+            <Button
+              key={s}
+              size="1"
+              variant="ghost"
+              onClick={() => onSubnetChange(s)}
+            >
+              {s}.*
+            </Button>
+          ))}
+        </div>
+      )}
 
       {isPending && (
         <Text size="1" color="gray">

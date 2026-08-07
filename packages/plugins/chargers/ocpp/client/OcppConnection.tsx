@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react";
-import { Badge, Button, Code, Link, Text, TextField } from "@radix-ui/themes";
+import {
+  Badge,
+  Button,
+  Code,
+  Link,
+  Spinner,
+  Text,
+  TextField,
+} from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
 
 /** Fallback only, for the moment before the server reports its own addresses.
@@ -82,8 +90,9 @@ function AddressStep({ base, others }: { base: string; others: string[] }) {
       </Text>
       {others.length > 0 && (
         <Text size="1" color="gray" as="div" style={{ marginTop: 6 }}>
-          This server has more than one address — use the one on the same
-          network as your charger: {others.join("   ")}
+          This server, the one that ChargeHA is running on, has more than one
+          address — use the one on the same network as your charger:{" "}
+          {others.join("   ")}
         </Text>
       )}
     </div>
@@ -123,10 +132,13 @@ function ResultStep(
   }
   if (seen.length === 0) {
     return (
-      <Text size="1" color="gray">
-        Some chargers reboot before reconnecting — give it a minute, and keep
-        this page open.
-      </Text>
+      <div style={row}>
+        <Spinner />
+        <Text size="1" color="gray">
+          Waiting for a charger to connect — some reboot before reconnecting, so
+          give it a minute and keep this page open.
+        </Text>
+      </div>
     );
   }
   return (
@@ -163,35 +175,30 @@ function ResultStep(
   );
 }
 
-/** The discovered id, with a manual escape hatch for chargers that need one. */
-function ChargerIdRow(
+/** Manual escape hatch for the charger that never announces itself.
+ *
+ *  Detection fills the same field, so the box doubles as a readout — no
+ *  "set manually" toggle, which only hid the one control that matters when
+ *  nothing turned up. */
+function ChargerIdStep(
   { chargerId, onDetected }: {
     chargerId: string;
     onDetected: (id: string) => void;
   },
 ) {
-  const [editing, setEditing] = useState(false);
   return (
-    <div style={row}>
-      <Text size="1" color="gray">Charger ID</Text>
-      {editing && (
-        <TextField.Root
-          size="1"
-          autoFocus
-          value={chargerId}
-          onChange={(e: { target: { value: string } }) =>
-            onDetected(e.target.value)}
-          onBlur={() => setEditing(false)}
-          style={{ width: 180 }}
-        />
-      )}
-      {!editing && chargerId === "" && (
-        <Text size="1" color="gray">not detected yet</Text>
-      )}
-      {!editing && chargerId !== "" && <Code size="1">{chargerId}</Code>}
-      {!editing && (
-        <Link size="1" onClick={() => setEditing(true)}>set manually</Link>
-      )}
+    <div>
+      <Text size="1" color="gray" as="div">
+        Enter your charger's ID here:
+      </Text>
+      <TextField.Root
+        size="1"
+        value={chargerId}
+        placeholder="not detected yet"
+        onChange={(e: { target: { value: string } }) =>
+          onDetected(e.target.value)}
+        style={{ width: 220, marginTop: 6 }}
+      />
     </div>
   );
 }
@@ -303,7 +310,7 @@ export function OcppConnectBlock(
         this up in the charger's own app or web page.
       </Text>
 
-      <Step n={1} title="Start listening here first">
+      <Step n={1} title="Click Listen for Chargers below">
         <ListenStep
           listening={listening}
           remainingMs={(expiresAt ?? now) - now}
@@ -344,7 +351,9 @@ export function OcppConnectBlock(
         </Text>
       )}
 
-      <ChargerIdRow chargerId={chargerId} onDetected={onDetected} />
+      <Step n={4} title="If your charger is not detected">
+        <ChargerIdStep chargerId={chargerId} onDetected={onDetected} />
+      </Step>
     </div>
   );
 }

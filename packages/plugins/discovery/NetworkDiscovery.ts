@@ -1,5 +1,6 @@
 /// <reference lib="deno.ns" />
 import type { Logger } from "@chargeha/server/lib/Logger";
+import { detectLanSubnets } from "@chargeha/server/lib/LanInterfaces";
 import { NetworkScan } from "./networkScan.ts";
 
 const BATCH_SIZE = 30;
@@ -95,23 +96,26 @@ export abstract class NetworkDiscovery<TDevice extends { host: string }> {
     }
   }
 
-  /** Detect subnets from network interfaces, or fall back to 192.168.1.*. */
+  /** Detect subnets from network interfaces, or fall back to 192.168.1.*.
+   *  Filtering (virtual/loopback/link-local/network-address exclusion, and
+   *  the missing `--allow-sys` case) lives in the shared `detectLanSubnets`,
+   *  the same helper OCPP uses to work out where it itself is reachable. */
   private candidatesFromInterfaces(): string[] {
     try {
-      const subnets = NetworkScan.extractSubnets(
-        this.networkInterfaces()
-          .filter((iface) =>
-            iface.family === "IPv4" && !iface.address.startsWith("127.")
-          )
-          .map((iface) => iface.address),
-      );
-      return subnets.flatMap(NetworkScan.generateSubnetIps);
+      const subnets = detectLanSubnets(this.networkInterfaces);
+      if (subnets.length > 0) {
+        return subnets.flatMap(NetworkScan.generateSubnetIps);
+      }
     } catch (err) {
       this.logger.info(
         `${this.label}: interface detection failed (${err}), falling back to 192.168.1.*`,
       );
       return NetworkScan.generateSubnetIps("192.168.1");
     }
+    this.logger.info(
+      `${this.label}: interface detection returned nothing, falling back to 192.168.1.*`,
+    );
+    return NetworkScan.generateSubnetIps("192.168.1");
   }
 
   private async probeBatchesFrom(

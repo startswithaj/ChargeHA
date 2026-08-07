@@ -5,7 +5,10 @@ import { SigenergyLocalAdapter } from "./SigenergyLocalAdapter.ts";
 import { JsmodbusReader } from "./SigenergyModbusClient.ts";
 import { discoverSigenergy } from "./SigenergyDiscovery.ts";
 import { sigenergyLocalConfigDef } from "./config.ts";
-import { createPluginConfigProcedures } from "../../../createPluginConfigProcedures.ts";
+import {
+  createNetworkDiscoveryProcedures,
+  createPluginConfigProcedures,
+} from "../../../createPluginConfigProcedures.ts";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 
 // ── Typed Zod schemas for the Sigenergy plugin procedures ───────────────────
@@ -30,6 +33,7 @@ export function createSigenergyLocalRouter(deps: PluginDependencies) {
       sigenergyLocalConfigDef,
       [],
     ),
+    ...createNetworkDiscoveryProcedures(deps),
 
     discover: publicProcedure
       .input(discoverInput)

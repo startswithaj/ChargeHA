@@ -9,7 +9,7 @@ import {
 } from "@radix-ui/themes";
 import { Loader2 } from "lucide-react";
 import { trpc } from "./trpc.ts";
-import { NetworkDeviceSearch } from "../../../hostUi.ts";
+import { NetworkDeviceSearch, useDefaultSubnet } from "../../../hostUi.ts";
 import { stepStyles as styles } from "../../../hostUi.ts";
 import type { EnphaseDevice, TestStatus } from "../../InverterSetupShared.tsx";
 import { TestResultBadge } from "../../InverterSetupShared.tsx";
@@ -54,9 +54,17 @@ function LabelledField(
 }
 
 function SearchSection(
-  { subnet, setSubnet, searchMutation, searchResults, onSelectDevice }: {
+  {
+    subnet,
+    setSubnet,
+    detectedSubnets,
+    searchMutation,
+    searchResults,
+    onSelectDevice,
+  }: {
     subnet: string;
     setSubnet: (v: string) => void;
+    detectedSubnets?: string[];
     searchMutation: ReturnType<
       typeof trpc.plugin.energy.enphase_local.discover.useMutation
     >;
@@ -70,6 +78,7 @@ function SearchSection(
         deviceNoun="Envoy gateways"
         subnet={subnet}
         onSubnetChange={setSubnet}
+        detectedSubnets={detectedSubnets}
         onSearch={() => searchMutation.mutate({ subnet: subnet || undefined })}
         isPending={searchMutation.isPending}
         searched={searchMutation.isSuccess}
@@ -216,6 +225,33 @@ function TestConnectionRow(
   );
 }
 
+/** Search state + the subnet default, split out to keep EnphaseLocalForm
+ *  under the function-length limit. */
+function useEnphaseSearch() {
+  const [subnet, setSubnet] = useState("");
+  const [searchResults, setSearchResults] = useState<EnphaseDevice[]>([]);
+
+  // Defaults the subnet field to where ChargeHA itself is reachable, once,
+  // while still leaving it fully editable.
+  const lanSubnets = trpc.plugin.energy.enphase_local.lanSubnets.useQuery();
+  useDefaultSubnet(lanSubnets.data, subnet, setSubnet);
+
+  const searchMutation = trpc.plugin.energy.enphase_local.discover.useMutation({
+    onSuccess: (result: { found: EnphaseDevice[] }) =>
+      setSearchResults(result.found),
+    onError: () => setSearchResults([]),
+  });
+
+  return {
+    subnet,
+    setSubnet,
+    lanSubnets,
+    searchMutation,
+    searchResults,
+    setSearchResults,
+  };
+}
+
 export function EnphaseLocalForm(
   { initial, onTestSuccess }: EnphaseLocalFormProps,
 ): JSX.Element {
@@ -226,16 +262,16 @@ export function EnphaseLocalForm(
   const [method, setMethod] = useState<AuthMethod>(
     initial.token && !initial.email ? "token" : "credentials",
   );
-  const [subnet, setSubnet] = useState("");
-  const [searchResults, setSearchResults] = useState<EnphaseDevice[]>([]);
+  const {
+    subnet,
+    setSubnet,
+    lanSubnets,
+    searchMutation,
+    searchResults,
+    setSearchResults,
+  } = useEnphaseSearch();
   // Read from the device's /info — shown for confirmation, never typed or stored.
   const [detectedSerial, setDetectedSerial] = useState("");
-
-  const searchMutation = trpc.plugin.energy.enphase_local.discover.useMutation({
-    onSuccess: (result: { found: EnphaseDevice[] }) =>
-      setSearchResults(result.found),
-    onError: () => setSearchResults([]),
-  });
 
   // Only the selected method's values are sent, so the other method can't shadow it.
   const active = method === "credentials"
@@ -291,6 +327,7 @@ export function EnphaseLocalForm(
       <SearchSection
         subnet={subnet}
         setSubnet={setSubnet}
+        detectedSubnets={lanSubnets.data}
         searchMutation={searchMutation}
         searchResults={searchResults}
         onSelectDevice={handleSelectDevice}

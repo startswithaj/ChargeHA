@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Button, Code, Text, TextField } from "@radix-ui/themes";
 import { Loader2 } from "lucide-react";
 import { trpc } from "./trpc.ts";
-import { NetworkDeviceSearch } from "../../../hostUi.ts";
+import { NetworkDeviceSearch, useDefaultSubnet } from "../../../hostUi.ts";
 import { stepStyles as styles } from "../../../hostUi.ts";
 import type {
   SigenergyDevice,
@@ -88,9 +88,17 @@ function AdvancedFields(
 }
 
 function SearchSection(
-  { subnet, setSubnet, searchMutation, searchResults, onSelectDevice }: {
+  {
+    subnet,
+    setSubnet,
+    detectedSubnets,
+    searchMutation,
+    searchResults,
+    onSelectDevice,
+  }: {
     subnet: string;
     setSubnet: (v: string) => void;
+    detectedSubnets?: string[];
     searchMutation: ReturnType<
       typeof trpc.plugin.energy.sigenergy_local.discover.useMutation
     >;
@@ -104,6 +112,7 @@ function SearchSection(
         deviceNoun="Sigenergy devices"
         subnet={subnet}
         onSubnetChange={setSubnet}
+        detectedSubnets={detectedSubnets}
         onSearch={() => searchMutation.mutate({ subnet: subnet || undefined })}
         isPending={searchMutation.isPending}
         searched={searchMutation.isSuccess}
@@ -208,13 +217,13 @@ export function SigenergyLocalForm(
     initial.deviceUnitId || "1",
   );
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [subnet, setSubnet] = useState(() => {
-    // Auto-detect subnet from browser hostname if it's an IP address.
-    const hostname = globalThis.location?.hostname ?? "";
-    const match = hostname.match(/^(\d+\.\d+\.\d+)\.\d+$/);
-    return match ? match[1] : "";
-  });
+  const [subnet, setSubnet] = useState("");
   const [searchResults, setSearchResults] = useState<SigenergyDevice[]>([]);
+
+  // Defaults the subnet field to where ChargeHA itself is reachable, once,
+  // while still leaving it fully editable.
+  const lanSubnets = trpc.plugin.energy.sigenergy_local.lanSubnets.useQuery();
+  useDefaultSubnet(lanSubnets.data, subnet, setSubnet);
 
   const searchMutation = trpc.plugin.energy.sigenergy_local.discover
     .useMutation({
@@ -266,6 +275,7 @@ export function SigenergyLocalForm(
       <SearchSection
         subnet={subnet}
         setSubnet={setSubnet}
+        detectedSubnets={lanSubnets.data}
         searchMutation={searchMutation}
         searchResults={searchResults}
         onSelectDevice={handleSelectDevice}

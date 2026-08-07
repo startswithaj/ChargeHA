@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { Badge, Text } from "@radix-ui/themes";
-import { NetworkDeviceSearch, PluginTestRow } from "../../../hostUi.ts";
+import {
+  NetworkDeviceSearch,
+  PluginTestRow,
+  useDefaultSubnet,
+} from "../../../hostUi.ts";
 import { trpc } from "./trpc.ts";
 
 /** Guidance shown only when a locked plug turned up. Listing it with an
@@ -24,11 +28,17 @@ export function TapoDiscoverySection(
   const found = discover.data?.found ?? [];
   const hasLocked = found.some((d) => d.status === "locked");
 
+  // Defaults the subnet field to where ChargeHA itself is reachable, once,
+  // while still leaving it fully editable.
+  const lanSubnets = trpc.plugin.charger.tapo.lanSubnets.useQuery();
+  useDefaultSubnet(lanSubnets.data, subnet, setSubnet);
+
   return (
     <NetworkDeviceSearch
       deviceNoun="Tapo plugs"
       subnet={subnet}
       onSubnetChange={setSubnet}
+      detectedSubnets={lanSubnets.data}
       onSearch={() => discover.mutate({ subnet: subnet || undefined })}
       isPending={discover.isPending}
       searched={discover.isSuccess || discover.isError}

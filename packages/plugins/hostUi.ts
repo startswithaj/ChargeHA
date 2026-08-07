@@ -39,6 +39,7 @@ export { ErrorBanner } from "../client/src/components/ui/ErrorBanner.tsx";
 export {
   NetworkDeviceSearch,
   type NetworkSearchResult,
+  useDefaultSubnet,
 } from "./NetworkDeviceSearch.tsx";
 export { default as dialogStyles } from "../client/src/components/ScheduleDialog/ScheduleDialog.module.css";
 

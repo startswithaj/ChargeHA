@@ -6,7 +6,10 @@ import { INFO_PATH, isEnvoyInfo, tagValue } from "./envoyInfo.ts";
 import { EnphaseLocalAdapter } from "./EnphaseLocalAdapter.ts";
 import { discoverEnphase } from "./EnphaseDiscovery.ts";
 import { ENPHASE_LOCAL_SECRET_KEYS, enphaseLocalConfigDef } from "./config.ts";
-import { createPluginConfigProcedures } from "../../../createPluginConfigProcedures.ts";
+import {
+  createNetworkDiscoveryProcedures,
+  createPluginConfigProcedures,
+} from "../../../createPluginConfigProcedures.ts";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 
@@ -32,6 +35,7 @@ export function createEnphaseLocalRouter(deps: PluginDependencies) {
       enphaseLocalConfigDef,
       ENPHASE_LOCAL_SECRET_KEYS,
     ),
+    ...createNetworkDiscoveryProcedures(deps),
 
     discover: publicProcedure
       .input(discoverInput)

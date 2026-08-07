@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
+import { detectLanAddresses } from "@chargeha/server/lib/LanInterfaces";
 import { createChargerConfigProcedures } from "../../../createPluginConfigProcedures.ts";
 import { OCPP_SECRET_KEYS, ocppConfigDef } from "./config.ts";
 import type { OcppCentralSystem } from "./OcppCentralSystem.ts";
@@ -32,32 +33,16 @@ async function chargePointIdFor(
   return config.charger_id ?? null;
 }
 
-/** Virtual interfaces a charger can never route to: container bridges, VPN
- *  tunnels, virtual-machine adapters. Offering these as candidates sends the
- *  user down a dead end. */
-const VIRTUAL_IFACE = /^(docker|br-|veth|utun|tun|tap|vmnet|vboxnet|zt|wg)/i;
-
-/** LAN addresses a charger could plausibly dial. */
+/** LAN addresses a charger could plausibly dial. Interface filtering
+ *  (virtual/loopback/link-local/network-address exclusion, and the missing
+ *  `--allow-sys` fallback) lives in the shared `detectLanAddresses` — this
+ *  just turns those addresses into connection URLs. */
 function lanBaseUrls(
   networkInterfaces: typeof Deno.networkInterfaces = Deno.networkInterfaces,
 ): string[] {
-  try {
-    return networkInterfaces()
-      .filter((i) =>
-        i.family === "IPv4" &&
-        !VIRTUAL_IFACE.test(i.name) &&
-        !i.address.startsWith("127.") &&
-        !i.address.startsWith("169.254.") &&
-        // A .0 host part is a network address, never a reachable host.
-        !i.address.endsWith(".0")
-      )
-      .map((i) => `ws://${i.address}:${serverPort()}${WS_PATH}`);
-  } catch (error) {
-    // Reading interfaces needs --allow-sys, which the test task does not
-    // grant. A settings page must not fail over a missing permission.
-    if (!(error instanceof Deno.errors.NotCapable)) throw error;
-    return [];
-  }
+  return detectLanAddresses(networkInterfaces).map((address) =>
+    `ws://${address}:${serverPort()}${WS_PATH}`
+  );
 }
 
 /** The pairing lifecycle, grouped so the main router stays readable.

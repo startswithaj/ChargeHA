@@ -1,7 +1,11 @@
 import { useMemo, useState } from "react";
 import { Button, Code, Text, TextField } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
-import { NetworkDeviceSearch, Spinner } from "../../../hostUi.ts";
+import {
+  NetworkDeviceSearch,
+  Spinner,
+  useDefaultSubnet,
+} from "../../../hostUi.ts";
 import { stepStyles as styles } from "../../../hostUi.ts";
 import type { FroniusDevice, TestStatus } from "../../InverterSetupShared.tsx";
 import { TestResultBadge } from "../../InverterSetupShared.tsx";
@@ -42,9 +46,17 @@ function useTestStatus(
 }
 
 function SearchSection(
-  { subnet, setSubnet, searchMutation, searchResults, handleSelectDevice }: {
+  {
+    subnet,
+    setSubnet,
+    detectedSubnets,
+    searchMutation,
+    searchResults,
+    handleSelectDevice,
+  }: {
     subnet: string;
     setSubnet: (v: string) => void;
+    detectedSubnets?: string[];
     searchMutation: ReturnType<
       typeof trpc.plugin.energy.fronius_local.discover.useMutation
     >;
@@ -58,6 +70,7 @@ function SearchSection(
         deviceNoun="Fronius inverters"
         subnet={subnet}
         onSubnetChange={setSubnet}
+        detectedSubnets={detectedSubnets}
         onSearch={() => searchMutation.mutate({ subnet: subnet || undefined })}
         isPending={searchMutation.isPending}
         searched={searchMutation.isSuccess}
@@ -74,6 +87,33 @@ function SearchSection(
   );
 }
 
+/** Search state + the subnet default, split out to keep FroniusLocalForm
+ *  under the function-length limit. */
+function useFroniusSearch() {
+  const [subnet, setSubnet] = useState("");
+  const [searchResults, setSearchResults] = useState<FroniusDevice[]>([]);
+
+  // Defaults the subnet field to where ChargeHA itself is reachable, once,
+  // while still leaving it fully editable.
+  const lanSubnets = trpc.plugin.energy.fronius_local.lanSubnets.useQuery();
+  useDefaultSubnet(lanSubnets.data, subnet, setSubnet);
+
+  const searchMutation = trpc.plugin.energy.fronius_local.discover.useMutation({
+    onSuccess: (result: { found: FroniusDevice[] }) =>
+      setSearchResults(result.found),
+    onError: () => setSearchResults([]),
+  });
+
+  return {
+    subnet,
+    setSubnet,
+    lanSubnets,
+    searchMutation,
+    searchResults,
+    setSearchResults,
+  };
+}
+
 export function FroniusLocalForm({
   initialHost,
   initialMeterDeviceId,
@@ -81,19 +121,14 @@ export function FroniusLocalForm({
 }: FroniusLocalFormProps): JSX.Element {
   const [froniusHost, setFroniusHost] = useState(initialHost);
   const [meterDeviceId, setMeterDeviceId] = useState(initialMeterDeviceId);
-  const [subnet, setSubnet] = useState(() => {
-    // Auto-detect subnet from browser hostname if it's an IP address
-    const hostname = globalThis.location?.hostname ?? "";
-    const match = hostname.match(/^(\d+\.\d+\.\d+)\.\d+$/);
-    return match ? match[1] : "";
-  });
-  const [searchResults, setSearchResults] = useState<FroniusDevice[]>([]);
-
-  const searchMutation = trpc.plugin.energy.fronius_local.discover.useMutation({
-    onSuccess: (result: { found: FroniusDevice[] }) =>
-      setSearchResults(result.found),
-    onError: () => setSearchResults([]),
-  });
+  const {
+    subnet,
+    setSubnet,
+    lanSubnets,
+    searchMutation,
+    searchResults,
+    setSearchResults,
+  } = useFroniusSearch();
 
   const testMutation = trpc.plugin.energy.fronius_local.testConnection
     .useMutation({
@@ -145,6 +180,7 @@ export function FroniusLocalForm({
       <SearchSection
         subnet={subnet}
         setSubnet={setSubnet}
+        detectedSubnets={lanSubnets.data}
         searchMutation={searchMutation}
         searchResults={searchResults}
         handleSelectDevice={handleSelectDevice}

@@ -20,6 +20,7 @@ import {
 } from "../services/VehicleService.ts";
 import { createLogger, Logger } from "../lib/Logger.ts";
 import { PluginDbLogger } from "../lib/PluginDbLogger.ts";
+import { detectLanSubnets } from "../lib/LanInterfaces.ts";
 
 /** Tunnel lifecycle exposed to plugins. URLs are live state, never persisted
  *  — quick-tunnel URLs change on every start. */
@@ -298,5 +299,16 @@ export class PluginDependencies<K extends string = string> {
    *  it in realtime readings. Only the Simulated vehicle plugin uses this. */
   setSimulatedLoad(watts: number): void {
     this.energyManager.setSimulatedLoad(watts);
+  }
+
+  // ── LAN detection (discovery plugins) ─────────────────────────────────
+
+  /** The /24 subnet(s) ChargeHA itself is reachable on, so a discovery
+   *  plugin's "Search Network" field can default to where the hardware
+   *  almost always is instead of an empty text box. Empty when interface
+   *  reads are unavailable (no `--allow-sys`) — the caller falls back to
+   *  its own guess, same as today. */
+  lanSubnets(): string[] {
+    return detectLanSubnets();
   }
 }

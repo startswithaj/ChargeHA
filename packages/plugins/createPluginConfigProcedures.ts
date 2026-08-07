@@ -67,6 +67,19 @@ export function createPluginConfigProcedures(
   };
 }
 
+/**
+ * The `lanSubnets` query every discovery-capable plugin (Fronius, Enphase,
+ * Sigenergy, Tapo) spreads into its router so the "Search Network" subnet
+ * field can default to where ChargeHA itself is actually running, instead of
+ * an empty text box. One copy of the query definition; the interface
+ * detection it calls lives in `PluginDependencies.lanSubnets`.
+ */
+export function createNetworkDiscoveryProcedures(deps: PluginDependencies) {
+  return {
+    lanSubnets: publicProcedure.query(() => deps.lanSubnets()),
+  };
+}
+
 const chargerGetConfigInput = z.object({ chargerRowId: z.string() });
 const chargerSetConfigInput = z.object({
   chargerRowId: z.string().nullable(),

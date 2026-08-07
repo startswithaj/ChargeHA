@@ -38,6 +38,8 @@ export const GATED_QUERIES: readonly string[] = [
   // Enumerates the server's own network interfaces — nothing to report in a
   // browser-only demo.
   "plugin.charger.ocpp.pairingStatus",
+  "plugin.charger.tapo.lanSubnets",
+  "plugin.energy.fronius_local.lanSubnets",
 ] as const satisfies readonly QueryPath[];
 
 /** Queries known to exist but not yet implemented. Empty — all are handled. */

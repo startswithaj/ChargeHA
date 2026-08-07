@@ -9,6 +9,7 @@
     "./db/types": "./src/db/types.ts",
     "./db/Serialization": "./src/db/Serialization.ts",
     "./lib/Logger": "./src/lib/Logger.ts",
+    "./lib/LanInterfaces": "./src/lib/LanInterfaces.ts",
     "./lib/PluginDbLogger": "./src/lib/PluginDbLogger.ts",
     "./lib/Encryption": "./src/lib/Encryption.ts",
     "./services/VehicleManager": "./src/services/VehicleManager.ts",

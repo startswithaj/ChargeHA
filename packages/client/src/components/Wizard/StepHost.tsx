@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button, Text } from "@radix-ui/themes";
 import { ArrowLeft, ArrowRight, SkipForward } from "lucide-react";
 import type { StepDef, StepProps, WizardAdvance, WizardNext } from "./flow.ts";
@@ -90,6 +90,32 @@ function WizardNav(
   );
 }
 
+/** Enter activates Next, from anywhere in the step.
+ *
+ *  Most steps are one field and a button, and typing a value then reaching for
+ *  the mouse is the wrong shape. Controls that already act on Enter are left
+ *  alone rather than fired twice, and a textarea keeps its newline. */
+function useEnterAdvances(enabled: boolean, onNext: () => void) {
+  useEffect(() => {
+    if (!enabled) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Enter" || e.defaultPrevented) return;
+      // Mid-word in an IME candidate window Enter commits the word, not the step.
+      if (e.isComposing || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      const tag = el?.tagName;
+      if (tag === "TEXTAREA" || tag === "BUTTON" || tag === "A") return;
+      if (el?.isContentEditable || el?.getAttribute("role") === "button") {
+        return;
+      }
+      e.preventDefault();
+      onNext();
+    };
+    globalThis.addEventListener("keydown", onKeyDown);
+    return () => globalThis.removeEventListener("keydown", onKeyDown);
+  }, [enabled, onNext]);
+}
+
 /**
  * Renders one step and the Next button that belongs to it.
  *
@@ -112,7 +138,7 @@ export function StepHost({ def, stepProps, nav, onAdvance }: StepHostProps) {
     setFailure(null);
   }, [next.kind, gateText]);
 
-  const handleNext = async () => {
+  const handleNext = useCallback(async () => {
     if (next.kind !== "ready") return;
     setPending(true);
     setFailure(null);
@@ -126,7 +152,9 @@ export function StepHost({ def, stepProps, nav, onAdvance }: StepHostProps) {
     } finally {
       setPending(false);
     }
-  };
+  }, [next, onAdvance]);
+
+  useEnterAdvances(next.kind === "ready" && !pending, handleNext);
 
   // Fragment, not a wrapper: .stepContent must stay a direct flex child of .container.
   return (
