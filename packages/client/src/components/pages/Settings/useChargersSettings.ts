@@ -44,7 +44,7 @@ export function useChargersSettings() {
   const removeMutation = trpc.charger.remove.useMutation({
     onSuccess: invalidate,
   });
-  const ensureMutation = trpc.charger.ensure.useMutation({
+  const createMutation = trpc.charger.create.useMutation({
     onSuccess: invalidate,
   });
   const reorderMutation = trpc.charger.reorder.useMutation({
@@ -57,7 +57,7 @@ export function useChargersSettings() {
   const needsAddConfirm = smartChargers.length === 0 && chargers.length > 0;
 
   const addCharger = (typeId: string) =>
-    ensureMutation.mutate({ chargerAdapterType: typeId }, {
+    createMutation.mutate({ chargerAdapterType: typeId }, {
       onSuccess: () => setEditing(null),
     });
 
@@ -109,11 +109,11 @@ export function useChargersSettings() {
   return {
     chargers,
     reorderable: chargers.length > 1,
-    error: ensureMutation.error?.message ?? removeMutation.error?.message ??
+    error: createMutation.error?.message ?? removeMutation.error?.message ??
       null,
     editing,
     confirm,
-    busy: ensureMutation.isPending,
+    busy: createMutation.isPending,
     choose,
     edit: (charger: ChargerWithState) =>
       setEditing({
@@ -123,7 +123,7 @@ export function useChargersSettings() {
       }),
     submitEdit,
     cancelEdit: () => {
-      ensureMutation.reset();
+      createMutation.reset();
       setEditing(null);
     },
     requestRemove,

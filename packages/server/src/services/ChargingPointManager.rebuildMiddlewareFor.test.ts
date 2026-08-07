@@ -289,4 +289,33 @@ describe("ChargingPointManager.rebuildMiddlewareFor", () => {
     expect(seen).toHaveLength(2);
     expect(seen[1].config.host).toBe("10.0.0.99");
   });
+
+  it("edits one row's config without touching the other, and rebuilds only that row's middleware", async () => {
+    const rowA = { ...ROW, id: "charger-a" };
+    const rowB = { ...ROW, id: "charger-b" };
+    chargerRows = [rowA, rowB];
+    chargerConfigs.set(rowA.id, { host: "10.0.0.1" });
+    chargerConfigs.set(rowB.id, { host: "10.0.0.2" });
+    await manager.addCharger(rowA);
+    await manager.addCharger(rowB);
+    const originalMwA = middlewares.get(rowA.id);
+    const originalMwB = middlewares.get(rowB.id);
+    assertExists(originalMwA);
+    assertExists(originalMwB);
+
+    // Simulate a config edit on row A only.
+    chargerConfigs.set(rowA.id, { host: "10.0.0.99" });
+    await manager.rebuildMiddlewareFor(rowA.id);
+
+    // Row B's stored config is untouched.
+    expect(chargerConfigs.get(rowB.id)?.host).toBe("10.0.0.2");
+    // Row A got a new middleware instance; row B's was never shut down or
+    // reconstructed.
+    const rebuiltMwA = middlewares.get(rowA.id);
+    assertExists(rebuiltMwA);
+    expect(rebuiltMwA).not.toBe(originalMwA);
+    expect(originalMwA.shutdownCalls).toBe(1);
+    expect(middlewares.get(rowB.id)).toBe(originalMwB);
+    expect(originalMwB.shutdownCalls).toBe(0);
+  });
 });

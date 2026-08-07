@@ -51,39 +51,19 @@ describe("Chargers tRPC Router", () => {
   });
 
   describe("charger.create", () => {
-    it("forwards input and returns the created row", async () => {
-      const calls: unknown[] = [];
-      const caller = callerWithStub({
-        createCharger: (input) => {
-          calls.push(input);
-          return Promise.resolve(CHARGER_ROW);
-        },
-      });
-      const data = await caller.charger.create({
-        name: "Garage Charger",
-        chargerAdapterType: "simulated",
-      });
-      expect(calls).toEqual([
-        { name: "Garage Charger", chargerAdapterType: "simulated" },
-      ]);
-      expect(data).toBe(CHARGER_ROW);
-    });
-  });
-
-  describe("charger.ensure", () => {
-    it("forwards the type to manager.ensureCharger, once, and returns the row's id", async () => {
+    it("forwards the type to manager.createChargerForType and returns the created row", async () => {
       const calls: string[] = [];
       const caller = callerWithStub({
-        ensureCharger: (chargerAdapterType) => {
+        createChargerForType: (chargerAdapterType) => {
           calls.push(chargerAdapterType);
           return Promise.resolve(CHARGER_ROW);
         },
       });
-      const result = await caller.charger.ensure({
+      const data = await caller.charger.create({
         chargerAdapterType: "simulated",
       });
       expect(calls).toEqual(["simulated"]);
-      expect(result).toEqual({ id: CHARGER_ROW.id });
+      expect(data).toBe(CHARGER_ROW);
     });
   });
 

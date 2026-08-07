@@ -55,8 +55,10 @@ export function PluginSetupRouter(
     } else if (kind === "energy") {
       utils.energy.getPlugins.invalidate();
     } else {
-      // The host owns charger-row creation on setup completion.
-      await utils.client.charger.ensure.mutate({
+      // The host owns charger-row creation on setup completion. This flow is
+      // reached by choosing "Add" for a charger type, same as the vehicle
+      // and energy branches above — it always creates a new row.
+      await utils.client.charger.create.mutate({
         chargerAdapterType: pluginId,
       });
       utils.charger.list.invalidate();

@@ -16,7 +16,6 @@ import { demoChargerDisplayNames } from "@chargeha/plugins/demoPluginSummaries";
 type ChargerMutations = Pick<
   MutationHandlers,
   | "charger.create"
-  | "charger.ensure"
   | "charger.setMode"
   | "charger.setAmps"
   | "charger.reorder"
@@ -56,29 +55,21 @@ const chargingForMode = (mode: DemoVehicleMode, current: boolean): boolean => {
 };
 
 export const chargerMutations: ChargerMutations = {
-  "charger.ensure": (input) => {
-    const existing = getDemoState().chargers.find(
+  // Always creates a new row, resolving the name from the plugin's display
+  // name with a distinguishing count appended for a second (or later) row of
+  // the same type — mirrors ChargingPointManager.createChargerForType.
+  "charger.create": (input) => {
+    const baseName = demoChargerDisplayNames[input.chargerAdapterType] ??
+      input.chargerAdapterType;
+    const sameType = getDemoState().chargers.filter(
       (c) => c.chargerAdapterType === input.chargerAdapterType,
     );
-    if (existing) return { id: existing.id };
+    const name = sameType.length === 0
+      ? baseName
+      : `${baseName} ${sameType.length + 1}`;
     const charger: DemoCharger = {
       id: crypto.randomUUID(),
-      name: demoChargerDisplayNames[input.chargerAdapterType] ??
-        input.chargerAdapterType,
-      chargerAdapterType: input.chargerAdapterType,
-      mode: "auto",
-      priority: nextPriority(getDemoState().chargers),
-      vehicleId: null,
-    };
-    updateDemoState((m) => ({ ...m, chargers: [...m.chargers, charger] }));
-    emitDemoEvent({ type: "chargers_changed", data: {} });
-    return { id: charger.id };
-  },
-
-  "charger.create": (input) => {
-    const charger: DemoCharger = {
-      id: crypto.randomUUID(),
-      name: input.name,
+      name,
       chargerAdapterType: input.chargerAdapterType,
       mode: "auto",
       priority: nextPriority(getDemoState().chargers),

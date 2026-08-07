@@ -196,7 +196,7 @@ vi.mock("../../../trpc.ts", () => ({
           reset: vi.fn(),
         })),
       },
-      ensure: {
+      create: {
         useMutation: vi.fn((_opts?: { onSuccess?: () => void }) => ({
           mutate: vi.fn(),
           mutateAsync: vi.fn(),

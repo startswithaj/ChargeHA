@@ -680,6 +680,44 @@ describe("ChargingPointManager", () => {
     });
   });
 
+  describe("createChargerForType", () => {
+    it("always creates a new row, even when one of the type already exists", async () => {
+      await manager.createChargerForType(CHARGER_TYPE);
+      await manager.createChargerForType(CHARGER_TYPE);
+
+      expect(chargerRows).toHaveLength(2);
+      expect(chargerRows.every((r) => r.chargerAdapterType === CHARGER_TYPE))
+        .toBe(true);
+      expect(new Set(chargerRows.map((r) => r.id)).size).toBe(2);
+    });
+
+    it("appends a distinguishing count to the second row of the same type so the two are never named alike", async () => {
+      await manager.createChargerForType(CHARGER_TYPE);
+      await manager.createChargerForType(CHARGER_TYPE);
+      await manager.createChargerForType(CHARGER_TYPE);
+
+      const names = chargerRows.map((r) => r.name);
+      expect(names).toEqual([
+        "Simulated Charger",
+        "Simulated Charger 2",
+        "Simulated Charger 3",
+      ]);
+    });
+
+    it("does not touch rows of a different type when numbering", async () => {
+      await manager.createCharger({
+        name: "My OCPP",
+        chargerAdapterType: "ocpp",
+      });
+      await manager.createChargerForType(CHARGER_TYPE);
+
+      const simulated = chargerRows.find((r) =>
+        r.chargerAdapterType === CHARGER_TYPE
+      );
+      expect(simulated?.name).toBe("Simulated Charger");
+    });
+  });
+
   describe("init", () => {
     it("loads grid voltage and registers existing charger rows", async () => {
       chargerRows = [ROW];

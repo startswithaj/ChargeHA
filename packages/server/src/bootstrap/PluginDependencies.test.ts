@@ -251,7 +251,7 @@ describe("PluginDependencies row-scoped config/secrets (real AppDatabase)", () =
     expect(rebuilt).toBe(false);
   });
 
-  it("createChargerRow delegates to chargingPoints.ensureCharger, stamped with this plugin's id", async () => {
+  it("createChargerRow delegates to chargingPoints.createChargerForType, stamped with this plugin's id", async () => {
     let seenAdapterType: string | null = null;
     const createdRow: ChargerRow = {
       id: "row-new",
@@ -272,7 +272,7 @@ describe("PluginDependencies row-scoped config/secrets (real AppDatabase)", () =
       chargingPoints: throwingMock<ChargingPointManager>(
         "ChargingPointManager",
         {
-          ensureCharger: (adapterType: string) => {
+          createChargerForType: (adapterType: string) => {
             seenAdapterType = adapterType;
             return Promise.resolve(createdRow);
           },

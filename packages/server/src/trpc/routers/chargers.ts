@@ -10,11 +10,10 @@ const modeInput = z.object({
 const priorityInput = z.object({
   order: z.array(z.string()), // charger ids in priority order
 });
-const createInput = z.object({
-  name: z.string(),
-  chargerAdapterType: z.string(),
-});
-const ensureInput = z.object({ chargerAdapterType: z.string() });
+// Always creates a new row of this type — the name is resolved server-side
+// from the plugin's displayName, with a distinguishing count appended for a
+// second (or later) row of the same type. See ChargingPointManager.createChargerForType.
+const createInput = z.object({ chargerAdapterType: z.string() });
 const setAmpsInput = z.object({ id: z.string(), amps: z.number().int() });
 const vehicleControlInput = z.object({
   vehicleId: z.string(),
@@ -28,16 +27,9 @@ export const chargersRouter = router({
 
   create: publicProcedure.input(createInput).mutation(
     async ({ ctx, input }) => {
-      return await ctx.chargingPointManager.createCharger(input);
-    },
-  ),
-
-  ensure: publicProcedure.input(ensureInput).mutation(
-    async ({ ctx, input }) => {
-      const row = await ctx.chargingPointManager.ensureCharger(
+      return await ctx.chargingPointManager.createChargerForType(
         input.chargerAdapterType,
       );
-      return { id: row.id };
     },
   ),
 

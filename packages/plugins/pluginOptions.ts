@@ -53,7 +53,7 @@ export interface ChargerPluginOption {
   description: string;
   iconKey: "server" | "plug" | "monitor";
   demoAvailable?: boolean;
-  /** Needs no config — settings adds it with charger.ensure directly,
+  /** Needs no config — settings adds it with charger.create directly,
    *  never routing through the plugin setup flow. */
   directAdd?: boolean;
 }

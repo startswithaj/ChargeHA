@@ -62,7 +62,6 @@ describe("OCPP e2e", () => {
 
   it("charge_now starts a transaction (RemoteStart → auto StartTransaction)", async () => {
     const charger = await trpc.charger.create.mutate({
-      name: "E2E OCPP",
       chargerAdapterType: "ocpp",
     });
     // Plug the cable in first: the vcp boots to Available (no cable) and

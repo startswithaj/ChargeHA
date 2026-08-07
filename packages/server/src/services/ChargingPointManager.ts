@@ -502,13 +502,23 @@ export class ChargingPointManager {
     this.eventEmitter.emit("chargers_changed", {});
   }
 
+  /** Always creates a new row, even if one of this adapter type already
+   *  exists — a second Tapo or a second OCPP charger is a new row, not a
+   *  reuse of the first. Two rows of the same type would be indistinguishable
+   *  in the UI, so the second (and later) gets a count appended to its name. */
   async createCharger(
     input: { name: string; chargerAdapterType: string },
   ): Promise<ChargerRow> {
     const rows = await this.db.getChargers();
+    const sameType = rows.filter((row) =>
+      row.chargerAdapterType === input.chargerAdapterType
+    );
+    const name = sameType.length === 0
+      ? input.name
+      : `${input.name} ${sameType.length + 1}`;
     const row: ChargerRow = {
       id: crypto.randomUUID(),
-      name: input.name,
+      name,
       chargerAdapterType: input.chargerAdapterType,
       chargerConfig: "{}",
       mode: "auto",
@@ -528,17 +538,31 @@ export class ChargingPointManager {
     return row;
   }
 
+  /** Always creates, resolving the row's name from the plugin's own
+   *  `displayName` — used by every "add a charger of this type" path that
+   *  doesn't already have a name to give (Settings' no-panel add, a plugin's
+   *  own add-mode save). `createCharger` does the actual insert and picks a
+   *  distinguishing name if one of this type already exists. */
+  async createChargerForType(chargerAdapterType: string): Promise<ChargerRow> {
+    const plugin = this.chargerPlugins.get(chargerAdapterType);
+    return await this.createCharger({
+      name: plugin?.displayName ?? chargerAdapterType,
+      chargerAdapterType,
+    });
+  }
+
+  /** Find-or-create, by adapter type. Only the first-run wizard needs this:
+   *  re-running it after the charger step already ran must not create a
+   *  second row. Every other creation path (Settings "Add charger", a
+   *  plugin's own add-mode save) must always create — see
+   *  `createChargerForType` / `createCharger`. */
   async ensureCharger(chargerAdapterType: string): Promise<ChargerRow> {
     const rows = await this.db.getChargers();
     const existing = rows.find((row) =>
       row.chargerAdapterType === chargerAdapterType
     );
     if (existing) return existing;
-    const plugin = this.chargerPlugins.get(chargerAdapterType);
-    return await this.createCharger({
-      name: plugin?.displayName ?? chargerAdapterType,
-      chargerAdapterType,
-    });
+    return await this.createChargerForType(chargerAdapterType);
   }
 
   async getChargersWithState() {

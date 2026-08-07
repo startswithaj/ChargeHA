@@ -61,7 +61,6 @@ describe("Tapo e2e", () => {
 
   it("charge_now switches the plug on and detects draw", async () => {
     const charger = await trpc.charger.create.mutate({
-      name: "E2E Plug",
       chargerAdapterType: "tapo",
     });
     await trpc.charger.setMode.mutate({ id: charger.id, mode: "charge_now" });

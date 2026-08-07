@@ -13,7 +13,7 @@ vi.mock("../../../trpc.ts", () => ({
     useUtils: () => ({ charger: { list: { invalidate: vi.fn() } } }),
     charger: {
       remove: { useMutation: () => ({ mutate: vi.fn(), error: null }) },
-      ensure: {
+      create: {
         useMutation: () => ({
           mutate: mocks.mutateMock,
           error: null,
