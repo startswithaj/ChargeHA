@@ -48,7 +48,7 @@ export class SolarAllocator {
    *  Starts from grid export, then:
    *  - Subtracts home battery discharge. Power leaving the battery is not
    *    solar. Without this, a battery operating in self-consumption won't be
-   *    drawing from the grid, and would makes the EV's own draw reappear as 
+   *    drawing from the grid, and would makes the EV's own draw reappear as
    *    "available solar" through the add-back below, and the car would charge
    *    off the home battery.
    *  - Adds back the EV's charge power when the meter includes EV load in
