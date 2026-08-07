@@ -8,6 +8,15 @@ describe("Tapo e2e", () => {
   const SIM_SUBNET = "172.30.99";
   const CREDS = { email: "user@example.com", password: "example-password" };
 
+  /** The row created by beforeAll's setConfig. Looked up rather than captured
+   *  so a test that runs standalone still finds it. */
+  async function tapoRowId(): Promise<string> {
+    const list = await trpc.charger.list.query();
+    const row = list.find((c) => c.chargerAdapterType === "tapo");
+    if (!row) throw new Error("No Tapo charger row found for e2e setup");
+    return row.id;
+  }
+
   beforeAll(async () => {
     // 5s loop: the suites otherwise idle on the 30s default for most
     // of their runtime. Config is per-stack (fresh DB every run).
@@ -60,9 +69,10 @@ describe("Tapo e2e", () => {
   });
 
   it("charge_now switches the plug on and detects draw", async () => {
-    const charger = await trpc.charger.create.mutate({
-      chargerAdapterType: "tapo",
-    });
+    // The row configured in beforeAll — not a fresh one. `charger.create`
+    // always creates now that multiple chargers of a type are allowed, so a
+    // new row here would have no host or credentials and could never connect.
+    const charger = { id: await tapoRowId() };
     await trpc.charger.setMode.mutate({ id: charger.id, mode: "charge_now" });
 
     await waitFor(async () => (await tapoState()).deviceOn === true, {

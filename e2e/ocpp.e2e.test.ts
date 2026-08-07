@@ -61,9 +61,10 @@ describe("OCPP e2e", () => {
   });
 
   it("charge_now starts a transaction (RemoteStart → auto StartTransaction)", async () => {
-    const charger = await trpc.charger.create.mutate({
-      chargerAdapterType: "ocpp",
-    });
+    // The row configured in beforeAll — not a fresh one. `charger.create`
+    // always creates now that multiple chargers of a type are allowed, so a
+    // new row here would have no charge point id and could never start.
+    const charger = { id: await ocppRowId() };
     // Plug the cable in first: the vcp boots to Available (no cable) and
     // the engine rightly refuses to start charging an empty connector.
     await vcpSend("StatusNotification", {

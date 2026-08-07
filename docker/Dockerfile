@@ -50,6 +50,10 @@ COPY packages/shared/ packages/shared/
 COPY packages/server/ packages/server/
 COPY packages/plugins/ packages/plugins/
 COPY packages/client/deno.json packages/client/deno.json
+# The entrypoint package — the only file that imports both the server and the
+# list of plugins. Without it `deno cache packages/app/main.ts` below fails and
+# the workspace member resolves to nothing.
+COPY packages/app/ packages/app/
 COPY drizzle/ drizzle/
 
 # Copy built client assets

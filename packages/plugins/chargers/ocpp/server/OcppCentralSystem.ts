@@ -17,9 +17,6 @@ export interface OcppChargerInfo {
   firmwareVersion: string;
 }
 
-/** A charger that reached us during a pairing window but whose id is not the
- *  configured one yet. Reported so the panel can show what turned up and
- *  offer to adopt it. */
 /** One charger that turned up during a pairing window. More than one can:
  *  a household may have two, or an old id may still be retrying alongside a
  *  new one, so the user picks rather than us guessing. */
