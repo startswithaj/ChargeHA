@@ -21,8 +21,23 @@ beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
 });
 
-vi.mock("../../lib/simulateSolarAllocation.ts", () => ({
-  parseConfigToSolarConfig: vi.fn().mockReturnValue({
+vi.mock("@chargeha/shared/solarPreview", () => ({
+  previewSolarAllocation: vi.fn(),
+}));
+
+import type { VehicleWithState } from "@chargeha/shared";
+import type { ControllerConfig } from "@chargeha/shared/engine";
+import { SolarSimulation } from "./SolarSimulation.tsx";
+import {
+  previewSolarAllocation,
+  type PreviewVehicleResult,
+  type SolarPreviewResult,
+} from "@chargeha/shared/solarPreview";
+
+describe("SolarSimulation", () => {
+  const baseConfig: ControllerConfig = {
+    chargingEnabled: true,
+    controllerLoopSeconds: 60,
     solarTrackingEnabled: true,
     solarTrackingMode: "solar_only",
     solarReference: "excess",
@@ -31,21 +46,17 @@ vi.mock("../../lib/simulateSolarAllocation.ts", () => ({
     minExcessSolarKw: null,
     gridVoltage: 230,
     threePhaseCharger: false,
+    consumptionExcludesCharging: false,
+    gracePeriodMinutes: 6,
+    cooldownPeriodMinutes: 15,
+    ampDebounceThreshold: 2,
+    ampDebounceSettleMinutes: 3,
     batteryPriorityEnabled: false,
     batteryPriorityLimit: 80,
-  }),
-  simulateSolarAllocation: vi.fn(),
-}));
+    priorityChargingEnabled: false,
+    timezone: "",
+  };
 
-import type { VehicleWithState } from "@chargeha/shared";
-import { SolarSimulation } from "./SolarSimulation.tsx";
-import {
-  simulateSolarAllocation,
-  type SimulationResult,
-  type VehicleAllocation,
-} from "../../lib/simulateSolarAllocation.ts";
-
-describe("SolarSimulation", () => {
   const mockVehicle = {
     id: "v1",
     name: "Model 3",
@@ -77,7 +88,7 @@ describe("SolarSimulation", () => {
     },
   } satisfies VehicleWithState;
 
-  const baseVehicleAllocation: VehicleAllocation = {
+  const baseVehicleAllocation: PreviewVehicleResult = {
     id: "v1",
     name: "Model 3",
     action: "charging",
@@ -86,34 +97,31 @@ describe("SolarSimulation", () => {
     solarKw: 2.3,
     gridKw: 0,
     reason: "",
+    reasonCode: "solar_tracking",
   };
 
-  const baseResult: SimulationResult = {
+  const baseResult: SolarPreviewResult = {
     vehicles: [baseVehicleAllocation],
-    availableSolarKw: 3.5,
     totalChargingKw: 2.3,
     gridImportKw: 0,
     gridExportKw: 1.2,
-    meetsMinSolarGeneration: true,
-    meetsMinExcessSolar: true,
-    batteryPriorityBlocking: false,
     blockoutActive: false,
   };
 
-  const mockSolarResult = (overrides: Partial<SimulationResult> = {}) =>
-    vi.mocked(simulateSolarAllocation).mockReturnValueOnce({
+  const mockSolarResult = (overrides: Partial<SolarPreviewResult> = {}) =>
+    vi.mocked(previewSolarAllocation).mockReturnValueOnce({
       ...baseResult,
       ...overrides,
     });
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(simulateSolarAllocation).mockReturnValue(baseResult);
+    vi.mocked(previewSolarAllocation).mockReturnValue(baseResult);
   });
   afterEach(cleanup);
 
   const defaultProps = {
-    config: { solar_tracking_enabled: "true" },
+    config: baseConfig,
     vehicles: [mockVehicle],
     currentEnergy: {
       solarProductionW: 5000,
@@ -196,10 +204,7 @@ describe("SolarSimulation", () => {
 
   // ---- result badges ----
 
-  it.each<[Partial<SimulationResult>, string]>([
-    [{ meetsMinSolarGeneration: false }, "Below min solar"],
-    [{ meetsMinExcessSolar: false }, "Below min excess"],
-    [{ batteryPriorityBlocking: true }, "Battery priority"],
+  it.each<[Partial<SolarPreviewResult>, string]>([
     [{ blockoutActive: true }, "Blockout active"],
   ])("shows %o result badge", (flags, badge) => {
     mockSolarResult({ vehicles: [], ...flags });
@@ -213,7 +218,7 @@ describe("SolarSimulation", () => {
 
   // ---- vehicle allocation display ----
 
-  it.each<[Partial<VehicleAllocation>, string]>([
+  it.each<[Partial<PreviewVehicleResult>, string]>([
     [{ action: "charging" }, "Charging"],
     [
       {
@@ -300,6 +305,36 @@ describe("SolarSimulation", () => {
     );
 
     expect(screen.getByText("Battery SOC")).toBeInTheDocument();
+  });
+
+  it("renders Battery Power slider when batterySoc is not null, and feeds it into the preview call", () => {
+    renderWithProviders(
+      <SolarSimulation
+        {...defaultProps}
+        currentEnergy={{
+          solarProductionW: 5000,
+          gridPowerW: -1200,
+          homeConsumptionW: 1500,
+          batteryPowerW: 500,
+          batterySoc: 75,
+          gridVoltageV: null,
+          lastUpdated: "2026-01-01T00:00:00.000Z",
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Battery Power")).toBeInTheDocument();
+    // Defaults from currentEnergy.batteryPowerW (500W = 0.5kW discharging).
+    const call = vi.mocked(previewSolarAllocation).mock.calls.at(-1);
+    expect(call?.[2].batteryPowerKw).toBeCloseTo(0.5);
+  });
+
+  it("does not render Battery Power slider when there is no battery", () => {
+    renderWithProviders(<SolarSimulation {...defaultProps} />);
+
+    expect(screen.queryByText("Battery Power")).not.toBeInTheDocument();
+    const call = vi.mocked(previewSolarAllocation).mock.calls.at(-1);
+    expect(call?.[2].batteryPowerKw).toBeNull();
   });
 
   // ---- SliderRow labels ----
