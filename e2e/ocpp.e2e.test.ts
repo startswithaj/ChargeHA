@@ -36,8 +36,9 @@ describe("OCPP e2e", () => {
       });
       return s.connected ? s : null;
     }, { label: "vcp connected", timeoutMs: 60_000 });
-    expect(status.info?.vendor).toBe("Solidstudio");
-    expect(status.info?.model).toBe("VirtualChargePoint");
+    // chargePointVendor/chargePointModel from docker/sap-e2e/station-template.json.
+    expect(status.info?.vendor).toBe("ChargeHA");
+    expect(status.info?.model).toBe("ChargeHA AC7.4");
     expect(status.wsPath).toBe(`/api/charger/ocpp/${CP_ID}`);
   });
 

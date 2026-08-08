@@ -1,0 +1,29 @@
+# Standalone OCPP 1.6 charge point simulator (SAP/e-mobility-charging-stations-simulator).
+# Connects to a dev server running on the host, not to the e2e app container.
+# Usage: docker compose -f devtools/sap-simulator/docker-compose.yml up -d --build
+services:
+  sap-sim:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      # ui-server admin API (basic auth admin/admin) — overridable so a second
+      # instance (docker compose -p ...) can bind its own port.
+      - "${UI_SERVER_HOST_PORT:-18080}:8080"
+    # Docker Desktop provides this mapping; Linux needs it declared.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # The simulator exits/retries its own websocket reconnect logic, but
+    # restart on a hard crash regardless.
+    restart: on-failure
+
+  # Upstream's Vue dashboard: station cards, connector status, and start/stop
+  # transaction buttons. The browser connects it straight to the ui-server on
+  # the published port, so it needs no link to the sap-sim service.
+  sap-sim-web:
+    build:
+      context: .
+      dockerfile: web.Dockerfile
+    ports:
+      - "${WEB_UI_HOST_PORT:-3030}:3030"
+    restart: on-failure

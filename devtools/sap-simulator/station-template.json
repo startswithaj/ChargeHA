@@ -1,0 +1,108 @@
+{
+  "$schemaVersion": 1,
+  "idTagsFile": "idtags.json",
+  "baseName": "vcp-dev-2",
+  "fixedName": true,
+  "chargePointModel": "ChargeHA AC7.4",
+  "chargePointVendor": "ChargeHA",
+  "power": 7400,
+  "powerUnit": "W",
+  "powerSharedByConnectors": false,
+  "currentOutType": "AC",
+  "numberOfPhases": 1,
+  "voltageOut": 240,
+  "numberOfConnectors": 1,
+  "randomConnectors": false,
+  "coherentMeterValues": true,
+  "evProfilesFile": "ev-profiles-vcp-dev-2.json",
+  "Configuration": {
+    "configurationKey": [
+      {
+        "key": "MeterValuesSampledData",
+        "readonly": false,
+        "value": "Current.Import,Voltage,Power.Active.Import,Energy.Active.Import.Register,SoC"
+      },
+      {
+        "key": "MeterValueSampleInterval",
+        "readonly": false,
+        "value": "10"
+      },
+      {
+        "key": "SupportedFeatureProfiles",
+        "readonly": true,
+        "value": "Core,SmartCharging,RemoteTrigger"
+      },
+      {
+        "key": "LocalAuthListEnabled",
+        "readonly": false,
+        "value": "false"
+      },
+      {
+        "key": "AuthorizeRemoteTxRequests",
+        "readonly": false,
+        "value": "false"
+      },
+      {
+        "key": "WebSocketPingInterval",
+        "readonly": false,
+        "value": "60"
+      },
+      {
+        "key": "ReserveConnectorZeroSupported",
+        "readonly": false,
+        "value": "false"
+      }
+    ]
+  },
+  "AutomaticTransactionGenerator": {
+    "//": "Off so ChargeHA drives sessions via RemoteStartTransaction. With it on, the generator starts and stops sessions on its own schedule and overrides a STOP from the app within minDelayBetweenTwoTransactions seconds.",
+    "enable": false,
+    "minDuration": 600,
+    "maxDuration": 3600,
+    "minDelayBetweenTwoTransactions": 15,
+    "maxDelayBetweenTwoTransactions": 30,
+    "probabilityOfStart": 1,
+    "stopAfterHours": 8,
+    "requireAuthorize": true
+  },
+  "Connectors": {
+    "0": {},
+    "1": {
+      "//": "Preparing, not Available: the charger boots with a car plugged in and waiting. ChargeHA only sends RemoteStartTransaction once it sees the connector plugged in, and with the transaction generator off nothing else would ever plug one in — Available would deadlock.",
+      "bootStatus": "Preparing",
+      "maximumPower": 7400,
+      "MeterValues": [
+        {
+          "unit": "A",
+          "context": "Sample.Periodic",
+          "measurand": "Current.Import",
+          "location": "Outlet"
+        },
+        {
+          "unit": "V",
+          "context": "Sample.Periodic",
+          "measurand": "Voltage",
+          "location": "Outlet"
+        },
+        {
+          "unit": "W",
+          "context": "Sample.Periodic",
+          "measurand": "Power.Active.Import",
+          "location": "Outlet"
+        },
+        {
+          "unit": "Wh",
+          "context": "Sample.Periodic",
+          "measurand": "Energy.Active.Import.Register",
+          "location": "Outlet"
+        },
+        {
+          "unit": "Percent",
+          "context": "Sample.Periodic",
+          "measurand": "SoC",
+          "location": "EV"
+        }
+      ]
+    }
+  }
+}

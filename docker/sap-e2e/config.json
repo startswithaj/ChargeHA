@@ -1,0 +1,43 @@
+{
+  "supervisionUrls": ["ws://app:8000/api/charger/ocpp"],
+  "supervisionUrlDistribution": "round-robin",
+  "log": {
+    "file": "/dev/stdout",
+    "errorFile": "/dev/stderr",
+    "console": false,
+    "rotate": false,
+    "level": "debug"
+  },
+  "worker": {
+    "processType": "workerSet",
+    "elementsPerWorker": 1,
+    "poolMinSize": 1,
+    "poolMaxSize": 2
+  },
+  "uiServer": {
+    "enabled": true,
+    "options": {
+      "host": "::"
+    },
+    "accessPolicy": {
+      "allowedHosts": ["localhost", "127.0.0.1", "::1"],
+      "allowedOrigins": [],
+      "allowLoopbackProxy": false,
+      "requireTlsForNonLoopback": false,
+      "trustedProxies": []
+    },
+    "type": "ws",
+    "authentication": {
+      "enabled": true,
+      "type": "protocol-basic-auth",
+      "username": "admin",
+      "password": "admin"
+    }
+  },
+  "stationTemplateUrls": [
+    {
+      "file": "vcp-test.station-template.json",
+      "numberOfStations": 1
+    }
+  ]
+}

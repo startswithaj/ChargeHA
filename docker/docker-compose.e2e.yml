@@ -62,6 +62,23 @@ services:
       e2e:
         ipv4_address: 172.30.99.60
 
+  ocpp-sap:
+    # SAP simulator, ported in alongside ocpp-vcp (not replacing it yet — see
+    # e2e/ocppHelpers.ts). Only the ocpp suites start it.
+    profiles: ["ocpp"]
+    build:
+      context: ..
+      dockerfile: docker/sap.e2e.Dockerfile
+    ports:
+      - "19998:8080" # UI server (ws, admin/admin) for the test runner
+    depends_on:
+      app:
+        condition: service_healthy # start only once the app probe passes
+    restart: on-failure
+    networks:
+      e2e:
+        ipv4_address: 172.30.99.61
+
 networks:
   e2e:
     ipam:

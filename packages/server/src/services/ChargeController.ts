@@ -275,6 +275,15 @@ export class ChargeController {
             origin: "controller",
             traceId,
             hasSolar,
+            // Deliberately false, not an oversight: while a smart charger has
+            // control, a schedule doesn't need the car awake — the charger
+            // supplies power and the car wakes itself on the Control Pilot
+            // signal. Waking it via the Tesla API just to check whether it's
+            // already at the schedule's target costs a paid wake (~$0.02) to
+            // avoid a minute or two of unnecessary charging, and the free
+            // /vehicles online probe picks up real state of charge within
+            // about a minute of the car waking anyway. Passing true here
+            // would cost money to fix something that self-corrects.
             hasSchedule: false,
             hasBlockout,
           })
