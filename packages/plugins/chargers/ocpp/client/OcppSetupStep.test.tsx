@@ -96,8 +96,8 @@ describe("ocppSetupStep", () => {
       <StepNextHarness def={ocppSetupStep} stepProps={{ chargerId: null }} />,
     );
 
-    const testButton = screen.getByRole("button", { name: "Test Connection" });
-    expect(testButton).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Test Connection" }))
+      .toBeDisabled();
     expect(screen.getByText("Detect or enter a Charger ID first."))
       .toBeInTheDocument();
 
@@ -105,6 +105,9 @@ describe("ocppSetupStep", () => {
       target: { value: "CP-1234" },
     });
 
+    // Re-queried, not reused: the step is keyed by charger id, so changing the
+    // id remounts it and any earlier verdict goes with the old node.
+    const testButton = screen.getByRole("button", { name: "Test Connection" });
     expect(testButton).toBeEnabled();
 
     fireEvent.click(testButton);

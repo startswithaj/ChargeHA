@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Badge, Button, Code, Link, Text, TextField } from "@radix-ui/themes";
+import { Badge, Button, Code, Text, TextField } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
+import { Spinner, TestResultBadge, type TestStatus } from "../../../hostUi.ts";
 
 /** Fallback only, for the moment before the server reports its own addresses.
  *  The browser's location is the wrong answer — it is the address *you* typed,
@@ -32,6 +33,20 @@ const row = {
   alignItems: "center",
   gap: 8,
   flexWrap: "wrap",
+} as const;
+
+/** Same row treatment as the LAN device search: filled row, identity on top,
+ *  detail beneath, action pinned right. A charger arriving over OCPP is the
+ *  same kind of "found a device, pick it" list, so it should not look like a
+ *  different one. */
+const resultRow = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 8,
+  padding: "6px 10px",
+  borderRadius: 6,
+  background: "var(--gray-a2)",
 } as const;
 
 /** How long before we suggest the charger cannot reach us at all. */
@@ -113,6 +128,35 @@ function WaitingBars() {
   );
 }
 
+/** One charger that answered the pairing window. */
+function SeenRow(
+  { charger, selected, onUse }: {
+    charger: SeenCharger;
+    selected: boolean;
+    onUse: () => void;
+  },
+) {
+  return (
+    <div style={resultRow}>
+      <div>
+        <Text size="2" weight="medium">{charger.chargerId}</Text>
+        {charger.info && (
+          <Text size="1" color="gray" style={{ display: "block" }}>
+            {charger.info.vendor} · {charger.info.model} · fw{" "}
+            {charger.info.firmwareVersion}
+          </Text>
+        )}
+      </div>
+      {selected && <Badge color="green" size="1">Selected</Badge>}
+      {!selected && (
+        <Button size="1" variant="soft" onClick={onUse}>
+          Use
+        </Button>
+      )}
+    </div>
+  );
+}
+
 /** What turned up, or why nothing has yet.
  *
  *  More than one charger can answer a single window — two in the household, or
@@ -174,27 +218,12 @@ function ResultStep(
         </Text>
       )}
       {seen.map((c) => (
-        <div key={c.chargerId} style={row}>
-          <Badge color={c.chargerId === chargerId ? "green" : "gray"} size="2">
-            {c.chargerId}
-          </Badge>
-          {c.info && (
-            <Text size="1" color="gray">
-              {c.info.vendor} · {c.info.model} · fw {c.info.firmwareVersion}
-            </Text>
-          )}
-          {c.chargerId === chargerId && (
-            <Text size="1" color="green">selected</Text>
-          )}
-          {c.chargerId !== chargerId && (
-            <Link
-              size="1"
-              onClick={() => onDetected(c.chargerId)}
-            >
-              use this
-            </Link>
-          )}
-        </div>
+        <SeenRow
+          key={c.chargerId}
+          charger={c}
+          selected={c.chargerId === chargerId}
+          onUse={() => onDetected(c.chargerId)}
+        />
       ))}
     </div>
   );
@@ -224,6 +253,46 @@ function ChargerIdStep(
           onDetected(e.target.value)}
         style={{ width: 220, marginTop: 6 }}
       />
+    </div>
+  );
+}
+
+/** Proves the charger answers a request ChargeHA initiates, not merely that a
+ *  socket exists. Addressed by charge point id rather than a charger row —
+ *  in the wizard no row exists until Next saves. */
+function TestStep({ chargePointId }: { chargePointId: string }) {
+  const test = trpc.plugin.charger.ocpp.testConnection.useMutation();
+  const result = test.data;
+
+  const testResult: TestStatus = (() => {
+    if (test.isPending) return { status: "testing" };
+    if (test.isError) return { status: "error", message: test.error.message };
+    if (result?.success === false) {
+      return { status: "error", message: result.error };
+    }
+    if (result?.success === true) {
+      return { status: "success", detail: `${result.latencyMs} ms` };
+    }
+    return { status: "idle" };
+  })();
+
+  return (
+    <div style={row}>
+      <Button
+        size="1"
+        variant="soft"
+        disabled={chargePointId === "" || test.isPending}
+        onClick={() => test.mutate({ chargePointId })}
+      >
+        {test.isPending && <Spinner />}
+        {test.isPending ? "Testing..." : "Test Connection"}
+      </Button>
+      <TestResultBadge testResult={testResult} />
+      {chargePointId === "" && (
+        <Text size="1" color="gray">
+          Detect or enter a Charger ID first.
+        </Text>
+      )}
     </div>
   );
 }
@@ -259,6 +328,67 @@ function ListenStep(
   );
 }
 
+/** The pairing window: its state, its countdown, and the two buttons that
+ *  open and close it. Kept out of the block itself, which is otherwise just
+ *  five steps of markup. */
+function usePairingWindow() {
+  const [now, setNow] = useState(() => Date.now());
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const begin = trpc.plugin.charger.ocpp.beginPairing.useMutation();
+  const cancel = trpc.plugin.charger.ocpp.cancelPairing.useMutation();
+  // Pairing is a property of the listener, not of any charger row, so this
+  // query takes no input and works identically with or without a saved row.
+  const status = trpc.plugin.charger.ocpp.pairingStatus.useQuery(
+    undefined,
+    { refetchInterval: 2000 },
+  );
+
+  const pairing = status.data?.pairing;
+  const listening = pairing?.armed === true;
+  const baseUrls = status.data?.baseUrls ?? [];
+  const base = baseUrls[0] ?? browserGuessUrl();
+  const expiresAt = pairing?.expiresAt ?? null;
+
+  // The deadline on the local clock. Taken from the server's own "time left"
+  // and re-anchored whenever a new window opens, so clock skew between the two
+  // machines cannot show a five-minute window as 5:04.
+  const [deadline, setDeadline] = useState<number | null>(null);
+  const expiresInMs = pairing?.expiresInMs ?? null;
+  useEffect(() => {
+    setDeadline(expiresInMs === null ? null : Date.now() + expiresInMs);
+  }, [expiresAt]);
+
+  // Ticks the countdown only. The window is not renewed behind the user's
+  // back: the deadline on screen is then the real one, and a charger that
+  // took too long is a press of Listen away from another window.
+  useEffect(() => {
+    if (!listening) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [listening]);
+
+  return {
+    listening,
+    seen: (pairing?.seen ?? []) as SeenCharger[],
+    base,
+    baseUrls,
+    port: base.split(":")[2]?.split("/")[0] ?? "",
+    remainingMs: (deadline ?? now) - now,
+    /** How long this window has been open with the user watching. Zero while
+     *  closed, so callers cannot mistake "never started" for "silent". */
+    quietFor: listening && startedAt !== null ? now - startedAt : 0,
+    starting: begin.isPending,
+    start: () => {
+      setStartedAt(Date.now());
+      begin.mutate();
+    },
+    stop: () => {
+      setStartedAt(null);
+      cancel.mutate();
+    },
+  };
+}
+
 /**
  * The whole "get your charger talking to ChargeHA" step.
  *
@@ -284,42 +414,8 @@ export function OcppConnectBlock(
     onDetected: (id: string) => void;
   },
 ) {
-  const [now, setNow] = useState(() => Date.now());
-  const [startedAt, setStartedAt] = useState<number | null>(null);
-  const begin = trpc.plugin.charger.ocpp.beginPairing.useMutation();
-  const stop = trpc.plugin.charger.ocpp.cancelPairing.useMutation();
-  // Pairing is a property of the listener, not of any charger row, so this
-  // query takes no input and works identically with or without a saved row.
-  const pairingStatus = trpc.plugin.charger.ocpp.pairingStatus.useQuery(
-    undefined,
-    { refetchInterval: 2000 },
-  );
-
-  const pairing = pairingStatus.data?.pairing;
-  const listening = pairing?.armed === true;
-  const seen: SeenCharger[] = pairing?.seen ?? [];
-  const baseUrls = pairingStatus.data?.baseUrls ?? [];
-  const base = baseUrls[0] ?? browserGuessUrl();
-  const port = base.split(":")[2]?.split("/")[0] ?? "";
-  const expiresAt = pairing?.expiresAt ?? null;
-
-  // The deadline on the local clock. Taken from the server's own "time left"
-  // and re-anchored whenever a new window opens, so clock skew between the two
-  // machines cannot show a five-minute window as 5:04.
-  const [deadline, setDeadline] = useState<number | null>(null);
-  const expiresInMs = pairing?.expiresInMs ?? null;
-  useEffect(() => {
-    setDeadline(expiresInMs === null ? null : Date.now() + expiresInMs);
-  }, [expiresAt]);
-
-  // Ticks the countdown only. The window is not renewed behind the user's
-  // back: the deadline on screen is then the real one, and a charger that
-  // took too long is a press of Listen away from another window.
-  useEffect(() => {
-    if (!listening) return;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [listening]);
+  const pairing = usePairingWindow();
+  const { listening, seen, base, baseUrls, port, remainingMs } = pairing;
 
   // Adopt the id the charger announced. Detecting it and then still showing
   // "not detected yet" until the user clicks a link is the contradiction this
@@ -331,8 +427,8 @@ export function OcppConnectBlock(
     if (seen.length === 1 && chargerId === "") onDetected(seen[0].chargerId);
   }, [seen.length, chargerId]);
 
-  const quiet = listening && startedAt !== null && seen.length === 0 &&
-    connected !== true && now - startedAt > QUIET_MS;
+  const quiet = pairing.quietFor > QUIET_MS && seen.length === 0 &&
+    connected !== true;
 
   return (
     <div style={block}>
@@ -344,16 +440,10 @@ export function OcppConnectBlock(
       <Step n={1} title="Click Listen for Chargers below">
         <ListenStep
           listening={listening}
-          remainingMs={(deadline ?? now) - now}
-          pending={begin.isPending}
-          onStart={() => {
-            setStartedAt(Date.now());
-            begin.mutate();
-          }}
-          onStop={() => {
-            setStartedAt(null);
-            stop.mutate();
-          }}
+          remainingMs={remainingMs}
+          pending={pairing.starting}
+          onStart={pairing.start}
+          onStop={pairing.stop}
         />
       </Step>
 
@@ -385,6 +475,14 @@ export function OcppConnectBlock(
 
       <Step n={4} title="If your charger isn't detected, enter its ID">
         <ChargerIdStep chargerId={chargerId} onDetected={onDetected} />
+      </Step>
+
+      <Step n={5} title="Test the connection">
+        {
+          /* Keyed by id: a different charger is a different test, so the old
+            verdict is dropped rather than left standing against the new one. */
+        }
+        <TestStep key={chargerId.trim()} chargePointId={chargerId.trim()} />
       </Step>
     </div>
   );

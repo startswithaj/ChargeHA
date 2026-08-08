@@ -3,7 +3,6 @@ import { skipToken } from "@tanstack/react-query";
 import {
   PluginFieldInputs,
   type PluginStepDef,
-  PluginTestRow,
   stepStyles as styles,
   type WizardNext,
 } from "../../../hostUi.ts";
@@ -49,21 +48,8 @@ export const ocppSetupStep: PluginStepDef = {
     );
 
     const values = { ...OCPP_DEFAULTS, ...(configQuery.data ?? {}), ...draft };
-    // The id the charger announced, not a row id — no row exists yet, which is
-    // why the test is addressed by charge point id here.
-    const chargePointId = (values.ocppChargerId ?? "").trim();
-    const idChosen = chargePointId !== "";
-
-    const test = trpc.plugin.charger.ocpp.testConnection.useMutation();
-    const result = test.data;
-    const testMessage = (() => {
-      if (!idChosen) return "Detect or enter a Charger ID first.";
-      if (result?.success === false) return result.error;
-      if (result?.success === true) {
-        return `Responding in ${result.latencyMs} ms`;
-      }
-      return null;
-    })();
+    // The id the charger announced, not a row id — no row exists until Next.
+    const idChosen = (values.ocppChargerId ?? "").trim() !== "";
 
     // One save, on Next — selecting a discovered charger and editing fields
     // above only touch local draft state.
@@ -84,13 +70,6 @@ export const ocppSetupStep: PluginStepDef = {
             connected={null}
             info={null}
             onDetected={(id) => setDraft((d) => ({ ...d, ocppChargerId: id }))}
-          />
-          <PluginTestRow
-            pending={test.isPending}
-            disabled={!idChosen}
-            message={testMessage}
-            tone={result?.success === false ? "red" : "gray"}
-            onTest={() => test.mutate({ chargePointId })}
           />
           <PluginFieldInputs
             fields={fields}
