@@ -477,6 +477,23 @@ export class ChargingPointManager {
     return resolution;
   }
 
+  /** Explicit vehicle assignment for a smart charger — resolveVehicle prefers
+   *  this over inference. `null` clears it, returning to inference. Updates
+   *  the in-memory row so the next controller loop or resolveVehicle call
+   *  sees it immediately; no rebuild/restart needed since the adapter itself
+   *  is unaffected. Only meaningful for `kind: "smart"` rows — vehicle_api
+   *  rows are already tied to their vehicle by construction. */
+  async setChargerVehicleId(
+    id: string,
+    vehicleId: string | null,
+  ): Promise<void> {
+    const entry = this.chargers.get(id);
+    if (!entry || entry.row.kind !== "smart") return;
+    await this.db.updateChargerVehicleId(id, vehicleId);
+    entry.row = { ...entry.row, vehicleId };
+    this.eventEmitter.emit("chargers_changed", {});
+  }
+
   // ── Mode / priority / CRUD (called from chargersRouter) ──────────────
 
   async setMode(

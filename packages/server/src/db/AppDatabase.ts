@@ -272,6 +272,12 @@ export class AppDatabase {
   async updateChargerActive(id: string, active: boolean): Promise<void> {
     await this.chargers.updateChargerActive(id, active);
   }
+  async updateChargerVehicleId(
+    id: string,
+    vehicleId: string | null,
+  ): Promise<void> {
+    await this.chargers.updateChargerVehicleId(id, vehicleId);
+  }
   async deleteCharger(id: string): Promise<void> {
     // Schedules reference a charger but have no DB-level FK, so cascade here.
     await this.schedules.deleteSchedulesByCharger(id);

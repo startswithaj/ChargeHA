@@ -549,24 +549,29 @@ export class OcppCentralSystem {
     mv: ReturnType<typeof meterValuesReq.parse>,
   ): Partial<OcppLiveData> {
     const samples = mv.meterValue.flatMap((entry) => entry.sampledValue);
-    const read = (measurand: string) => {
-      const sample = samples.find(
+    const sampleFor = (measurand: string) =>
+      samples.find(
         (s) => (s.measurand ?? "Energy.Active.Import.Register") === measurand,
       );
+    const read = (measurand: string) => {
+      const sample = sampleFor(measurand);
       return sample ? parseFloat(sample.value) : null;
     };
-    const rawPower = read("Power.Active.Import");
-    const powerUnit = samples.find(
-      (s) => s.measurand === "Power.Active.Import",
-    )?.unit;
-    const energyRegisterWh = read("Energy.Active.Import.Register");
+    const powerSample = sampleFor("Power.Active.Import");
+    const rawPower = powerSample ? parseFloat(powerSample.value) : null;
+    // The register carries its own unit, so it must be normalised the same
+    // way power is — a kWh charger otherwise reads 1000x low.
+    const registerSample = sampleFor("Energy.Active.Import.Register");
+    const energyRegisterWh = registerSample
+      ? toWattHours(parseFloat(registerSample.value), registerSample.unit)
+      : null;
     return {
       // PRD fallback chain tier 2: no power measurand → derive from how
       // fast the register counts up. Tier 3 (current × voltage) stays in
       // the adapter for when neither power nor a register delta exists.
       powerW: rawPower === null
         ? this.derivePowerFromRegister(chargePointId, energyRegisterWh)
-        : toWatts(rawPower, powerUnit),
+        : toWatts(rawPower, powerSample?.unit),
       currentA: read("Current.Import"),
       voltageV: read("Voltage"),
       energyRegisterWh,
@@ -643,4 +648,9 @@ function isAccepted(res: unknown): boolean {
 /** OCPP allows Power.Active.Import in W (default) or kW. */
 function toWatts(value: number, unit: string | undefined): number {
   return unit === "kW" ? value * 1000 : value;
+}
+
+/** OCPP allows Energy.Active.Import.Register in Wh (default) or kWh. */
+function toWattHours(value: number, unit: string | undefined): number {
+  return unit === "kWh" ? value * 1000 : value;
 }

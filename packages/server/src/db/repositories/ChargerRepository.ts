@@ -90,6 +90,17 @@ export class ChargerRepository {
       .where(eq(chargers.id, id));
   }
 
+  /** Explicit vehicle assignment for a smart charger. `null` clears it,
+   *  returning resolution to inference — never `""`. */
+  async updateChargerVehicleId(
+    id: string,
+    vehicleId: string | null,
+  ): Promise<void> {
+    await this.db.update(chargers)
+      .set({ vehicleId, updatedAt: new Date().toISOString() })
+      .where(eq(chargers.id, id));
+  }
+
   async deleteCharger(id: string): Promise<void> {
     await this.db.delete(chargers).where(eq(chargers.id, id));
   }

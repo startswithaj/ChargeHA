@@ -21,6 +21,10 @@ vi.mock("../../../trpc.ts", () => ({
         }),
       },
       reorder: { useMutation: () => ({ mutate: vi.fn(), error: null }) },
+      setVehicleId: { useMutation: () => ({ mutate: vi.fn(), error: null }) },
+    },
+    vehicle: {
+      list: { useQuery: () => ({ data: [], isLoading: false }) },
     },
   },
 }));

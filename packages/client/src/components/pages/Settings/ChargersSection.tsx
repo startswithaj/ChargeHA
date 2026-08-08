@@ -132,6 +132,7 @@ function ChargerListItem(
     <div style={{ borderRadius: 6, background: "var(--gray-a2)" }}>
       <ChargerRow
         charger={charger}
+        vehicles={settings.vehicles}
         reorderable={settings.reorderable}
         editable={isSmartCharger(charger) &&
           hasSettingsPanel(charger.chargerAdapterType)}
@@ -139,6 +140,8 @@ function ChargerListItem(
         onEdit={() => expanded ? settings.cancelEdit() : settings.edit(charger)}
         onRemove={() => settings.requestRemove(charger.id)}
         onMove={(direction) => settings.move(charger.id, direction)}
+        onAssignVehicle={(vehicleId) =>
+          settings.assignVehicle(charger.id, vehicleId)}
       />
       {expanded && (
         <ChargerEditForm

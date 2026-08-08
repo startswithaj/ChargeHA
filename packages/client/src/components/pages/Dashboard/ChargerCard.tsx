@@ -12,6 +12,10 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ChargerState, ChargingPointMode } from "@chargeha/shared";
+
+// Mirrors ChargingPointManager's VehicleResolution["kind"] — kept local
+// since the type isn't shared, only the tRPC output that carries it.
+type VehicleResolutionKind = "linked" | "inferred" | "ambiguous" | "none";
 import { kwhValue, kwValue } from "../../../utils/Format.ts";
 import { useChargerCommands } from "../../../hooks/useChargers.ts";
 import { Spinner } from "../../ui/Spinner.tsx";
@@ -154,7 +158,16 @@ function getStatusText(
 }
 
 export function ChargerCard(
-  { id, name, mode, state, solarW, gridW, controllerDetail }: {
+  {
+    id,
+    name,
+    mode,
+    state,
+    solarW,
+    gridW,
+    controllerDetail,
+    vehicleResolution,
+  }: {
     id: string;
     name: string;
     mode: ChargingPointMode;
@@ -162,10 +175,14 @@ export function ChargerCard(
     solarW: number;
     gridW: number;
     controllerDetail: string | null;
+    /** Only "ambiguous" (several cars plugged in, none assigned) is worth a
+     *  card warning — every other kind resolves fine or has nothing to say. */
+    vehicleResolution: VehicleResolutionKind;
   },
 ) {
   const { commandPending, changeMode } = useChargerCommands(id);
   const unconfigured = state?.status === "unconfigured";
+  const ambiguous = vehicleResolution === "ambiguous";
   const alarm = isAlarm(state);
 
   return (
@@ -214,6 +231,12 @@ export function ChargerCard(
         {unconfigured && (
           <DetailRow icon={Settings}>
             Open charger settings to finish setup
+          </DetailRow>
+        )}
+        {!unconfigured && ambiguous && (
+          <DetailRow icon={TriangleAlert} color="yellow">
+            Two cars are plugged in — choose which one is on this charger in
+            charger settings
           </DetailRow>
         )}
         {/* Nothing has reported yet, so "not charging" would be a guess. */}

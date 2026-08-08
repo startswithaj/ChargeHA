@@ -271,6 +271,7 @@ function ChargingPointCards(
             solarW={solarGrid[point.id]?.solarW ?? 0}
             gridW={solarGrid[point.id]?.gridW ?? 0}
             controllerDetail={controllerStatuses[point.id]?.detail ?? null}
+            vehicleResolution={point.vehicleResolution}
           />
         );
       })}
@@ -380,7 +381,12 @@ export function VehicleList(
     },
   });
 
-  const { chargers: points } = useChargers();
+  const { chargers: allPoints } = useChargers();
+  // A deactivated point is not driving anything — its middleware is
+  // unregistered, so its card's Charge Now and Start Charging would command a
+  // charger the server no longer has. The list keeps inactive rows because
+  // the API-control toggle in settings reads `active` off them.
+  const points = useMemo(() => allPoints.filter((p) => p.active), [allPoints]);
   const solarGrid = useChargingSolarGrid(
     realtime,
     chargingEntriesFromPoints(points),

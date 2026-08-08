@@ -299,7 +299,25 @@ export class ChargeController {
         }
       },
       getState: () => this.mergedChargerState(row),
-      start: (amps, ctx) => {
+      // Ambiguous resolution means mergedChargerState fell back to
+      // batteryLevel: 0 / chargeLimit: 100 — the engine would never see
+      // "battery full" and would happily command amps forever. Refusing to
+      // start (or adjust) while ambiguous is what keeps that fallback safe;
+      // an explicit assignment in Settings is what clears it.
+      start: async (amps, ctx) => {
+        const resolution = await this.chargingPointManager.resolveVehicle(
+          row.id,
+        );
+        if (resolution.kind === "ambiguous") {
+          // The caller discards this return value, so without the log a
+          // charger that quietly never starts has no explanation anywhere
+          // but the dashboard card.
+          this.logger.warn(
+            `Charger ${row.name} (${row.id}) not started: more than one ` +
+              "vehicle is plugged in and none is assigned to it",
+          );
+          return { success: false, error: "Ambiguous vehicle resolution" };
+        }
         const chargerState = this.chargingPointManager.getState(row.id);
         if (!chargerState) return Promise.resolve();
         return this.chargingPointManager.startChargingAt(

@@ -19,6 +19,12 @@ const vehicleControlInput = z.object({
   vehicleId: z.string(),
   active: z.boolean(),
 });
+// `vehicleId: null` clears the assignment, returning resolution to
+// inference — never an empty string.
+const setVehicleIdInput = z.object({
+  id: z.string(),
+  vehicleId: z.string().nullable(),
+});
 
 export const chargersRouter = router({
   list: publicProcedure.query(async ({ ctx }) => {
@@ -70,6 +76,15 @@ export const chargersRouter = router({
       await ctx.chargingPointManager.setVehicleApiControl(
         input.vehicleId,
         input.active,
+      );
+    },
+  ),
+
+  setVehicleId: publicProcedure.input(setVehicleIdInput).mutation(
+    async ({ ctx, input }) => {
+      await ctx.chargingPointManager.setChargerVehicleId(
+        input.id,
+        input.vehicleId,
       );
     },
   ),

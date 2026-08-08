@@ -8,6 +8,8 @@ import type { ChargerWithState } from "../../../hooks/useChargers.ts";
 const { makeHookReturn, hookRef } = vi.hoisted(() => {
   const make = (overrides: Record<string, unknown> = {}) => ({
     chargers: [] as unknown[],
+    vehicles: [] as { id: string; name: string }[],
+    assignVehicle: vi.fn(),
     reorderable: false,
     error: null as string | null,
     confirm: null as unknown,
@@ -243,5 +245,51 @@ describe("ChargersSection", () => {
     hookRef.current = makeHookReturn({ error: "Charger unreachable" });
     renderWithProviders(<ChargersSection />);
     expect(screen.getByText("Charger unreachable")).toBeInTheDocument();
+  });
+
+  it("offers a vehicle assignment dropdown for a smart charger, defaulting to Automatic", () => {
+    hookRef.current = makeHookReturn({
+      chargers: [makeCharger()],
+      vehicles: [{ id: "VEH1", name: "Model 3" }, {
+        id: "VEH2",
+        name: "Ioniq 5",
+      }],
+    });
+    renderWithProviders(<ChargersSection />);
+
+    expect(
+      screen.getByLabelText("Vehicle for Garage Plug"),
+    ).toHaveTextContent("Automatic");
+  });
+
+  it("assigns a vehicle from the dropdown", () => {
+    hookRef.current = makeHookReturn({
+      chargers: [makeCharger()],
+      vehicles: [{ id: "VEH1", name: "Model 3" }],
+    });
+    renderWithProviders(<ChargersSection />);
+
+    fireEvent.click(screen.getByLabelText("Vehicle for Garage Plug"));
+    fireEvent.click(screen.getByRole("option", { name: "Model 3" }));
+
+    expect(hookRef.current.assignVehicle).toHaveBeenCalledWith("c1", "VEH1");
+  });
+
+  it("does not offer a vehicle dropdown for a vehicle-API charging point", () => {
+    hookRef.current = makeHookReturn({
+      chargers: [
+        makeCharger({
+          id: "t1",
+          name: "Model 3",
+          vehicleId: "VIN1",
+          kind: "vehicle_api",
+        }),
+      ],
+      vehicles: [{ id: "VEH1", name: "Model 3" }],
+    });
+    renderWithProviders(<ChargersSection />);
+
+    expect(screen.queryByLabelText("Vehicle for Model 3")).not
+      .toBeInTheDocument();
   });
 });

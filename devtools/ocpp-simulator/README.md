@@ -32,8 +32,8 @@ ADMIN_HOST_PORT=19999 \
 
 The app keys every socket by the charge point id the device announces, so
 several simulators can run at once. Each needs its own compose project name
-(`-p`) — otherwise compose replaces the running container instead of adding
-one — plus its own `CP_ID` and `ADMIN_HOST_PORT`.
+(`-p`) — otherwise compose replaces the running container instead of adding one
+— plus its own `CP_ID` and `ADMIN_HOST_PORT`.
 
 ```sh
 CP_ID=vcp-dev-2 ADMIN_HOST_PORT=19998 \

@@ -1,11 +1,16 @@
 import { ArrowDownIcon, ArrowUpIcon } from "@radix-ui/react-icons";
-import { Badge, IconButton, Text } from "@radix-ui/themes";
+import { Badge, IconButton, Select, Text } from "@radix-ui/themes";
 import { Pencil, Trash2, X } from "lucide-react";
 import type { ChargerStatus, ChargingPointMode } from "@chargeha/shared";
 import {
   type ChargerWithState,
   isSmartCharger,
 } from "../../../hooks/useChargers.ts";
+
+// The dropdown's "Automatic" option means "clear the assignment" — Radix
+// Select can't carry `null` as a value, so it gets its own string sentinel
+// translated back to null at the call site. Never stored or sent as "".
+const AUTOMATIC = "__automatic__";
 
 export const MODE_LABELS: Record<ChargingPointMode, string> = {
   auto: "Auto",
@@ -39,15 +44,52 @@ const STATUS_COLORS: Record<ChargerStatus, "green" | "red" | "gray" | "amber"> =
 const labelFor = (map: Record<string, string>, key: string): string =>
   map[key] ?? key;
 
+function VehicleAssignSelect(
+  { chargerName, vehicleId, vehicles, onAssign }: {
+    chargerName: string;
+    vehicleId: string | null;
+    vehicles: { id: string; name: string }[];
+    onAssign: (vehicleId: string | null) => void;
+  },
+) {
+  return (
+    <Select.Root
+      size="1"
+      value={vehicleId ?? AUTOMATIC}
+      onValueChange={(value) => onAssign(value === AUTOMATIC ? null : value)}
+    >
+      <Select.Trigger aria-label={`Vehicle for ${chargerName}`} />
+      <Select.Content>
+        <Select.Item value={AUTOMATIC}>Automatic</Select.Item>
+        {vehicles.map((v) => (
+          <Select.Item key={v.id} value={v.id}>{v.name}</Select.Item>
+        ))}
+      </Select.Content>
+    </Select.Root>
+  );
+}
+
 export function ChargerRow(
-  { charger, reorderable, editable, expanded, onEdit, onRemove, onMove }: {
+  {
+    charger,
+    vehicles,
+    reorderable,
+    editable,
+    expanded,
+    onEdit,
+    onRemove,
+    onMove,
+    onAssignVehicle,
+  }: {
     charger: ChargerWithState;
+    vehicles: { id: string; name: string }[];
     reorderable: boolean;
     editable: boolean;
     expanded: boolean;
     onEdit: () => void;
     onRemove: () => void;
     onMove: (direction: "up" | "down") => void;
+    onAssignVehicle: (vehicleId: string | null) => void;
   },
 ) {
   const smart = isSmartCharger(charger);
@@ -87,6 +129,14 @@ export function ChargerRow(
         </Badge>
         {reorderable && (
           <Text size="1" color="gray">Priority {charger.priority}</Text>
+        )}
+        {smart && (
+          <VehicleAssignSelect
+            chargerName={charger.name}
+            vehicleId={charger.vehicleId}
+            vehicles={vehicles}
+            onAssign={onAssignVehicle}
+          />
         )}
       </div>
 

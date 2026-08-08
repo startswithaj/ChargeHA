@@ -1,10 +1,13 @@
 FROM node:22-alpine
 RUN apk add --no-cache git
-ARG VCP_REF=master
-# Pin VCP_REF to a commit SHA in CI. Fetch the ref explicitly — a plain
-# depth-1 clone only has the default-branch tip, so `checkout <sha>` would
-# fail; and a swallowed failure (|| true) would silently run master while
-# claiming a pin. A bad ref must fail the build loudly.
+# Upstream's default branch is `main`; `master` still exists but was abandoned
+# at 8b65895 (2025-03-19), so a `master` default silently pinned us to a dead
+# branch. Default to a SHA on `main` instead — a branch name is not a pin.
+ARG VCP_REF=df2b8d749fdbb0493d1582f9ea7a3d55712c2666
+# Fetch the ref explicitly — a plain depth-1 clone only has the default-branch
+# tip, so `checkout <sha>` would fail; and a swallowed failure (|| true) would
+# silently run the default branch while claiming a pin. A bad ref must fail the
+# build loudly.
 RUN git clone --no-checkout --depth 1 \
     https://github.com/solidstudiosh/ocpp-virtual-charge-point /vcp \
   && cd /vcp \

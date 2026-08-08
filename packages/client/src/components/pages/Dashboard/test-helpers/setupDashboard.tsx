@@ -161,6 +161,10 @@ function setPointsFromVehicles(
       mode: v.mode ?? "auto",
       priority: v.priority ?? 1,
       vehicleId: v.id,
+      // Real rows always carry this; the dashboard hides inactive points, so
+      // a fixture without it renders nothing at all.
+      active: v.active ?? true,
+      kind: v.kind ?? "vehicle_api",
       createdAt: now,
       updatedAt: now,
       resolvedVehicleId: v.id,

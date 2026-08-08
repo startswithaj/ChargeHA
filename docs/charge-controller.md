@@ -217,6 +217,48 @@ A `suspendable` hint is included on each engine decision and persisted with the
 log entry, but it is not currently acted on by the controller — wake suppression
 is now the middleware's job.
 
+## Smart charger vehicle resolution
+
+A vehicle-API charging point (Tesla, etc.) always knows which car it is — the
+car told it. A smart charger (a plug or a wallbox that isn't vehicle-aware)
+doesn't: it only knows something is plugged in, not what.
+`ChargingPointManager.resolveVehicle` decides which vehicle's data (battery
+level, charge limit) applies to that charger, in one of two ways:
+
+- **Explicit assignment.** If the charger's row has a `vehicleId` set, that
+  vehicle is used — no guessing. Set this from the charger's row in Settings (a
+  dropdown next to mode/priority, listing your vehicles plus "Automatic"). Takes
+  effect on the next loop; no restart needed. Choosing "Automatic" clears the
+  assignment and returns to inference below.
+- **Inference.** With no explicit assignment, the controller picks whichever
+  vehicle is plugged in (`isPluggedIn`), at home (`isHome !== false`), and not
+  currently driven by its own API. If exactly one vehicle matches, that's the
+  answer. If none match, there's nothing to resolve. If **more than one**
+  matches — two cars plugged in at home — the controller refuses to guess.
+
+One car at home works fine with inference and needs no configuration. **Two or
+more cars that can plug into the same smart charger need an explicit
+assignment**, or the charger has no way to tell them apart.
+
+### What happens if you don't assign one
+
+An ambiguous resolution (several candidates, none explicit) has no vehicle data
+to report: no battery level, no charge limit. Rather than invent one (the merged
+state's `batteryLevel: 0` / `chargeLimit: 100` fallback used when a vehicle is
+temporarily unreachable would otherwise make the engine think the battery is
+always empty and never stop), the controller refuses to start or adjust amps for
+that charger while ambiguous — an already-running charge is left alone, but
+nothing new is commanded. The dashboard card for that charger shows a warning
+telling you to assign a vehicle in Settings. Assigning one (or unplugging down
+to a single car) clears the warning and resumes normal control on the next loop.
+
+An explicit assignment is a statement, not a live check — it applies even if
+that vehicle isn't currently plugged into the charger, the same way a
+vehicle-API charging point stays linked to its car regardless of momentary plug
+state. If you swap which car uses a given smart charger, update the assignment
+(or clear it back to Automatic) rather than relying on inference to catch the
+change.
+
 ## Decision logging
 
 Every cycle produces a log entry per vehicle with:

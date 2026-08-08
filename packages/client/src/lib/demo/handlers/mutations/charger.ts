@@ -21,6 +21,7 @@ type ChargerMutations = Pick<
   | "charger.reorder"
   | "charger.remove"
   | "charger.setVehicleControl"
+  | "charger.setVehicleId"
   | "plugin.charger.simulated_charger.updateState"
 >;
 
@@ -146,6 +147,11 @@ export const chargerMutations: ChargerMutations = {
       apiControlActive: input.active,
       isCharging: input.active ? v.isCharging : false,
     }));
+    emitDemoEvent({ type: "chargers_changed", data: {} });
+  },
+
+  "charger.setVehicleId": (input) => {
+    patchCharger(input.id, (c) => ({ ...c, vehicleId: input.vehicleId }));
     emitDemoEvent({ type: "chargers_changed", data: {} });
   },
 

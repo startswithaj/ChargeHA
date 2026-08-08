@@ -264,6 +264,12 @@ describe("ChargingPointManager", () => {
         );
         return Promise.resolve();
       },
+      updateChargerVehicleId: (id, vehicleId) => {
+        chargerRows = chargerRows.map((r) =>
+          r.id === id ? { ...r, vehicleId } : r
+        );
+        return Promise.resolve();
+      },
     });
 
     middlewares = new Map();
@@ -818,6 +824,93 @@ describe("ChargingPointManager", () => {
       const vehicleId = await manager.resolveVehicleId(ROW.id);
 
       expect(vehicleId).toBeNull();
+    });
+
+    it("prefers the explicit assignment even when inference would pick a different vehicle", async () => {
+      const row = { ...ROW, id: "charger-linked", vehicleId: "VEH1" };
+      await manager.addCharger(row);
+      const mw = middlewares.get(row.id);
+      assertExists(mw);
+      mw.seedCache({ ...STATE, isCharging: true });
+      // Only VEH2 is plugged in — inference alone would pick VEH2, not VEH1.
+      vehicleStates = new Map([
+        ["VEH2", { ...VEHICLE_STATE, vehicleId: "VEH2", isPluggedIn: true }],
+      ]);
+
+      const resolution = await manager.resolveVehicle(row.id);
+
+      expect(resolution).toEqual({ kind: "linked", vehicleId: "VEH1" });
+    });
+
+    it("resolves an explicit assignment even when that vehicle is not plugged in", async () => {
+      const row = { ...ROW, id: "charger-linked", vehicleId: "VEH1" };
+      await manager.addCharger(row);
+      vehicleStates = new Map([
+        ["VEH1", { ...VEHICLE_STATE, vehicleId: "VEH1", isPluggedIn: false }],
+      ]);
+
+      const resolution = await manager.resolveVehicle(row.id);
+
+      // Explicit assignment always wins — it is a fact the user stated, not
+      // a guess to be second-guessed by momentary plug state. Mirrors how a
+      // vehicle_api charging point stays linked to its car regardless of
+      // whether it's currently plugged in.
+      expect(resolution).toEqual({ kind: "linked", vehicleId: "VEH1" });
+    });
+
+    it("resolves two plugged-in vehicles correctly when one is explicitly assigned", async () => {
+      const row = { ...ROW, id: "charger-linked", vehicleId: "VEH1" };
+      await manager.addCharger(row);
+      vehicleStates = new Map([
+        ["VEH1", { ...VEHICLE_STATE, vehicleId: "VEH1", isPluggedIn: true }],
+        ["VEH2", { ...VEHICLE_STATE, vehicleId: "VEH2", isPluggedIn: true }],
+      ]);
+
+      const resolution = await manager.resolveVehicle(row.id);
+
+      expect(resolution).toEqual({ kind: "linked", vehicleId: "VEH1" });
+    });
+  });
+
+  describe("setChargerVehicleId", () => {
+    it("assigns a vehicle to a smart charger and takes effect without a rebuild", async () => {
+      chargerRows = [ROW];
+      await manager.addCharger(ROW);
+      vehicleStates = new Map([
+        ["VEH1", { ...VEHICLE_STATE, vehicleId: "VEH1", isPluggedIn: true }],
+        ["VEH2", { ...VEHICLE_STATE, vehicleId: "VEH2", isPluggedIn: true }],
+      ]);
+      // Two plugged in, unassigned — would otherwise be ambiguous.
+      expect((await manager.resolveVehicle(ROW.id)).kind).toBe("ambiguous");
+
+      await manager.setChargerVehicleId(ROW.id, "VEH1");
+
+      const resolution = await manager.resolveVehicle(ROW.id);
+      expect(resolution).toEqual({ kind: "linked", vehicleId: "VEH1" });
+      expect(chargerRows.find((r) => r.id === ROW.id)?.vehicleId).toBe(
+        "VEH1",
+      );
+    });
+
+    it("clearing the assignment returns resolution to inference", async () => {
+      const row = { ...ROW, id: "charger-linked", vehicleId: "VEH1" };
+      chargerRows = [row];
+      await manager.addCharger(row);
+      vehicleStates = new Map([
+        ["VEH2", { ...VEHICLE_STATE, vehicleId: "VEH2", isPluggedIn: true }],
+      ]);
+
+      await manager.setChargerVehicleId(row.id, null);
+
+      const resolution = await manager.resolveVehicle(row.id);
+      expect(resolution).toEqual({ kind: "inferred", vehicleId: "VEH2" });
+      expect(chargerRows.find((r) => r.id === row.id)?.vehicleId).toBeNull();
+    });
+
+    it("does nothing for an unregistered charger", async () => {
+      await manager.setChargerVehicleId("no-such-charger", "VEH1");
+
+      expect(chargerRows).toHaveLength(0);
     });
   });
 });

@@ -12,6 +12,10 @@ services:
       - WS_URL=${WS_URL:-ws://host.docker.internal:8000/api/charger/ocpp}
       - CP_ID=${CP_ID:-vcp-dev}
       - ADMIN_PORT=9999
+      # The built-in meter loop reports a hardcoded 36 kW and carries only the
+      # energy register, so it overwrites anything drive.ts injects. Off here;
+      # drive.ts is the sole source of meter values.
+      - DISABLE_METER_VALUES=true
     ports:
       # Overridable so a second instance (docker compose -p ...) can bind its own port.
       - "${ADMIN_HOST_PORT:-19999}:9999" # admin API

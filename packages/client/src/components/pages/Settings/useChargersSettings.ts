@@ -6,6 +6,7 @@ import {
   isSmartCharger,
   useChargers,
 } from "../../../hooks/useChargers.ts";
+import { useVehicles } from "../../../hooks/useVehicles.ts";
 
 export type ChargerConfirm =
   // `commit` is what actually creates the charger — a type with no settings
@@ -38,6 +39,7 @@ function reorderedIds(
 
 export function useChargersSettings() {
   const { chargers } = useChargers();
+  const { vehicles } = useVehicles();
   const utils = trpc.useUtils();
   const invalidate = () => utils.charger.list.invalidate();
 
@@ -48,6 +50,9 @@ export function useChargersSettings() {
     onSuccess: invalidate,
   });
   const reorderMutation = trpc.charger.reorder.useMutation({
+    onSuccess: invalidate,
+  });
+  const setVehicleIdMutation = trpc.charger.setVehicleId.useMutation({
     onSuccess: invalidate,
   });
 
@@ -108,6 +113,9 @@ export function useChargersSettings() {
 
   return {
     chargers,
+    vehicles,
+    assignVehicle: (chargerId: string, vehicleId: string | null) =>
+      setVehicleIdMutation.mutate({ id: chargerId, vehicleId }),
     reorderable: chargers.length > 1,
     error: createMutation.error?.message ?? removeMutation.error?.message ??
       null,

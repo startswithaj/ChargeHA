@@ -133,6 +133,27 @@ describe("OCPP transaction adoption", () => {
     expect(cs.getData(CP).energyRegisterWh).toBe(4000);
   });
 
+  it("scales a kWh energy register to Wh — OCPP allows either unit", async () => {
+    const { cs, socket } = attached();
+
+    // Raw call rather than the meterValues helper: the point of this test is
+    // the unit field, which the helper deliberately omits.
+    await call(socket, "MeterValues", {
+      connectorId: 1,
+      transactionId: 7,
+      meterValue: [{
+        timestamp: new Date().toISOString(),
+        sampledValue: [{
+          value: "1.5",
+          measurand: "Energy.Active.Import.Register",
+          unit: "kWh",
+        }],
+      }],
+    });
+
+    expect(cs.getData(CP).energyRegisterWh).toBe(1500);
+  });
+
   it("keeps the transaction counter ahead of an adopted id — the next StartTransaction returns 8", async () => {
     const { cs, socket } = attached();
 

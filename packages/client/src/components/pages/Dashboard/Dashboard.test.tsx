@@ -211,11 +211,12 @@ vi.mock("../../MetricCard/MetricCard.tsx", () => ({
 // computed solar/grid split per vehicle.
 vi.mock("../../VehicleCard/VehicleCard.tsx", () => ({
   VehicleCard: (
-    { name, onNavigateSettings, solarPowerW, gridPowerW }: {
+    { name, onNavigateSettings, solarPowerW, gridPowerW, readOnly }: {
       name: string;
       onNavigateSettings?: () => void;
       solarPowerW?: number;
       gridPowerW?: number;
+      readOnly?: boolean;
     },
   ) => (
     <div
@@ -223,6 +224,7 @@ vi.mock("../../VehicleCard/VehicleCard.tsx", () => ({
       data-name={name}
       data-solar-w={solarPowerW ?? ""}
       data-grid-w={gridPowerW ?? ""}
+      data-read-only={readOnly ? "true" : "false"}
     >
       {name}
       {onNavigateSettings && (
@@ -281,6 +283,20 @@ describe("Dashboard", () => {
     expect(screen.getByTestId("vehicle-card")).toBeInTheDocument();
     expect(screen.queryByText("No vehicles configured")).not
       .toBeInTheDocument();
+    expect(screen.getByTestId("vehicle-card"))
+      .toHaveAttribute("data-read-only", "false");
+  });
+
+  it("a vehicle whose charging point is deactivated loses its controls", () => {
+    // API control off deactivates the point but leaves the row in the list,
+    // so the vehicle must fall through to the data-only card rather than keep
+    // buttons that command a charger the server has unregistered.
+    h.setVehicles([makeVehicle({ active: false })]);
+
+    h.render();
+
+    expect(screen.getByTestId("vehicle-card"))
+      .toHaveAttribute("data-read-only", "true");
   });
 
   // ---- Loading state ----

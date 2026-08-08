@@ -157,8 +157,11 @@ vi.mock("../../../trpc.ts", () => ({
     })),
     vehicle: {
       list: {
+        // The mock bypasses useQuery's `select`, so this must already be in
+        // the post-select shape (an array) that useVehicles expects on
+        // `.data` — not the raw `{ vehicles: [] }` server response.
         useQuery: vi.fn(() => ({
-          data: { vehicles: [] },
+          data: [],
           isLoading: false,
           error: null,
         })),
@@ -197,6 +200,18 @@ vi.mock("../../../trpc.ts", () => ({
         })),
       },
       create: {
+        useMutation: vi.fn((_opts?: { onSuccess?: () => void }) => ({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn(),
+          isPending: false,
+          isSuccess: false,
+          isError: false,
+          error: null,
+          data: undefined,
+          reset: vi.fn(),
+        })),
+      },
+      setVehicleId: {
         useMutation: vi.fn((_opts?: { onSuccess?: () => void }) => ({
           mutate: vi.fn(),
           mutateAsync: vi.fn(),
