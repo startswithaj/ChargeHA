@@ -8,7 +8,7 @@ import type { OcppCentralSystem } from "./OcppCentralSystem.ts";
 
 /** Long enough to walk to the charger and paste a URL into its app, short
  *  enough that an unattended window closes on its own. */
-const PAIRING_TTL_MS = 3 * 60 * 1000;
+const PAIRING_TTL_MS = 5 * 60 * 1000;
 
 /** Same default as bootstrap.ts, which owns the actual listen port. */
 const serverPort = (): string => Deno.env.get("PORT") ?? "8000";
@@ -21,6 +21,13 @@ const WS_PATH = "/api/charger/ocpp";
 const chargerInput = z.object({
   chargerRowId: z.string(),
 });
+
+/** Either identifier works. Settings acts on a saved row; the wizard has only
+ *  the id the charger announced, because no row exists until Next saves. */
+const testConnectionInput = z.union([
+  chargerInput,
+  z.object({ chargePointId: z.string().min(1) }),
+]);
 
 /** The OCPP charge point id configured on one charger row, or null when that
  *  row has not been given one yet. The only place a row id becomes a charge
@@ -72,9 +79,16 @@ function pairingProcedures(centralSystem: OcppCentralSystem) {
       return {
         pairing: {
           armed: pairing.armed,
-          // Epoch ms so the panel can show its own countdown without needing
-          // a second endpoint or guessing the TTL.
+          // Epoch ms, which identifies the window — the panel re-anchors its
+          // countdown when this changes.
           expiresAt: pairing.expiresAt,
+          // Time left by the SERVER's clock. The panel counts down from this
+          // rather than subtracting `expiresAt` from its own clock: the two
+          // machines disagree by seconds, which showed as "5:04 left" on a
+          // five-minute window.
+          expiresInMs: pairing.expiresAt === null
+            ? null
+            : Math.max(0, pairing.expiresAt - Date.now()),
           announcedId: pairing.announcedId,
           info: pairing.info,
           // Every charger seen this window, so the panel can offer a choice
@@ -124,9 +138,11 @@ export function createOcppRouter(
     ...pairingProcedures(centralSystem),
 
     testConnection: publicProcedure
-      .input(chargerInput)
+      .input(testConnectionInput)
       .mutation(async ({ input }) => {
-        const chargePointId = await chargePointIdFor(deps, input.chargerRowId);
+        const chargePointId = "chargePointId" in input
+          ? input.chargePointId
+          : await chargePointIdFor(deps, input.chargerRowId);
         if (
           chargePointId === null ||
           !centralSystem.getData(chargePointId).connected

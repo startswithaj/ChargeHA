@@ -5,7 +5,10 @@ import { renderWithProviders } from "../../../../client/src/test-utils.tsx";
 import { StepNextHarness } from "../../../../client/src/components/Wizard/steps/test-helpers/StepNextHarness.tsx";
 import { ocppSetupStep } from "./OcppSetupStep.tsx";
 
-const mocks = vi.hoisted(() => ({ setConfigMutate: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  setConfigMutate: vi.fn(),
+  testMutate: vi.fn(),
+}));
 
 vi.mock("./trpc.ts", () => ({
   trpc: {
@@ -19,6 +22,12 @@ vi.mock("./trpc.ts", () => ({
             useMutation: vi.fn(() => ({
               mutate: mocks.setConfigMutate,
               mutateAsync: mocks.setConfigMutate,
+              isPending: false,
+            })),
+          },
+          testConnection: {
+            useMutation: vi.fn(() => ({
+              mutate: mocks.testMutate,
               isPending: false,
             })),
           },
@@ -63,5 +72,43 @@ describe("ocppSetupStep", () => {
     });
 
     expect(mocks.setConfigMutate).not.toHaveBeenCalled();
+  });
+
+  it("Next is blocked until an ID exists, and a typed one is enough", () => {
+    renderWithProviders(
+      <StepNextHarness def={ocppSetupStep} stepProps={{ chargerId: null }} />,
+    );
+
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+    expect(screen.getByText("Detect a charger, or enter its ID"))
+      .toBeInTheDocument();
+
+    // No charger has answered pairing here — the mock reports `seen: []`.
+    fireEvent.change(screen.getByPlaceholderText("not detected yet"), {
+      target: { value: "CP-1234" },
+    });
+
+    expect(screen.getByRole("button", { name: "Next" })).toBeEnabled();
+  });
+
+  it("Test Connection is disabled until there is a charger ID", () => {
+    renderWithProviders(
+      <StepNextHarness def={ocppSetupStep} stepProps={{ chargerId: null }} />,
+    );
+
+    const testButton = screen.getByRole("button", { name: "Test Connection" });
+    expect(testButton).toBeDisabled();
+    expect(screen.getByText("Detect or enter a Charger ID first."))
+      .toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText("not detected yet"), {
+      target: { value: "CP-1234" },
+    });
+
+    expect(testButton).toBeEnabled();
+
+    fireEvent.click(testButton);
+    // Addressed by charge point id, not row id — no row exists at this step.
+    expect(mocks.testMutate).toHaveBeenCalledWith({ chargePointId: "CP-1234" });
   });
 });

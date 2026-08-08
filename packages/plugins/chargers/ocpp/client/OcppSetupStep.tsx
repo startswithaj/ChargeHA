@@ -3,6 +3,7 @@ import { skipToken } from "@tanstack/react-query";
 import {
   PluginFieldInputs,
   type PluginStepDef,
+  PluginTestRow,
   stepStyles as styles,
   type WizardNext,
 } from "../../../hostUi.ts";
@@ -12,17 +13,17 @@ import { OcppConnectBlock } from "./OcppConnection.tsx";
 
 function ocppNext(
   // No charger row exists yet at this step (the whole point of the wizard),
-  // so "connected" can never be true here — gate on the pairing window
-  // having actually seen a charger, plus the user having picked one, instead.
-  seenAny: boolean,
+  // so "connected" can never be true here — an id is the only thing to gate on.
+  //
+  // Detection is the happy path, but a charge point id is printable — usually
+  // the serial on the charger — so a typed id binds just as well as one that
+  // announced itself. Also requiring the pairing window to have seen something
+  // would trap anyone whose charger reboots slowly.
   idChosen: boolean,
   save: () => Promise<void>,
 ): WizardNext {
-  if (!seenAny) {
-    return { kind: "blocked", reason: "Waiting for a charger to answer" };
-  }
   if (!idChosen) {
-    return { kind: "blocked", reason: "Choose a charger" };
+    return { kind: "blocked", reason: "Detect a charger, or enter its ID" };
   }
   return {
     kind: "ready",
@@ -39,11 +40,6 @@ export const ocppSetupStep: PluginStepDef = {
       chargerId === null ? skipToken : { chargerRowId: chargerId },
     );
     const saveMutation = trpc.plugin.charger.ocpp.setConfig.useMutation();
-    // Row-independent — no charger row exists yet at this step.
-    const pairingStatus = trpc.plugin.charger.ocpp.pairingStatus.useQuery(
-      undefined,
-      { refetchInterval: 2000 },
-    );
     const [draft, setDraft] = useState<Record<string, string>>({});
     // Same pairing affordance as the settings panel, so first-run and later
     // edits behave identically.
@@ -53,8 +49,21 @@ export const ocppSetupStep: PluginStepDef = {
     );
 
     const values = { ...OCPP_DEFAULTS, ...(configQuery.data ?? {}), ...draft };
-    const seenAny = (pairingStatus.data?.pairing.seen.length ?? 0) > 0;
-    const idChosen = (values.ocppChargerId ?? "") !== "";
+    // The id the charger announced, not a row id — no row exists yet, which is
+    // why the test is addressed by charge point id here.
+    const chargePointId = (values.ocppChargerId ?? "").trim();
+    const idChosen = chargePointId !== "";
+
+    const test = trpc.plugin.charger.ocpp.testConnection.useMutation();
+    const result = test.data;
+    const testMessage = (() => {
+      if (!idChosen) return "Detect or enter a Charger ID first.";
+      if (result?.success === false) return result.error;
+      if (result?.success === true) {
+        return `Responding in ${result.latencyMs} ms`;
+      }
+      return null;
+    })();
 
     // One save, on Next — selecting a discovered charger and editing fields
     // above only touch local draft state.
@@ -67,7 +76,7 @@ export const ocppSetupStep: PluginStepDef = {
     };
 
     return {
-      next: ocppNext(seenAny, idChosen, save),
+      next: ocppNext(idChosen, save),
       view: (
         <div className={styles.stepContainer}>
           <OcppConnectBlock
@@ -75,6 +84,13 @@ export const ocppSetupStep: PluginStepDef = {
             connected={null}
             info={null}
             onDetected={(id) => setDraft((d) => ({ ...d, ocppChargerId: id }))}
+          />
+          <PluginTestRow
+            pending={test.isPending}
+            disabled={!idChosen}
+            message={testMessage}
+            tone={result?.success === false ? "red" : "gray"}
+            onTest={() => test.mutate({ chargePointId })}
           />
           <PluginFieldInputs
             fields={fields}

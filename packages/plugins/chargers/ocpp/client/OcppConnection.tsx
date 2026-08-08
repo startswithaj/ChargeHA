@@ -1,13 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  Badge,
-  Button,
-  Code,
-  Link,
-  Spinner,
-  Text,
-  TextField,
-} from "@radix-ui/themes";
+import { Badge, Button, Code, Link, Text, TextField } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
 
 /** Fallback only, for the moment before the server reports its own addresses.
@@ -99,6 +91,28 @@ function AddressStep({ base, others }: { base: string; others: string[] }) {
   );
 }
 
+/** Three bars bouncing in sequence. The wait has no measurable pace, so this
+ *  says "still going" without implying progress toward a deadline — the only
+ *  real number, the window countdown, is in step 1. */
+function WaitingBars() {
+  return (
+    <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          style={{
+            width: 3,
+            height: 14,
+            borderRadius: 2,
+            background: "var(--blue-9)",
+            animation: `waitBounce 1s ${i * 0.15}s infinite`,
+          }}
+        />
+      ))}
+    </span>
+  );
+}
+
 /** What turned up, or why nothing has yet.
  *
  *  More than one charger can answer a single window — two in the household, or
@@ -106,9 +120,12 @@ function AddressStep({ base, others }: { base: string; others: string[] }) {
  *  the list is shown rather than us keeping whichever happened to connect
  *  last. A single arrival is adopted without a click. */
 function ResultStep(
-  { seen, chargerId, connected, info, onDetected }: {
+  { seen, chargerId, connected, listening, info, onDetected }: {
     seen: SeenCharger[];
     chargerId: string;
+    /** Nothing is being waited *for* until the window is open, so the spinner
+     *  would otherwise claim work that has not started. */
+    listening: boolean;
     /** A charger whose id is already saved connects normally rather than
      *  through pairing, so it never appears in `seen` — without this the step
      *  would claim we are still waiting for a charger that is plainly here. */
@@ -130,10 +147,18 @@ function ResultStep(
       </div>
     );
   }
+  if (seen.length === 0 && !listening) {
+    return (
+      <Text size="1" color="gray">
+        Nothing yet — press "Listen for charger" above, then save on the
+        charger.
+      </Text>
+    );
+  }
   if (seen.length === 0) {
     return (
       <div style={row}>
-        <Spinner />
+        <WaitingBars />
         <Text size="1" color="gray">
           Waiting for a charger to connect — some reboot before reconnecting, so
           give it a minute and keep this page open.
@@ -278,17 +303,23 @@ export function OcppConnectBlock(
   const port = base.split(":")[2]?.split("/")[0] ?? "";
   const expiresAt = pairing?.expiresAt ?? null;
 
-  // Ticks the countdown, and renews the window while the panel is open:
-  // chargers often need a reboot to pick up new OCPP settings, which can
-  // outlast a single window while the user is still at the charger.
+  // The deadline on the local clock. Taken from the server's own "time left"
+  // and re-anchored whenever a new window opens, so clock skew between the two
+  // machines cannot show a five-minute window as 5:04.
+  const [deadline, setDeadline] = useState<number | null>(null);
+  const expiresInMs = pairing?.expiresInMs ?? null;
+  useEffect(() => {
+    setDeadline(expiresInMs === null ? null : Date.now() + expiresInMs);
+  }, [expiresAt]);
+
+  // Ticks the countdown only. The window is not renewed behind the user's
+  // back: the deadline on screen is then the real one, and a charger that
+  // took too long is a press of Listen away from another window.
   useEffect(() => {
     if (!listening) return;
-    const timer = setInterval(() => {
-      setNow(Date.now());
-      if ((expiresAt ?? 0) - Date.now() < 45_000) begin.mutate();
-    }, 1000);
+    const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [listening, expiresAt]);
+  }, [listening]);
 
   // Adopt the id the charger announced. Detecting it and then still showing
   // "not detected yet" until the user clicks a link is the contradiction this
@@ -313,7 +344,7 @@ export function OcppConnectBlock(
       <Step n={1} title="Click Listen for Chargers below">
         <ListenStep
           listening={listening}
-          remainingMs={(expiresAt ?? now) - now}
+          remainingMs={(deadline ?? now) - now}
           pending={begin.isPending}
           onStart={() => {
             setStartedAt(Date.now());
@@ -338,6 +369,7 @@ export function OcppConnectBlock(
           seen={seen}
           chargerId={chargerId}
           connected={connected === true}
+          listening={listening}
           info={info}
           onDetected={onDetected}
         />
@@ -351,7 +383,7 @@ export function OcppConnectBlock(
         </Text>
       )}
 
-      <Step n={4} title="If your charger is not detected">
+      <Step n={4} title="If your charger isn't detected, enter its ID">
         <ChargerIdStep chargerId={chargerId} onDetected={onDetected} />
       </Step>
     </div>
