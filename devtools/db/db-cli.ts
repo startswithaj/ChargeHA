@@ -67,30 +67,21 @@ export async function resetDatabase(
     console.debug(`No existing database to back up: ${error}`);
   }
 
-  // Open the database, drop all tables, and recreate
+  // Deleting the file beats emptying it: no list of tables to keep in step
+  // with migrations, and nothing can survive. The WAL sidecars must go too —
+  // left behind, SQLite replays them and the "deleted" rows come back.
+  for (const path of [dbPath, `${dbPath}-wal`, `${dbPath}-shm`]) {
+    try {
+      await Deno.remove(path);
+    } catch (error) {
+      // Already absent is the desired state; anything else is a real problem.
+      if (!(error instanceof Deno.errors.NotFound)) throw error;
+    }
+  }
+
+  // Rebuild from the migrations, exactly as a first run would.
   const db = new AppDatabase(dbPath);
   try {
-    // Drop all tables in correct order (respecting any implicit FK references)
-    const tables = [
-      "controller_logs",
-      "vehicle_charge_readings",
-      "vehicle_poll_logs",
-      "energy_readings",
-      "schedules",
-      "tariff_periods",
-      "vehicles",
-      "sessions",
-      "auth_oidc",
-      "auth_local",
-      "config",
-      "__drizzle_migrations",
-    ];
-    for (const table of tables) {
-      // deno-lint-ignore no-explicit-any
-      (db as any).sqlite.exec(`DROP TABLE IF EXISTS ${table}`);
-    }
-
-    // Recreate all tables
     await db.init();
     console.log("Database reset complete. All tables recreated.");
   } finally {
