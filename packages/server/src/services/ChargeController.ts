@@ -304,20 +304,16 @@ export class ChargeController {
       // "battery full" and would happily command amps forever. Refusing to
       // start (or adjust) while ambiguous is what keeps that fallback safe;
       // an explicit assignment in Settings is what clears it.
-      start: async (amps, ctx) => {
-        const resolution = await this.chargingPointManager.resolveVehicle(
-          row.id,
-        );
-        if (resolution.kind === "ambiguous") {
-          // The caller discards this return value, so without the log a
-          // charger that quietly never starts has no explanation anywhere
-          // but the dashboard card.
-          this.logger.warn(
-            `Charger ${row.name} (${row.id}) not started: more than one ` +
-              "vehicle is plugged in and none is assigned to it",
-          );
-          return { success: false, error: "Ambiguous vehicle resolution" };
-        }
+      // Deliberately no guard on ambiguous vehicle resolution. Not knowing
+      // which car is on the charger is not a reason to refuse to charge it:
+      // the car enforces its own charge limit, so the worst case is charging
+      // when we could have stopped early, and a car that silently never
+      // charges is worse than one that charges more than it needed to.
+      // mergedChargerState's batteryLevel 0 / chargeLimit 100 fallback keeps
+      // solar tracking and schedules working; only "battery full" is lost,
+      // and the car handles that itself. The dashboard card warns so the
+      // user can assign a vehicle and get the real numbers back.
+      start: (amps, ctx) => {
         const chargerState = this.chargingPointManager.getState(row.id);
         if (!chargerState) return Promise.resolve();
         return this.chargingPointManager.startChargingAt(

@@ -2,6 +2,7 @@ import type {
   CallContext,
   ChargerState,
   ChargingPointMode,
+  VehicleChargeState,
 } from "@chargeha/shared";
 import { SolarAllocator } from "@chargeha/shared/engine";
 import { linkedChargingPointId } from "@chargeha/shared/chargingPoints";
@@ -445,28 +446,26 @@ export class ChargingPointManager {
 
   // Inference never guesses: exactly one plugged-in vehicle resolves
   // (charging or not); several plugged in is ambiguous.
+  //
+  // A vehicle_api row is already tied to its vehicle by construction (see
+  // setChargerVehicleId) — that link always wins, state or no state.
+  //
+  // For a smart charger, an explicit assignment (entry.row.vehicleId) is a
+  // preference, not a lock: it wins only while that car is actually plugged
+  // in at THIS charger's home — i.e. the same isPluggedIn/isHome test as
+  // inference below. Once it is unplugged (or driven away), it falls
+  // through to inference exactly as if no assignment existed, rather than
+  // resolving to "none" or to a car that is miles away. A vehicle with no
+  // cached state yet (never polled) has no known isPluggedIn, so it is
+  // treated the same as "not plugged in" and also falls through.
   async resolveVehicle(id: string): Promise<VehicleResolution> {
     const entry = this.chargers.get(id);
     if (!entry) return { kind: "none", vehicleId: null };
-    if (entry.row.vehicleId) {
-      return { kind: "linked", vehicleId: entry.row.vehicleId };
-    }
 
-    // A car driven by its own API is not a candidate for this charger, and
-    // one that is away cannot be plugged into it. isHome is null when
-    // unknown, so only an explicit false rules a vehicle out.
-    const selfDriven = new Set(
-      (await this.db.getChargers())
-        .filter((r) => r.kind === "vehicle_api" && r.active)
-        .map((r) => r.vehicleId),
-    );
-    const pluggedIn = [...(await this.vehicleManager.getAllStates())]
-      .filter(([vehicleId, v]) =>
-        v.isPluggedIn && v.isHome !== false && !selfDriven.has(vehicleId)
-      );
-    const resolution: VehicleResolution = pluggedIn.length === 1
-      ? { kind: "inferred", vehicleId: pluggedIn[0][0] }
-      : { kind: pluggedIn.length > 1 ? "ambiguous" : "none", vehicleId: null };
+    const resolution = entry.row.kind === "smart"
+      ? await this.resolveSmartCharger(entry.row.vehicleId)
+      : this.resolveConstructionLinked(entry.row.vehicleId);
+
     if (entry.lastResolved !== resolution.vehicleId) {
       entry.lastResolved = resolution.vehicleId;
       this.logger.info(
@@ -475,6 +474,51 @@ export class ChargingPointManager {
       );
     }
     return resolution;
+  }
+
+  // vehicle_api rows are tied to their vehicle by construction — no state
+  // check needed, unlike a smart charger's explicit assignment.
+  private resolveConstructionLinked(
+    vehicleId: string | null,
+  ): VehicleResolution {
+    return vehicleId
+      ? { kind: "linked", vehicleId }
+      : { kind: "none", vehicleId: null };
+  }
+
+  private async resolveSmartCharger(
+    assignedId: string | null,
+  ): Promise<VehicleResolution> {
+    const states = await this.vehicleManager.getAllStates();
+    if (assignedId !== null) {
+      const assigned = states.get(assignedId);
+      // isHome is null when unknown, so only an explicit false rules it out —
+      // same precedent as the inference check below.
+      if (assigned?.isPluggedIn && assigned.isHome !== false) {
+        return { kind: "linked", vehicleId: assignedId };
+      }
+    }
+    return await this.inferVehicle(states);
+  }
+
+  private async inferVehicle(
+    states: Map<string, VehicleChargeState>,
+  ): Promise<VehicleResolution> {
+    // A car driven by its own API is not a candidate for this charger, and
+    // one that is away cannot be plugged into it. isHome is null when
+    // unknown, so only an explicit false rules a vehicle out.
+    const selfDriven = new Set(
+      (await this.db.getChargers())
+        .filter((r) => r.kind === "vehicle_api" && r.active)
+        .map((r) => r.vehicleId),
+    );
+    const pluggedIn = [...states]
+      .filter(([vehicleId, v]) =>
+        v.isPluggedIn && v.isHome !== false && !selfDriven.has(vehicleId)
+      );
+    return pluggedIn.length === 1
+      ? { kind: "inferred", vehicleId: pluggedIn[0][0] }
+      : { kind: pluggedIn.length > 1 ? "ambiguous" : "none", vehicleId: null };
   }
 
   /** Explicit vehicle assignment for a smart charger — resolveVehicle prefers

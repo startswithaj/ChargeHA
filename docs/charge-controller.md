@@ -226,38 +226,54 @@ doesn't: it only knows something is plugged in, not what.
 level, charge limit) applies to that charger, in one of two ways:
 
 - **Explicit assignment.** If the charger's row has a `vehicleId` set, that
-  vehicle is used — no guessing. Set this from the charger's row in Settings (a
+  vehicle is preferred — but only while it is actually plugged into a charger at
+  home: `isPluggedIn` true and `isHome !== false` (unknown `isHome` does not
+  rule it out). Set the assignment from the charger's row in Settings (a
   dropdown next to mode/priority, listing your vehicles plus "Automatic"). Takes
   effect on the next loop; no restart needed. Choosing "Automatic" clears the
   assignment and returns to inference below.
-- **Inference.** With no explicit assignment, the controller picks whichever
-  vehicle is plugged in (`isPluggedIn`), at home (`isHome !== false`), and not
-  currently driven by its own API. If exactly one vehicle matches, that's the
-  answer. If none match, there's nothing to resolve. If **more than one**
-  matches — two cars plugged in at home — the controller refuses to guess.
+- **Inference.** If there's no explicit assignment, or the assigned vehicle
+  isn't plugged in at home right now, the controller falls back to picking
+  whichever vehicle is plugged in (`isPluggedIn`), at home (`isHome !== false`),
+  and not currently driven by its own API. If exactly one vehicle matches,
+  that's the answer. If none match, there's nothing to resolve. If **more than
+  one** matches — two cars plugged in at home — the controller refuses to guess.
+
+An explicit assignment means "when both cars are home, this is the one on this
+charger" — it settles which car a charger belongs to when more than one could be
+plugged into it. It is not a lock: unplug the assigned car (or drive it away)
+and the charger falls back to inference rather than continuing to read a car
+that is no longer there.
 
 One car at home works fine with inference and needs no configuration. **Two or
 more cars that can plug into the same smart charger need an explicit
-assignment**, or the charger has no way to tell them apart.
+assignment**, or the charger has no way to tell them apart while both are
+plugged in.
 
 ### What happens if you don't assign one
 
 An ambiguous resolution (several candidates, none explicit) has no vehicle data
-to report: no battery level, no charge limit. Rather than invent one (the merged
-state's `batteryLevel: 0` / `chargeLimit: 100` fallback used when a vehicle is
-temporarily unreachable would otherwise make the engine think the battery is
-always empty and never stop), the controller refuses to start or adjust amps for
-that charger while ambiguous — an already-running charge is left alone, but
-nothing new is commanded. The dashboard card for that charger shows a warning
-telling you to assign a vehicle in Settings. Assigning one (or unplugging down
-to a single car) clears the warning and resumes normal control on the next loop.
+to report: no battery level, no charge limit. The charger keeps charging anyway,
+on the merged state's `batteryLevel: 0` / `chargeLimit: 100` fallback.
 
-An explicit assignment is a statement, not a live check — it applies even if
-that vehicle isn't currently plugged into the charger, the same way a
-vehicle-API charging point stays linked to its car regardless of momentary plug
-state. If you swap which car uses a given smart charger, update the assignment
-(or clear it back to Automatic) rather than relying on inference to catch the
-change.
+That is deliberate. Not knowing _which_ car is plugged in is not a reason to
+refuse to charge it — the car enforces its own charge limit, so the worst case
+is charging when we could have stopped early for solar reasons, and a charger
+that silently never charges is a far worse failure than one that charges more
+than it strictly needed to. Solar tracking, schedules and blockouts all still
+apply; the only thing lost is "stop because the battery is full", which the car
+handles itself.
+
+The dashboard card for that charger shows a warning telling you to assign a
+vehicle in Settings. Assigning one (or unplugging down to a single car) restores
+real battery data on the next loop.
+
+An explicit assignment applies only while that vehicle is plugged in at home;
+otherwise the charger falls back to inference for as long as the assigned
+vehicle stays unplugged or away. If you swap which car usually uses a given
+smart charger, update the assignment (or clear it back to Automatic) so the
+right car wins whenever both are plugged in at once — inference alone can't tell
+them apart in that case.
 
 ## Decision logging
 

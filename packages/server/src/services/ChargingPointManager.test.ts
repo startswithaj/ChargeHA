@@ -787,9 +787,12 @@ describe("ChargingPointManager", () => {
   // under the test-file-length limit.
 
   describe("resolveVehicleId", () => {
-    it("returns the linked vehicle id without inspecting state", async () => {
+    it("returns the linked vehicle id when it is plugged in and home", async () => {
       const row = { ...ROW, id: "charger-linked", vehicleId: "VEH1" };
       await manager.addCharger(row);
+      vehicleStates = new Map([
+        ["VEH1", { ...VEHICLE_STATE, vehicleId: "VEH1", isPluggedIn: true }],
+      ]);
 
       const vehicleId = await manager.resolveVehicleId(row.id);
 
@@ -826,39 +829,84 @@ describe("ChargingPointManager", () => {
       expect(vehicleId).toBeNull();
     });
 
-    it("prefers the explicit assignment even when inference would pick a different vehicle", async () => {
+    it("falls through to inference when the assigned vehicle isn't among the plugged-in states", async () => {
       const row = { ...ROW, id: "charger-linked", vehicleId: "VEH1" };
       await manager.addCharger(row);
       const mw = middlewares.get(row.id);
       assertExists(mw);
       mw.seedCache({ ...STATE, isCharging: true });
-      // Only VEH2 is plugged in — inference alone would pick VEH2, not VEH1.
+      // VEH1 is assigned but has no cached state; only VEH2 is plugged in.
+      // The assignment is a preference, not a lock — it must not shadow the
+      // car that is actually plugged in.
       vehicleStates = new Map([
         ["VEH2", { ...VEHICLE_STATE, vehicleId: "VEH2", isPluggedIn: true }],
       ]);
 
       const resolution = await manager.resolveVehicle(row.id);
 
-      expect(resolution).toEqual({ kind: "linked", vehicleId: "VEH1" });
+      expect(resolution).toEqual({ kind: "inferred", vehicleId: "VEH2" });
     });
 
-    it("resolves an explicit assignment even when that vehicle is not plugged in", async () => {
+    it("falls through to inference when the assigned vehicle is not plugged in", async () => {
       const row = { ...ROW, id: "charger-linked", vehicleId: "VEH1" };
       await manager.addCharger(row);
       vehicleStates = new Map([
         ["VEH1", { ...VEHICLE_STATE, vehicleId: "VEH1", isPluggedIn: false }],
+        ["VEH2", { ...VEHICLE_STATE, vehicleId: "VEH2", isPluggedIn: true }],
       ]);
 
       const resolution = await manager.resolveVehicle(row.id);
 
-      // Explicit assignment always wins — it is a fact the user stated, not
-      // a guess to be second-guessed by momentary plug state. Mirrors how a
-      // vehicle_api charging point stays linked to its car regardless of
-      // whether it's currently plugged in.
+      // The assignment is a preference, not a lock. An unplugged assigned
+      // car must not shadow the car that is actually plugged in — that is
+      // the bug this behaviour fixes.
+      expect(resolution).toEqual({ kind: "inferred", vehicleId: "VEH2" });
+    });
+
+    it("falls through to inference when the assigned vehicle is explicitly away", async () => {
+      const row = { ...ROW, id: "charger-linked", vehicleId: "VEH1" };
+      await manager.addCharger(row);
+      vehicleStates = new Map([
+        [
+          "VEH1",
+          {
+            ...VEHICLE_STATE,
+            vehicleId: "VEH1",
+            isPluggedIn: true,
+            isHome: false,
+          },
+        ],
+        ["VEH2", { ...VEHICLE_STATE, vehicleId: "VEH2", isPluggedIn: true }],
+      ]);
+
+      const resolution = await manager.resolveVehicle(row.id);
+
+      expect(resolution).toEqual({ kind: "inferred", vehicleId: "VEH2" });
+    });
+
+    it("stays linked when the assigned vehicle's isHome is unknown (null)", async () => {
+      const row = { ...ROW, id: "charger-linked", vehicleId: "VEH1" };
+      await manager.addCharger(row);
+      vehicleStates = new Map([
+        [
+          "VEH1",
+          {
+            ...VEHICLE_STATE,
+            vehicleId: "VEH1",
+            isPluggedIn: true,
+            isHome: null,
+          },
+        ],
+      ]);
+
+      const resolution = await manager.resolveVehicle(row.id);
+
+      // isHome: null means unknown, not "away" — must not rule the vehicle
+      // out, same as the inference path's precedent.
       expect(resolution).toEqual({ kind: "linked", vehicleId: "VEH1" });
     });
 
-    it("resolves two plugged-in vehicles correctly when one is explicitly assigned", async () => {
+    it("resolves to the assigned vehicle when it is plugged in and home, even with another vehicle also plugged in", async () => {
       const row = { ...ROW, id: "charger-linked", vehicleId: "VEH1" };
       await manager.addCharger(row);
       vehicleStates = new Map([
@@ -868,7 +916,26 @@ describe("ChargingPointManager", () => {
 
       const resolution = await manager.resolveVehicle(row.id);
 
+      // This is the case the assignment feature exists for: two cars home,
+      // the assignment picks which one belongs to this charger.
       expect(resolution).toEqual({ kind: "linked", vehicleId: "VEH1" });
+    });
+
+    it("falls through to inference when the assigned vehicle has no cached state", async () => {
+      const row = { ...ROW, id: "charger-linked", vehicleId: "VEH1" };
+      await manager.addCharger(row);
+      // VEH1 has never been polled — no entry at all.
+      vehicleStates = new Map([
+        ["VEH2", { ...VEHICLE_STATE, vehicleId: "VEH2", isPluggedIn: true }],
+      ]);
+
+      const resolution = await manager.resolveVehicle(row.id);
+
+      // No cached state means "unknown whether plugged in", which is
+      // treated the same as "not plugged in" — it cannot win the linked
+      // branch, so this degrades to inference like any other unplugged
+      // assignment.
+      expect(resolution).toEqual({ kind: "inferred", vehicleId: "VEH2" });
     });
   });
 

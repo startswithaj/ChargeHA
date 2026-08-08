@@ -149,7 +149,7 @@ describe("ChargeController — ambiguous vehicle resolution", () => {
     db?.close();
   });
 
-  it("refuses to start/adjust amps while two vehicles are plugged in and unassigned", async () => {
+  it("still charges while two vehicles are plugged in and unassigned", async () => {
     db = new AppDatabase(":memory:");
     await db.init();
 
@@ -284,11 +284,11 @@ describe("ChargeController — ambiguous vehicle resolution", () => {
     expect((await chargingPointManager.resolveVehicle(smart.id)).kind).toBe(
       "ambiguous",
     );
-    // Solar is plentiful and mode is auto — if the ambiguous fallback
-    // (battery 0 / limit 100) were left unguarded, the engine would command
-    // amps. It must not.
-    expect(chargerMw.startCalls).toBe(0);
-    expect(chargerMw.setAmpsCalls).toBe(0);
+    // Solar is plentiful and mode is auto. Not knowing WHICH car is on the
+    // charger must never stop it charging — the car enforces its own limit,
+    // so charging on the battery 0 / limit 100 fallback is safe, and a
+    // charger that silently does nothing is the worse failure.
+    expect(chargerMw.startCalls).toBeGreaterThan(0);
 
     // Explicit assignment clears the ambiguity and lets charging proceed.
     await chargingPointManager.setChargerVehicleId(smart.id, "VEH1");
