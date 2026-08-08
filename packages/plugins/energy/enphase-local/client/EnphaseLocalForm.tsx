@@ -11,8 +11,8 @@ import { Loader2 } from "lucide-react";
 import { trpc } from "./trpc.ts";
 import { NetworkDeviceSearch, useDefaultSubnet } from "../../../hostUi.ts";
 import { stepStyles as styles } from "../../../hostUi.ts";
-import type { EnphaseDevice, TestStatus } from "../../InverterSetupShared.tsx";
-import { TestResultBadge } from "../../InverterSetupShared.tsx";
+import { TestResultBadge, type TestStatus } from "../../../hostUi.ts";
+import type { EnphaseDevice } from "../../InverterSetupShared.tsx";
 
 export interface EnphaseLocalFormValues {
   host: string;

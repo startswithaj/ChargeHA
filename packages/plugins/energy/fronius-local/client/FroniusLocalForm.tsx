@@ -7,8 +7,8 @@ import {
   useDefaultSubnet,
 } from "../../../hostUi.ts";
 import { stepStyles as styles } from "../../../hostUi.ts";
-import type { FroniusDevice, TestStatus } from "../../InverterSetupShared.tsx";
-import { TestResultBadge } from "../../InverterSetupShared.tsx";
+import { TestResultBadge, type TestStatus } from "../../../hostUi.ts";
+import type { FroniusDevice } from "../../InverterSetupShared.tsx";
 
 interface FroniusLocalFormProps {
   initialHost: string;

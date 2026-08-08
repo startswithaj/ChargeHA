@@ -41,6 +41,7 @@ export {
   type NetworkSearchResult,
   useDefaultSubnet,
 } from "./NetworkDeviceSearch.tsx";
+export { TestResultBadge, type TestStatus } from "./TestResultBadge.tsx";
 export { default as dialogStyles } from "../client/src/components/ScheduleDialog/ScheduleDialog.module.css";
 
 // Hooks.
