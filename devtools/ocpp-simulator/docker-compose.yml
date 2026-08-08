@@ -1,0 +1,22 @@
+# Standalone OCPP 1.6 charge point simulator (solidstudiosh/ocpp-virtual-charge-point).
+# Connects to a dev server running on the host, not to the e2e app container.
+# Usage: docker compose -f devtools/ocpp-simulator/docker-compose.yml up
+services:
+  ocpp-vcp:
+    build:
+      # Reuse the e2e image so the pinned VCP_REF stays in one place.
+      context: ../..
+      dockerfile: docker/vcp.Dockerfile
+    environment:
+      # host.docker.internal reaches the host's dev server from inside the container.
+      - WS_URL=${WS_URL:-ws://host.docker.internal:8000/api/charger/ocpp}
+      - CP_ID=${CP_ID:-vcp-dev}
+      - ADMIN_PORT=9999
+    ports:
+      # Overridable so a second instance (docker compose -p ...) can bind its own port.
+      - "${ADMIN_HOST_PORT:-19999}:9999" # admin API
+    # Docker Desktop provides this mapping; Linux needs it declared.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # vcp exits on a failed connect — retry until the dev server is up.
+    restart: on-failure
