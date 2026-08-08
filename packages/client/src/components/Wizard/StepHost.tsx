@@ -104,10 +104,11 @@ function useEnterAdvances(enabled: boolean, onNext: () => void) {
       if (e.isComposing || e.metaKey || e.ctrlKey || e.altKey) return;
       const el = e.target as HTMLElement | null;
       const tag = el?.tagName;
+      // Only elements that act on Enter themselves are skipped. A control that
+      // merely holds focus (a selection card, say) must not swallow the key —
+      // one that does want it calls preventDefault, caught above.
       if (tag === "TEXTAREA" || tag === "BUTTON" || tag === "A") return;
-      if (el?.isContentEditable || el?.getAttribute("role") === "button") {
-        return;
-      }
+      if (el?.isContentEditable) return;
       e.preventDefault();
       onNext();
     };
