@@ -8,21 +8,38 @@ self-consumption — with advanced scheduling and notifications. Set and forget.
 
 ## Contents
 
+- [Contents](#contents)
 - [Demo](#demo)
 - [ChargeHQ.net](#chargehqnet)
 - [Features](#features)
+  - [Reporting](#reporting)
 - [Supported Integrations](#supported-integrations)
+  - [Coming Soon](#coming-soon)
 - [Notes about Tesla](#notes-about-tesla)
+  - [Onboarding (setup wizard)](#onboarding-setup-wizard)
+  - [Polling cadence (data calls)](#polling-cadence-data-calls)
+  - [Online probe (transition detection)](#online-probe-transition-detection)
+  - [Wake calls](#wake-calls)
+  - [Charge-rate (amps) updates](#charge-rate-amps-updates)
 - [How It Works](#how-it-works)
 - [Quick Start](#quick-start)
-- [Mobile & Home Screen](#mobile--home-screen)
+- [Mobile \& Home Screen](#mobile--home-screen)
 - [Getting Started](#getting-started)
+  - [Docker (recommended)](#docker-recommended)
+  - [Local Development](#local-development)
+  - [Devtools](#devtools)
 - [Environment Variables](#environment-variables)
 - [Database Migrations](#database-migrations)
+  - [Encryption Key](#encryption-key)
 - [Roadmap](#roadmap)
+  - [Smart Charger Support (OCPP)](#smart-charger-support-ocpp)
 - [Tech Stack](#tech-stack)
 - [App Tour Video](#app-tour-video)
 - [Contributing](#contributing)
+  - [Plugin architecture](#plugin-architecture)
+  - [Adding an inverter](#adding-an-inverter)
+  - [Vehicles and chargers](#vehicles-and-chargers)
+  - [Before you open a PR](#before-you-open-a-pr)
 - [Contributors](#contributors)
 
 ## Demo
@@ -492,7 +509,7 @@ issue first so we can agree the interface.
 - Add tests for your adapter (see the `test-helpers/` folders in existing
   plugins)
 - Run `deno task check:all` — formatting, lint, types, plugin refs, and tests
-  must all pass
+  must all pass.
 
 ## Contributors
 
