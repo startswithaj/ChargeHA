@@ -56,4 +56,9 @@ export interface ChargerPluginOption {
   /** Needs no config — settings adds it with charger.create directly,
    *  never routing through the plugin setup flow. */
   directAdd?: boolean;
+  /** Storage key in a row's `chargerConfig` holding the charge point's own
+   *  identifier (OCPP's charge point id). Lets a host show which physical
+   *  charger a row is without naming any plugin's config key itself. Absent
+   *  when the adapter has no such id. */
+  identityConfigKey?: string;
 }
