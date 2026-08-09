@@ -19,7 +19,7 @@ export function VehicleControlToggle({ vehicleId }: { vehicleId: string }) {
   if (!point || !chargers.some(isSmartCharger)) return null;
 
   return (
-    <Tooltip content="Off: the smart charger controls this car. On: charge control runs through the car's own API.">
+    <Tooltip content="Off: the smart charger controls this vehicle. On: charge control runs through the vehicle's own API.">
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <Text size="1" color="gray">API control</Text>
         <Switch

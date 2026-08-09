@@ -373,10 +373,10 @@ describe("Stats", () => {
     renderStats();
 
     expect(screen.getByText("Solar → Home")).toBeInTheDocument();
-    expect(screen.getByText("Solar → Car")).toBeInTheDocument();
+    expect(screen.getByText("Solar → Vehicle")).toBeInTheDocument();
     expect(screen.getByText("Solar → Grid")).toBeInTheDocument();
     expect(screen.getByText("Grid → Home")).toBeInTheDocument();
-    expect(screen.getByText("Grid → Car")).toBeInTheDocument();
+    expect(screen.getByText("Grid → Vehicle")).toBeInTheDocument();
     expect(screen.getByText("Solar Production")).toBeInTheDocument();
   });
 

@@ -33,8 +33,8 @@ export function SimulatedChargerSettings(): JSX.Element | null {
         />
       </SettingsRow>
       <SettingsRow
-        label="Car appetite (A)"
-        help="The fake car's max draw. 0 = plugged in but not drawing."
+        label="Vehicle appetite (A)"
+        help="The simulated vehicle's max draw. 0 = plugged in but not drawing."
       >
         <TextField.Root
           size="2"

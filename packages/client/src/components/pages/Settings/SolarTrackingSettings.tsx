@@ -129,7 +129,7 @@ function SolarMainRows(
       </SettingsRow>
       <SettingsRow
         label="Solar margin"
-        help="Reserve solar for your household before allocating to the car. Positive values keep a buffer for home use. Negative values allow a small amount of grid import."
+        help="Reserve solar for your household before allocating to the vehicle. Positive values keep a buffer for home use. Negative values allow a small amount of grid import."
       >
         <div
           style={{
@@ -272,7 +272,7 @@ function SolarHardwareRows(
       </SettingsRow>
       <SettingsRow
         label="Three-phase charger"
-        help="Enable if your charger is wired for 3-phase power. The solar algorithm divides available watts by voltage x phases to calculate amps — if the car misreports phases as 1, the controller will overshoot by 3x without this setting."
+        help="Enable if your charger is wired for 3-phase power. The solar algorithm divides available watts by voltage x phases to calculate amps — if the vehicle misreports phases as 1, the controller will overshoot by 3x without this setting."
       >
         <Switch
           size="2"
