@@ -527,7 +527,6 @@ export function VehicleList(
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {/* Vehicle section — one card per configured vehicle */}
       <Text
         size="1"
         color="gray"
@@ -561,8 +560,7 @@ export function VehicleList(
         onNavigateSettings={onNavigateSettings}
       />
 
-      {!vehiclesLoading && points.length === 0 && vehicles.length === 0 &&
-        vehiclesError && (
+      {!vehiclesLoading && vehicles.length === 0 && vehiclesError && (
         <VehicleListErrorCard
           error={vehiclesError}
           onRetry={refreshVehicles}
