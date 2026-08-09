@@ -59,6 +59,7 @@ packages/plugins/
   energy/
     fronius-local/              — Fronius inverter (local HTTP) plugin
     fronius-cloud/              — Fronius Cloud API plugin
+    goodwe-sems/                — GoodWe SEMS Portal (cloud) plugin
   vehicles/
     tesla/                      — Tesla Fleet API plugin (adapter, proxy, tokens, router)
     simulated/                  — Simulated vehicle for dev/demo

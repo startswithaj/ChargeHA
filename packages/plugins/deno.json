@@ -66,6 +66,13 @@
     "./energy/enphase-local/server/config": "./energy/enphase-local/server/config.ts",
     "./energy/enphase-local/client/EnphaseLocalConfig": "./energy/enphase-local/client/EnphaseLocalConfig.tsx",
     "./energy/enphase-local/client/EnphaseLocalForm": "./energy/enphase-local/client/EnphaseLocalForm.tsx",
+    "./energy/goodwe-sems/server": "./energy/goodwe-sems/server/index.ts",
+    "./energy/goodwe-sems/server/GoodweSemsAdapter": "./energy/goodwe-sems/server/GoodweSemsAdapter.ts",
+    "./energy/goodwe-sems/server/GoodweSemsClient": "./energy/goodwe-sems/server/GoodweSemsClient.ts",
+    "./energy/goodwe-sems/server/router": "./energy/goodwe-sems/server/router.ts",
+    "./energy/goodwe-sems/server/config": "./energy/goodwe-sems/server/config.ts",
+    "./energy/goodwe-sems/client/GoodweSemsConfig": "./energy/goodwe-sems/client/GoodweSemsConfig.tsx",
+    "./energy/goodwe-sems/client/GoodweSemsForm": "./energy/goodwe-sems/client/GoodweSemsForm.tsx",
     "./energy/InverterSetupShared": "./energy/InverterSetupShared.tsx",
     "./componentRegistry": "./componentRegistry.ts",
     "./demoPluginSummaries": "./demoPluginSummaries.ts"
