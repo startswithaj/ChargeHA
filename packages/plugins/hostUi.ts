@@ -37,6 +37,8 @@ export { useSaveStatus } from "../client/src/hooks/useSectionConfig.ts";
 export { Spinner } from "../client/src/components/ui/Spinner.tsx";
 export { ErrorBanner } from "../client/src/components/ui/ErrorBanner.tsx";
 export {
+  type DiscoveryResult,
+  DiscoveryResultList,
   NetworkDeviceSearch,
   type NetworkSearchResult,
   useDefaultSubnet,
