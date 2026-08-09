@@ -8,6 +8,7 @@ import type {
 import { ScheduleCard } from "../../ScheduleCard/ScheduleCard.tsx";
 import { ScheduleForm } from "../../ScheduleDialog/ScheduleDialog.tsx";
 import { EmptyState } from "../../ui/EmptyState.tsx";
+import { type ScheduleNotice, ScheduleNoticeCard } from "./ScheduleNotice.tsx";
 import styles from "./Schedules.module.css";
 
 export interface ScheduleTarget {
@@ -15,11 +16,16 @@ export interface ScheduleTarget {
   id: string;
   name: string;
   badge: string;
+  /** The charge point's own id (e.g. an OCPP charge point id), when its
+   *  plugin advertises one. Two chargers of the same type are otherwise
+   *  indistinguishable in this heading. */
+  identifier: string | null;
 }
 
 interface TargetScheduleSectionProps {
   target: ScheduleTarget;
   targetSchedules: ChargeSchedule[];
+  notices: ScheduleNotice[];
   showingForm: boolean;
   gap: { startTime: string; endTime: string };
   editingScheduleId: string | null;
@@ -32,9 +38,34 @@ interface TargetScheduleSectionProps {
   onDelete: (id: string) => void;
 }
 
+function TargetHeading({ target }: { target: ScheduleTarget }) {
+  const isVehicle = target.kind === "vehicle";
+  return (
+    <div className={styles.vehicleLabel}>
+      {isVehicle
+        ? <Car size={16} style={{ color: "var(--color-vehicle)" }} />
+        : <Zap size={16} style={{ color: "var(--color-charging)" }} />}
+      <Text size="3" weight="medium">{target.name}</Text>
+      {target.identifier !== null && (
+        <Badge variant="soft" size="1" title="Charge point id">
+          {target.identifier}
+        </Badge>
+      )}
+      {
+        /* A row named after its adapter already says its type; repeating it in
+          the badge tells the user nothing about which charger this is. */
+      }
+      {target.badge !== target.name && (
+        <Badge variant="outline" size="1">{target.badge}</Badge>
+      )}
+    </div>
+  );
+}
+
 export function TargetScheduleSection({
   target,
   targetSchedules,
+  notices,
   showingForm,
   gap,
   editingScheduleId,
@@ -53,15 +84,7 @@ export function TargetScheduleSection({
   return (
     <div className={styles.vehicleSection}>
       <div className={styles.sectionHeader}>
-        <div className={styles.vehicleLabel}>
-          {isVehicle
-            ? <Car size={16} style={{ color: "var(--color-vehicle)" }} />
-            : <Zap size={16} style={{ color: "var(--color-charging)" }} />}
-          <Text size="3" weight="medium">{target.name}</Text>
-          <Badge variant="outline" size="1">
-            {target.badge}
-          </Badge>
-        </div>
+        <TargetHeading target={target} />
         {!showingForm && (
           <Button
             variant="soft"
@@ -73,6 +96,10 @@ export function TargetScheduleSection({
           </Button>
         )}
       </div>
+
+      {notices.map((notice) => (
+        <ScheduleNoticeCard key={notice.id} notice={notice} />
+      ))}
 
       {/* Existing schedules */}
       {targetSchedules.length === 0 && !showingForm && (
