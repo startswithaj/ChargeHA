@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { pluginSettingsComponents } from "@chargeha/plugins/componentRegistry";
+import {
+  chargerPluginOptions,
+  pluginSettingsComponents,
+} from "@chargeha/plugins/componentRegistry";
 import { trpc } from "../../../trpc.ts";
 import {
   type ChargerWithState,
@@ -22,6 +25,12 @@ export type ChargerEditing =
 
 export const hasSettingsPanel = (typeId: string): boolean =>
   `${typeId}-settings` in pluginSettingsComponents;
+
+/** Nothing to fill in before the row exists, so adding skips the form. Not the
+ *  same as having no settings panel: the simulated charger declares this yet
+ *  still has one, for the dev knobs its row exposes once it is created. */
+const addsDirectly = (typeId: string): boolean =>
+  chargerPluginOptions.find((o) => o.id === typeId)?.directAdd === true;
 
 function reorderedIds(
   ids: string[],
@@ -68,7 +77,7 @@ export function useChargersSettings() {
 
   // A charger type with nothing to configure skips straight to creation.
   const choose = (typeId: string) => {
-    if (hasSettingsPanel(typeId)) {
+    if (!addsDirectly(typeId)) {
       setEditing({ mode: "add", typeId });
       return;
     }

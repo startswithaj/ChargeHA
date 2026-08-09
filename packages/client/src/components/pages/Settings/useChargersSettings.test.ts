@@ -5,7 +5,22 @@ import { useChargersSettings } from "./useChargersSettings.ts";
 const mocks = vi.hoisted(() => ({ mutateMock: vi.fn() }));
 
 vi.mock("@chargeha/plugins/componentRegistry", () => ({
-  pluginSettingsComponents: { "tapo-settings": () => null },
+  // "sim" is the shape that matters: a panel AND directAdd. Its settings are
+  // dev knobs for an existing row, not fields to fill in before creating one.
+  pluginSettingsComponents: {
+    "tapo-settings": () => null,
+    "sim-settings": () => null,
+  },
+  chargerPluginOptions: [
+    { id: "tapo", label: "Tapo", description: "", iconKey: "plug" },
+    {
+      id: "sim",
+      label: "Sim",
+      description: "",
+      iconKey: "monitor",
+      directAdd: true,
+    },
+  ],
 }));
 
 vi.mock("../../../trpc.ts", () => ({
@@ -65,6 +80,29 @@ describe("useChargersSettings", () => {
 
     expect(result.current.confirm).toBeNull();
     expect(commit).not.toHaveBeenCalled();
+  });
+
+  it("adds a directAdd type straight away, panel or no panel", () => {
+    const { result } = renderHook(() => useChargersSettings());
+
+    // Has a settings panel, but nothing to configure before the row exists.
+    // Routing it into the add form leaves an empty form whose Add does
+    // nothing, because the panel has no row to read or save.
+    act(() => result.current.choose("sim"));
+
+    expect(result.current.editing).toBeNull();
+    // needsAddConfirm here, so creation waits on the dialog rather than
+    // running immediately — but it is `addCharger`, not a panel commit.
+    expect(result.current.confirm).toEqual(
+      expect.objectContaining({ kind: "add", typeId: "sim" }),
+    );
+
+    act(() => result.current.acceptConfirm());
+
+    expect(mocks.mutateMock).toHaveBeenCalledWith(
+      { chargerAdapterType: "sim" },
+      expect.anything(),
+    );
   });
 
   it("accepting the control-path dialog runs the panel's commit", () => {
