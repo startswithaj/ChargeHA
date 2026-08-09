@@ -71,8 +71,6 @@ vi.mock("../../../lib/featureFlags.ts", async (orig) => {
   };
 });
 
-// ---- Tests ----
-
 describe("VehicleTypeStep", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -87,8 +85,6 @@ describe("VehicleTypeStep", () => {
   afterEach(() => {
     cleanup();
   });
-
-  // ---- Initial render ----
 
   it("renders the vehicle-type chooser with both options and descriptions", () => {
     renderWithProviders(
@@ -114,8 +110,6 @@ describe("VehicleTypeStep", () => {
     expect(screen.getByRole("button", { name: /^Simulated Creates a virtual/ }))
       .toHaveAttribute("aria-disabled", "false");
   });
-
-  // ---- User interactions ----
 
   it("selecting Tesla commits the selection without naming a next step", () => {
     renderWithProviders(

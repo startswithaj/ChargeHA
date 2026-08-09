@@ -5,7 +5,6 @@ import {
   type SectionType,
 } from "@chargeha/shared/configSections";
 
-// ── Tapo plugin config section ──────────────────────────────────────────────
 // Only the password is a secret (matching fronius-cloud); email is plain.
 
 export const tapoConfigDef = defineSection({

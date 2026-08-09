@@ -6,7 +6,7 @@ import { useToast } from "../../../../hooks/useToast.tsx";
 import { useVehicles } from "../../../../hooks/useVehicles.ts";
 import { trpc } from "../../../../trpc.ts";
 
-// ---- Typed mock-fn instances (consumed by vi.mock factories in the test file) ----
+// Typed mock-fn instances, consumed by vi.mock factories in the test file.
 
 type ConfigGetAllReturn = {
   data: string | null;
@@ -75,8 +75,6 @@ export const dashboardMocks = {
   // mutation factory below; mockDismissMutate calls it to simulate refetch.
   capturedDismiss: { onSuccess: undefined as (() => void) | undefined },
 };
-
-// ---- Data factories ----
 
 export function makeVehicleState(overrides: Record<string, unknown> = {}) {
   return {
@@ -262,8 +260,6 @@ export function makeEnergyReturn(
     error: null,
   } as unknown as ReturnType<typeof useEnergyData>;
 }
-
-// ---- Harness ----
 
 export interface DashboardHarness {
   setEnergy: (overrides?: EnergyOverrides) => void;

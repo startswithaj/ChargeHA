@@ -19,8 +19,6 @@ describe("TeslaService", () => {
     updatedAt: "2024-01-01T00:00:00Z",
   };
 
-  // ── Mocks ───────────────────────────────────────────────────────────────────
-
   function mockLogger(): Logger {
     return {
       debug: () => {},
@@ -123,8 +121,6 @@ describe("TeslaService", () => {
       Promise.resolve(key === "client_secret" ? "secret" : null),
   };
 
-  // ── listFleetVehicles ───────────────────────────────────────────────────────
-
   describe("TeslaService.listFleetVehicles", () => {
     it("returns mapped vehicle list from Fleet API", async () => {
       const io = mockIo(() =>
@@ -162,8 +158,6 @@ describe("TeslaService", () => {
       );
     });
   });
-
-  // ── resetOnboarding ─────────────────────────────────────────────────────────
 
   describe("TeslaService.resetOnboarding", () => {
     it("removes vehicles, resets config to defaults, and stops refresh", async () => {
@@ -266,8 +260,6 @@ describe("TeslaService", () => {
     });
   });
 
-  // ── selectVehicle ───────────────────────────────────────────────────────────
-
   describe("TeslaService.selectVehicle", () => {
     it("upserts vehicle row and registers with manager", async () => {
       const upserted: unknown[] = [];
@@ -299,8 +291,6 @@ describe("TeslaService", () => {
       expect(added).toHaveLength(1);
     });
   });
-
-  // ── registerPartner ─────────────────────────────────────────────────────────
 
   describe("TeslaService.registerPartner", () => {
     it("throws when client credentials are not configured", async () => {
@@ -416,8 +406,6 @@ describe("TeslaService", () => {
     });
   });
 
-  // ── checkProxyReachable ─────────────────────────────────────────────────────
-
   describe("TeslaService.checkProxyReachable", () => {
     it("returns not configured when no vehicles", async () => {
       const service = makeService();
@@ -455,8 +443,6 @@ describe("TeslaService", () => {
       expect(result).toEqual({ teslaConfigured: true, proxyReachable: false });
     });
   });
-
-  // ── checkKeyPairing ─────────────────────────────────────────────────────────
 
   describe("TeslaService.checkKeyPairing", () => {
     const depsWithVehicle = (

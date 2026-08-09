@@ -78,8 +78,6 @@ describe("SolarAllocator", () => {
     },
   });
 
-  // ── resolveVoltage ────────────────────────────────────────────────────────
-
   describe("resolveVoltage", () => {
     it("uses vehicle voltage when >= 100V", () => {
       const state = { ...BASE_STATE, chargerVoltage: 240 };
@@ -135,8 +133,6 @@ describe("SolarAllocator", () => {
       ).toBe(220);
     });
   });
-
-  // ── calculateAvailableSolar ───────────────────────────────────────────────
 
   describe("calculateAvailableSolar", () => {
     it("uses grid export in excess mode", () => {
@@ -348,8 +344,6 @@ describe("SolarAllocator", () => {
       expect(result).toBe(7900);
     });
   });
-
-  // ── waterfall ─────────────────────────────────────────────────────────────
 
   describe("waterfall", () => {
     it("returns empty map when no energy data", () => {

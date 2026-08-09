@@ -18,12 +18,10 @@ describe("OCPP e2e", () => {
   // app on reconnect.
   const CP_ID = "sap-test";
 
-  // Row-scoped procedures need the charger row id. There is no row until the
-  // first setConfig call below, which creates one by passing
-  // chargerRowId: null — the same "one write creates it" shape the client
-  // uses. Every test shares that row: `charger.create` always creates a new
-  // one now that several chargers of a type are allowed, so a fresh row here
-  // would have no charge point id and could never connect.
+  // No row exists until beforeAll's setConfig creates one with
+  // chargerRowId: null — the same shape the client uses. Every test shares
+  // it: `charger.create` would make a second row with no charge point id,
+  // which could never connect.
   /** Rows are matched by charge point id, not by adapter type: the stack
    *  runs two OCPP stations now, so "the OCPP row" is ambiguous. */
   async function ocppRow(chargePointId: string = CP_ID) {
@@ -94,7 +92,7 @@ describe("OCPP e2e", () => {
     // always creates now that multiple chargers of a type are allowed, so a
     // new row here would have no charge point id and could never start.
     const charger = { id: await ocppRowId() };
-    // Plug the cable in first: the vcp boots to Available (no cable) and
+    // Plug the cable in first: the station boots to Available (no cable) and
     // the engine rightly refuses to start charging an empty connector.
     await vcpSend("StatusNotification", {
       connectorId: 1,
@@ -103,8 +101,8 @@ describe("OCPP e2e", () => {
     });
     await trpc.charger.setMode.mutate({ id: charger.id, mode: "charge_now" });
 
-    // vcp auto-sends StartTransaction + StatusNotification(Charging)
-    // after accepting RemoteStartTransaction (verified in vcp source).
+    // The station auto-sends StartTransaction + StatusNotification(Charging)
+    // after accepting RemoteStartTransaction, so the test injects neither.
     const state = await waitFor(async () => {
       const list = await trpc.charger.list.query();
       const s = list.find((c) => c.id === charger.id)?.state;
@@ -115,7 +113,7 @@ describe("OCPP e2e", () => {
   });
 
   it("MeterValues flow into charger state", async () => {
-    // Re-inject each attempt: the vcp's own periodic MeterValues race a
+    // Re-inject each attempt: the station's own periodic MeterValues race a
     // one-shot injection, so the value must be refreshed until a poll
     // lands on it.
     const state = await waitFor(async () => {
@@ -228,8 +226,8 @@ describe("OCPP e2e", () => {
   });
 
   it("stale MeterValues flips the charger to faulted", async () => {
-    // Deterministic, in-band: shrink the meter timeout, send one reading,
-    // then stop sending. State must go faulted with the stale detail.
+    // Shrink the meter timeout rather than mock the clock: keeps the check
+    // in-band and deterministic.
     await ocppTrpc.plugin.charger.ocpp.setConfig.mutate({
       chargerRowId: await ocppRowId(),
       values: { ocppMeterTimeoutSeconds: "5" },

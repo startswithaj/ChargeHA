@@ -9,7 +9,6 @@ export function useVehicles() {
   // Per-vehicle API errors from SSE — shared store written by useRealtimeEvents
   const vehicleErrors = useVehicleErrors();
 
-  // --- Query: fetch vehicle list via tRPC ---
   const {
     data: vehiclesData,
     isLoading: loading,

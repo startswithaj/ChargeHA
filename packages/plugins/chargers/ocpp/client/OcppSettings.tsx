@@ -23,8 +23,6 @@ export function OcppSettings(
       });
     },
   });
-  // Pairing sits under the Charger ID row so "Use this ID" is beside the field
-  // it fills; `after` is what hands us the setter.
   // Charger ID is discovered in the connect block above, not typed in a row.
   const fields = useMemo(
     () => OCPP_FIELDS.filter((f) => f.key !== "ocppChargerId"),

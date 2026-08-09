@@ -196,7 +196,6 @@ describe("StatsChart", () => {
 
   it("renders empty chart when data is null and not loading", () => {
     renderWithProviders(<StatsChart {...defaultProps} />);
-    // No chart, no loading
     expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
   });
 
@@ -457,9 +456,7 @@ describe("CustomTooltip", () => {
         },
       }],
     });
-    // Header shows hour range
     expect(screen.getByText("10:00 – 11:00")).toBeInTheDocument();
-    // Flow rows
     expect(screen.getByText("Solar → Home")).toBeInTheDocument();
     expect(screen.getByText("1.50 kWh")).toBeInTheDocument();
     expect(screen.getByText("Grid → Home")).toBeInTheDocument();

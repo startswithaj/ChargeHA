@@ -17,11 +17,6 @@ export function createOcppWsRoutes(
 
   app.get("/:chargerId", async (c) => {
     const chargerId = c.req.param("chargerId");
-    // Any OCPP charger row configured with this charge point id adopts the
-    // connection. Previously a single plugin-wide charger_id was consulted,
-    // so a second charger could never be adopted no matter how it was
-    // configured — that was the one and only blocker to multiple OCPP
-    // chargers.
     const entries = await deps.resolveChargerConfigs();
     const adopted = entries.some((e) => e.config.charger_id === chargerId);
     // Pairing accepts an id we have never seen, so the panel can prove the

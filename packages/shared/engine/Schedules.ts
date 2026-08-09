@@ -60,11 +60,9 @@ export function isScheduleActiveNow(
     ? parseTimezone(now, timezone)
     : { day: now.getDay(), hours: now.getHours(), minutes: now.getMinutes() };
 
-  // Check day of week
   const dayKey = DAY_MAP[String(day)];
   if (!schedule.days.includes(dayKey)) return false;
 
-  // Parse time strings
   const currentMinutes = hours * 60 + minutes;
   const startMinutes = toMinutes(schedule.startTime);
   const endMinutes = toMinutes(schedule.endTime);

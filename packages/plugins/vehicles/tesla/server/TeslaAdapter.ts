@@ -123,7 +123,6 @@ export class TeslaAdapter implements VehicleAdapter {
   }
 
   async connect(ctx: CallContext): Promise<void> {
-    // Verify we can reach the Fleet API
     try {
       await this.isVehicleOnline(ctx);
       this.logger.info(`Connected to vehicle ${this.vin}`);
@@ -245,7 +244,6 @@ export class TeslaAdapter implements VehicleAdapter {
   }
 
   async wakeVehicle(ctx: CallContext): Promise<boolean> {
-    // Check if vehicle is already online before sending wake POST
     if (await this.isVehicleOnline(ctx)) {
       this.logger.debug(`Vehicle ${this.vin} is already online, skipping wake`);
       return true;
@@ -310,8 +308,6 @@ export class TeslaAdapter implements VehicleAdapter {
     const vehicle = vehicles?.find((v) => v.vin === this.vin);
     return vehicle?.state === "online";
   }
-
-  // ---- Private helpers ----
 
   /** Look up the per-call cost for an endpoint. */
   private static endpointCost(endpoint: string): number {

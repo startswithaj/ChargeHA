@@ -329,7 +329,6 @@ describe("OCPP adapter — tier 3 power derivation", () => {
       1,
     );
 
-    // Awaiting the adapter's state build — it is promise-wrapped.
     const state = await adapter.getChargerState(ctx);
 
     expect(state.chargePowerKw).toBeCloseTo(6.9, 9);
@@ -343,7 +342,6 @@ describe("OCPP adapter — tier 3 power derivation", () => {
       3,
     );
 
-    // Awaiting the adapter's state build — it is promise-wrapped.
     const state = await adapter.getChargerState(ctx);
 
     expect(state.chargePowerKw).toBeCloseTo(6.9, 9);
@@ -355,7 +353,6 @@ describe("OCPP adapter — tier 3 power derivation", () => {
       3,
     );
 
-    // Awaiting the adapter's state build — it is promise-wrapped.
     const state = await adapter.getChargerState(ctx);
 
     expect(state.chargePowerKw).toBeNull();
@@ -371,7 +368,6 @@ describe("OCPP adapter — tier 3 power derivation", () => {
         1,
       );
 
-      // Awaiting the adapter's state build — it is promise-wrapped.
       const state = await adapter.getChargerState(ctx);
 
       expect(state.isCharging).toBe(true);
@@ -386,7 +382,6 @@ describe("OCPP adapter — tier 3 power derivation", () => {
         1,
       );
 
-      // Awaiting the adapter's state build — it is promise-wrapped.
       const state = await adapter.getChargerState(ctx);
 
       expect(state.isCharging).toBe(true);
@@ -401,7 +396,6 @@ describe("OCPP adapter — tier 3 power derivation", () => {
         1,
       );
 
-      // Awaiting the adapter's state build — it is promise-wrapped.
       const state = await adapter.getChargerState(ctx);
 
       expect(state.isCharging).toBe(false);
@@ -413,7 +407,6 @@ describe("OCPP adapter — tier 3 power derivation", () => {
         1,
       );
 
-      // Awaiting the adapter's state build — it is promise-wrapped.
       const state = await adapter.getChargerState(ctx);
 
       expect(state.isCharging).toBe(false);
@@ -426,7 +419,6 @@ describe("OCPP adapter — tier 3 power derivation", () => {
         1,
       );
 
-      // Awaiting the adapter's state build — it is promise-wrapped.
       const state = await adapter.getChargerState(ctx);
 
       expect(state.isCharging).toBe(false);

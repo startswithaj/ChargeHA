@@ -42,16 +42,16 @@ export function ampsRange(amps: number, maxAmps: number): string {
   return `${ampsValue(amps)} / ${ampsValue(maxAmps)} max`;
 }
 
-/**
- * Format 24h time string (HH:MM) to 12h format.
- * e.g. "13:00" → "1:00 PM", "00:30" → "12:30 AM"
- */
 function toHour12(h: number): number {
   if (h === 0) return 12;
   if (h > 12) return h - 12;
   return h;
 }
 
+/**
+ * Format 24h time string (HH:MM) to 12h format.
+ * e.g. "13:00" → "1:00 PM", "00:30" → "12:30 AM"
+ */
 export function formatTime12h(time: string): string {
   const [h, m] = time.split(":").map(Number);
   const period = h >= 12 ? "PM" : "AM";
@@ -112,7 +112,6 @@ export function formatRate(
   ratePerKwh: number,
   currencySymbol: string,
 ): string {
-  // Use 2dp if that's enough precision, otherwise 4dp
   const twoDecimal = Math.round(ratePerKwh * 100) / 100;
   if (ratePerKwh === twoDecimal) {
     return `${currencySymbol}${ratePerKwh.toFixed(2)}`;

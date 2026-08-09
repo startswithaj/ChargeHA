@@ -20,8 +20,6 @@ describe("ScheduleService", () => {
     db.close();
   });
 
-  // ----- list -----
-
   describe("list", () => {
     it("returns empty array when no schedules exist", async () => {
       const result = await service.list();
@@ -105,8 +103,6 @@ describe("ScheduleService", () => {
       expect(result.schedules[1].scheduleType).toBe("blockout");
     });
   });
-
-  // ----- create -----
 
   describe("create", () => {
     it("creates a charge schedule with valid input", async () => {
@@ -345,8 +341,6 @@ describe("ScheduleService", () => {
     });
   });
 
-  // ----- update -----
-
   describe("update", () => {
     it("updates an existing schedule", async () => {
       await db.createSchedule({
@@ -434,8 +428,6 @@ describe("ScheduleService", () => {
       expect(result.schedule.enabled).toBe(false);
     });
   });
-
-  // ----- delete -----
 
   describe("delete", () => {
     it("deletes an existing schedule", async () => {

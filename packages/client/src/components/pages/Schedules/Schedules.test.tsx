@@ -189,8 +189,6 @@ describe("Schedules", () => {
     cleanup();
   });
 
-  // ---- Basic rendering ----
-
   it("renders Blockout Schedules section", () => {
     renderWithProviders(<Schedules />);
 
@@ -204,8 +202,6 @@ describe("Schedules", () => {
 
     expect(screen.getByText("Loading...")).toBeInTheDocument();
   });
-
-  // ---- No-vehicle empty state ----
 
   it("renders no vehicles empty state when vehicles list is empty", () => {
     setVehicles({ vehicles: [] });
@@ -239,8 +235,6 @@ describe("Schedules", () => {
     ).toBeInTheDocument();
   });
 
-  // ---- Vehicle section rendering ----
-
   it("renders vehicle name in section header", () => {
     renderWithProviders(<Schedules />);
 
@@ -253,8 +247,6 @@ describe("Schedules", () => {
     expect(screen.getByText("tesla")).toBeInTheDocument();
   });
 
-  // ---- Empty schedule state per vehicle ----
-
   it("renders empty schedule message when vehicle has no charge schedules", () => {
     renderWithProviders(<Schedules />);
 
@@ -262,8 +254,6 @@ describe("Schedules", () => {
       screen.getByText("No charge schedules for this vehicle."),
     ).toBeInTheDocument();
   });
-
-  // ---- Existing charge schedule cards ----
 
   it("renders the schedule card and hides the empty-state copy when a charge schedule exists", () => {
     setSchedules({
@@ -280,8 +270,6 @@ describe("Schedules", () => {
       screen.queryByText("No charge schedules for this vehicle."),
     ).not.toBeInTheDocument();
   });
-
-  // ---- Add Schedule button ----
 
   it("shows inline schedule form when Add Schedule is clicked", () => {
     renderWithProviders(<Schedules />);
@@ -307,8 +295,6 @@ describe("Schedules", () => {
     expect(screen.queryByTestId("schedule-form")).not.toBeInTheDocument();
     expect(screen.getByText("Add Schedule")).toBeInTheDocument();
   });
-
-  // ---- Blockout section ----
 
   it("renders empty blockout state when no blockout schedules exist", () => {
     renderWithProviders(<Schedules />);
@@ -370,8 +356,6 @@ describe("Schedules", () => {
     expect(screen.getByText("Add Blockout Period")).toBeInTheDocument();
   });
 
-  // ---- Info card / footer content ----
-
   it("renders informational footer copy", () => {
     renderWithProviders(<Schedules />);
 
@@ -390,8 +374,6 @@ describe("Schedules", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/Times shown in/)).toBeInTheDocument();
   });
-
-  // ---- Multiple vehicles ----
 
   it("renders a section header and empty state per vehicle", () => {
     setVehicles({
@@ -422,8 +404,6 @@ describe("Schedules", () => {
 
     expect(screen.getAllByText("Add Schedule")).toHaveLength(2);
   });
-
-  // ---- Edit flow for charge schedules ----
 
   it("opens edit form when Edit button is clicked on a charge schedule card", () => {
     setSchedules({
@@ -487,8 +467,6 @@ describe("Schedules", () => {
     expect(screen.getByTestId("schedule-card")).toBeInTheDocument();
   });
 
-  // ---- Edit flow for blockout schedules ----
-
   it("opens edit form when Edit button is clicked on a blockout schedule card", () => {
     setSchedules({
       schedules: [blockoutSchedule],
@@ -517,8 +495,6 @@ describe("Schedules", () => {
 
     expect(screen.queryByText("Add Blockout Period")).not.toBeInTheDocument();
   });
-
-  // ---- Delete flow ----
 
   it("calls removeSchedule when Delete button is clicked on a charge schedule", () => {
     const removeSchedule = vi.fn();
@@ -550,8 +526,6 @@ describe("Schedules", () => {
     expect(removeSchedule).toHaveBeenCalledWith("sched-blockout-1");
   });
 
-  // ---- Toggle flow ----
-
   it("calls toggleSchedule when Toggle button is clicked on a schedule", () => {
     const toggleSchedule = vi.fn();
     setSchedules({
@@ -566,8 +540,6 @@ describe("Schedules", () => {
 
     expect(toggleSchedule).toHaveBeenCalledWith("sched-1", false);
   });
-
-  // ---- handleSave routes to addSchedule for new schedules ----
 
   it("calls addSchedule when save is triggered on a create-charge form", () => {
     const addSchedule = vi.fn().mockResolvedValue(null);
@@ -593,8 +565,6 @@ describe("Schedules", () => {
     expect(addSchedule).toHaveBeenCalled();
   });
 
-  // ---- handleSave routes to updateSchedule for edit ----
-
   it("calls updateSchedule when save is triggered on an edit form", () => {
     const updateSchedule = vi.fn().mockResolvedValue(null);
     setSchedules({
@@ -611,8 +581,6 @@ describe("Schedules", () => {
     expect(updateSchedule).toHaveBeenCalledWith("sched-1", expect.anything());
   });
 
-  // ---- Both charge and blockout schedules ----
-
   it("renders both charge and blockout schedule cards", () => {
     setSchedules({
       schedules: [chargeSchedule, blockoutSchedule],
@@ -627,8 +595,6 @@ describe("Schedules", () => {
     expect(cards[0]).toHaveAttribute("data-schedule-id", "sched-1");
     expect(cards[1]).toHaveAttribute("data-schedule-id", "sched-blockout-1");
   });
-
-  // ---- Form targeting (editing hides correct Add button per section) ----
 
   it("does not hide Add Blockout Period when editing a charge schedule", () => {
     setSchedules({
@@ -657,8 +623,6 @@ describe("Schedules", () => {
 
     expect(screen.getByText("Add Schedule")).toBeInTheDocument();
   });
-
-  // ---- Charge point identity in the group heading ----
 
   describe("group heading", () => {
     it("shows the OCPP charge point id so two chargers can be told apart", () => {
@@ -695,8 +659,6 @@ describe("Schedules", () => {
       expect(screen.queryByText("vcp-dev-2")).not.toBeInTheDocument();
     });
   });
-
-  // ---- Overlapping schedules on one charging point ----
 
   describe("overlap warning", () => {
     // The user's real case: an OCPP charger plus the car plugged into it, each
@@ -800,8 +762,6 @@ describe("Schedules", () => {
     });
   });
 
-  // ---- Whether a vehicle schedule can actually run ----
-
   describe("vehicle schedule reachability", () => {
     const setSmartPoint = (overrides: Record<string, unknown> = {}): void => {
       setChargers([
@@ -886,8 +846,6 @@ describe("Schedules", () => {
       ).not.toBeInTheDocument();
     });
   });
-
-  // ---- Grouping: a point is always visible as its own group ----
 
   describe("group composition", () => {
     it("gives an assigned smart charger both a charger group and a vehicle group", () => {

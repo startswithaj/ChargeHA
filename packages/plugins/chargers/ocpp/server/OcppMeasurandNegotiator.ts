@@ -1,7 +1,7 @@
-// ChargeHA never used to ask a charger what to report, so a charger shipping
-// the 1.6 minimum (Energy.Active.Import.Register and nothing else) left the
-// controller with no current and no voltage. This negotiates
-// MeterValuesSampledData once per charge point, on BootNotification.
+// A charger shipping the 1.6 minimum (Energy.Active.Import.Register and
+// nothing else) leaves the controller with no current and no voltage. This
+// negotiates MeterValuesSampledData once per charge point, on
+// BootNotification.
 import type { Logger } from "@chargeha/server/lib/Logger";
 import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import { changeConfigurationRes, getConfigurationRes } from "./OcppMessages.ts";

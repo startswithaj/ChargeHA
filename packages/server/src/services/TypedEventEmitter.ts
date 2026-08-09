@@ -127,7 +127,6 @@ export class TypedEventEmitter {
       }
     }
 
-    // Return unsubscribe function
     return () => {
       set.delete(listener as Listener<EventType>);
     };

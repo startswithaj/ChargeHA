@@ -51,10 +51,6 @@ describe("VehicleService", () => {
     isHome: null,
   };
 
-  // ---------------------------------------------------------------------------
-  // Mock factories
-  // ---------------------------------------------------------------------------
-
   function makeMockDb(
     overrides: Partial<AppDatabase> = {},
     vehicles: VehicleRow[] = [],
@@ -108,10 +104,6 @@ describe("VehicleService", () => {
     } as unknown as VehiclePluginRegistry;
   }
 
-  // ---------------------------------------------------------------------------
-  // Tests
-  // ---------------------------------------------------------------------------
-
   let service: VehicleService;
   let db: AppDatabase;
   let mgr: VehicleManager;
@@ -130,10 +122,6 @@ describe("VehicleService", () => {
       () => stubChargingPoints,
     );
   });
-
-  // =========================================================================
-  // getPluginSummaries
-  // =========================================================================
 
   describe("getPluginSummaries", () => {
     it("returns configured=true when a vehicle matches the plugin id", async () => {
@@ -218,10 +206,6 @@ describe("VehicleService", () => {
     });
   });
 
-  // =========================================================================
-  // getCommandStatus
-  // =========================================================================
-
   describe("getCommandStatus", () => {
     it("returns default when vehicle not found", async () => {
       db = makeMockDb({}, []);
@@ -270,10 +254,6 @@ describe("VehicleService", () => {
     });
   });
 
-  // =========================================================================
-  // getVehicleOrThrow
-  // =========================================================================
-
   describe("getVehicleOrThrow", () => {
     it("returns vehicle when found", async () => {
       const result = await service.getVehicleOrThrow("v1");
@@ -290,10 +270,6 @@ describe("VehicleService", () => {
       }
     });
   });
-
-  // =========================================================================
-  // listVehicles
-  // =========================================================================
 
   describe("listVehicles", () => {
     it("returns vehicles with state, location, and no error", async () => {
@@ -361,10 +337,6 @@ describe("VehicleService", () => {
       expect(result[0].lastErrorAt).toBe(errorAt);
     });
   });
-
-  // =========================================================================
-  // createVehicle
-  // =========================================================================
 
   describe("createVehicle", () => {
     it("creates vehicle with defaults and registers with manager", async () => {
@@ -509,10 +481,6 @@ describe("VehicleService", () => {
     });
   });
 
-  // =========================================================================
-  // deleteVehicle
-  // =========================================================================
-
   describe("deleteVehicle", () => {
     it("deletes vehicle and all related data", async () => {
       const deletedIds: string[] = [];
@@ -547,10 +515,6 @@ describe("VehicleService", () => {
     });
   });
 
-  // =========================================================================
-  // setPriority
-  // =========================================================================
-
   describe("setPriority", () => {
     it("updates priority", async () => {
       let prioritySet: number | undefined;
@@ -572,10 +536,6 @@ describe("VehicleService", () => {
       expect(prioritySet).toBe(3);
     });
   });
-
-  // =========================================================================
-  // executeCommand
-  // =========================================================================
 
   describe("executeCommand", () => {
     it("executes wake command via vehicleManager.requestState with forceRefresh", async () => {

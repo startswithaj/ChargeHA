@@ -80,8 +80,6 @@ describe("WizardService", () => {
     );
   }
 
-  // ── getStatus ─────────────────────────────────────────────────────────
-
   describe("getStatus", () => {
     it("returns completed:true when wizard_completed is 'true'", async () => {
       const service = makeService({
@@ -153,8 +151,6 @@ describe("WizardService", () => {
     });
   });
 
-  // ── complete ──────────────────────────────────────────────────────────
-
   describe("complete", () => {
     it("stops tunnel when running and clears wizard state", async () => {
       let tunnelStopped = false;
@@ -209,8 +205,6 @@ describe("WizardService", () => {
       expect(tunnelStopped).toBe(false);
     });
   });
-
-  // ── Navigation state (getState/patchState) ───────────────────────────
 
   describe("getState", () => {
     it("reads every field from its config key", async () => {
@@ -309,8 +303,6 @@ describe("WizardService", () => {
       expect(configSet).toEqual({ wizard_energy_type: "" });
     });
   });
-
-  // ── setAuthMode ───────────────────────────────────────────────────────
 
   describe("setAuthMode", () => {
     it("delegates to authService.changeMode with correct input", async () => {
@@ -468,8 +460,6 @@ describe("WizardService", () => {
     });
   });
 
-  // ── saveOidcConfig ────────────────────────────────────────────────────
-
   describe("saveOidcConfig", () => {
     it("tests discovery and saves config", async () => {
       let discoveryTested = false;
@@ -597,8 +587,6 @@ describe("WizardService", () => {
       expect(savedSecret).not.toBe("secret123");
     });
   });
-
-  // ── demoSetup ─────────────────────────────────────────────────────────
 
   describe("demoSetup", () => {
     it("creates simulated vehicle, sets defaults, and registers it", async () => {

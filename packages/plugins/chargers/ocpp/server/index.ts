@@ -61,8 +61,8 @@ export class OcppChargerPlugin implements ChargerPlugin {
   ): Promise<ChargerMiddleware> {
     const { config } = resolved;
     const chargePointId = config.charger_id;
-    // Previously this fell back to "", binding an unconfigured row to a
-    // phantom charge point that looked live but could never connect. Throwing
+    // Never fall back to a placeholder id: that binds an unconfigured row to a
+    // phantom charge point that looks live but can never connect. Throwing
     // registers an UnconfiguredChargerMiddleware whose message names the
     // problem on the dashboard.
     if (chargePointId === undefined) {

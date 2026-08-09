@@ -520,7 +520,6 @@ export function Schedules({ onNavigateSettings }: SchedulesProps) {
         removeSchedule={removeSchedule}
       />
 
-      {/* Separator */}
       <div className={styles.separator} />
 
       <BlockoutSection
@@ -537,7 +536,6 @@ export function Schedules({ onNavigateSettings }: SchedulesProps) {
         schedules={schedules}
       />
 
-      {/* Info note */}
       <Card className={styles.infoCard}>
         <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
           <Info

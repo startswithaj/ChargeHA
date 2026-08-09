@@ -11,8 +11,6 @@ import {
 } from "../../../createPluginConfigProcedures.ts";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 
-// ── Typed Zod schemas for the Sigenergy plugin procedures ───────────────────
-
 const discoverInput = z.object({
   subnet: z.string().optional(),
 });
@@ -23,8 +21,6 @@ const testConnectionInput = z.object({
   plantUnitId: z.number().optional(),
   deviceUnitId: z.number().optional(),
 });
-
-// ── Sigenergy plugin tRPC router ────────────────────────────────────────────
 
 export function createSigenergyLocalRouter(deps: PluginDependencies) {
   return router({

@@ -39,8 +39,6 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
     this.strategy = new TeslaApiStrategy();
   }
 
-  // ── Public: data ──────────────────────────────────────────────────────
-
   get online(): boolean {
     return this.lastKnownOnline;
   }
@@ -134,8 +132,6 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
     return this.getCachedState();
   }
 
-  // ── Public: commands ──────────────────────────────────────────────────
-
   async startCharging(ctx: CallContext): Promise<boolean> {
     this.logger.debug(`startCharging origin=${ctx.origin}`);
     await this.ensureOnline(withSuffix(ctx, "pre"));
@@ -225,8 +221,6 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
     }
     this.lastKnownOnline = true;
   }
-
-  // ── Private: I/O ──────────────────────────────────────────────────────
 
   /** Free online check via /vehicles endpoint ($0). Debounced for the
    *  polling path so high-frequency callers don't burn Tesla rate-limit

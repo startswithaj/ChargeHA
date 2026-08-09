@@ -94,7 +94,6 @@ describe("VehicleSettings", () => {
 
   afterEach(() => {
     cleanup();
-    // Reset plugin registries
     Object.keys(pluginSettingsComponents).forEach((key) => {
       delete (pluginSettingsComponents as Record<string, unknown>)[key];
     });
@@ -149,7 +148,6 @@ describe("VehicleSettings", () => {
       handleDelete,
     });
     renderWithProviders(<VehicleSettings />);
-    // Find and click the delete button (the ghost red button)
     const buttons = screen.getAllByRole("button");
     // The delete button is just before the "Add Simulated Vehicle" button
     fireEvent.click(buttons[buttons.length - 2]);
@@ -165,14 +163,11 @@ describe("VehicleSettings", () => {
       handleMovePriority,
     });
     renderWithProviders(<VehicleSettings />);
-    // Find the down arrow buttons (enabled ones)
     const buttons = screen.getAllByRole("button");
     // The priority section has ArrowUp and ArrowDown for each vehicle
     // First vehicle: up disabled, down enabled
     // Second vehicle: up enabled, down disabled
-    // Let's click the first enabled down button
     const enabledButtons = buttons.filter((b) => !b.hasAttribute("disabled"));
-    // Click one of the priority buttons
     if (enabledButtons.length > 0) {
       fireEvent.click(enabledButtons[0]);
     }

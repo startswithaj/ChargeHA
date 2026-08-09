@@ -6,10 +6,8 @@ import { LogEntryCard } from "./LogEntryCard.tsx";
 import type { ControllerLogEntry } from "../../../hooks/useControllerLogs.ts";
 
 describe("LogEntryCard", () => {
-  // The wire shape `ControllerLogEntry` carries strict enums and a
-  // fully-populated `config`. The factory returns the loose test shape and
-  // widens through `as never` at the single render boundary, matching the
-  // pattern used in Logs.test.tsx.
+  // `ControllerLogEntry` carries strict enums and a fully-populated `config`,
+  // so the loose test shape widens through `as never` at the render boundary.
   const makeEntry = (overrides: Record<string, unknown> = {}) => {
     return {
       id: 1,

@@ -10,8 +10,6 @@ import {
 } from "../../../createPluginConfigProcedures.ts";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 
-// ── Typed Zod schemas for Fronius Local plugin procedures ───────────────────
-
 const discoverInput = z.object({
   subnet: z.string().optional(),
 });
@@ -20,8 +18,6 @@ const testConnectionInput = z.object({
   host: z.string(),
   meterDeviceId: z.number().optional(),
 });
-
-// ── Fronius Local plugin tRPC router ────────────────────────────────────────
 
 export function createFroniusLocalRouter(deps: PluginDependencies) {
   return router({

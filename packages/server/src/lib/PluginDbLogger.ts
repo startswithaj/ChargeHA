@@ -2,7 +2,7 @@ import type { Logger } from "./Logger.ts";
 
 /**
  * Callback signature for persisting a log entry.
- * Provided by createPluginDependencies — plugins never import AppDatabase.
+ * Provided by PluginDependencies — plugins never import AppDatabase.
  */
 export type PersistLogFn = (entry: {
   level: string;

@@ -53,8 +53,6 @@ function VersionFooter() {
   );
 }
 
-// ── Main Settings Component ──
-
 export function Settings() {
   const { data: charging, isLoading: chargingLoading } = useChargingConfig();
   const chargingMutation = useChargingConfigMutation();

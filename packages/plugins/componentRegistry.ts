@@ -16,32 +16,15 @@ export type {
   VehiclePluginOption,
 };
 
-// Simulated energy settings component
 import { SimulatedEnergyConfig } from "./energy/simulated/client/SimulatedEnergyConfig.tsx";
-
-// Tesla settings component
 import { TeslaSettings } from "./vehicles/tesla/client/TeslaSettings.tsx";
-
-// Simulated vehicle settings component
 import { SimulatedVehicleSettings } from "./vehicles/simulated/client/SimulatedVehicleSettings.tsx";
-
-// Fronius settings components
 import { FroniusCloudConfig } from "./energy/fronius-cloud/client/FroniusCloudConfig.tsx";
 import { FroniusLocalConfig } from "./energy/fronius-local/client/FroniusLocalConfig.tsx";
-
-// Sigenergy settings component
 import { SigenergyLocalConfig } from "./energy/sigenergy-local/client/SigenergyLocalConfig.tsx";
-
-// Enphase settings component
 import { EnphaseLocalConfig } from "./energy/enphase-local/client/EnphaseLocalConfig.tsx";
-
-// Tapo settings component
 import { TapoSettings } from "./chargers/tapo/client/TapoSettings.tsx";
-
-// OCPP settings component
 import { OcppSettings } from "./chargers/ocpp/client/OcppSettings.tsx";
-
-// Simulated charger settings component
 import { SimulatedChargerSettings } from "./chargers/simulated/client/SimulatedChargerSettings.tsx";
 
 // Plugin wizard step definitions — imported from each plugin's client folder
@@ -131,18 +114,14 @@ export const energyPluginSteps: Record<string, PluginStepDef[]> = {
   simulated_energy: simulatedEnergyWizardSteps,
 };
 
-/** Charger plugin options for the charger type selection step. Filled by
- *  plugin change sets (tapoChargerOption, ocppChargerOption,
- *  simulatedChargerOption). */
+/** Charger plugin options for the charger type selection step. */
 export const chargerPluginOptions: ChargerPluginOption[] = [
   tapoChargerOption,
   ocppChargerOption,
   simulatedChargerOption,
 ];
 
-/** Charger plugin wizard steps, keyed by charger adapter type. Filled by
- *  plugin change sets (tapo: tapoWizardSteps, ocpp: ocppWizardSteps,
- *  simulated_charger: simulatedChargerWizardSteps). */
+/** Charger plugin wizard steps, keyed by charger adapter type. */
 export const chargerPluginSteps: Record<string, PluginStepDef[]> = {
   tapo: tapoWizardSteps,
   ocpp: ocppWizardSteps,

@@ -108,7 +108,6 @@ describe("ScheduleForm", () => {
     mocks.dayPickerOnChangeRef.value = null;
 
     Element.prototype.scrollIntoView = vi.fn();
-    // Mock ResizeObserver
     globalThis.ResizeObserver = vi.fn().mockImplementation(() => ({
       observe: vi.fn(),
       unobserve: vi.fn(),
@@ -158,8 +157,6 @@ describe("ScheduleForm", () => {
     expect(screen.queryByText(label)).not.toBeInTheDocument();
   });
 
-  // ---- Form submission ----
-
   it.each<[string, () => string | null | Promise<string | null>]>([
     ["async null", () => Promise.resolve(null)],
     ["sync null", () => null],
@@ -207,7 +204,6 @@ describe("ScheduleForm", () => {
       <ScheduleForm {...defaultProps} onSave={onSave} />,
     );
 
-    // Clear all days via DayPicker onChange, wrapped in act
     assertExists(mocks.dayPickerOnChangeRef.value);
     const clearDays = mocks.dayPickerOnChangeRef.value;
     await act(() => {
@@ -222,7 +218,6 @@ describe("ScheduleForm", () => {
       expect(screen.getByText("Select at least one day.")).toBeInTheDocument();
     });
 
-    // onSave should NOT be called when validation fails
     expect(onSave).not.toHaveBeenCalled();
   });
 
@@ -238,8 +233,6 @@ describe("ScheduleForm", () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
-  // ---- updateField via time picker onChange ----
-
   it("updates start time when TimePicker onChange fires", async () => {
     renderWithProviders(<ScheduleForm {...defaultProps} />);
 
@@ -249,7 +242,6 @@ describe("ScheduleForm", () => {
       updateStart("08:30");
     });
 
-    // After state update and re-render, check the value
     const timePickers = screen.getAllByTestId("time-picker");
     expect(timePickers[0]).toHaveValue("08:30");
   });
@@ -267,8 +259,6 @@ describe("ScheduleForm", () => {
     expect(timePickers[1]).toHaveValue("22:00");
   });
 
-  // ---- updateField via day picker onChange ----
-
   it("updates days when DayPicker onChange fires", async () => {
     renderWithProviders(<ScheduleForm {...defaultProps} />);
 
@@ -280,8 +270,6 @@ describe("ScheduleForm", () => {
 
     expect(screen.getByTestId("day-picker")).toHaveTextContent("mon,wed,fri");
   });
-
-  // ---- Charge amps stepper ----
 
   it.each<[string, "-" | "+" | "max", number | undefined, string]>([
     ["decrements from default 32", "-", undefined, "31A"],
@@ -305,8 +293,6 @@ describe("ScheduleForm", () => {
 
     expect(stepperButtons("−")[0]).toBeDisabled();
   });
-
-  // ---- Charge limit stepper ----
 
   it.each<[string, number, "-" | "+", string]>([
     ["decrements from 80", 80, "-", "75%"],
@@ -335,8 +321,6 @@ describe("ScheduleForm", () => {
     expect(stepperButtons(symbol)[1]).toBeDisabled();
   });
 
-  // ---- Editing initializes form correctly ----
-
   it("populates form with editing schedule data for charge type", () => {
     renderWithProviders(
       <ScheduleForm
@@ -351,10 +335,8 @@ describe("ScheduleForm", () => {
       />,
     );
 
-    // Verify charge amps and limit reflect the editing schedule
     expect(screen.getByText("16A")).toBeInTheDocument();
     expect(screen.getByText("90%")).toBeInTheDocument();
-    // Verify days
     expect(screen.getByTestId("day-picker")).toHaveTextContent("mon,tue");
   });
 
@@ -376,14 +358,11 @@ describe("ScheduleForm", () => {
       />,
     );
 
-    // Blockout schedule should not show charge fields
     expect(screen.queryByText("Charge Amps")).not.toBeInTheDocument();
     expect(screen.getByTestId("day-picker")).toHaveTextContent(
       "mon,tue,wed,thu,fri",
     );
   });
-
-  // ---- Default times ----
 
   it("applies defaultStartTime and defaultEndTime when creating new schedule", () => {
     renderWithProviders(
@@ -413,8 +392,6 @@ describe("ScheduleForm", () => {
     expect(timePickers[1]).toHaveValue("06:00");
   });
 
-  // ---- Error is cleared on field update ----
-
   it("clears error message when a field is updated after validation error", async () => {
     const onSave = vi.fn().mockResolvedValue("Some error");
 
@@ -422,13 +399,11 @@ describe("ScheduleForm", () => {
       <ScheduleForm {...defaultProps} onSave={onSave} />,
     );
 
-    // Trigger error
     submitForm();
     await waitFor(() => {
       expect(screen.getByText("Some error")).toBeInTheDocument();
     });
 
-    // Update a field (end time) to clear the error
     assertExists(mocks.timePickerRefs.end);
     const updateEndTime = mocks.timePickerRefs.end;
     await act(() => {

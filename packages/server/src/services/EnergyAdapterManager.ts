@@ -19,8 +19,6 @@ type ChargingLoadProvider = () => Promise<
   { unmeteredW: number; meteredW: number }
 >;
 
-// ── EnergyAdapterManager ────────────────────────────────────────────────
-
 /**
  * Owns the energy adapter lifecycle: resolves config from DB, constructs
  * the correct adapter via plugin registry, and handles hot-swap on config

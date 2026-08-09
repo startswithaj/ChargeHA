@@ -125,16 +125,14 @@ export class TapoChargerAdapter implements ChargerAdapter {
     };
   }
 
-  // ── State mapping ────────────────────────────────────────────────────
-
   private buildState(
     info: TapoDeviceInfo,
     energy: TapoEnergyUsage,
   ): ChargerState {
     const powerW = energy.current_power / 1000;
     const aboveThreshold = powerW >= this.config.detectionThresholdW;
-    // isCharging = deviceOn && power >= threshold — the switch
-    // being off gates the session regardless of a stale power reading.
+    // The switch being off gates the session regardless of a stale power
+    // reading.
     const isCharging = this.updateSession(
       info.device_on && aboveThreshold,
       energy.today_energy,

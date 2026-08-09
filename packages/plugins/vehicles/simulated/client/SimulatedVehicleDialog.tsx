@@ -168,7 +168,6 @@ export function SimulatedVehicleDialog({
           immediately on the dashboard.
         </Text>
 
-        {/* Plugged In */}
         <div className={styles.field}>
           <Text size="2" weight="medium">Plugged In</Text>
           <Switch
@@ -188,7 +187,6 @@ export function SimulatedVehicleDialog({
           hint="Sets the battery state of charge. Step: 5%."
         />
 
-        {/* Location */}
         <LocationField
           lat={lat}
           setLat={setLat}
@@ -206,14 +204,12 @@ export function SimulatedVehicleDialog({
           onStep={stepLimit}
         />
 
-        {/* Validation error */}
         {error && (
           <div className={styles.error}>
             <Text size="2" color="red">{error}</Text>
           </div>
         )}
 
-        {/* Actions */}
         <div className={styles.footer} style={{ marginTop: 0 }}>
           <Button type="button" variant="soft" color="gray" onClick={onCancel}>
             Cancel

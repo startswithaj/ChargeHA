@@ -60,13 +60,11 @@ export class WizardService {
   }
 
   async complete() {
-    // Auto-stop tunnel if running
     if (this.tunnelManager.isRunning) {
       await this.tunnelManager.stop();
       this.logger.info("Tunnel stopped on wizard completion");
     }
 
-    // Clear wizard navigation state from DB
     await this.patchState({
       stepId: null,
       vehicleType: null,
@@ -75,7 +73,6 @@ export class WizardService {
       controlPath: null,
     });
 
-    // Clear OIDC pending flag if set
     await this.db.setConfig("wizard_oidc_pending", "");
 
     await this.db.setConfig("wizard_completed", "true");
@@ -168,7 +165,6 @@ export class WizardService {
   async saveOidcConfig(
     input: WizardSaveOidcConfigInput,
   ): Promise<{ success: true }> {
-    // Test OIDC discovery endpoint reachability
     const result = await this.oidcService.testDiscovery(input.issuerUrl);
     if (!result.success) {
       throw new ServiceError(
@@ -177,13 +173,11 @@ export class WizardService {
       );
     }
 
-    // Encrypt client secret if encryption key available
     const { value: clientSecret, isEncrypted } = await maybeEncrypt(
       input.clientSecret,
       this.encryptionKey,
     );
 
-    // Save OIDC config to DB
     await this.db.upsertOidcConfig({
       issuerUrl: input.issuerUrl,
       clientId: input.clientId,
@@ -192,7 +186,6 @@ export class WizardService {
       baseUrl: input.baseUrl,
     });
 
-    // Mark that OIDC wizard flow is pending
     await this.db.setConfig("wizard_oidc_pending", "true");
 
     // OidcService.getState() reads the new config on next /auth/oidc/login.

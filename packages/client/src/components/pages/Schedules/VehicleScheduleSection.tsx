@@ -101,7 +101,6 @@ export function TargetScheduleSection({
         <ScheduleNoticeCard key={notice.id} notice={notice} />
       ))}
 
-      {/* Existing schedules */}
       {targetSchedules.length === 0 && !showingForm && (
         <EmptyState
           icon={<Clock size={20} />}
@@ -113,7 +112,6 @@ export function TargetScheduleSection({
 
       <div className={styles.scheduleList}>
         {targetSchedules.map((s) => {
-          // If editing this schedule, show inline form instead
           if (editingScheduleId === s.id) {
             return (
               <ScheduleForm
@@ -139,7 +137,6 @@ export function TargetScheduleSection({
         })}
       </div>
 
-      {/* Inline create form for this target */}
       {isCreating && (
         <ScheduleForm
           editingSchedule={null}

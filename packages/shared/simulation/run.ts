@@ -14,9 +14,6 @@ import type {
 
 const VOLTAGE = 230;
 
-/** Run a full-day charge controller simulation using the pure decision engine.
- *  No database, no adapters, no service classes — just plain objects and the
- *  engine's decide() method. */
 function buildControllerConfig(opts: SimulationOptions): ControllerConfig {
   return {
     chargingEnabled: true,
@@ -198,6 +195,9 @@ function stepBattery(
   };
 }
 
+/** Run a full-day charge controller simulation using the pure decision engine.
+ *  No database, no adapters, no service classes — just plain objects and the
+ *  engine's decide() method. */
 export function runSimulation(
   opts: SimulationOptions,
 ): SimulationOutput {
@@ -240,7 +240,6 @@ export function runSimulation(
     );
     batterySoc = battery.soc;
 
-    // Build engine input
     const vehicles: EngineVehicleInput[] = vehicleConfigs.map((vc) => ({
       id: vc.id,
       vehicleId: vc.id,

@@ -52,7 +52,6 @@ describe("TeslaTokenManager", () => {
   beforeEach(async () => {
     db = new AppDatabase(":memory:");
     await db.init();
-    // Seed default credentials for most tests
     await db.setPluginConfig("tesla.client_id", "test-client-id");
     await db.setPluginConfig("tesla.client_secret", "test-client-secret");
     await db.setPluginConfig("tesla.region", "na");
@@ -262,7 +261,6 @@ describe("TeslaTokenManager", () => {
           new URL(url1).searchParams.get("client_id"),
         ).toBe("old-id");
 
-        // Update DB config — no reinitialize needed
         await db.setPluginConfig("tesla.client_id", "new-id");
         await db.setPluginConfig("tesla.region", "eu");
 
@@ -353,7 +351,6 @@ describe("TeslaTokenManager", () => {
     });
 
     it("returns empty strings when no credentials in DB", async () => {
-      // Fresh DB with no tesla config
       const freshDb = new AppDatabase(":memory:");
       await freshDb.init();
       const freshDeps = makeDeps(freshDb);
@@ -373,14 +370,12 @@ describe("TeslaTokenManager", () => {
       const d = makeDeps(db);
       const m = new TeslaTokenManager(d, testLogger);
 
-      // Store tokens
       const expiresAt = new Date(Date.now() + 3600000).toISOString();
       await seedTokens(db, "access-token", "refresh-token", expiresAt);
 
       const token = await m.getAccessToken();
       expect(token).toBe("access-token");
 
-      // Update credentials — tokens should still be accessible
       await db.setPluginConfig("tesla.client_id", "updated-client-id");
 
       const token2 = await m.getAccessToken();

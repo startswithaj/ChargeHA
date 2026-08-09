@@ -133,8 +133,6 @@ export class EnphaseLocalAdapter implements EnergySourceAdapter {
     };
   }
 
-  // ── Internals ─────────────────────────────────────────────────────────────
-
   private async resolveMeterMap(): Promise<MeterMap> {
     if (this.metersProbed) return this.meterMap;
     const meters = await this.client.getJson(METERS_PATH) as MeterConfig[];

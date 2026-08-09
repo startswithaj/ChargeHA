@@ -41,7 +41,6 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
   private logger: Logger;
   private dbLog: PluginDbLogger;
 
-  // Internal state
   private socPercent: number;
   private chargeLimit: number;
   private isCharging = false;
@@ -225,7 +224,6 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
       traceId: ctx.traceId,
     });
 
-    // Auto-stop if SOC already at or above new limit
     if (this.isCharging && this.socPercent >= this.chargeLimit) {
       await this.stopCharging(ctx);
     }
@@ -254,7 +252,6 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
       `${this.config.vehicleName} SOC set to ${this.socPercent}%`,
     );
 
-    // If SOC is now at or above charge limit, stop charging
     if (this.isCharging && this.socPercent >= this.chargeLimit) {
       this.isCharging = false;
     }
@@ -286,8 +283,6 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
     return this.isCharging ? this.calculatePowerKw() * 1000 : 0;
   }
 
-  // --- Private helpers ---
-
   private calculatePowerKw(): number {
     const powerKw = (this.chargeAmps * this.config.voltage *
       this.config.phases) / 1000;
@@ -314,7 +309,6 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
     );
     this.energyAddedKwh += energyKwh;
 
-    // Auto-stop when charge limit reached
     if (this.socPercent >= this.chargeLimit) {
       this.socPercent = this.chargeLimit;
       this.isCharging = false;

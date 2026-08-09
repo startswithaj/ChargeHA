@@ -179,8 +179,6 @@ export function useSchedules() {
   const toggleMutation = useToggleScheduleMutation();
   const deleteMutation = useDeleteScheduleMutation();
 
-  // --- Stable callbacks matching the original API ---
-
   const addSchedule = useMemo(
     () => async (data: ScheduleFormData): Promise<string | null> => {
       const err = validateScheduleOverlap(data, schedules);

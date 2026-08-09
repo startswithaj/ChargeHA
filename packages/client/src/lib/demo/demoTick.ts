@@ -130,13 +130,13 @@ interface Decision {
   drawW: number;
 }
 
-/** Decide one vehicle's draw given an active charge schedule (if any), whether a
- *  blockout is active, and the solar excess still available. */
 const charge = (amps: number): Decision =>
   amps > 0
     ? { isCharging: true, amps, drawW: amps * GRID_VOLTAGE_V }
     : { isCharging: false, amps: 0, drawW: 0 };
 
+/** Decide one vehicle's draw given an active charge schedule (if any), whether a
+ *  blockout is active, and the solar excess still available. */
 const decideCharge = (
   v: DemoVehicle,
   schedule: DemoSchedule | undefined,

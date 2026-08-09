@@ -25,21 +25,18 @@ export const vehiclesRouter = router({
     return { vehicles };
   }),
 
-  // Create a new vehicle
   create: publicProcedure
     .input(vehicleCreateInput)
     .mutation(async ({ ctx, input }) => {
       return await ctx.vehicleService.createVehicle(input);
     }),
 
-  // Delete a vehicle
   delete: publicProcedure
     .input(vehicleIdInput)
     .mutation(async ({ ctx, input }) => {
       return await ctx.vehicleService.deleteVehicle(input.vehicleId);
     }),
 
-  // Set vehicle priority
   setPriority: publicProcedure
     .input(vehicleSetPriorityInput)
     .mutation(async ({ ctx, input }) => {

@@ -73,21 +73,16 @@ export function useVehicleSettings() {
   const { navigate } = useRouter();
   const { data: homeConfig } = useHomeConfig();
 
-  // --- Queries (read side) ---
   const utils = trpc.useUtils();
   const vehiclesQuery = trpc.vehicle.list.useQuery(undefined, {
     select: (data) => data.vehicles as VehicleWithState[],
   });
 
-  // --- Derived values from queries ---
   const vehicles = vehiclesQuery.data ?? [];
 
-  // --- Local UI state ---
   const [recentlyAddedVins, setRecentlyAddedVins] = useState<Set<string>>(
     new Set(),
   );
-
-  // --- Mutations ---
 
   // No onSuccess cache work: the MutationCache in trpcSetup invalidates on
   // every successful mutation, so the vehicle list refetches without waiting
@@ -103,14 +98,10 @@ export function useVehicleSettings() {
     namePrefix: "Demo EV",
   });
 
-  // --- Mutation handlers ---
-
   const handleDelete = (vin: string) =>
     deleteMutation.mutate({ vehicleId: vin });
 
   const handleAddSimulatedVehicle = () => addSimMutation.mutate();
-
-  // --- Plugin onboarding ---
 
   const vehiclePluginsQuery = trpc.vehicle.getPlugins.useQuery();
   const vehiclePlugins = vehiclePluginsQuery.data ?? [];
@@ -121,7 +112,6 @@ export function useVehicleSettings() {
     navigate({ type: "pluginSetup", pluginId });
   }, []);
 
-  // Combine query and mutation errors for display
   const mutations = [
     deleteMutation,
     addSimMutation,

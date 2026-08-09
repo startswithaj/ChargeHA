@@ -396,7 +396,6 @@ describe("ControllerEngine", () => {
         },
         energyOverrides: { batterySoc: 60, gridPowerW: -5000 },
       }));
-      // Should proceed to solar tracking and start
       expect(output.decisions.get("V1")?.action).toBe("start");
     });
   });
@@ -418,7 +417,6 @@ describe("ControllerEngine", () => {
       const d2 = output.decisions.get("V2");
       expect(d1?.action).toBe("start");
       expect(d2?.action).toBe("start");
-      // Both should get allocated amps (equal split)
       const total = (d1?.targetAmps ?? 0) + (d2?.targetAmps ?? 0);
       expect(total).toBeGreaterThan(0);
     });
@@ -438,7 +436,6 @@ describe("ControllerEngine", () => {
       });
       const d1 = output.decisions.get("V1");
       const d2 = output.decisions.get("V2");
-      // Priority 1 should get all the amps, priority 2 gets none
       expect(d1?.targetAmps).toBeGreaterThanOrEqual(5);
       expect(d2?.targetAmps).toBe(null);
     });
@@ -720,8 +717,8 @@ describe("ControllerEngine", () => {
         timestamp: baseTimestamp + 60_000,
       }));
 
-      // Tick 3: grace expires — solar_grid fallback, currently at min (5A)
-      // but let's say vehicle is at 10A still → should adjust
+      // Tick 3: grace expired but the vehicle is still at 10A, so the
+      // solar_grid fallback has to adjust it down to min.
       const output = engine.decide(makeInput({
         configOverrides: { solarTrackingMode: "solar_grid" },
         vehicle: { state: { isCharging: true, chargeAmps: 10 } },

@@ -876,10 +876,9 @@ export class ControllerEngine {
     config: ControllerConfig,
     energy: EnergyData,
   ): number {
-    // The early return for `consumptionExcludesCharging || !isCharging` is no
-    // longer needed: SolarAllocator.addBackW returns 0 in exactly those cases,
-    // and surplusW additionally nets off battery discharge and caps at panel
-    // output — which the raw grid-export shortcut skipped.
+    // No early return for `consumptionExcludesCharging || !isCharging`:
+    // addBackW is already 0 in those cases, and surplusW additionally nets off
+    // battery discharge and caps at panel output.
     const voltage = SolarAllocator.resolveVoltage(
       state.chargerVoltage,
       energy,

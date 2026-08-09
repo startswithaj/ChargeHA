@@ -61,8 +61,6 @@ vi.mock("../../../lib/featureFlags.ts", async (orig) => {
   };
 });
 
-// ---- Tests ----
-
 describe("AuthStep", () => {
   const makeStepProps = (overrides: Partial<StepProps> = {}): StepProps => ({
     onAdvance: vi.fn(),
@@ -89,11 +87,8 @@ describe("AuthStep", () => {
     cleanup();
     vi.clearAllMocks();
     mockIsFeatureEnabled.mockReturnValue(true);
-    // Reset location search
     globalThis.history.replaceState({}, "", "/");
   });
-
-  // ---- Initial render ----
 
   it("renders three auth mode cards", () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
@@ -121,8 +116,6 @@ describe("AuthStep", () => {
     ).toBeInTheDocument();
   });
 
-  // ---- No Authentication mode ----
-
   it("selects 'No Authentication' and calls setAuthMode mutation", async () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
     const onAdvance = vi.fn();
@@ -143,8 +136,6 @@ describe("AuthStep", () => {
       expect(onAdvance).toHaveBeenCalledTimes(1);
     });
   });
-
-  // ---- Username & Password mode ----
 
   it("shows local form when Username & Password is selected", () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
@@ -221,8 +212,6 @@ describe("AuthStep", () => {
       expect(onAdvance).toHaveBeenCalledTimes(1);
     });
   });
-
-  // ---- OIDC mode ----
 
   it("disables the OIDC option in demo mode", () => {
     mockIsFeatureEnabled.mockReturnValue(false);
@@ -314,7 +303,6 @@ describe("AuthStep", () => {
     const onAdvance = vi.fn();
     mockSaveOidcConfigMutateAsync.mockResolvedValue({ success: true });
 
-    // Mock location.href setter
     const hrefSetter = vi.fn();
     const originalLocation = globalThis.location;
     Object.defineProperty(globalThis, "location", {
@@ -360,12 +348,10 @@ describe("AuthStep", () => {
       );
     });
 
-    // Should NOT call setAuthMode for OIDC
     expect(mockSetAuthModeMutateAsync).not.toHaveBeenCalled();
     // Should NOT call onAdvance (redirect handles navigation)
     expect(onAdvance).not.toHaveBeenCalled();
 
-    // Restore
     Object.defineProperty(globalThis, "location", {
       value: originalLocation,
       writable: true,
@@ -423,8 +409,6 @@ describe("AuthStep", () => {
     expect(onAdvance).not.toHaveBeenCalled();
   });
 
-  // ---- OIDC error display from URL ----
-
   it("displays OIDC error from URL query param on mount", async () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
     globalThis.history.replaceState({}, "", "/wizard?error=provider_denied");
@@ -450,8 +434,6 @@ describe("AuthStep", () => {
       expect(screen.getByTestId("oidc-form")).toBeInTheDocument();
     });
   });
-
-  // ---- Auto-advance on OIDC session ----
 
   it("auto-advances when session shows OIDC authenticated", async () => {
     const onAdvance = vi.fn();
@@ -490,8 +472,6 @@ describe("AuthStep", () => {
       expect(screen.getByTestId("local-form")).toBeInTheDocument();
     });
   });
-
-  // ---- Redirect URI display ----
 
   it("shows computed redirect URI when base URL is entered", () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
@@ -537,8 +517,6 @@ describe("AuthStep", () => {
     );
   });
 
-  // ---- No mode selected ----
-
   it("disables Next with a hint when no mode is selected", async () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
     const onAdvance = vi.fn();
@@ -552,8 +530,6 @@ describe("AuthStep", () => {
     ).toBeInTheDocument();
     expect(onAdvance).not.toHaveBeenCalled();
   });
-
-  // ---- Mode switching ----
 
   it.each<[string, string, string, string, string]>([
     [
@@ -589,19 +565,15 @@ describe("AuthStep", () => {
     mockSessionRefetch.mockResolvedValue({ data: null });
     renderAuthStep(makeStepProps());
 
-    // Trigger a validation error
     fireEvent.click(screen.getByText("Username & Password"));
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     await waitFor(() => {
       expect(screen.getByText("Username is required")).toBeInTheDocument();
     });
 
-    // Switch mode — error should clear
     fireEvent.click(screen.getByText("No Authentication"));
     expect(screen.queryByText("Username is required")).not.toBeInTheDocument();
   });
-
-  // ---- Keyboard navigation ----
 
   it("selects mode via Enter key on card", async () => {
     mockSessionRefetch.mockResolvedValue({ data: null });

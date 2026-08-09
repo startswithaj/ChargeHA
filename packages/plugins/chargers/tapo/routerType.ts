@@ -1,5 +1,3 @@
-// Review note 4: assumes the foundation extends createAppRouter with a
-// charger plugin-router slot, mirroring vehicle/energy.
 import type { createAppRouter } from "../../../server/src/trpc/root.ts";
 import type { createTapoRouter } from "./server/router.ts";
 

@@ -155,7 +155,6 @@ function CustomTooltip({
     gridToCar: datum.gridToCarCostCents,
   };
 
-  // Show cost column when there's cost data for the dataset
   const showCost = hasCostData;
 
   return (

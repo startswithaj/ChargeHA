@@ -238,7 +238,6 @@ describe("App", () => {
     beforeEach(() => {
       // jsdom doesn't implement matchMedia
       globalThis.matchMedia = vi.fn().mockReturnValue({ matches: false });
-      // Reset to root before each test
       globalThis.history.pushState(null, "", "/");
       mockWizardDefault();
       mockAuthDefault();
@@ -324,24 +323,20 @@ describe("App", () => {
     it("responds to browser back/forward (popstate)", async () => {
       render(<App />);
 
-      // Navigate forward: Dashboard -> Stats -> Settings
       await userEvent.click(screen.getByText("Stats"));
       await userEvent.click(screen.getByText("Settings"));
       expect(screen.getByText("Settings Page")).toBeInTheDocument();
 
-      // Simulate browser back
       globalThis.history.back();
       await waitFor(() => {
         expect(screen.getByText("Stats Page")).toBeInTheDocument();
       });
 
-      // Simulate browser back again
       globalThis.history.back();
       await waitFor(() => {
         expect(screen.getByText("Dashboard Page")).toBeInTheDocument();
       });
 
-      // Simulate browser forward
       globalThis.history.forward();
       await waitFor(() => {
         expect(screen.getByText("Stats Page")).toBeInTheDocument();
@@ -471,7 +466,6 @@ describe("App", () => {
       const switchEl = screen.getByRole("switch");
       await userEvent.click(switchEl);
 
-      // After toggle, should switch to dark
       expect(themeRoot?.className).toContain("dark");
       expect(localStorage.getItem("chargeha-theme")).toBe(
         JSON.stringify("dark"),

@@ -272,11 +272,6 @@ export class VehicleManager {
     return this.vehicles.get(vehicleId)?.middleware.online ?? false;
   }
 
-  // ── Commands ──────────────────────────────────────────────────────────
-
-  /** Start or adjust charging. Handles: clamp amps → set amps → start →
-   *  error/backoff tracking. The middleware handles wake internally.
-   *  Idempotent: only sends commands when state differs from target. */
   // ── Error tracking ────────────────────────────────────────────────────
 
   reportVehicleError(

@@ -453,7 +453,6 @@ describe("DataRecorder", () => {
       feedEnergy(emitter, ENERGY_DATA);
       await testable(recorder).record();
 
-      // Query the energy reading directly to check rate_per_kwh
       // deno-lint-ignore no-explicit-any
       const rows = (db as any).sqlite.prepare(
         "SELECT rate_per_kwh FROM energy_readings ORDER BY id DESC LIMIT 1",
@@ -504,7 +503,6 @@ describe("DataRecorder", () => {
       // Don't call updateData — latestRealtime stays null
       vehicleManager.setVehicleState("VIN1", CHARGE_STATE);
 
-      // Call recordChargeReadings directly — should return early
       await testable(recorder).recordChargeReadings(25);
     });
 
@@ -680,7 +678,6 @@ describe("DataRecorder", () => {
       const totalGrid = capturedReadings[0].gridContributionW +
         capturedReadings[1].gridContributionW;
       expect(totalSolar + totalGrid).toBe(3700 + 2000);
-      // ratePerKwh should be null
       expect(capturedReadings[0].ratePerKwh).toBeNull();
     });
 
@@ -810,13 +807,10 @@ describe("DataRecorder", () => {
       feedEnergy(emitter, ENERGY_DATA);
       await db.setConfig("data_retention_days", "730");
 
-      // Directly test pruning logic
       const val = await db.getConfig("data_retention_days");
       const days = parseInt(val ?? "730", 10) || 730;
       await db.pruneEnergyReadings(days);
       await db.pruneVehicleChargeReadings(days);
-
-      // Should not crash
     });
   });
 });

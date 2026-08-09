@@ -20,8 +20,9 @@ export const PluginSettingsHostProvider = PluginSettingsHostContext.Provider;
 export const usePluginSettingsHost = () =>
   useContext(PluginSettingsHostContext);
 
-/** Plugin settings components are resolved from a registry and take no props,
- *  so a host that wants the cursor in the first field asks through here. */
+/** The registry fixes what props a plugin settings panel receives
+ *  (`PluginSettingsProps`), so a host that wants the cursor in the first field
+ *  asks through here rather than through a prop every panel must forward. */
 const PluginAutoFocusContext = createContext(false);
 
 export const PluginAutoFocusProvider = PluginAutoFocusContext.Provider;

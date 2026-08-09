@@ -89,8 +89,6 @@ describe("WizardShell", () => {
     cleanup();
   });
 
-  // ---- Initial render ----
-
   it("renders step indicator matching step count", () => {
     renderWithProviders(
       <WizardShell flow={makeFlow()} store={makeStore()} basePath="/wizard" />,
@@ -171,8 +169,6 @@ describe("WizardShell", () => {
 
     expect(screen.getByText("Loading wizard...")).toBeInTheDocument();
   });
-
-  // ---- Navigation ----
 
   it("clicking Next advances to next step", async () => {
     renderWithProviders(
@@ -307,8 +303,6 @@ describe("WizardShell", () => {
     expect(screen.getByText("Tesla Credentials")).toBeInTheDocument();
   });
 
-  // ---- Resolving a step id that isn't in the list ----
-
   it("lands on the next step still in the list when the stored step is gated off", () => {
     // The user had Tesla steps, then switched to a type without them.
     setStepId("tesla-credentials");
@@ -350,8 +344,6 @@ describe("WizardShell", () => {
     expect(screen.getByText("Step 12 of 12")).toBeInTheDocument();
   });
 
-  // ---- Step content rendering ----
-
   it("renders the step content for the current step", () => {
     renderWithProviders(
       <WizardShell flow={makeFlow()} store={makeStore()} basePath="/wizard" />,
@@ -360,8 +352,6 @@ describe("WizardShell", () => {
     expect(screen.getByTestId("step-content-0")).toBeInTheDocument();
     expect(screen.getByText("Welcome content")).toBeInTheDocument();
   });
-
-  // ---- Last step ----
 
   it("shows Finish button on last step instead of Next and Skip", () => {
     setStepId("done");
@@ -396,8 +386,6 @@ describe("WizardShell", () => {
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
   });
 
-  // ---- Step indicator ----
-
   it("marks active step dot in indicator", async () => {
     setStepId("tesla-key-generation");
 
@@ -412,20 +400,15 @@ describe("WizardShell", () => {
     const indicator = screen.getByRole("navigation", { name: "Wizard steps" });
     const dots = indicator.querySelectorAll("[class*='stepDot']");
 
-    // Steps before current should be completed
     Array.from({ length: 3 }).forEach((_, i) => {
       expect(dots[i].className).toContain("stepDotCompleted");
     });
 
-    // Current step should be active
     expect(dots[3].className).toContain("stepDotActive");
 
-    // Steps after current should be neither active nor completed
     expect(dots[4].className).not.toContain("stepDotActive");
     expect(dots[4].className).not.toContain("stepDotCompleted");
   });
-
-  // ---- Dynamic recomposition ----
 
   it("recomputes progress bar when the selections change which steps exist", () => {
     const { rerender } = renderWithProviders(
@@ -641,8 +624,6 @@ describe("WizardShell", () => {
       await waitFor(() => expect(mockPatch).not.toHaveBeenCalled());
     });
   });
-
-  // ---- Advance ----
 
   describe("advance", () => {
     it("writes the selection and the step it leads to in one patch", () => {

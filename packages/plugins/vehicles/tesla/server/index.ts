@@ -58,8 +58,8 @@ export async function checkTeslaProxyHealth(
  * lifecycle, and vehicle adapter creation behind the VehiclePlugin interface.
  *
  * Construction kicks off async startup (proxy start, optional token
- * auto-refresh, DB vehicle load) saved as `startupPromise`. Methods that
- * depend on startup awaited it internally; `shutdown()` awaits it too.
+ * auto-refresh, DB vehicle load) saved as `startupPromise`, which `shutdown()`
+ * awaits so teardown never races an in-flight boot.
  */
 export class TeslaVehiclePlugin implements VehiclePlugin, ChargerPlugin {
   private readonly middlewares = new Map<string, TeslaVehicleMiddleware>();
@@ -208,8 +208,6 @@ export class TeslaVehiclePlugin implements VehiclePlugin, ChargerPlugin {
       });
     }
   }
-
-  // ── Plugin interface implementations ────────────────────────────────────
 
   getRouter() {
     return createTeslaRouter(this, this.deps);

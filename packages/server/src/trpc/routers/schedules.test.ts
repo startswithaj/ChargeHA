@@ -147,7 +147,6 @@ describe("Schedules tRPC Router", () => {
       });
       expect(result.success).toBe(true);
 
-      // Verify deleted
       const list = await caller.schedule.list();
       expect(list.schedules).toHaveLength(0);
     });

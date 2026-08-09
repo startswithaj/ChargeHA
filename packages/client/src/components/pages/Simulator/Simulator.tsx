@@ -612,8 +612,6 @@ export function Simulator() {
   );
 }
 
-// ---- Sub-components ----
-
 function SolarProfileSection(
   { config, set }: {
     config: SimConfig;

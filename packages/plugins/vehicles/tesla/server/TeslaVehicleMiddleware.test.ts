@@ -111,7 +111,6 @@ describe("TeslaVehicleMiddleware", () => {
     });
 
     it("returns cache (marked offline) when vehicle is offline", async () => {
-      // Seed some state so cache exists
       middleware.seedState(
         buildVehicleChargeState({ isOnline: true, batteryLevel: 42 }),
       );
@@ -164,7 +163,6 @@ describe("TeslaVehicleMiddleware", () => {
     it("rate-limits wakes to once per hour", async () => {
       adapter.isOnline = false;
 
-      // First wake succeeds
       await middleware.requestState(ctx({ hasSchedule: true }));
       expect(adapter.wakeVehicleCalls).toBe(1);
 
@@ -237,7 +235,6 @@ describe("TeslaVehicleMiddleware", () => {
       });
 
       const state = await middleware.requestState(ctx());
-      // Probe ran, transition detected, fresh fetch happened
       expect(adapter.isVehicleOnlineCalls).toBe(1);
       expect(adapter.getChargeStateCalls).toBe(1);
       expect(state?.isPluggedIn).toBe(true);

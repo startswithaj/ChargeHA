@@ -99,8 +99,6 @@ describe("VehicleCard", () => {
     expect(screen.getByText("Offline")).toBeInTheDocument();
   });
 
-  // --- loading prop ---
-
   it("renders Skeleton (no name) when loading is true", () => {
     renderVC({ loading: true });
     expect(screen.queryByText("Model 3")).not.toBeInTheDocument();
@@ -110,8 +108,6 @@ describe("VehicleCard", () => {
     renderVC({ loading: false });
     expect(screen.getByText("Model 3")).toBeInTheDocument();
   });
-
-  // --- commandsDisabled banner ---
 
   it("renders banner with default reason and no Fix button when commandsDisabled and onNavigateSettings omitted", () => {
     renderVC({ commandsDisabled: true });
@@ -143,8 +139,6 @@ describe("VehicleCard", () => {
       .not.toBeInTheDocument();
   });
 
-  // --- vehicleError banner ---
-
   it("shows vehicle error banner when vehicleError is provided", () => {
     renderVC({ vehicleError: "Tesla API rate limited" });
 
@@ -159,8 +153,6 @@ describe("VehicleCard", () => {
     renderVC({ vehicleError: value });
     expect(screen.queryByText("Vehicle API error")).not.toBeInTheDocument();
   });
-
-  // --- charging details: solar/grid, energy added, minutesToFull ---
 
   const renderCharging = (extra: Partial<VCProps> = {}) => {
     return renderVC({
@@ -242,8 +234,6 @@ describe("VehicleCard", () => {
     expect(screen.queryByText(/solar,/)).not.toBeInTheDocument();
   });
 
-  // --- commandPending spinner states ---
-
   it.each<[VCProps["commandPending"], boolean, string, string]>([
     ["stop", true, "Stopping...", "Stop Charging"],
     ["start", false, "Starting...", "Start Charging"],
@@ -312,8 +302,6 @@ describe("VehicleCard", () => {
     expect(screen.getByText("+").closest("button")).toBeDisabled();
   });
 
-  // --- lastLocation / StaticMap ---
-
   it("renders StaticMap when lastLocation is provided", () => {
     renderVC({ lastLocation: { latitude: 37.7749, longitude: -122.4194 } });
     expect(screen.getByTestId("static-map")).toBeInTheDocument();
@@ -323,8 +311,6 @@ describe("VehicleCard", () => {
     renderVC({ lastLocation: null });
     expect(screen.queryByTestId("static-map")).not.toBeInTheDocument();
   });
-
-  // --- mode + start/stop button callbacks ---
 
   it.each<[string, "stop" | "auto" | "charge_now"]>([
     ["STOP", "stop"],
@@ -358,8 +344,6 @@ describe("VehicleCard", () => {
     expect(onStopCharging).toHaveBeenCalledTimes(1);
   });
 
-  // --- commandPending mode spinners ---
-
   it.each<[VCProps["commandPending"], string]>([
     ["mode:stop", "STOP"],
     ["mode:auto", "AUTO"],
@@ -373,8 +357,6 @@ describe("VehicleCard", () => {
       expect(screen.getByText(label).closest("button")).toBeDisabled();
     },
   );
-
-  // --- amps display ---
 
   it("shows amps / max amps label when charging", () => {
     renderVC({
@@ -391,8 +373,6 @@ describe("VehicleCard", () => {
     renderVC({ state: makeVehicleState({ isCharging: false }) });
     expect(screen.getByText("Not Charging")).toBeInTheDocument();
   });
-
-  // --- paired with a smart charger ---
 
   it("badges the charger it is plugged into, with the charge point id", () => {
     renderVC({
@@ -420,11 +400,9 @@ describe("VehicleCard", () => {
       .toBeInTheDocument();
   });
 
-  // readOnly takes away the controls, not the information: the charger card
-  // beside it owns every row it measures, but time to full is the car's own.
-  // A car driven by a smart charger never sees its own startCharging, so its
-  // isCharging stays false while the charger delivers energy. The estimate
-  // alone has to be enough to show the row.
+  // readOnly drops the controls, not the information: the charger card owns the
+  // rows it measures, time to full is the car's own — and a car a smart charger
+  // drives never reports isCharging, so the estimate alone has to show the row.
   it("shows time to full on a paired card that reports no charging of its own", () => {
     renderVC({
       readOnly: true,

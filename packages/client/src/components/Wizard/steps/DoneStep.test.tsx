@@ -91,8 +91,6 @@ vi.mock("../../../trpc.ts", () => ({
   },
 }));
 
-// ---- Tests ----
-
 describe("DoneStep", () => {
   const makeStepProps = (overrides: Partial<StepProps> = {}): StepProps => ({
     onAdvance: vi.fn(),
@@ -132,8 +130,6 @@ describe("DoneStep", () => {
     globalThis.dispatchEvent = originalDispatchEvent;
     cleanup();
   });
-
-  // ---- Initial render ----
 
   it("renders summary checklist", async () => {
     vi.mocked(trpc.auth.session.useQuery).mockReturnValue({
@@ -246,7 +242,6 @@ describe("DoneStep", () => {
       expect(screen.getByText("Setup Complete!")).toBeInTheDocument();
     });
 
-    // Should show warning about skipped steps
     await waitFor(() => {
       expect(screen.getByText(/steps were skipped/)).toBeInTheDocument();
     });
@@ -254,8 +249,6 @@ describe("DoneStep", () => {
     expect(screen.getByText(/You can configure these later in Settings/))
       .toBeInTheDocument();
   });
-
-  // ---- Authentication checklist item ----
 
   it.each<[string, boolean, "local" | "oidc" | "none", string]>([
     ["local", true, "local", "Authentication configured"],
@@ -332,8 +325,6 @@ describe("DoneStep", () => {
       expect(onSkipTo).toHaveBeenCalledWith(stepId);
     },
   );
-
-  // ---- API calls ----
 
   it("'Go to Dashboard' calls wizard.complete and navigates to /", async () => {
     vi.mocked(trpc.config.system.get.useQuery).mockReturnValue({

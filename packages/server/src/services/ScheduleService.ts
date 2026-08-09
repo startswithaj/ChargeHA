@@ -89,7 +89,6 @@ export class ScheduleService {
     chargeAmps?: number | null;
     chargeLimitPct?: number | null;
   }) {
-    // Additional validation for charge schedules
     if (input.scheduleType === "charge") {
       const targets = [input.vehicleId, input.chargerId]
         .filter((t) => t != null);

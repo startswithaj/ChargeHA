@@ -5,7 +5,7 @@ const files = [
   "-f",
   "docker/docker-compose.e2e.yml",
   ...overrides.flatMap((f) => ["-f", f]),
-  // ocpp suites additionally start the profiled vcp charger simulator.
+  // ocpp suites additionally start the profiled charger simulators.
   ...(suite.startsWith("ocpp") ? ["--profile", "ocpp"] : []),
 ];
 

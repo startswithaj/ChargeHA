@@ -208,10 +208,8 @@ export class KlapClient {
       if (parsed.result === undefined) {
         throw new TapoConnectionError(`${method} returned no result`);
       }
-      // Routine, high-frequency traffic (every poll) — throttled to at most
-      // one row per SUCCESS_LOG_THROTTLE_MS per charger, except the first
-      // success after a failure (lastSuccessLogAt reset to null), which
-      // always logs immediately since a recovery line is the useful one.
+      // At most one row per SUCCESS_LOG_THROTTLE_MS per charger, except the
+      // first success after a failure — a recovery line is worth logging now.
       const now = Date.now();
       if (
         this.lastSuccessLogAt === null ||

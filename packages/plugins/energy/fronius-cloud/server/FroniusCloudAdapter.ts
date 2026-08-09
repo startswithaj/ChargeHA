@@ -269,7 +269,6 @@ export class FroniusCloudAdapter implements EnergySourceAdapter {
 
     const timeUntilExpiry = this.tokenExpiresAt - Date.now();
     if (timeUntilExpiry > TOKEN_REFRESH_MARGIN_SECONDS * 1000) {
-      // Token is still valid
       return;
     }
 

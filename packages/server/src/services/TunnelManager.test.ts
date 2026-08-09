@@ -6,8 +6,6 @@ import { PINGGY_PROVIDER, TunnelManager } from "./TunnelManager.ts";
 import type { PluginTunnelRoute } from "@chargeha/shared/plugins";
 
 describe("TunnelManager", () => {
-  // ── Test Helpers ────────────────────────────────────────────────────────────
-
   const mockLogger = {
     info: () => {},
     error: () => {},
@@ -84,8 +82,6 @@ describe("TunnelManager", () => {
 
     return { process, resolveStatus };
   }
-
-  // ── Stubs ───────────────────────────────────────────────────────────────────
 
   interface MockCommandOptions {
     mockProcess: Deno.ChildProcess;
@@ -179,8 +175,6 @@ describe("TunnelManager", () => {
     );
   };
 
-  // ── Tests ───────────────────────────────────────────────────────────────────
-
   describe("PINGGY_PROVIDER", () => {
     it("matches free.pinggy.net URLs but not the tesla-rejected alias", () => {
       const output = [
@@ -234,7 +228,6 @@ describe("TunnelManager", () => {
 
       await tm.start();
 
-      // Verify handler route works via captured middleware handler
       assertExists(capturedMiddlewareHandler);
       const resp = await capturedMiddlewareHandler(
         new Request("http://localhost:4040/test"),
@@ -536,7 +529,6 @@ describe("TunnelManager", () => {
       await tm.start();
       expect(tm.isRunning).toBe(true);
 
-      // Simulate the tunnel process exiting
       resolveStatus(
         { success: false, code: 1, signal: null } as Deno.CommandStatus,
       );
@@ -864,7 +856,6 @@ describe("TunnelManager", () => {
       // Allow pipeStderr to process remaining chunks
       await new Promise((r) => setTimeout(r, 50));
 
-      // pipeStderr should have logged the remaining chunks
       const tunnelLogs = debugCalls.filter((m) =>
         m.startsWith("[test-tunnel]")
       );

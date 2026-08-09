@@ -27,7 +27,7 @@ function chargerTypeNext(
 export const chargerTypeStep: StepDef = {
   id: "charger-type",
   label: "Charger Type",
-  // Only on the Yes path (review note 1).
+  // Only on the "Yes, I have a smart charger" path.
   presentWhen: (state) => state.controlPath === "charger",
   useStep: ({ onAdvance }) => {
     const { state, isLoading } = useWizardState();

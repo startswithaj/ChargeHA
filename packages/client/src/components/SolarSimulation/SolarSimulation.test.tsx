@@ -149,8 +149,6 @@ describe("SolarSimulation", () => {
     expect(screen.getByText("Model 3")).toBeInTheDocument();
   });
 
-  // ---- no vehicles ----
-
   it("shows no vehicles message when vehicles array is empty", () => {
     renderWithProviders(
       <SolarSimulation {...defaultProps} vehicles={[]} />,
@@ -163,8 +161,6 @@ describe("SolarSimulation", () => {
     ).toBeInTheDocument();
   });
 
-  // ---- null currentEnergy ----
-
   it("renders with null currentEnergy using defaults", () => {
     renderWithProviders(
       <SolarSimulation
@@ -176,8 +172,6 @@ describe("SolarSimulation", () => {
     expect(screen.getByText("Solar Charging Simulation")).toBeInTheDocument();
   });
 
-  // ---- day buttons ----
-
   it.each(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])(
     "renders %s day button",
     (day) => {
@@ -186,8 +180,6 @@ describe("SolarSimulation", () => {
       expect(screen.getByText(day)).toBeInTheDocument();
     },
   );
-
-  // ---- summary bar ----
 
   it.each([
     "Solar:",
@@ -202,8 +194,6 @@ describe("SolarSimulation", () => {
     expect(screen.getByText(label)).toBeInTheDocument();
   });
 
-  // ---- result badges ----
-
   it.each<[Partial<SolarPreviewResult>, string]>([
     [{ blockoutActive: true }, "Blockout active"],
   ])("shows %o result badge", (flags, badge) => {
@@ -215,8 +205,6 @@ describe("SolarSimulation", () => {
 
     expect(screen.getByText(badge)).toBeInTheDocument();
   });
-
-  // ---- vehicle allocation display ----
 
   it.each<[Partial<PreviewVehicleResult>, string]>([
     [{ action: "charging" }, "Charging"],
@@ -286,8 +274,6 @@ describe("SolarSimulation", () => {
     expect(screen.getByText(/\+ 1\.7 kW grid/)).toBeInTheDocument();
   });
 
-  // ---- battery SOC slider ----
-
   it("renders Battery SOC slider when batterySoc is not null", () => {
     renderWithProviders(
       <SolarSimulation
@@ -336,8 +322,6 @@ describe("SolarSimulation", () => {
     const call = vi.mocked(previewSolarAllocation).mock.calls.at(-1);
     expect(call?.[2].batteryPowerKw).toBeNull();
   });
-
-  // ---- SliderRow labels ----
 
   it.each(["Solar Production", "Home Consumption", "Time", "Day"])(
     "renders %s label",

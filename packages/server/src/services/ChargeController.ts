@@ -148,7 +148,6 @@ export class ChargeController {
       `Loop: ${targets.length} charging points (${passive.length} passive), ${schedules.length} schedules, energy=${energySummary}`,
     );
 
-    // Compute context for middleware requests
     const hasSolar = energy !== null &&
       energy.solarProductionW >= config.minSolarGenerationKw * 1000;
     const hasBlockout = schedules.some(
@@ -188,7 +187,6 @@ export class ChargeController {
     await this.refreshUnlinkedVehicles(targets, traceId, hasSolar, hasBlockout);
     await this.refreshPassiveChargers(passive, traceId);
 
-    // Run the pure decision engine
     const output = this.engine.decide({
       config,
       vehicles: engineVehicles,
@@ -198,7 +196,6 @@ export class ChargeController {
       timestamp: Date.now(),
     });
 
-    // Execute decisions, build log entries, emit events
     const logEntries: ControllerLogInput[] = await targets.reduce(
       async (prevPromise, target) => {
         const acc = await prevPromise;
@@ -219,12 +216,10 @@ export class ChargeController {
       Promise.resolve([] as ControllerLogInput[]),
     );
 
-    // Batch-insert log entries
     if (logEntries.length > 0) {
       await this.db.insertControllerLogEntries(logEntries);
     }
 
-    // Periodic pruning
     this.loopCount++;
     if (this.loopCount % PRUNE_EVERY_N_LOOPS === 0) {
       const system = await this.configService.getSystem();
@@ -362,11 +357,6 @@ export class ChargeController {
         }
       },
       getState: () => this.mergedChargerState(row),
-      // Ambiguous resolution means mergedChargerState fell back to
-      // batteryLevel: 0 / chargeLimit: 100 — the engine would never see
-      // "battery full" and would happily command amps forever. Refusing to
-      // start (or adjust) while ambiguous is what keeps that fallback safe;
-      // an explicit assignment in Settings is what clears it.
       // Deliberately no guard on ambiguous vehicle resolution. Not knowing
       // which car is on the charger is not a reason to refuse to charge it:
       // the car enforces its own charge limit, so the worst case is charging

@@ -216,13 +216,11 @@ describe("Wizard tRPC Router", () => {
       const { caller: tunnelCaller, mockTunnelManager } =
         makeCallerWithActiveTunnel();
 
-      // Tunnel should be running before complete
       expect(mockTunnelManager.isRunning).toBe(true);
 
       const result = await tunnelCaller.wizard.complete();
       expect(result.completed).toBe(true);
 
-      // Tunnel should be stopped after complete
       expect(mockTunnelManager.isRunning).toBe(false);
     });
   });
@@ -382,7 +380,6 @@ describe("Wizard tRPC Router", () => {
       assertExists(setCookie);
       expect(setCookie).toContain("session_id=");
 
-      // Extract session ID and verify it's valid in the DB
       const sessionId = setCookie.split("session_id=")[1].split(";")[0];
       const authService = new AuthService(
         db,
@@ -477,17 +474,14 @@ describe("Wizard tRPC Router", () => {
 
   describe("wizard.complete - clears wizard state", () => {
     it("clears wizard_step, wizard_vehicle_type, wizard_energy_type on complete", async () => {
-      // Set wizard state
       await caller.wizard.patchState({
         stepId: "home-location",
         vehicleType: "tesla",
         energyType: "fronius_local",
       });
 
-      // Complete wizard
       await caller.wizard.complete();
 
-      // All wizard state should be cleared
       expect(await caller.wizard.state()).toEqual({
         stepId: null,
         vehicleType: null,

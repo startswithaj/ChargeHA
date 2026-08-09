@@ -62,11 +62,6 @@ function parseLogLevel(raw: string | undefined): LogLevel {
   return "info";
 }
 
-/**
- * Construct the entire app: infrastructure, services, plugins, HTTP router.
- * Returns a `shutdown` function that stops the server, shuts down plugins,
- * closes the tunnel, and closes the DB.
- */
 function buildAuxServices(
   {
     db,
@@ -535,6 +530,11 @@ export type RegisterPlugins = (
   chargerRegistry: ChargerPluginRegistry,
 ) => void;
 
+/**
+ * Construct the entire app: infrastructure, services, plugins, HTTP router.
+ * Returns a `shutdown` function that stops the server, shuts down plugins,
+ * closes the tunnel, and closes the DB.
+ */
 export async function bootstrap(
   registerPlugins: RegisterPlugins,
 ): Promise<

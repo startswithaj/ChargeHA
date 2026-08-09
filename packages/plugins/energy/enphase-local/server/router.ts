@@ -13,8 +13,6 @@ import {
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 
-// ── Typed Zod schemas for the Enphase plugin procedures ─────────────────────
-
 const discoverInput = z.object({
   subnet: z.string().optional(),
 });
@@ -25,8 +23,6 @@ const testConnectionInput = z.object({
   password: z.string().optional(),
   token: z.string().optional(),
 });
-
-// ── Enphase plugin tRPC router ──────────────────────────────────────────────
 
 export function createEnphaseLocalRouter(deps: PluginDependencies) {
   return router({

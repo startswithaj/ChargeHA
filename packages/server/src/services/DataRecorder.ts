@@ -154,7 +154,6 @@ export class DataRecorder {
 
     if (charging.length === 0) return;
 
-    // Get energy data for solar attribution
     const energy = this.latestRealtime;
     const solarProductionW = energy.solarProductionW;
     const homeConsumptionW = energy.homeConsumptionW;

@@ -178,7 +178,6 @@ export function WizardShell(
         labels={active.map((s) => s.label)}
       />
 
-      {/* Step header */}
       <div className={styles.stepHeader}>
         <Text size="1" color="gray">
           Step {currentStep + 1} of {active.length}

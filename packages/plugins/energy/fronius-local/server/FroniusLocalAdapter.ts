@@ -105,7 +105,6 @@ export class FroniusLocalAdapter implements EnergySourceAdapter {
       );
     }
 
-    // Take the first inverter
     const firstId = Object.keys(inverters)[0];
     const info = inverters[firstId];
 

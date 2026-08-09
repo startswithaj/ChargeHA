@@ -262,8 +262,6 @@ describe("Dashboard", () => {
     cleanup();
   });
 
-  // ---- Basic rendering ----
-
   it("renders energy metric cards", () => {
     h.render();
 
@@ -309,21 +307,16 @@ describe("Dashboard", () => {
       .toHaveAttribute("data-read-only", "true");
   });
 
-  // ---- Loading state ----
-
   it("forwards loading prop to MetricCard when energy data is loading", () => {
     h.setEnergyLoading();
 
     h.render();
 
     const cards = screen.getAllByTestId("metric-card");
-    // Every metric card receives loading=true while energy data is loading.
     expect(cards.length).toBeGreaterThan(0);
     expect(cards.every((c) => c.getAttribute("data-loading") === "true"))
       .toBe(true);
   });
-
-  // ---- lastUpdated timestamp ----
 
   it("renders relative time when lastUpdated is set", () => {
     h.setEnergy({ lastUpdated: new Date(Date.now() - 30_000) });
@@ -340,8 +333,6 @@ describe("Dashboard", () => {
 
     expect(screen.queryByText(/Updated/)).not.toBeInTheDocument();
   });
-
-  // ---- System alert ----
 
   it("shows system alert when config contains system_alert data", async () => {
     h.setSystemAlert({
@@ -390,8 +381,6 @@ describe("Dashboard", () => {
     expect(screen.queryByText("Safety Alert")).not.toBeInTheDocument();
   });
 
-  // ---- Plugin warnings ----
-
   it("shows plugin warning when health check fails", async () => {
     h.setPluginWarnings([{
       title: "Proxy Unreachable",
@@ -423,8 +412,6 @@ describe("Dashboard", () => {
       expect(screen.getByText("Reduced telemetry")).toBeInTheDocument();
     });
   });
-
-  // ---- Vehicle without state (asleep/unreachable) ----
 
   it("renders asleep card with Wake button when vehicle has no state", () => {
     h.setVehicles([{
@@ -523,8 +510,6 @@ describe("Dashboard", () => {
     });
   });
 
-  // ---- Battery metric card ----
-
   it("renders Battery metric card when batteryPowerW is present", () => {
     h.setEnergy({
       realtime: {
@@ -566,8 +551,6 @@ describe("Dashboard", () => {
     expect(screen.getByText("Battery")).toBeInTheDocument();
     expect(screen.queryByText(/% charged/)).not.toBeInTheDocument();
   });
-
-  // ---- Daily stats cards ----
 
   it("renders Charged Today and Solar to EVs cards", () => {
     h.render();
@@ -762,8 +745,6 @@ describe("Dashboard", () => {
     expect(screen.getByText("16A / 32A max")).toBeInTheDocument();
   });
 
-  // ---- Vehicle solar/grid computation ----
-
   it("passes computed solarW and gridW to VehicleCard for a charging vehicle", () => {
     // solar 4000W, home 1000W → available solar = 3000W; vehicle charges at 3000W
     // → solarW = 3000, gridW = 0
@@ -836,8 +817,6 @@ describe("Dashboard", () => {
     });
   });
 
-  // ---- No vehicles CTA ----
-
   it("renders Add Vehicle CTA when no vehicles configured", () => {
     h.setVehicles([]);
 
@@ -868,8 +847,6 @@ describe("Dashboard", () => {
       .toBeInTheDocument();
   });
 
-  // ---- onNavigateSettings callback ----
-
   it("passes onNavigateSettings to VehicleCard", () => {
     const onNavigateSettings = vi.fn();
     h.setVehicles();
@@ -880,8 +857,6 @@ describe("Dashboard", () => {
 
     expect(onNavigateSettings).toHaveBeenCalled();
   });
-
-  // ---- Current rate metric card ----
 
   it("renders Current Rate card with period label and next-rate subtitle", () => {
     h.setTariff({
