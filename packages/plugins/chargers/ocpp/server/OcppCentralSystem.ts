@@ -103,9 +103,9 @@ const freshData = (): OcppLiveData => ({
   lastUpdated: new Date().toISOString(),
 });
 
-/** Everything that belongs to one charge point's live socket. Previously
- *  these were single fields on the class, which is why a second charger
- *  evicted the first and why both would have shared a transaction counter. */
+/** Everything that belongs to one charge point's live socket. Held per
+ *  connection rather than as fields on the class, so a second charger cannot
+ *  evict the first nor share its transaction counter. */
 interface OcppConnection {
   socket: WebSocket;
   data: OcppLiveData;
@@ -175,14 +175,18 @@ export class OcppCentralSystem {
     // Re-arming must not forget a charger that is already paired. The panel
     // re-arms from polled state that can be a couple of seconds stale, so a
     // reset here would blank the "found" display and make it flicker.
+    // Read through pairingState() so an expired window counts as closed — the
+    // raw field stays armed until something replaces it, which would carry a
+    // lapsed window's chargers into the next one.
+    const previous = this.pairingState();
     this.pairing = {
       armed: true,
       expiresAt: Date.now() + ttlMs,
       // Keep across a renewal — the panel renews every minute while open, and
       // forgetting what was found would empty the picker.
-      announcedId: this.pairing.armed ? this.pairing.announcedId : null,
-      info: this.pairing.armed ? this.pairing.info : null,
-      seen: this.pairing.armed ? this.pairing.seen : [],
+      announcedId: previous.armed ? previous.announcedId : null,
+      info: previous.armed ? previous.info : null,
+      seen: previous.armed ? previous.seen : [],
     };
     this.logger.info(`OCPP pairing armed for ${Math.round(ttlMs / 1000)}s`);
   }
@@ -282,7 +286,7 @@ export class OcppCentralSystem {
    *  the same id updates its row rather than adding a duplicate — chargers
    *  reconnect frequently. */
   notePairedCharger(chargerId: string): void {
-    if (!this.pairing.armed) return;
+    if (!this.pairingState().armed) return;
     this.pairing = {
       ...this.pairing,
       announcedId: chargerId,
@@ -493,7 +497,7 @@ export class OcppCentralSystem {
         this.patch(chargePointId, { info });
         // Surface vendor/model on the pairing state too, so the panel can
         // name the charger that turned up before it is adopted.
-        if (this.pairing.armed) {
+        if (this.pairingState().armed) {
           this.pairing = {
             ...this.pairing,
             info,
