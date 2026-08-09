@@ -3,8 +3,10 @@ name: CI
 on:
   push:
     branches: [main]
+  # No base-branch filter: a PR stacked on a feature branch needs the same
+  # test and build signal as one targeting main. Release and deploy stay off
+  # regardless — they gate on a push to main below.
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 # Collapse redundant runs on rapid pushes to the same ref. Never cancel a main
