@@ -8,6 +8,18 @@ import type {
 
 const DEFAULT_TIMEOUT_MS = 5000;
 
+/** Worst first. The dashboard renders in this order, so the most serious
+ *  problem sits at the top when several checks report at once. */
+const SEVERITY_ORDER = ["error", "warning"] as const;
+
+export type WarningSeverity = (typeof SEVERITY_ORDER)[number];
+
+export interface PluginWarning {
+  title: string;
+  message: string;
+  severity: WarningSeverity;
+}
+
 /**
  * Plugins that implement multiple roles (Tesla is both vehicle and charger) are
  * registered in more than one registry, so the same check arrives twice.
@@ -32,6 +44,29 @@ function raceWithTimeout(
   return Promise.race([task, promise]).finally(() => clearTimeout(timer));
 }
 
+/** null when the check passed. A check that rejected or timed out reported
+ *  nothing at all, so it cannot be downgraded to a warning. */
+function severityOf(
+  settled: PromiseSettledResult<HealthCheckResult>,
+): WarningSeverity | null {
+  if (settled.status === "rejected") return "error";
+  if (settled.value.status === "ok") return null;
+  return settled.value.status === "warning" ? "warning" : "error";
+}
+
+/** The check's own message wins so a check with several failure modes can say
+ *  which one it hit; `warningMessage` covers the checks that report no detail.
+ *  A timeout or a rejection is not the check reporting anything — the message
+ *  there is ours, not the plugin's, so the static text stays. */
+function messageOf(
+  settled: PromiseSettledResult<HealthCheckResult>,
+  fallback: string,
+): string {
+  if (settled.status === "rejected") return fallback;
+  if (settled.value.status === "timeout") return fallback;
+  return settled.value.message ?? fallback;
+}
+
 export interface EncryptionCheckResult {
   configured: boolean;
 }
@@ -50,9 +85,7 @@ export class HealthService {
   }
 
   /** Collect user-facing warnings from all failed plugin health checks. */
-  async getPluginWarnings(): Promise<
-    Array<{ title: string; message: string }>
-  > {
+  async getPluginWarnings(): Promise<PluginWarning[]> {
     const checks = dedupeByName([
       ...this.vehiclePlugins.getHealthChecks(),
       ...this.energyPlugins.getHealthChecks(),
@@ -62,14 +95,21 @@ export class HealthService {
 
     const results = await this.runChecks(checks);
 
-    return checks.flatMap((check, i) => {
-      const result = results[i];
-      if (!check.warningTitle || !check.warningMessage) return [];
-      const failed = result.status === "rejected" ||
-        result.value.status !== "ok";
-      if (!failed) return [];
-      return [{ title: check.warningTitle, message: check.warningMessage }];
+    const warnings = checks.flatMap((check, i) => {
+      const { warningTitle, warningMessage } = check;
+      if (!warningTitle || !warningMessage) return [];
+      const severity = severityOf(results[i]);
+      if (severity === null) return [];
+      return [{
+        title: warningTitle,
+        message: messageOf(results[i], warningMessage),
+        severity,
+      }];
     });
+
+    return warnings.toSorted((a, b) =>
+      SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity)
+    );
   }
 
   private runChecks(checks: PluginHealthCheck[]) {

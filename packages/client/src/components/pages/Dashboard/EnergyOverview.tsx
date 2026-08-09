@@ -8,6 +8,7 @@ import {
   Car,
   DollarSign,
   Home,
+  Info,
   PlugZap,
   Sun,
 } from "lucide-react";
@@ -29,19 +30,29 @@ import styles from "./Dashboard.module.css";
 interface PluginWarning {
   title: string;
   message: string;
+  /** Absent on cards the dashboard raises itself, which are all errors. */
+  severity?: "warning" | "error";
 }
 
 interface EnergyOverviewProps {
   pluginWarnings: PluginWarning[];
 }
 
+/** Amber and red have to be far enough apart to read at a 3px border —
+ *  a degraded charger must not look like one that stopped charging. */
+const WARNING_ACCENTS = {
+  warning: { color: "var(--amber-9)", Icon: Info },
+  error: { color: "var(--red-9)", Icon: AlertTriangle },
+} as const;
+
 function PluginWarningCard({ warning }: { warning: PluginWarning }) {
+  const { color, Icon } = WARNING_ACCENTS[warning.severity ?? "error"];
   return (
-    <Card style={{ borderLeft: "3px solid var(--orange-9)" }}>
+    <Card style={{ borderLeft: `3px solid ${color}` }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <AlertTriangle
+        <Icon
           size={20}
-          style={{ color: "var(--orange-9)", flexShrink: 0 }}
+          style={{ color, flexShrink: 0 }}
         />
         <div>
           <Text size="2" weight="bold" style={{ display: "block" }}>

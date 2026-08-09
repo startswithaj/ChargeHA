@@ -211,12 +211,20 @@ vi.mock("../../MetricCard/MetricCard.tsx", () => ({
 // computed solar/grid split per vehicle.
 vi.mock("../../VehicleCard/VehicleCard.tsx", () => ({
   VehicleCard: (
-    { name, onNavigateSettings, solarPowerW, gridPowerW, readOnly }: {
+    {
+      name,
+      onNavigateSettings,
+      solarPowerW,
+      gridPowerW,
+      readOnly,
+      chargingPoint,
+    }: {
       name: string;
       onNavigateSettings?: () => void;
       solarPowerW?: number;
       gridPowerW?: number;
       readOnly?: boolean;
+      chargingPoint?: { name: string; identifier: string | null } | null;
     },
   ) => (
     <div
@@ -225,6 +233,8 @@ vi.mock("../../VehicleCard/VehicleCard.tsx", () => ({
       data-solar-w={solarPowerW ?? ""}
       data-grid-w={gridPowerW ?? ""}
       data-read-only={readOnly ? "true" : "false"}
+      data-charging-point={chargingPoint?.name ?? ""}
+      data-charging-point-id={chargingPoint?.identifier ?? ""}
     >
       {name}
       {onNavigateSettings && (
@@ -396,6 +406,24 @@ describe("Dashboard", () => {
     });
   });
 
+  it("shows a degraded plugin warning alongside an error", async () => {
+    h.setPluginWarnings([
+      { title: "Proxy Unreachable", message: "Commands will fail." },
+      {
+        title: "Reduced telemetry",
+        message: "Charging current is unavailable.",
+        severity: "warning",
+      },
+    ]);
+
+    h.render();
+
+    await waitFor(() => {
+      expect(screen.getByText("Proxy Unreachable")).toBeInTheDocument();
+      expect(screen.getByText("Reduced telemetry")).toBeInTheDocument();
+    });
+  });
+
   // ---- Vehicle without state (asleep/unreachable) ----
 
   it("renders asleep card with Wake button when vehicle has no state", () => {
@@ -546,6 +574,192 @@ describe("Dashboard", () => {
 
     expect(screen.getByText("Charged Today")).toBeInTheDocument();
     expect(screen.getByText("Solar to EVs")).toBeInTheDocument();
+  });
+
+  // A smart charger is the control path, so it renders its own card and the
+  // car rides alongside read-only. Pairing is on the RESOLVED vehicle, so an
+  // assignment that fell through, and a car whose own API control was switched
+  // off, both land on the charger that actually controls them.
+  const smartPoint = (overrides: Record<string, unknown> = {}) =>
+    makeVehicle({
+      id: "VEH1",
+      name: "Demo EV",
+      kind: "smart",
+      chargerVehicleId: null,
+      resolvedVehicleId: "VEH1",
+      vehicleResolution: "inferred",
+      ...overrides,
+    });
+
+  it("shows both cards for a smart charger and its car", () => {
+    h.setVehicles([
+      smartPoint({ chargerVehicleId: "VEH1", vehicleResolution: "linked" }),
+    ]);
+    h.render();
+
+    expect(screen.getByText("Demo EV assigned to this charger"))
+      .toBeInTheDocument();
+    expect(screen.getAllByTestId("vehicle-card")).toHaveLength(1);
+  });
+
+  it("leaves the paired vehicle card read-only", () => {
+    h.setVehicles([smartPoint()]);
+    h.render();
+
+    expect(screen.getByTestId("vehicle-card").getAttribute("data-read-only"))
+      .toBe("true");
+  });
+
+  it("ties the two cards together by name and charge point id", () => {
+    h.setVehicles([
+      smartPoint({
+        adapterType: "ocpp",
+        chargerConfig: '{"charger_id":"vcp-dev-2"}',
+      }),
+    ]);
+    h.render();
+
+    expect(screen.getByText("Demo EV detected automatically"))
+      .toBeInTheDocument();
+    const card = screen.getByTestId("vehicle-card");
+    expect(card.getAttribute("data-charging-point")).toBe("Demo EV");
+    // The name alone cannot tell two chargers of one type apart.
+    expect(card.getAttribute("data-charging-point-id")).toBe("vcp-dev-2");
+  });
+
+  it("shows the charge point id on the charger card", () => {
+    h.setVehicles([
+      smartPoint({
+        adapterType: "ocpp",
+        chargerConfig: '{"charger_id":"vcp-dev-2"}',
+      }),
+    ]);
+    h.render();
+
+    expect(screen.getByTitle("Charge point id")).toHaveTextContent(
+      "vcp-dev-2",
+    );
+  });
+
+  it("keeps controls on a vehicle-API point", () => {
+    h.setVehicles([makeVehicle({ id: "VEH1", name: "Demo EV" })]);
+    h.render();
+
+    expect(screen.getByTestId("vehicle-card").getAttribute("data-read-only"))
+      .toBe("false");
+    expect(
+      screen.queryByText(/detected automatically|assigned to this charger/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not repeat a paired car in the unlinked section", () => {
+    h.setVehicles([smartPoint()]);
+    h.render();
+
+    expect(screen.getAllByTestId("vehicle-card")).toHaveLength(1);
+  });
+
+  it("gives a car its own card back when it drives away from its charger", () => {
+    h.setVehicles([
+      smartPoint({
+        chargerVehicleId: "VEH1",
+        resolvedVehicleId: null,
+        vehicleResolution: "none",
+      }),
+    ]);
+    h.render();
+
+    // The charger claims nothing, and the car is no longer paired to it, so it
+    // reappears as its own card — read-only, since no point controls it.
+    expect(
+      screen.queryByText(/detected automatically|assigned to this charger/),
+    ).not.toBeInTheDocument();
+    const card = screen.getByTestId("vehicle-card");
+    expect(card.getAttribute("data-charging-point")).toBe("");
+  });
+
+  it("lets only one of two chargers inferring the same car claim it", () => {
+    h.setVehicles([
+      smartPoint(),
+      smartPoint({ id: "VEH2", name: "Spare Plug" }),
+    ]);
+    h.render();
+
+    // Both points resolve to the one plugged-in car; only the first may claim
+    // it, so the second names no car rather than claiming it twice.
+    expect(screen.getAllByText("Demo EV detected automatically")).toHaveLength(
+      1,
+    );
+    const paired = screen.getAllByTestId("vehicle-card").filter((card) =>
+      card.getAttribute("data-charging-point") === "Demo EV"
+    );
+    expect(paired).toHaveLength(1);
+  });
+
+  // API control ON: the car commands itself, so the smart charger it is
+  // plugged into goes passive and the car's own point keeps the controls.
+  // API control OFF: the charger is in charge and the car's card is read-only.
+  // Exactly one of the two carries controls either way.
+  it("leaves controls on the car's own card while it drives itself", () => {
+    h.setVehicles([
+      makeVehicle({ id: "VEH1", name: "Demo EV" }),
+      makeVehicle({
+        id: "PLUG1",
+        name: "Garage Plug",
+        kind: "smart",
+        chargerVehicleId: null,
+        resolvedVehicleId: null,
+        vehicleResolution: "none",
+        controlOwner: "vehicle_api",
+        passiveForVehicleId: "VEH1",
+        state: null,
+      }),
+    ]);
+    h.render();
+
+    // One card for the car, and it is the controllable one.
+    const carCards = screen.getAllByTestId("vehicle-card").filter((c) =>
+      c.getAttribute("data-name") === "Demo EV"
+    );
+    expect(carCards).toHaveLength(1);
+    expect(carCards[0].getAttribute("data-read-only")).toBe("false");
+    // The passive charger says who is driving instead of offering modes.
+    expect(screen.getByText("Controlled by Demo EV")).toBeInTheDocument();
+    expect(screen.queryByText("CHARGE NOW")).not.toBeInTheDocument();
+  });
+
+  it("moves controls to the charger when the car stops driving itself", () => {
+    h.setVehicles([
+      smartPoint({ chargerVehicleId: "VEH1", vehicleResolution: "linked" }),
+    ]);
+    h.render();
+
+    expect(screen.getByTestId("vehicle-card").getAttribute("data-read-only"))
+      .toBe("true");
+    expect(screen.getByText("CHARGE NOW")).toBeInTheDocument();
+    expect(screen.queryByText(/Controlled by/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the live readings on a passive charger", () => {
+    h.setVehicles([
+      makeVehicle({ id: "VEH1", name: "Demo EV" }),
+      makeVehicle({
+        id: "PLUG1",
+        name: "Garage Plug",
+        kind: "smart",
+        chargerVehicleId: null,
+        resolvedVehicleId: null,
+        vehicleResolution: "none",
+        controlOwner: "vehicle_api",
+        passiveForVehicleId: "VEH1",
+        state: { isCharging: true, chargePowerKw: 3.8, chargeAmps: 16.13 },
+      }),
+    ]);
+    h.render();
+
+    // The charger is where the real meter is, so its readings stay.
+    expect(screen.getByText("Charging at 3.8 kW")).toBeInTheDocument();
+    expect(screen.getByText("16A / 32A max")).toBeInTheDocument();
   });
 
   // ---- Vehicle solar/grid computation ----

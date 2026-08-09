@@ -14,8 +14,14 @@ type ConfigGetAllReturn = {
   error: null;
 };
 
+type PluginWarning = {
+  title: string;
+  message: string;
+  severity?: "warning" | "error";
+};
+
 type PluginWarningsReturn = {
-  data: Array<{ title: string; message: string }>;
+  data: PluginWarning[];
   isLoading: boolean;
   error: null;
 };
@@ -157,17 +163,28 @@ function setPointsFromVehicles(
       id: `cp-${v.id}`,
       name: v.name,
       chargerAdapterType: v.adapterType ?? "simulated",
-      chargerConfig: "{}",
+      chargerConfig: v.chargerConfig ?? "{}",
       mode: v.mode ?? "auto",
       priority: v.priority ?? 1,
-      vehicleId: v.id,
+      // Overridable so a fixture can describe an UNASSIGNED smart charger —
+      // the only shape that reaches ChargerCard, since VehicleList renders a
+      // vehicle card whenever the point names a vehicle it can find.
+      vehicleId: v.chargerVehicleId === undefined ? v.id : v.chargerVehicleId,
       // Real rows always carry this; the dashboard hides inactive points, so
       // a fixture without it renders nothing at all.
       active: v.active ?? true,
       kind: v.kind ?? "vehicle_api",
       createdAt: now,
       updatedAt: now,
-      resolvedVehicleId: v.id,
+      resolvedVehicleId: v.resolvedVehicleId === undefined
+        ? v.id
+        : v.resolvedVehicleId,
+      vehicleResolution: v.vehicleResolution ?? "linked",
+      // "vehicle_api" here means a SMART charger gone passive for a
+      // self-driven car; a vehicle_api row is always "self", since that row is
+      // the car's own API.
+      controlOwner: v.controlOwner ?? "self",
+      passiveForVehicleId: v.passiveForVehicleId ?? null,
       state: chargerStateFrom(
         v.id,
         v.state as Record<string, unknown> | null,
@@ -254,9 +271,7 @@ export interface DashboardHarness {
   setVehicles: (vehicles?: Array<Record<string, unknown>>) => void;
   setVehiclesRaw: (returnValue: ReturnType<typeof useVehicles>) => void;
   setSystemAlert: (alert: Record<string, unknown> | null) => void;
-  setPluginWarnings: (
-    warnings: Array<{ title: string; message: string }>,
-  ) => void;
+  setPluginWarnings: (warnings: PluginWarning[]) => void;
   setTariff: (rate: TariffCurrentRateReturn["data"]) => void;
   setWakeMutation: (
     impl: { mutate: Mock; isPending?: boolean; variables?: unknown },

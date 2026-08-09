@@ -14,8 +14,8 @@ export const simulatedChargerSetupStep: PluginStepDef = {
       <div className={styles.stepContainer}>
         <Text size="2">
           Creates a virtual smart charger for testing — no hardware required.
-          Adjust its plugged-in state and simulated vehicle appetite from Settings
-          once it's added.
+          Adjust its plugged-in state and simulated vehicle appetite from
+          Settings once it's added.
         </Text>
       </div>
     ),

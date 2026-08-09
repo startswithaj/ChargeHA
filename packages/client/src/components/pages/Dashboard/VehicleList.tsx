@@ -12,6 +12,7 @@ import { useVehicles } from "../../../hooks/useVehicles.ts";
 import { useToast } from "../../../hooks/useToast.tsx";
 import { useControllerStatuses } from "../../../hooks/controllerStatusStore.ts";
 import { useChargerCommands, useChargers } from "../../../hooks/useChargers.ts";
+import { chargePointIdentifier } from "../../../lib/chargePointIdentity.ts";
 import { VehicleCard } from "../../VehicleCard/VehicleCard.tsx";
 import { ChargerCard } from "./ChargerCard.tsx";
 import { trpc } from "../../../trpc.ts";
@@ -24,9 +25,49 @@ type VehicleCardProps = ComponentProps<typeof VehicleCard>;
 
 type ChargingPoint = ReturnType<typeof useChargers>["chargers"][number];
 
+type DashboardVehicle = ReturnType<typeof useVehicles>["vehicles"][number];
+
+/** The car a point puts on screen. Resolution first — an assignment that fell
+ *  through resolves to the car actually plugged in — then the car a passive
+ *  charger is passing current to. That second case is not a fallback for
+ *  tidiness: `inferVehicle` deliberately skips self-driven cars, so a smart
+ *  charger holding current for one resolves to nobody while
+ *  `passiveForVehicleId` names it. */
+const cardVehicleId = (point: ChargingPoint): string | null =>
+  point.resolvedVehicleId ?? point.passiveForVehicleId;
+
+/** Which point owns each car's card, so no car renders twice.
+ *
+ *  A vehicle_api point outranks a smart one for the same car. When a smart
+ *  charger has gone passive, both points name that car, and the vehicle_api
+ *  point is the one whose card carries working controls — letting list order
+ *  decide would sometimes hand the car to the passive charger and leave the
+ *  controls nowhere.
+ *
+ *  Within a rank the first point in list order wins: two smart chargers infer
+ *  the same car when only one is plugged in. Entries are reversed because a
+ *  Map keeps the LAST value for a duplicate key. */
+function ownerByVehicleId(points: ChargingPoint[]): Map<string, string> {
+  const rank = (p: ChargingPoint) => p.kind === "vehicle_api" ? 0 : 1;
+  return new Map(
+    [...points]
+      .sort((a, b) => rank(a) - rank(b))
+      .flatMap((p) => {
+        const vehicleId = cardVehicleId(p);
+        return vehicleId === null
+          ? []
+          : [[vehicleId, p.id] as [string, string]];
+      })
+      .reverse(),
+  );
+}
+
+// `point`, not `chargingPoint`: VehicleCard now has a `chargingPoint` prop of
+// its own for the badge naming a car's charger, and these props are spread
+// straight into it.
 function ConnectedVehicleCard(
-  { vehicleId, chargingPoint, ...props }:
-    & { vehicleId: string; chargingPoint: ChargingPoint }
+  { vehicleId, point, ...props }:
+    & { vehicleId: string; point: ChargingPoint }
     & Omit<
       VehicleCardProps,
       | "commandsDisabled"
@@ -45,12 +86,12 @@ function ConnectedVehicleCard(
     { refetchInterval: 30_000 },
   );
   const { commandPending, startCharging, stopCharging, setAmps, changeMode } =
-    useChargerCommands(chargingPoint.id);
+    useChargerCommands(point.id);
 
   return (
     <VehicleCard
       {...props}
-      mode={chargingPoint.mode as VehicleMode}
+      mode={point.mode as VehicleMode}
       commandPending={commandPending}
       onStartCharging={startCharging}
       onStopCharging={stopCharging}
@@ -58,7 +99,7 @@ function ConnectedVehicleCard(
       onChangeMode={changeMode}
       commandsDisabled={cmdStatus?.commandsDisabled ?? false}
       commandsDisabledReason={cmdStatus?.reason ?? undefined}
-      chargerStatus={chargingPoint.state}
+      chargerStatus={point.state}
     />
   );
 }
@@ -184,94 +225,176 @@ function useAllocationStatus(
   }, [priorityChargingEnabled, points, controllerStatuses]);
 }
 
-// One card per charging point; linked points (Tesla) render the full
-// vehicle card. Vehicles without a linked point get their own read-only
-// card below — vehicle data stays on vehicle cards.
-function ChargingPointCards(
-  {
-    points,
-    vehicles,
-    home,
-    vehiclesLoading,
-    vehicleErrors,
-    solarGrid,
-    allocationStatus,
-    controllerStatuses,
-    wakeMutation,
-    refreshMutation,
-    onNavigateSettings,
-  }: {
-    points: ChargingPoint[];
-    vehicles: ReturnType<typeof useVehicles>["vehicles"];
-    home: { lat: number; lng: number } | null;
-    vehiclesLoading: boolean;
-    vehicleErrors: Record<string, string | undefined>;
-    solarGrid: Record<string, { solarW: number; gridW: number }>;
-    allocationStatus: Record<string, string>;
-    controllerStatuses: ReturnType<typeof useControllerStatuses>;
-    wakeMutation: ReturnType<typeof trpc.vehicle.command.useMutation>;
-    refreshMutation: ReturnType<typeof trpc.vehicle.refreshState.useMutation>;
-    onNavigateSettings?: () => void;
+interface PointCardContext {
+  vehicles: DashboardVehicle[];
+  home: { lat: number; lng: number } | null;
+  vehiclesLoading: boolean;
+  vehicleErrors: Record<string, string | undefined>;
+  solarGrid: Record<string, { solarW: number; gridW: number }>;
+  allocationStatus: Record<string, string>;
+  controllerStatuses: ReturnType<typeof useControllerStatuses>;
+  wakeMutation: ReturnType<typeof trpc.vehicle.command.useMutation>;
+  refreshMutation: ReturnType<typeof trpc.vehicle.refreshState.useMutation>;
+  onNavigateSettings?: () => void;
+}
+
+function AsleepPointCard(
+  { vehicle, ctx }: { vehicle: DashboardVehicle; ctx: PointCardContext },
+) {
+  const isWaking = ctx.wakeMutation.isPending &&
+    ctx.wakeMutation.variables?.vehicleId === vehicle.id;
+  return (
+    <AsleepVehicleCard
+      v={vehicle}
+      isWaking={isWaking}
+      onWake={() =>
+        ctx.wakeMutation.mutate({ vehicleId: vehicle.id, command: "wake" })}
+    />
+  );
+}
+
+// A vehicle_api point IS the car — its own API is the control path — so it
+// renders one card, and that card keeps its controls.
+function VehicleApiPointCard(
+  { point, vehicle, ctx }: {
+    point: ChargingPoint;
+    vehicle: DashboardVehicle;
+    ctx: PointCardContext;
+  },
+) {
+  if (!vehicle.state) return <AsleepPointCard vehicle={vehicle} ctx={ctx} />;
+  return (
+    <ConnectedVehicleCard
+      vehicleId={vehicle.id}
+      point={point}
+      name={vehicle.name || vehicle.state.vehicleName}
+      state={vehicle.state}
+      priority={point.priority}
+      solarPowerW={ctx.solarGrid[point.id]?.solarW ?? 0}
+      gridPowerW={ctx.solarGrid[point.id]?.gridW ?? 0}
+      loading={ctx.vehiclesLoading}
+      lastLocation={vehicle.lastLocation}
+      atHome={vehicle.lastLocation
+        ? isHome(ctx.home, vehicle.lastLocation)
+        : null}
+      vehicleError={ctx.vehicleErrors[vehicle.id]}
+      allocationStatus={ctx.allocationStatus[point.id] ?? null}
+      pollingSuspended={vehicle.pollingSuspended}
+      pollingSuspendReason={vehicle.pollingSuspendReason}
+      controllerReason={ctx.controllerStatuses[point.id]?.reason ?? null}
+      controllerDetail={ctx.controllerStatuses[point.id]?.detail ?? null}
+      onNavigateSettings={ctx.onNavigateSettings}
+      onRefresh={() =>
+        ctx.refreshMutation.mutateAsync({ vehicleId: vehicle.id })}
+    />
+  );
+}
+
+// A smart charger is the control path, so its card carries the controls and
+// the car rides alongside read-only: charging detail on the charger, battery
+// and location on the car. Emitted as one fragment so nothing can be rendered
+// between the pair. Also the fallback for a vehicle_api point whose vehicle is
+// missing, so a point never renders nothing at all.
+function SmartPointCards(
+  { point, vehicle, ctx }: {
+    point: ChargingPoint;
+    vehicle: DashboardVehicle | null;
+    ctx: PointCardContext;
   },
 ) {
   return (
     <>
+      <ChargerCard
+        id={point.id}
+        name={point.name}
+        mode={point.mode}
+        state={point.state}
+        solarW={ctx.solarGrid[point.id]?.solarW ?? 0}
+        gridW={ctx.solarGrid[point.id]?.gridW ?? 0}
+        controllerDetail={ctx.controllerStatuses[point.id]?.detail ?? null}
+        controllerReason={ctx.controllerStatuses[point.id]?.reason ?? null}
+        allocationStatus={ctx.allocationStatus[point.id] ?? null}
+        identifier={chargePointIdentifier(point)}
+        onNavigateSettings={ctx.onNavigateSettings}
+        vehicleResolution={point.vehicleResolution}
+        resolvedVehicleName={vehicle?.name || null}
+        controlOwner={point.controlOwner}
+        passiveForVehicleName={ctx.vehicles.find((v) =>
+          v.id === point.passiveForVehicleId
+        )?.name || null}
+      />
+      {
+        /* Nothing here while passive: the car commands itself, so its own
+          vehicle_api point renders it, with controls. */
+      }
+      {point.controlOwner === "self" && vehicle?.state && (
+        <VehicleCard
+          readOnly
+          chargingPoint={{
+            name: point.name,
+            identifier: chargePointIdentifier(point),
+          }}
+          name={vehicle.name || vehicle.state.vehicleName}
+          state={vehicle.state}
+          priority={point.priority}
+          mode={point.mode as VehicleMode}
+          commandPending={false}
+          onStartCharging={() => {}}
+          onStopCharging={() => {}}
+          onSetAmps={() => {}}
+          onChangeMode={() => {}}
+          loading={ctx.vehiclesLoading}
+          lastLocation={vehicle.lastLocation}
+          atHome={vehicle.lastLocation
+            ? isHome(ctx.home, vehicle.lastLocation)
+            : null}
+          vehicleError={ctx.vehicleErrors[vehicle.id]}
+          pollingSuspended={vehicle.pollingSuspended}
+          pollingSuspendReason={vehicle.pollingSuspendReason}
+          // The charger card's badge and status line already say this.
+          chargerStatus={null}
+          onNavigateSettings={ctx.onNavigateSettings}
+          onRefresh={() =>
+            ctx.refreshMutation.mutateAsync({ vehicleId: vehicle.id })}
+        />
+      )}
+      {point.controlOwner === "self" && vehicle && !vehicle.state && (
+        <AsleepPointCard vehicle={vehicle} ctx={ctx} />
+      )}
+    </>
+  );
+}
+
+// One card per charging point, plus the car's own card when a smart charger
+// is what controls it.
+function ChargingPointCards(
+  { points, ...ctx }: { points: ChargingPoint[] } & PointCardContext,
+) {
+  const owner = useMemo(() => ownerByVehicleId(points), [points]);
+  return (
+    <>
       {points.map((point) => {
-        const vehicle = point.vehicleId !== null
-          ? vehicles.find((v) => v.id === point.vehicleId) ?? null
+        const vehicleId = cardVehicleId(point);
+        const owned = vehicleId !== null && owner.get(vehicleId) === point.id;
+        const vehicle = owned
+          ? ctx.vehicles.find((v) => v.id === vehicleId) ?? null
           : null;
-        if (vehicle?.state) {
+        if (point.kind !== "smart" && vehicle !== null) {
           return (
-            <ConnectedVehicleCard
+            <VehicleApiPointCard
               key={point.id}
-              vehicleId={vehicle.id}
-              chargingPoint={point}
-              name={vehicle.name || vehicle.state.vehicleName}
-              state={vehicle.state}
-              priority={point.priority}
-              solarPowerW={solarGrid[point.id]?.solarW ?? 0}
-              gridPowerW={solarGrid[point.id]?.gridW ?? 0}
-              loading={vehiclesLoading}
-              lastLocation={vehicle.lastLocation}
-              atHome={vehicle.lastLocation
-                ? isHome(home, vehicle.lastLocation)
-                : null}
-              vehicleError={vehicleErrors[vehicle.id]}
-              allocationStatus={allocationStatus[point.id] ?? null}
-              pollingSuspended={vehicle.pollingSuspended}
-              pollingSuspendReason={vehicle.pollingSuspendReason}
-              controllerReason={controllerStatuses[point.id]?.reason ?? null}
-              controllerDetail={controllerStatuses[point.id]?.detail ?? null}
-              onNavigateSettings={onNavigateSettings}
-              onRefresh={() =>
-                refreshMutation.mutateAsync({ vehicleId: vehicle.id })}
-            />
-          );
-        }
-        if (vehicle) {
-          const isWaking = wakeMutation.isPending &&
-            wakeMutation.variables?.vehicleId === vehicle.id;
-          return (
-            <AsleepVehicleCard
-              key={point.id}
-              v={vehicle}
-              isWaking={isWaking}
-              onWake={() =>
-                wakeMutation.mutate({ vehicleId: vehicle.id, command: "wake" })}
+              point={point}
+              vehicle={vehicle}
+              ctx={ctx}
             />
           );
         }
         return (
-          <ChargerCard
+          <SmartPointCards
             key={point.id}
-            id={point.id}
-            name={point.name}
-            mode={point.mode}
-            state={point.state}
-            solarW={solarGrid[point.id]?.solarW ?? 0}
-            gridW={solarGrid[point.id]?.gridW ?? 0}
-            controllerDetail={controllerStatuses[point.id]?.detail ?? null}
-            vehicleResolution={point.vehicleResolution}
+            point={point}
+            vehicle={vehicle}
+            ctx={ctx}
           />
         );
       })}
@@ -301,12 +424,16 @@ function DataOnlyVehicleCards(
     onNavigateSettings?: () => void;
   },
 ) {
-  const linked = new Set(
-    points.map((p) => p.vehicleId).filter((id) => id !== null),
+  // On screen already = an active point RESOLVED to this car, which is not the
+  // same as being assigned to one. An inferred car has no vehicleId anywhere,
+  // and a car assigned to a charger it has since driven away from resolves to
+  // nothing there and correctly gets its own card back here.
+  const shown = new Set(
+    points.map(cardVehicleId).filter((id) => id !== null),
   );
   return (
     <>
-      {vehicles.filter((v) => !linked.has(v.id)).map((v) => {
+      {vehicles.filter((v) => !shown.has(v.id)).map((v) => {
         if (v.state) {
           return (
             <VehicleCard

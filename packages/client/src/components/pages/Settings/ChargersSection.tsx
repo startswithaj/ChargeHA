@@ -18,12 +18,25 @@ import {
   type ChargerWithState,
   isSmartCharger,
 } from "../../../hooks/useChargers.ts";
+import { CHARGERS_ANCHOR_ID } from "../../../lib/settingsAnchors.ts";
 
 const labelFor = (typeId: string) =>
   chargerPluginOptions.find((o) => o.id === typeId)?.label ?? typeId;
 
 export function ChargersSection() {
   const settings = useChargersSettings();
+  return (
+    // Anchor, not a layout wrapper: the dashboard's ambiguous-charger warning
+    // links straight to this section rather than to the top of Settings.
+    <div id={CHARGERS_ANCHOR_ID}>
+      <ChargersSectionBody settings={settings} />
+    </div>
+  );
+}
+
+function ChargersSectionBody(
+  { settings }: { settings: ReturnType<typeof useChargersSettings> },
+) {
   return (
     <SettingsSection
       icon={<Plug size={18} />}
@@ -50,6 +63,18 @@ export function ChargersSection() {
           <Text size="2" weight="bold">Charging Points</Text>
           <AddChargerSelect onChoose={settings.choose} />
         </div>
+
+        <Text
+          size="1"
+          color="gray"
+          style={{ display: "block", marginBottom: 10 }}
+        >
+          Assigning a vehicle tells ChargeHA which vehicle is on a charger. On
+          Automatic it attempts to detect the vehicle automatically, but only
+          while one is plugged in. If two vehicles are simultaneously plugged
+          in, detection will fail, so it won't charge and vehicle schedules
+          won't apply.
+        </Text>
 
         <ChargerList settings={settings} />
       </div>

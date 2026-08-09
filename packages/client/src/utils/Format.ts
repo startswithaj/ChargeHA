@@ -22,6 +22,27 @@ export function kwhValue(wh: number): string {
 }
 
 /**
+ * Format a current reading as whole amps.
+ * e.g. 16.13 → "16A"
+ *
+ * A charger that reports no current measurand has its amps derived from
+ * power ÷ voltage ÷ phases, so the decimals are an artefact of that division
+ * rather than anything the hardware measured. Nothing else on a card carries
+ * decimals in amps, and no charger is commanded in fractions of one.
+ */
+export function ampsValue(amps: number): string {
+  return `${Math.round(amps)}A`;
+}
+
+/**
+ * Format a current reading against its ceiling.
+ * e.g. (16.13, 32) → "16A / 32A max"
+ */
+export function ampsRange(amps: number, maxAmps: number): string {
+  return `${ampsValue(amps)} / ${ampsValue(maxAmps)} max`;
+}
+
+/**
  * Format 24h time string (HH:MM) to 12h format.
  * e.g. "13:00" → "1:00 PM", "00:30" → "12:30 AM"
  */

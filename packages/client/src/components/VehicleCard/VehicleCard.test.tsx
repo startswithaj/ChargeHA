@@ -391,4 +391,76 @@ describe("VehicleCard", () => {
     renderVC({ state: makeVehicleState({ isCharging: false }) });
     expect(screen.getByText("Not Charging")).toBeInTheDocument();
   });
+
+  // --- paired with a smart charger ---
+
+  it("badges the charger it is plugged into, with the charge point id", () => {
+    renderVC({
+      readOnly: true,
+      chargingPoint: { name: "OCPP Smart Charger", identifier: "vcp-dev-2" },
+    });
+    const badge = screen.getByTitle("Charging on this charger");
+    expect(badge).toHaveTextContent("OCPP Smart Charger");
+    expect(badge).toHaveTextContent("vcp-dev-2");
+  });
+
+  it("badges the charger name alone when the adapter has no id", () => {
+    renderVC({
+      readOnly: true,
+      chargingPoint: { name: "Garage Plug", identifier: null },
+    });
+    expect(screen.getByTitle("Charging on this charger")).toHaveTextContent(
+      "Garage Plug",
+    );
+  });
+
+  it("names no charger when the car has none", () => {
+    renderVC();
+    expect(screen.queryByTitle("Charging on this charger")).not
+      .toBeInTheDocument();
+  });
+
+  // readOnly takes away the controls, not the information: the charger card
+  // beside it owns every row it measures, but time to full is the car's own.
+  // A car driven by a smart charger never sees its own startCharging, so its
+  // isCharging stays false while the charger delivers energy. The estimate
+  // alone has to be enough to show the row.
+  it("shows time to full on a paired card that reports no charging of its own", () => {
+    renderVC({
+      readOnly: true,
+      state: makeVehicleState({ isCharging: false, minutesToFull: 135 }),
+    });
+
+    expect(screen.getByText("2h 15m to 80%")).toBeInTheDocument();
+  });
+
+  it("keeps time to full on a read-only card but drops the controls", () => {
+    renderVC({
+      readOnly: true,
+      state: makeVehicleState({ isCharging: true, minutesToFull: 135 }),
+    });
+
+    expect(screen.getByText("2h 15m to 80%")).toBeInTheDocument();
+    expect(screen.queryByText("Stop Charging")).not.toBeInTheDocument();
+    expect(screen.queryByText("CHARGE NOW")).not.toBeInTheDocument();
+  });
+
+  it("does not repeat rows the charger card already shows", () => {
+    renderVC({
+      readOnly: true,
+      state: makeVehicleState({
+        isCharging: true,
+        chargeAmps: 20,
+        chargeAmpsMax: 48,
+        energyAddedKwh: 4.2,
+        minutesToFull: 60,
+      }),
+      allocationStatus: "Priority: receiving all solar",
+    });
+
+    expect(screen.queryByText("20A / 48A max")).not.toBeInTheDocument();
+    expect(screen.queryByText("4.2 kWh added")).not.toBeInTheDocument();
+    expect(screen.queryByText("Priority: receiving all solar")).not
+      .toBeInTheDocument();
+  });
 });

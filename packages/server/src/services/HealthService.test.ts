@@ -85,7 +85,30 @@ describe("HealthService", () => {
       );
       const result = await service.getPluginWarnings();
       expect(result).toEqual([
-        { title: "Proxy Down", message: "Cannot reach proxy" },
+        { title: "Proxy Down", message: "not reachable", severity: "error" },
+      ]);
+    });
+
+    it("falls back to warningMessage when the check reports no detail", async () => {
+      const checks: PluginHealthCheck[] = [{
+        name: "check-1",
+        warningTitle: "Proxy Down",
+        warningMessage: "Cannot reach proxy",
+        run: () => Promise.resolve({ status: "error" }),
+      }];
+      const service = new HealthService(
+        createMockRegistry(checks),
+        emptyEnergyRegistry,
+        emptyChargerRegistry,
+        null,
+      );
+      const result = await service.getPluginWarnings();
+      expect(result).toEqual([
+        {
+          title: "Proxy Down",
+          message: "Cannot reach proxy",
+          severity: "error",
+        },
       ]);
     });
 
@@ -105,7 +128,11 @@ describe("HealthService", () => {
       );
       const result = await service.getPluginWarnings();
       expect(result).toEqual([
-        { title: "Slow Service", message: "Service timed out" },
+        {
+          title: "Slow Service",
+          message: "Service timed out",
+          severity: "error",
+        },
       ]);
     });
 
@@ -124,7 +151,11 @@ describe("HealthService", () => {
       );
       const result = await service.getPluginWarnings();
       expect(result).toEqual([
-        { title: "Connection Error", message: "Cannot connect" },
+        {
+          title: "Connection Error",
+          message: "Cannot connect",
+          severity: "error",
+        },
       ]);
     });
 
@@ -156,7 +187,7 @@ describe("HealthService", () => {
           name: "check-fail",
           warningTitle: "Fail Warning",
           warningMessage: "This should appear",
-          run: () => Promise.resolve({ status: "error", message: "down" }),
+          run: () => Promise.resolve({ status: "error" }),
         },
       ];
       const service = new HealthService(
@@ -167,8 +198,63 @@ describe("HealthService", () => {
       );
       const result = await service.getPluginWarnings();
       expect(result).toEqual([
-        { title: "Fail Warning", message: "This should appear" },
+        {
+          title: "Fail Warning",
+          message: "This should appear",
+          severity: "error",
+        },
       ]);
+    });
+
+    it("marks a warning-status check as a warning, not an error", async () => {
+      const checks: PluginHealthCheck[] = [{
+        name: "degraded-check",
+        warningTitle: "Reduced telemetry",
+        warningMessage: "Some readings are unavailable.",
+        run: () =>
+          Promise.resolve({
+            status: "warning",
+            message: "Charging current is not being reported.",
+          }),
+      }];
+      const service = new HealthService(
+        createMockRegistry(checks),
+        emptyEnergyRegistry,
+        emptyChargerRegistry,
+        null,
+      );
+      const result = await service.getPluginWarnings();
+      expect(result).toEqual([{
+        title: "Reduced telemetry",
+        message: "Charging current is not being reported.",
+        severity: "warning",
+      }]);
+    });
+
+    it("orders errors ahead of warnings", async () => {
+      const checks: PluginHealthCheck[] = [
+        {
+          name: "check-warn",
+          warningTitle: "Degraded",
+          warningMessage: "Still charging.",
+          run: () => Promise.resolve({ status: "warning" }),
+        },
+        {
+          name: "check-error",
+          warningTitle: "Offline",
+          warningMessage: "Not charging.",
+          run: () => Promise.resolve({ status: "error" }),
+        },
+      ];
+      const service = new HealthService(
+        createMockRegistry(checks),
+        emptyEnergyRegistry,
+        emptyChargerRegistry,
+        null,
+      );
+      const result = await service.getPluginWarnings();
+      expect(result.map((w) => w.severity)).toEqual(["error", "warning"]);
+      expect(result[0].title).toBe("Offline");
     });
 
     it("dedupes a check shared by a plugin registered in two registries", async () => {
@@ -193,7 +279,8 @@ describe("HealthService", () => {
       const result = await service.getPluginWarnings();
       expect(result).toEqual([{
         title: "Tesla Proxy Unreachable",
-        message: "Vehicle commands will fail.",
+        message: "down",
+        severity: "error",
       }]);
       expect(runs).toEqual(["tesla-proxy"]);
     });

@@ -109,8 +109,31 @@ describe("Health tRPC Router", () => {
 
       const data = await caller.health.pluginWarnings();
       expect(data).toEqual([
-        { title: "Proxy Down", message: "Cannot reach proxy" },
+        { title: "Proxy Down", message: "not reachable", severity: "error" },
       ]);
+    });
+
+    it("returns a warning severity when a check reports degraded", async () => {
+      const plugin = makePlugin({
+        getHealthChecks: () => [{
+          name: "test-check",
+          warningTitle: "Reduced telemetry",
+          warningMessage: "Some readings are unavailable.",
+          run: () =>
+            Promise.resolve({
+              status: "warning" as const,
+              message: "Charging current is not being reported.",
+            }),
+        }],
+      });
+      const caller = await setupCaller(null, plugin);
+
+      const data = await caller.health.pluginWarnings();
+      expect(data).toEqual([{
+        title: "Reduced telemetry",
+        message: "Charging current is not being reported.",
+        severity: "warning",
+      }]);
     });
   });
 });

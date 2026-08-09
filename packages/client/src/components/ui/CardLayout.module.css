@@ -20,6 +20,10 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
+  /* A charging point is named after its adapter, so the badge naming one can
+     be long. Wrapping keeps it on its own line at narrow widths instead of
+     squeezing the card title. */
+  flex-wrap: wrap;
 }
 
 .modeToggle {

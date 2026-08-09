@@ -247,6 +247,20 @@ describe("ChargersSection", () => {
     expect(screen.getByText("Charger unreachable")).toBeInTheDocument();
   });
 
+  // The dashboard's ambiguous-charger warning links straight here.
+  it("anchors the section so it can be linked to", () => {
+    const { container } = renderWithProviders(<ChargersSection />);
+    expect(container.querySelector("#settings-chargers")).toBeInTheDocument();
+  });
+
+  it("explains what assigning a vehicle does", () => {
+    renderWithProviders(<ChargersSection />);
+    expect(screen.getByText(/Assigning a vehicle tells ChargeHA/))
+      .toBeInTheDocument();
+    expect(screen.getByText(/vehicle schedules won't\s+apply/))
+      .toBeInTheDocument();
+  });
+
   it("offers a vehicle assignment dropdown for a smart charger, defaulting to Automatic", () => {
     hookRef.current = makeHookReturn({
       chargers: [makeCharger()],
