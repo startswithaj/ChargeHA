@@ -2,7 +2,11 @@ import type { EnergyData, VehicleChargeState } from "../types.ts";
 import { SolarAllocator } from "./SolarAllocator.ts";
 import { DecisionChecks } from "./DecisionChecks.ts";
 import type { DecisionCheck } from "./DecisionChecks.ts";
-import { isScheduleActiveNow } from "./Schedules.ts";
+import {
+  isScheduleActiveNow,
+  selectActiveChargeSchedule,
+} from "./Schedules.ts";
+import type { ActiveChargeSchedule } from "./Schedules.ts";
 import type {
   ControllerConfig,
   ControlStateUpdates,
@@ -26,17 +30,6 @@ import { createControlState } from "./types.ts";
  *
  *  No I/O, no database, no adapters. The caller (ChargeController or the
  *  simulator) executes the returned decisions. */
-/** Global schedules (no target) apply everywhere; targeted ones match the
- *  charging point directly or via its linked vehicle. */
-function scheduleTargets(
-  s: EngineSchedule,
-  target: { id: string; vehicleId: string | null },
-): boolean {
-  if (s.chargerId !== null) return s.chargerId === target.id;
-  if (s.vehicleId !== null) return s.vehicleId === target.vehicleId;
-  return true;
-}
-
 export class ControllerEngine {
   private controlStates = new Map<string, VehicleControlState>();
 
@@ -357,15 +350,17 @@ export class ControllerEngine {
     now: Date,
   ): EvalResult {
     const checks: DecisionCheck[] = [];
-    const activeCharge = schedules.find((s) =>
-      s.scheduleType === "charge" && s.enabled &&
-      scheduleTargets(s, vehicle) &&
-      isScheduleActiveNow(s, now, config.timezone)
+    const active = selectActiveChargeSchedule(
+      schedules,
+      vehicle,
+      now,
+      config.timezone,
     );
-    if (!activeCharge) {
+    if (!active) {
       checks.push(DecisionChecks.chargeScheduleNone());
       return { decision: null, checks };
     }
+    const activeCharge = active.effective;
 
     const limitReached = activeCharge.chargeLimitPct !== null &&
       state.batteryLevel >= activeCharge.chargeLimitPct;
@@ -386,6 +381,7 @@ export class ControllerEngine {
     }
 
     const amps = activeCharge.chargeAmps ?? state.chargeAmpsMax;
+    const merged = mergedSuffix(active);
     const makeDecision = (
       action: PipelineDecision["action"],
       detail: string,
@@ -397,13 +393,19 @@ export class ControllerEngine {
     if (!state.isCharging) {
       return makeDecision(
         "start",
-        `Start charging at ${amps}A (schedule ${activeCharge.startTime}-${activeCharge.endTime})`,
+        `Start charging at ${amps}A (schedule ${activeCharge.startTime}-${activeCharge.endTime}${merged})`,
       );
     }
     if (state.chargeAmps !== amps) {
-      return makeDecision("adjust_amps", `Adjust to ${amps}A (schedule)`);
+      return makeDecision(
+        "adjust_amps",
+        `Adjust to ${amps}A (schedule${merged})`,
+      );
     }
-    return makeDecision("none", `Already charging at ${amps}A (schedule)`);
+    return makeDecision(
+      "none",
+      `Already charging at ${amps}A (schedule${merged})`,
+    );
   }
 
   private evaluateBatteryPriority(
@@ -936,6 +938,16 @@ export class ControllerEngine {
       pendingSince: controlState.pendingSince,
     };
   }
+}
+
+/** Suffix appended to a schedule decision's detail when two or more
+ *  overlapping schedules were merged. Empty for the ordinary single-schedule
+ *  case so existing log text is unchanged. */
+function mergedSuffix(active: ActiveChargeSchedule): string {
+  if (!active.merged) return "";
+  const pct = active.effective.chargeLimitPct;
+  if (pct === null) return " merged";
+  return ` merged, limit ${pct}%`;
 }
 
 /** Reason text when solar production is under the configured minimum. */

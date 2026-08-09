@@ -30,6 +30,8 @@ describe("Chargers tRPC Router", () => {
     state: null,
     resolvedVehicleId: null,
     vehicleResolution: "none" as const,
+    controlOwner: "self" as const,
+    passiveForVehicleId: null,
   }];
 
   const callerWithStub = (overrides: Partial<ChargingPointManager>) =>

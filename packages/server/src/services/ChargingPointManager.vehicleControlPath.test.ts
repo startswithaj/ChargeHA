@@ -1,7 +1,13 @@
 import { beforeEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { assertExists } from "@std/assert";
-import type { CallContext, ChargerInfo, ChargerState } from "@chargeha/shared";
+import type {
+  CallContext,
+  ChargerInfo,
+  ChargerState,
+  VehicleChargeState,
+} from "@chargeha/shared";
+import { buildVehicleChargeState } from "@chargeha/shared/test-factories";
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { ChargerRow, VehicleRow } from "../db/types.ts";
 import { ChargerPluginRegistry } from "@chargeha/server/bootstrap/ChargerPluginRegistry";
@@ -24,6 +30,7 @@ import { throwingMock } from "../test-helpers/throwingMock.ts";
  *  and can be read on its own. */
 class StubChargerMiddleware implements ChargerMiddleware {
   startCalls: string[] = [];
+  ampCalls: number[] = [];
   nextState: ChargerState | null;
   info: ChargerInfo;
   private cached: ChargerState | null = null;
@@ -55,7 +62,8 @@ class StubChargerMiddleware implements ChargerMiddleware {
     return Promise.resolve(true);
   }
 
-  setChargeAmps(_amps: number, _ctx: CallContext): Promise<boolean> {
+  setChargeAmps(amps: number, _ctx: CallContext): Promise<boolean> {
+    this.ampCalls.push(amps);
     return Promise.resolve(true);
   }
 
@@ -148,6 +156,7 @@ describe("ChargingPointManager vehicle control path", () => {
   let db: AppDatabase;
   let chargerRows: ChargerRow[];
   let vehicleRows: VehicleRow[];
+  let vehicleStates: Map<string, VehicleChargeState>;
   let deletedIds: string[];
   let registry: ChargerPluginRegistry;
   let middlewares: Map<string, StubChargerMiddleware>;
@@ -157,6 +166,7 @@ describe("ChargingPointManager vehicle control path", () => {
   beforeEach(() => {
     chargerRows = [];
     vehicleRows = [];
+    vehicleStates = new Map();
     deletedIds = [];
     db = throwingMock<AppDatabase>("AppDatabase", {
       getChargers: () => Promise.resolve(chargerRows),
@@ -206,7 +216,8 @@ describe("ChargingPointManager vehicle control path", () => {
     );
     emitter = new MockEventEmitter();
     const vehicleManager = throwingMock<VehicleManager>("VehicleManager", {
-      getAllStates: () => Promise.resolve(new Map()),
+      getAllStates: () => Promise.resolve(vehicleStates),
+      loadIsUnmetered: () => false,
     });
     const poller = throwingMock<EnergyPoller>("EnergyPoller", {
       tryGetRealtimeSnapshot: () => null,
@@ -423,6 +434,217 @@ describe("ChargingPointManager vehicle control path", () => {
 
       expect(middlewares.has(chargerRows[0].id)).toBe(false);
       expect(manager.getState(chargerRows[0].id)).toBeNull();
+    });
+  });
+
+  /** With API control on, the car's own API owns the session and the smart
+   *  charger it is plugged into must stop deciding — but must NOT be
+   *  unregistered, or it stops passing current and stops reporting the meter
+   *  reading everything else depends on. */
+  describe("passive smart charger", () => {
+    const apiPoint = (vehicleId: string, active = true): ChargerRow => ({
+      ...ROW,
+      id: `cp-${vehicleId}`,
+      chargerAdapterType: "tesla",
+      vehicleId,
+      kind: "vehicle_api",
+      active,
+    });
+
+    const plugged = (id: string, overrides = {}) =>
+      buildVehicleChargeState({
+        vehicleId: id,
+        isPluggedIn: true,
+        isHome: true,
+        ...overrides,
+      });
+
+    /** Registers both plugins, boots, and polls the smart charger once so it
+     *  has cached state to reason about. */
+    const boot = async (): Promise<void> => {
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      await manager.init();
+      const mw = middlewares.get(ROW.id);
+      assertExists(mw);
+      mw.nextState = { ...STATE };
+      await manager.requestState(ROW.id, CTX);
+    };
+
+    it("goes passive for a self-driven car plugged into it", async () => {
+      chargerRows = [ROW, apiPoint("VIN1")];
+      vehicleStates = new Map([["VIN1", plugged("VIN1")]]);
+      await boot();
+
+      const path = await manager.getControlPath(ROW.id);
+
+      expect(path.owner).toBe("vehicle_api");
+      expect(path.passiveForVehicleId).toBe("VIN1");
+    });
+
+    it("keeps control when that car's API control is off", async () => {
+      chargerRows = [ROW, apiPoint("VIN1", false)];
+      vehicleStates = new Map([["VIN1", plugged("VIN1")]]);
+      await boot();
+
+      const path = await manager.getControlPath(ROW.id);
+
+      expect(path.owner).toBe("self");
+      expect(path.passiveForVehicleId).toBeNull();
+    });
+
+    it("follows the toggle in both directions", async () => {
+      chargerRows = [ROW, apiPoint("VIN1", false)];
+      vehicleStates = new Map([["VIN1", plugged("VIN1")]]);
+      await boot();
+      expect((await manager.getControlPath(ROW.id)).owner).toBe("self");
+
+      await manager.setVehicleApiControl("VIN1", true);
+      expect((await manager.getControlPath(ROW.id)).owner).toBe("vehicle_api");
+
+      await manager.setVehicleApiControl("VIN1", false);
+      expect((await manager.getControlPath(ROW.id)).owner).toBe("self");
+    });
+
+    // The household case: one API-controlled Tesla, one dumb second car. The
+    // charger must keep working normally for the second car.
+    it("keeps full control for a second, non-API car on the same charger", async () => {
+      chargerRows = [ROW, apiPoint("VIN1")];
+      vehicleStates = new Map([
+        ["VIN1", plugged("VIN1")],
+        ["VIN2", plugged("VIN2")],
+      ]);
+      await boot();
+
+      const path = await manager.getControlPath(ROW.id);
+      const resolution = await manager.resolveVehicle(ROW.id);
+
+      expect(path.owner).toBe("self");
+      expect(resolution.vehicleId).toBe("VIN2");
+    });
+
+    it("goes passive for an explicitly assigned self-driven car", async () => {
+      chargerRows = [{ ...ROW, vehicleId: "VIN1" }, apiPoint("VIN1")];
+      vehicleStates = new Map([["VIN1", plugged("VIN1")]]);
+      await boot();
+
+      expect((await manager.getControlPath(ROW.id)).passiveForVehicleId).toBe(
+        "VIN1",
+      );
+    });
+
+    it("refuses to guess when two self-driven cars are plugged in", async () => {
+      chargerRows = [ROW, apiPoint("VIN1"), apiPoint("VIN2")];
+      vehicleStates = new Map([
+        ["VIN1", plugged("VIN1")],
+        ["VIN2", plugged("VIN2")],
+      ]);
+      await boot();
+
+      expect((await manager.getControlPath(ROW.id)).owner).toBe("self");
+    });
+
+    it("holds the connector open at max amps, once", async () => {
+      chargerRows = [ROW, apiPoint("VIN1")];
+      vehicleStates = new Map([["VIN1", plugged("VIN1")]]);
+      await boot();
+      const mw = middlewares.get(ROW.id);
+      assertExists(mw);
+
+      await manager.holdOpen(ROW.id, CTX);
+      await manager.holdOpen(ROW.id, CTX);
+
+      expect(mw.startCalls).toHaveLength(1);
+      expect(mw.ampCalls).toEqual([32]);
+    });
+
+    it("does nothing while nothing is plugged in", async () => {
+      chargerRows = [ROW, apiPoint("VIN1")];
+      vehicleStates = new Map([["VIN1", plugged("VIN1")]]);
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      await manager.init();
+      const mw = middlewares.get(ROW.id);
+      assertExists(mw);
+      mw.nextState = { ...STATE, isPluggedIn: false };
+      await manager.requestState(ROW.id, CTX);
+
+      await manager.holdOpen(ROW.id, CTX);
+
+      expect(mw.startCalls).toHaveLength(0);
+    });
+
+    it("re-issues the hold after the cable is pulled and replugged", async () => {
+      chargerRows = [ROW, apiPoint("VIN1")];
+      vehicleStates = new Map([["VIN1", plugged("VIN1")]]);
+      await boot();
+      const mw = middlewares.get(ROW.id);
+      assertExists(mw);
+      await manager.holdOpen(ROW.id, CTX);
+
+      // Unplug, then replug — requestState is what detects the edge.
+      mw.nextState = { ...STATE, isPluggedIn: false };
+      await manager.requestState(ROW.id, CTX);
+      mw.nextState = { ...STATE, isPluggedIn: true };
+      await manager.requestState(ROW.id, CTX);
+      await manager.holdOpen(ROW.id, CTX);
+
+      expect(mw.startCalls).toHaveLength(2);
+    });
+
+    it("clears the hold when control comes back, so amps are re-decided", async () => {
+      chargerRows = [ROW, apiPoint("VIN1")];
+      vehicleStates = new Map([["VIN1", plugged("VIN1")]]);
+      await boot();
+      const mw = middlewares.get(ROW.id);
+      assertExists(mw);
+      await manager.holdOpen(ROW.id, CTX);
+
+      await manager.setVehicleApiControl("VIN1", false);
+      // Reading the path is what observes the transition and drops the hold.
+      expect((await manager.getControlPath(ROW.id)).owner).toBe("self");
+      await manager.startChargingAt(ROW.id, 10, CTX, { ...STATE });
+
+      expect(mw.ampCalls).toEqual([32, 10]);
+    });
+
+    it("exposes the control path on the charger list for the dashboard", async () => {
+      chargerRows = [ROW, apiPoint("VIN1")];
+      vehicleStates = new Map([["VIN1", plugged("VIN1")]]);
+      await boot();
+
+      const listed = await manager.getChargersWithState();
+      const smart = listed.find((r) => r.id === ROW.id);
+
+      expect(smart?.controlOwner).toBe("vehicle_api");
+      expect(smart?.passiveForVehicleId).toBe("VIN1");
+    });
+
+    // One physical session, two reporters: the charger's meter and the car's
+    // own API. Counting both turned 7kW of load into 14kW, and that figure
+    // feeds the energy adapter and so every solar decision.
+    it("counts a passive charger's session once, not twice", async () => {
+      chargerRows = [ROW, apiPoint("VIN1")];
+      vehicleStates = new Map([
+        ["VIN1", plugged("VIN1", { isCharging: true, chargePowerKw: 7 })],
+      ]);
+      vehicleRows = [{
+        id: "VIN1",
+        name: "Car VIN1",
+        adapterType: "tesla",
+        priority: 1,
+        config: "{}",
+        mode: "auto",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      }];
+      await boot();
+      const mw = middlewares.get(ROW.id);
+      assertExists(mw);
+      mw.nextState = { ...STATE, isCharging: true, chargePowerKw: 7 };
+      await manager.requestState(ROW.id, CTX);
+
+      const load = await manager.getChargingLoadW();
+
+      expect(load.meteredW).toBe(7000);
     });
   });
 });

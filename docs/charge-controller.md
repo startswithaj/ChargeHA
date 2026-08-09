@@ -117,11 +117,40 @@ A charge schedule can target:
 
 1. A specific charging point (`chargerId` set) — applies to that charger only,
    regardless of which vehicle is on it.
-2. A specific vehicle (`vehicleId` set, `chargerId` null) — applies wherever
-   that vehicle is charging.
-3. Nothing set on either — applies to every vehicle.
+2. A specific vehicle (`vehicleId` set, `chargerId` null) — applies to whichever
+   charging point currently resolves to that vehicle (see smart charger vehicle
+   resolution below). A vehicle schedule does nothing while no charging point
+   resolves to that car.
+3. Nothing set on either — applies to every charging point.
 
-Charger targeting is checked first, then vehicle, then untargeted-applies-all.
+That ranking — charger, then vehicle, then untargeted — decides which schedule
+is in charge, not which one applies. Two of them can be active on the same
+charging point at the same minute, and then they merge.
+
+### Two schedules at once
+
+A charger schedule matches the charger directly. A vehicle schedule matches the
+same charger through the car plugged into it. So both can be active on one
+charging point, and ChargeHA does not pick between them:
+
+1. The **highest-ranked** schedule supplies the window and the amps. Charger
+   beats vehicle beats untargeted.
+2. The **strictest charge limit** across every overlapping schedule still stops
+   the charge — the lowest `chargeLimitPct` of the set wins, whichever schedule
+   it came from.
+3. Only the minutes they share merge. Outside the shared window each schedule
+   runs on its own, unchanged.
+
+Example: a charger schedule set to 32A and the car's own schedule set to 32A up
+to 80%, both running 00:00–06:00. The car charges at 32A and stops at 80%.
+
+This is deliberate. A charger schedule has no battery visibility, so it can only
+ever say "how fast". A vehicle schedule knows the car, so it can say "how full".
+Letting one win would throw away the half of the answer only the other one has.
+
+Same-rank ties break by earliest start, then longest window, then id. That order
+is fixed, so the same set of schedules always produces the same result — it
+never depends on the order the database returned the rows in.
 
 ### Day and time matching
 
@@ -303,6 +332,9 @@ level, charge limit) applies to that charger:
    - Yes → resolved to that vehicle. Done.
    - No (unplugged, or driven away) → fall through to inference (step 3), as if
      no assignment existed.
+   - A vehicle that has never been polled has no cached state, so nothing says
+     it is plugged in. It is treated the same as "not plugged in" and also falls
+     through.
 3. **No assignment, or it didn't apply — infer.** Look at every vehicle that is
    plugged in, at home, and not currently driven by its own API (a vehicle-API
    charger already claims that car).
@@ -345,6 +377,39 @@ the charger has no way to tell them apart while both are plugged in.
    vehicle in Settings.
 6. Assigning one (or unplugging down to a single car) restores real battery data
    on the next loop.
+
+## What the screens tell you
+
+The dashboard and the Schedules page report resolution and schedule merging as
+they stand right now, so you don't have to work either out from the logs.
+
+### Dashboard
+
+1. A smart charger's card names the car it resolved to, and says how: assigned
+   (you picked it in Settings and it is plugged in here) or detected (ChargeHA
+   found the only car plugged in). "Using", not "charging" — resolution says
+   which car is on the charger, not that it is drawing.
+2. When two cars are plugged in and none is assigned, the card warns instead of
+   naming a car: nothing gets battery-aware control until you assign one.
+3. A smart charger and the car on it render as a **pair of cards**. The charger
+   card carries the controls, because the charger is the control path. The
+   vehicle card sits alongside it read-only, showing battery and location.
+4. A car driven by its own vehicle API is one card, and it keeps its controls —
+   there the car _is_ the charging point.
+5. A car that no charging point resolves to still gets its own read-only card
+   further down. Nothing disappears from the screen.
+
+### Schedules
+
+1. When a charger schedule and a vehicle schedule can both drive one charging
+   point, the page warns and names the days and clock window they share, which
+   schedule sets the current, and that the car's percentage limit still stops
+   the charge.
+2. A vehicle schedule says whether it is running through a charging point right
+   now, idle because no point resolves to that car, or blocked because two cars
+   are plugged in and none is assigned.
+3. All of it is about this instant. Resolution changes when someone plugs a car
+   in, so these lines are a status report, not a permanent claim.
 
 ## Decision logging
 

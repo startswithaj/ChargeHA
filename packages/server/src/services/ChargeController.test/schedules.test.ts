@@ -126,6 +126,115 @@ describe("ChargeController — schedules", () => {
     });
   });
 
+  describe("overlapping charger and vehicle schedules", () => {
+    // Both schedules target the same charging point: one keyed to the charger,
+    // one keyed to the car resolved as plugged into it.
+    const addOverlappingPair = async (
+      c: ControllerCtx,
+      chargerId: string,
+      order: "charger-first" | "vehicle-first",
+    ) => {
+      const { today, startTime, endTime } = currentScheduleWindow();
+      const chargerSchedule = {
+        id: "merge-charger",
+        vehicleId: null,
+        chargerId,
+        scheduleType: "charge" as const,
+        startTime,
+        endTime,
+        days: [today],
+        chargeAmps: 32,
+        chargeLimitPct: null,
+        enabled: true,
+      };
+      const vehicleSchedule = {
+        ...chargerSchedule,
+        id: "merge-vehicle",
+        vehicleId: VIN,
+        chargerId: null,
+        chargeAmps: 10,
+        chargeLimitPct: 80,
+      };
+      const ordered = order === "charger-first"
+        ? [chargerSchedule, vehicleSchedule]
+        : [vehicleSchedule, chargerSchedule];
+      // Sequential inserts so the rows land in the requested order.
+      await ordered.reduce(
+        async (prev, s) => {
+          await prev;
+          await c.db.createSchedule(s);
+        },
+        Promise.resolve(),
+      );
+    };
+
+    const findCharger = async (c: ControllerCtx) => {
+      const charger = (await c.db.getChargers()).find((r) =>
+        r.vehicleId === VIN
+      );
+      assertExists(charger);
+      return charger;
+    };
+
+    it("charges at the charger schedule's amps below the vehicle limit", async () => {
+      ctx = await setupController({ batteryLevel: 50 }, "auto");
+      await addOverlappingPair(
+        ctx,
+        (await findCharger(ctx)).id,
+        "charger-first",
+      );
+      await ctx.runOneLoop();
+
+      expect(ctx.adapter.commands).toContainEqual({ cmd: "setAmps", args: 32 });
+      expect(ctx.adapter.commands).toContainEqual({ cmd: "start" });
+    });
+
+    it("issues the same commands whichever schedule was created first", async () => {
+      ctx = await setupController({ batteryLevel: 50 }, "auto");
+      await addOverlappingPair(
+        ctx,
+        (await findCharger(ctx)).id,
+        "vehicle-first",
+      );
+      await ctx.runOneLoop();
+
+      expect(ctx.adapter.commands).toContainEqual({ cmd: "setAmps", args: 32 });
+      expect(ctx.adapter.commands).toContainEqual({ cmd: "start" });
+    });
+
+    it("stops at the vehicle limit and agrees with the engine's choice", async () => {
+      // chargeLimit 100 so the schedule's 80% is the binding constraint rather
+      // than the vehicle's own limit, which is checked earlier.
+      ctx = await setupController(
+        {
+          batteryLevel: 85,
+          chargeLimit: 100,
+          isCharging: true,
+          chargeAmps: 32,
+        },
+        "auto",
+        { ...BASE_ENERGY, solarProductionW: 0, gridPowerW: 3500 },
+      );
+      await addOverlappingPair(
+        ctx,
+        (await findCharger(ctx)).id,
+        "vehicle-first",
+      );
+      await ctx.runOneLoop();
+
+      const log = await ctx.getLastLogParsed();
+      assertExists(log);
+      // The controller's requestState limit and the engine's decision both come
+      // from the one selector, so the check reports the merged 80% limit.
+      const scheduleCheck = log.checks.find((c) =>
+        c.check === "charge_schedule"
+      );
+      expect(scheduleCheck?.result).toContain("limit reached (85% >= 80%)");
+      expect(scheduleCheck?.result).toContain("@ 32A");
+      expect(log.action).not.toBe("start");
+    });
+  });
+
   describe("schedule to solar transition", () => {
     it("stops immediately when no solar generation (nighttime)", async () => {
       // Was charging at 16A under a schedule that just ended; zero solar means

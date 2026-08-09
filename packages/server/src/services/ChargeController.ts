@@ -12,6 +12,8 @@ import {
   ControllerEngine,
   DecisionChecks,
   isScheduleActiveNow,
+  scheduleTargets,
+  selectActiveChargeSchedule,
 } from "@chargeha/shared/engine";
 import type {
   ControllerConfig,
@@ -133,10 +135,8 @@ export class ChargeController {
   async runOnce(): Promise<ControllerConfig> {
     const traceId = createTraceId();
     const config = await this.loadConfig();
-    const chargerRows = (await this.db.getChargers()).filter((r) =>
-      r.active && this.chargingPointManager.isControllable(r.id)
-    );
-    const targets = this.buildChargerTargets(chargerRows);
+    const { self, passive } = await this.splitByControlPath();
+    const targets = this.buildChargerTargets(self);
     const schedules = await this.db.getSchedules();
     const energySnapshot = this.poller.tryGetRealtimeSnapshot();
     const now = new Date();
@@ -145,7 +145,7 @@ export class ChargeController {
     const gridW = energy && Math.round(energy.gridPowerW);
     const energySummary = energy ? `solar=${solarW}W grid=${gridW}W` : "none";
     this.logger.debug(
-      `Loop: ${targets.length} charging points, ${schedules.length} schedules, energy=${energySummary}`,
+      `Loop: ${targets.length} charging points (${passive.length} passive), ${schedules.length} schedules, energy=${energySummary}`,
     );
 
     // Compute context for middleware requests
@@ -158,19 +158,20 @@ export class ChargeController {
     // Request fresh state for each target via its middleware
     const engineVehicles: EngineVehicleInput[] = await Promise.all(
       targets.map(async (target) => {
-        const applicable = schedules.filter((s) =>
-          this.isScheduleApplicable(s, target, now, config.timezone)
-        );
-        const activeChargeSchedule = applicable.find(
-          (s) => s.scheduleType === "charge",
+        const activeCharge = selectActiveChargeSchedule(
+          schedules,
+          target,
+          now,
+          config.timezone,
         );
         await target.requestState({
           origin: "controller",
           traceId,
           hasSolar,
-          hasSchedule: applicable.length > 0,
+          hasSchedule: activeCharge !== null || hasBlockout,
           hasBlockout,
-          scheduleChargeLimitPct: activeChargeSchedule?.chargeLimitPct ?? null,
+          scheduleChargeLimitPct: activeCharge?.effective.chargeLimitPct ??
+            null,
         });
         const state = await target.getState();
         return {
@@ -185,6 +186,7 @@ export class ChargeController {
     );
 
     await this.refreshUnlinkedVehicles(targets, traceId, hasSolar, hasBlockout);
+    await this.refreshPassiveChargers(passive, traceId);
 
     // Run the pure decision engine
     const output = this.engine.decide({
@@ -289,6 +291,58 @@ export class ChargeController {
           })
         ),
     );
+  }
+
+  /** Split active, controllable charging points into the ones this loop
+   *  decides for and the ones a vehicle's own API owns. A passive point is
+   *  not a decision target: no mode, no schedules, no solar allocation, no
+   *  commands. Its draw is not lost — the same physical session appears in
+   *  the allocator through that car's own, active, charging point.
+   *
+   *  The self-driven set is computed once for the whole pass; deriving it
+   *  per charger would cost two DB reads per charger per loop. */
+  private async splitByControlPath(): Promise<
+    { self: ChargerRow[]; passive: ChargerRow[] }
+  > {
+    const [allRows, selfDriven] = await Promise.all([
+      this.db.getChargers(),
+      this.chargingPointManager.getSelfDrivenVehicles(),
+    ]);
+    const rows = allRows.filter((r) =>
+      r.active && this.chargingPointManager.isControllable(r.id)
+    );
+    const paths = await Promise.all(
+      rows.map(async (row) => ({
+        row,
+        owner:
+          (await this.chargingPointManager.getControlPath(row.id, selfDriven))
+            .owner,
+      })),
+    );
+    return {
+      self: paths.filter((p) => p.owner === "self").map((p) => p.row),
+      passive: paths.filter((p) => p.owner === "vehicle_api").map((p) => p.row),
+    };
+  }
+
+  /** Passive chargers are still polled — the dashboard card and the energy
+   *  adapter's charging-load figure both read their cached state — and still
+   *  held open, or the car's own API has no path to draw current through.
+   *  They get no decision, no mode, no schedule and no allocation.
+   *
+   *  No solar/schedule hints are passed: those exist so a cost-aware VEHICLE
+   *  middleware can decide whether a paid wake is worth it, and a passive
+   *  point acts on neither. The car itself is refreshed through its own
+   *  vehicle_api target, which is active by definition here. */
+  private async refreshPassiveChargers(
+    rows: ChargerRow[],
+    traceId: string,
+  ): Promise<void> {
+    const ctx = { origin: "controller:passive", traceId };
+    await Promise.all(rows.map(async (row) => {
+      await this.chargingPointManager.requestState(row.id, ctx);
+      await this.chargingPointManager.holdOpen(row.id, ctx);
+    }));
   }
 
   private buildChargerTargets(rows: ChargerRow[]): ControlTarget[] {
@@ -677,9 +731,7 @@ export class ChargeController {
   ): boolean {
     if (!s.enabled || !isScheduleActiveNow(s, now, timezone)) return false;
     if (s.scheduleType === "blockout") return true;
-    if (s.chargerId !== null) return s.chargerId === target.id;
-    if (s.vehicleId !== null) return s.vehicleId === target.vehicleId;
-    return true;
+    return scheduleTargets(s, target);
   }
 
   private isActiveBlockout(
