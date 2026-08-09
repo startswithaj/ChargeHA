@@ -7,6 +7,7 @@
  *      deno run -A devtools/sim/cli.ts --csv
  *      deno run -A devtools/sim/cli.ts --waterfall
  *      deno run -A devtools/sim/cli.ts --seed=123
+ *      deno run -A devtools/sim/cli.ts --battery-kwh=13.5 --battery-soc=20
  */
 
 import {
@@ -21,6 +22,15 @@ const vehicleCount = Deno.args.includes("--vehicles=2") ? 2 : 1;
 const waterfall = Deno.args.includes("--waterfall");
 const seedArg = Deno.args.find((a) => a.startsWith("--seed="));
 const seed = seedArg ? parseInt(seedArg.split("=")[1]) : 42;
+const batteryKwhArg = Deno.args.find((a) => a.startsWith("--battery-kwh="));
+const batteryCapacityKwh = batteryKwhArg
+  ? parseFloat(batteryKwhArg.split("=")[1])
+  : 0;
+const batterySocArg = Deno.args.find((a) => a.startsWith("--battery-soc="));
+const batteryStartSoc = batterySocArg
+  ? parseFloat(batterySocArg.split("=")[1])
+  : 50;
+const batteryPriority = Deno.args.includes("--battery-priority");
 
 const VEHICLE_NAMES = ["EV 1", "EV 2"].slice(0, vehicleCount);
 
@@ -53,6 +63,11 @@ const { results } = runSimulation({
   homeLoad: 1500,
   sunrise: 6.5,
   sunset: 18,
+  batteryCapacityKwh,
+  batteryMaxRateKw: 5,
+  batteryStartSoc,
+  batteryPriorityEnabled: batteryPriority,
+  batteryPriorityLimit: 20,
 });
 
 function printCsv(results: SimResult[]): void {

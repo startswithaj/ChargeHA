@@ -24,6 +24,12 @@ describe("runSimulation", () => {
     homeLoad: 500,
     sunrise: DEFAULT_SOLAR_CONFIG.sunrise,
     sunset: DEFAULT_SOLAR_CONFIG.sunset,
+    // No home battery: these cases isolate solar-to-EV behaviour.
+    batteryCapacityKwh: 0,
+    batteryMaxRateKw: 5,
+    batteryStartSoc: 50,
+    batteryPriorityEnabled: false,
+    batteryPriorityLimit: 20,
   });
 
   it("produces a sensible amps profile for a single charging point with a plugged-in car", () => {

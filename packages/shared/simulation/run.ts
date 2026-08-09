@@ -34,8 +34,8 @@ function buildControllerConfig(opts: SimulationOptions): ControllerConfig {
     cooldownPeriodMinutes: Number(opts.cooldownMin) || 15,
     ampDebounceThreshold: opts.ampDebounceThreshold ?? 2,
     ampDebounceSettleMinutes: opts.ampDebounceSettleMinutes ?? 3,
-    batteryPriorityEnabled: false,
-    batteryPriorityLimit: 0,
+    batteryPriorityEnabled: opts.batteryPriorityEnabled,
+    batteryPriorityLimit: opts.batteryPriorityLimit,
     priorityChargingEnabled: opts.waterfall,
     timezone: "",
   };
@@ -161,6 +161,43 @@ function snapshotVehicleResults(
   });
 }
 
+interface BatteryTick {
+  batteryPowerW: number; // + = discharging, - = charging
+  gridPowerW: number;
+  soc: number;
+}
+
+/** Self-consumption home battery: covers a deficit by discharging, absorbs a
+ *  surplus by charging — capped by max rate and remaining capacity/headroom.
+ *  `netW` is home + EV load minus solar production (positive = deficit). */
+function stepBattery(
+  netW: number,
+  soc: number,
+  capacityKwh: number,
+  maxRateW: number,
+): BatteryTick {
+  if (capacityKwh <= 0) return { batteryPowerW: 0, gridPowerW: netW, soc };
+
+  const socWh = (soc / 100) * capacityKwh * 1000;
+  const headroomWh = capacityKwh * 1000 - socWh;
+
+  if (netW > 0) {
+    const dischargeW = Math.min(netW, maxRateW, socWh * 60);
+    return {
+      batteryPowerW: dischargeW,
+      gridPowerW: netW - dischargeW,
+      soc: soc - (dischargeW / 60) / (capacityKwh * 1000) * 100,
+    };
+  }
+
+  const chargeW = Math.min(-netW, maxRateW, headroomWh * 60);
+  return {
+    batteryPowerW: -chargeW,
+    gridPowerW: netW + chargeW,
+    soc: soc + (chargeW / 60) / (capacityKwh * 1000) * 100,
+  };
+}
+
 export function runSimulation(
   opts: SimulationOptions,
 ): SimulationOutput {
@@ -184,12 +221,24 @@ export function runSimulation(
   // incremented each simulation tick
   // deno-lint-ignore custom-no-let/no-let
   let simTimestamp = Date.now();
+  // home battery state of charge, tracked across ticks
+  // deno-lint-ignore custom-no-let/no-let
+  let batterySoc = opts.batteryStartSoc;
 
   // deno-lint-ignore custom-no-imperative-loops/no-imperative-loops
   for (const reading of solarDay) {
     simTimestamp += 60_000;
 
     const totalChargingW = applyChargingEnergy(vehicleConfigs, vehicleStates);
+
+    const netW = (reading.homeW + totalChargingW) - reading.solarW;
+    const battery = stepBattery(
+      netW,
+      batterySoc,
+      opts.batteryCapacityKwh,
+      opts.batteryMaxRateKw * 1000,
+    );
+    batterySoc = battery.soc;
 
     // Build engine input
     const vehicles: EngineVehicleInput[] = vehicleConfigs.map((vc) => ({
@@ -208,10 +257,12 @@ export function runSimulation(
       schedules: [],
       energy: {
         solarProductionW: reading.solarW,
-        gridPowerW: reading.gridW + totalChargingW,
+        gridPowerW: battery.gridPowerW,
         homeConsumptionW: reading.homeW + totalChargingW,
-        batteryPowerW: null,
-        batterySoc: null,
+        batteryPowerW: opts.batteryCapacityKwh > 0
+          ? battery.batteryPowerW
+          : null,
+        batterySoc: opts.batteryCapacityKwh > 0 ? batterySoc : null,
         gridVoltageV: null,
         lastUpdated: new Date(simTimestamp).toISOString(),
       },
@@ -233,8 +284,10 @@ export function runSimulation(
       time: reading.time,
       solarW: reading.solarW,
       homeW: reading.homeW,
-      gridW: reading.gridW,
-      excessW: Math.max(0, -reading.gridW),
+      gridW: battery.gridPowerW,
+      excessW: Math.max(0, -battery.gridPowerW),
+      batteryW: battery.batteryPowerW,
+      batterySoc,
       vehicles: vehicleResults,
     });
   }

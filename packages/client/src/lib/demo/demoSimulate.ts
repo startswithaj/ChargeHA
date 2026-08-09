@@ -94,6 +94,12 @@ const simOptions = (profile: DayProfile): SimulationOptions => ({
   homeLoad: profile.homeLoad,
   sunrise: DEFAULT_SOLAR_CONFIG.sunrise,
   sunset: DEFAULT_SOLAR_CONFIG.sunset,
+  // The demo day models solar and EV charging only — no home battery.
+  batteryCapacityKwh: 0,
+  batteryMaxRateKw: 5,
+  batteryStartSoc: 50,
+  batteryPriorityEnabled: false,
+  batteryPriorityLimit: 20,
 });
 
 interface ChargingVehicle {

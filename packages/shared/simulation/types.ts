@@ -37,6 +37,11 @@ export interface SimulationOptions {
   sunset: number;
   ampDebounceThreshold?: number;
   ampDebounceSettleMinutes?: number;
+  batteryCapacityKwh: number;
+  batteryMaxRateKw: number;
+  batteryStartSoc: number;
+  batteryPriorityEnabled: boolean;
+  batteryPriorityLimit: number;
 }
 
 /** A charging point with a fixed default configuration, used to seed the
@@ -82,6 +87,8 @@ export interface SimResult {
   homeW: number;
   gridW: number;
   excessW: number;
+  batteryW: number;
+  batterySoc: number;
   vehicles: VehicleResult[];
 }
 
