@@ -19,8 +19,14 @@ jobs:
   test:
     uses: ./.github/workflows/test.yml
 
+  # Only for branches living in this repo. A fork PR's head is untrusted and
+  # its token cannot push an image anyway, so building it burns runner time
+  # for nothing — maintainers use the /build comment in build-pr.yml instead.
   build:
     needs: test
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/build.yml
     permissions:
       contents: read
