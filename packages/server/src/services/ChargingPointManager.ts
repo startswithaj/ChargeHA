@@ -22,6 +22,8 @@ import { UnconfiguredChargerMiddleware } from "./UnconfiguredChargerMiddleware.t
 
 const MAX_COMMAND_BACKOFF_SEC = 900;
 
+const watts = (kw: number | null | undefined): number => (kw ?? 0) * 1000;
+
 interface ChargerEntry {
   row: ChargerRow;
   middleware: ChargerMiddleware;
@@ -630,6 +632,55 @@ export class ChargingPointManager {
     );
     if (existing) return existing;
     return await this.createChargerForType(chargerAdapterType);
+  }
+
+  /** Live charging load, split by whether a physical meter would already have
+   *  counted it. `unmeteredW` applies to any energy reading; `meteredW` only
+   *  to an adapter that measures nothing itself. See docs/simulated-load.md.
+   *
+   *  Counted once: a vehicle charging through a charger is one physical load,
+   *  so the charger's reading wins and that vehicle is skipped. */
+  async getChargingLoadW(): Promise<
+    { unmeteredW: number; meteredW: number }
+  > {
+    const perCharger = await Promise.all(
+      [...this.chargers].map(async ([id, entry]) => ({
+        // Raw cached state rather than getState(): enrich() reads the energy
+        // snapshot back, and this figure is about to feed the energy adapter.
+        powerW: watts(entry.middleware.getCachedState()?.chargePowerKw),
+        vehicleId: (await this.resolveVehicle(id)).vehicleId,
+      })),
+    );
+    const claimed = new Set(
+      perCharger.flatMap((c) => c.vehicleId === null ? [] : [c.vehicleId]),
+    );
+    const [states, rows] = await Promise.all([
+      this.vehicleManager.getAllStates(),
+      this.db.getVehicles(),
+    ]);
+    // Classified by what the plugin declares about itself, not by its id.
+    const unmeteredById = new Map(
+      rows.map((
+        r,
+      ) => [r.id, this.vehicleManager.loadIsUnmetered(r.adapterType)]),
+    );
+    const unclaimed = [...states].filter(([id]) => !claimed.has(id));
+    const sumVehicles = (unmetered: boolean) =>
+      unclaimed.reduce(
+        (total, [id, state]) =>
+          (unmeteredById.get(id) ?? false) === unmetered
+            ? total + watts(state.chargePowerKw)
+            : total,
+        0,
+      );
+
+    return {
+      unmeteredW: sumVehicles(true),
+      // Chargers count as metered: a real charger's draw is on the real meter,
+      // and a simulated one is indistinguishable from it over the wire.
+      meteredW: sumVehicles(false) +
+        perCharger.reduce((total, c) => total + c.powerW, 0),
+    };
   }
 
   async getChargersWithState() {

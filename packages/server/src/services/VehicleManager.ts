@@ -237,6 +237,12 @@ export class VehicleManager {
     return await this.wrapWithIsHome(raw);
   }
 
+  /** True when this adapter type's vehicles draw no real power, so no meter
+   *  can observe them. See docs/simulated-load.md. */
+  loadIsUnmetered(adapterType: string): boolean {
+    return this.vehiclePlugins.get(adapterType)?.loadIsUnmetered ?? false;
+  }
+
   async getAllStates(): Promise<Map<string, VehicleChargeState>> {
     const home = parseHomeCoords(
       await this.db.getConfig("home_latitude"),

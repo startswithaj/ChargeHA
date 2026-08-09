@@ -293,14 +293,6 @@ export class PluginDependencies<K extends string = string> {
     await this.vehicleManager.deleteVehicle(id);
   }
 
-  // ── Simulated load (Simulated plugin only) ───────────────────────────
-
-  /** Report simulated charging load so EnergyAdapterManager can reflect
-   *  it in realtime readings. Only the Simulated vehicle plugin uses this. */
-  setSimulatedLoad(watts: number): void {
-    this.energyManager.setSimulatedLoad(watts);
-  }
-
   // ── LAN detection (discovery plugins) ─────────────────────────────────
 
   /** The /24 subnet(s) ChargeHA itself is reachable on, so a discovery

@@ -181,26 +181,18 @@ describe("SimulatedVehicleAdapter", () => {
     });
   });
 
-  describe("onPowerChange callback", () => {
-    it("fires when charging starts", async () => {
-      let lastPower = 0;
-      adapter.onPowerChange = (watts) => {
-        lastPower = watts;
-      };
-
+  // The draw is now read from cached state rather than announced by the
+  // adapter (docs/simulated-load.md), so getCurrentPowerW is the contract.
+  describe("current power", () => {
+    it("is positive while charging", async () => {
       await adapter.startCharging(c("test:start"));
-      expect(lastPower).toBeGreaterThan(0);
+      expect(adapter.getCurrentPowerW()).toBeGreaterThan(0);
     });
 
-    it("fires with 0 when charging stops", async () => {
-      let lastPower = -1;
-      adapter.onPowerChange = (watts) => {
-        lastPower = watts;
-      };
-
+    it("is zero once charging stops", async () => {
       await adapter.startCharging(c("test:start"));
       await adapter.stopCharging(c("test:stop"));
-      expect(lastPower).toBe(0);
+      expect(adapter.getCurrentPowerW()).toBe(0);
     });
   });
 });

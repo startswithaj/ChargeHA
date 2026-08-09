@@ -100,6 +100,11 @@ export interface CommandStatus {
 
 export interface VehiclePlugin extends BasePlugin {
   readonly settingsComponentKey: string | null;
+  /** True when this plugin's vehicles draw no real power — the charging is
+   *  invented, so no meter, real or simulated, can observe it. Their draw is
+   *  therefore added to every energy reading. Defaults to false: a real car
+   *  charging is measured by real hardware. See docs/simulated-load.md. */
+  readonly loadIsUnmetered?: boolean;
   createVehicleMiddleware(row: VehicleRow): Promise<VehicleMiddleware>;
   getVehicleHttpRoutes(): PluginHttpRoutes | null;
   getTunnelRoutes(): PluginTunnelRoute[];
@@ -158,6 +163,11 @@ export interface VehicleMiddleware {
 export interface EnergyPlugin extends BasePlugin {
   readonly vendor: string;
   readonly settingsComponentKey: string | null;
+  /** False when this adapter measures no real electricity and invents its
+   *  figures instead — nothing charging appears in them, so charging load has
+   *  to be added on top. Defaults to true: a real inverter has already counted
+   *  whatever its meter saw. See docs/simulated-load.md. */
+  readonly measuresLoad?: boolean;
   /** Build the energy adapter from current config. Called by
    *  EnergyAdapterManager during initial setup and on reconfigure. */
   createAdapter(): Promise<EnergySourceAdapter>;

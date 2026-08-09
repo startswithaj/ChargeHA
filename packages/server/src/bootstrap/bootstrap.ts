@@ -256,6 +256,7 @@ function buildServices(
     db,
     energyRegistry,
     new Logger("EnergyAdapter", logLevel),
+    () => chargingPointManager.getChargingLoadW(),
   );
   const vehicleService = new VehicleService(
     db,

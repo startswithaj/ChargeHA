@@ -17,6 +17,9 @@ export class SimulatedEnergyPlugin implements EnergyPlugin {
   readonly settingsComponentKey = "simulated-energy-config";
   readonly configDef = simulatedEnergyConfigDef;
   readonly secretKeys: readonly string[] = [];
+  /** Generates a curve rather than measuring a switchboard, so no charging
+   *  of any kind shows up in it. */
+  readonly measuresLoad = false;
 
   constructor(private readonly deps: PluginDependencies) {
     deps.log.info("Simulated Energy plugin initialized");

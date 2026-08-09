@@ -54,9 +54,6 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
   private homeLat: number;
   private homeLng: number;
 
-  // Callback for energy interceptor wiring
-  onPowerChange?: (watts: number) => void;
-
   constructor(
     id: string,
     userConfig: SimulatedVehicleConfig = {},
@@ -93,7 +90,6 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
   disconnect(): Promise<void> {
     if (this.isCharging) {
       this.isCharging = false;
-      this.onPowerChange?.(0);
     }
     return Promise.resolve();
   }
@@ -153,7 +149,6 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
     this.isCharging = true;
     this.lastUpdateTime = Date.now();
     const powerW = this.calculatePowerKw() * 1000;
-    this.onPowerChange?.(powerW);
     this.logger.info(
       `${this.config.vehicleName} started charging at ${this.chargeAmps}A (${
         Math.round(powerW)
@@ -176,7 +171,6 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
       this.updateSoc(); // Finalize SOC before stopping
     }
     this.isCharging = false;
-    this.onPowerChange?.(0);
     this.logger.info(
       `${this.config.vehicleName} stopped charging at SOC ${
         this.socPercent.toFixed(1)
@@ -206,7 +200,6 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
 
     if (this.isCharging) {
       const powerW = this.calculatePowerKw() * 1000;
-      this.onPowerChange?.(powerW);
       this.logger.debug(
         `${this.config.vehicleName} amps set to ${this.chargeAmps}A (${
           Math.round(powerW)
@@ -264,7 +257,6 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
     // If SOC is now at or above charge limit, stop charging
     if (this.isCharging && this.socPercent >= this.chargeLimit) {
       this.isCharging = false;
-      this.onPowerChange?.(0);
     }
   }
 
@@ -273,7 +265,6 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
     if (!value && this.isCharging) {
       this.updateSoc();
       this.isCharging = false;
-      this.onPowerChange?.(0);
     }
   }
 
@@ -327,7 +318,6 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
     if (this.socPercent >= this.chargeLimit) {
       this.socPercent = this.chargeLimit;
       this.isCharging = false;
-      this.onPowerChange?.(0);
       this.logger.info(
         `${this.config.vehicleName} reached charge limit ${this.chargeLimit}%`,
       );

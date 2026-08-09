@@ -36,8 +36,9 @@ export const simulatedConfigDef = defineSection({});
 
 /**
  * Simulated vehicle plugin — creates SimulatedVehicleAdapter instances for
- * testing and demo use. Pushes aggregated simulated charging load into
- * EnergyAdapterManager via `deps.setSimulatedLoad`.
+ * testing and demo use. Their charging draw reaches the energy figures by
+ * being read from cached vehicle state, not reported from here; see
+ * docs/simulated-load.md.
  */
 export class SimulatedVehiclePlugin implements VehiclePlugin, ChargerPlugin {
   readonly id = "simulated";
@@ -46,6 +47,8 @@ export class SimulatedVehiclePlugin implements VehiclePlugin, ChargerPlugin {
   readonly configDef = simulatedConfigDef;
   readonly secretKeys: readonly string[] = [];
   readonly settingsComponentKey = "simulated-settings";
+  /** These cars move no electricity, so nothing can meter them. */
+  readonly loadIsUnmetered = true;
 
   private readonly adapters = new Map<string, SimulatedVehicleAdapter>();
   private readonly middlewares = new Map<string, SimulatedVehicleMiddleware>();
@@ -75,7 +78,6 @@ export class SimulatedVehiclePlugin implements VehiclePlugin, ChargerPlugin {
       this.deps.log,
       this.deps.dbLog,
     );
-    sim.onPowerChange = () => this.recalculate();
     this.adapters.set(row.id, sim);
     const middleware = new SimulatedVehicleMiddleware(sim);
     this.middlewares.set(row.id, middleware);
@@ -119,10 +121,6 @@ export class SimulatedVehiclePlugin implements VehiclePlugin, ChargerPlugin {
   /** Look up a simulated adapter by vehicle id. Router helper. */
   getAdapter(vehicleId: string): SimulatedVehicleAdapter | undefined {
     return this.adapters.get(vehicleId);
-  }
-
-  private recalculate(): void {
-    this.deps.setSimulatedLoad(this.getTotalPowerW());
   }
 
   getRouter(): AnyRouter {

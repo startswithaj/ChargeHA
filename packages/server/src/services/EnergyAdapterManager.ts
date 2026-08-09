@@ -11,6 +11,14 @@ import { NullEnergyAdapter } from "./NullEnergyAdapter.ts";
 
 const ADAPTER_TYPE_KEY = equipmentConfigDef.energyAdapterType.key;
 
+/** Live charging load, already split by whether a physical meter would have
+ *  counted it. A plain function rather than the ChargingPointManager itself:
+ *  that manager depends on the poller that owns this one, so holding it
+ *  directly would be a construction cycle. */
+type ChargingLoadProvider = () => Promise<
+  { unmeteredW: number; meteredW: number }
+>;
+
 // ── EnergyAdapterManager ────────────────────────────────────────────────
 
 /**
@@ -30,17 +38,23 @@ export class EnergyAdapterManager implements EnergySourceAdapter {
   private readonly logger: Logger;
   private adapter: EnergySourceAdapter | null = null;
   private activeType: string | null = null;
-  private simulatedLoadW = 0;
+  private readonly chargingLoad: ChargingLoadProvider;
   private readonly initializationPromise: Promise<void>;
 
   constructor(
     db: AppDatabase,
     energyPlugins: EnergyPluginRegistry,
     logger: Logger,
+    /** Resolved lazily at poll time: ChargingPointManager is constructed
+     *  after this manager (it reaches the poller that owns it), so bootstrap
+     *  passes an accessor rather than the manager. A function, not the
+     *  manager itself — this class needs the load figures and nothing else. */
+    chargingLoad: ChargingLoadProvider,
   ) {
     this.db = db;
     this.energyPlugins = energyPlugins;
     this.logger = logger;
+    this.chargingLoad = chargingLoad;
     this.initializationPromise = this.initialize();
   }
 
@@ -80,15 +94,30 @@ export class EnergyAdapterManager implements EnergySourceAdapter {
     }
     const data = await this.adapter.getRealtimeData();
 
-    if (this.simulatedLoadW > 0) {
+    const addW = await this.unseenLoadW();
+    if (addW > 0) {
       return {
         ...data,
-        homeConsumptionW: data.homeConsumptionW + this.simulatedLoadW,
-        gridPowerW: data.gridPowerW + this.simulatedLoadW,
+        homeConsumptionW: data.homeConsumptionW + addW,
+        gridPowerW: data.gridPowerW + addW,
       };
     }
 
     return data;
+  }
+
+  /** Watts the active adapter could not have measured, so they are missing
+   *  from its reading. See docs/simulated-load.md. */
+  private async unseenLoadW(): Promise<number> {
+    const { unmeteredW, meteredW } = await this.chargingLoad();
+    // Unmetered load moves no electricity, so no adapter can see it and it
+    // always applies. Metered load is already inside a measuring adapter's
+    // reading — adding it there would count the charger twice.
+    const plugin = this.activeType === null
+      ? undefined
+      : this.energyPlugins.get(this.activeType);
+    const measures = plugin?.measuresLoad ?? true;
+    return unmeteredW + (measures ? 0 : meteredW);
   }
 
   async getDeviceInfo(): Promise<DeviceInfo> {
@@ -97,13 +126,6 @@ export class EnergyAdapterManager implements EnergySourceAdapter {
       throw new Error("EnergyAdapterManager not initialized");
     }
     return this.adapter.getDeviceInfo();
-  }
-
-  // ── Simulated load ────────────────────────────────────────────────────
-
-  /** Set simulated load in watts (used by the Simulated vehicle plugin). */
-  setSimulatedLoad(watts: number): void {
-    this.simulatedLoadW = Math.max(0, watts);
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────
