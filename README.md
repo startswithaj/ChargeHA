@@ -320,6 +320,8 @@ README:
   SSO
 - [Quality Checks](devtools/quality/README.md) — unused file detection
 - [Simulators](devtools/sim/README.md) — solar and charge simulations
+- [SEMS Simulator](devtools/sems-simulator/README.md) — fake GoodWe SEMS Portal
+  cloud API for testing the GoodWe plugin without an account
 
 ## Environment Variables
 

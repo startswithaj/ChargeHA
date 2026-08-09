@@ -1,0 +1,73 @@
+services:
+  fake-sems:
+    build: .
+    image: fake-sems:local
+    ports:
+      # 8099 keeps out of ChargeHA's way on 8000.
+      - "8099:8099"
+    environment:
+      PORT: "8099"
+      # TLS on 443 is what makes the gateway-mode host rewrite reachable.
+      TLS: "1"
+      TLS_PORT: "443"
+      SEMS_ACCOUNT: tester@example.com
+      SEMS_PASSWORD: fake-password-123
+      SEMS_REGION: eu
+      GRID_SIGN_MODE: signed
+      API_BASE_MODE: direct
+      # silent | info | debug — debug adds request/response bodies.
+      LOG_LEVEL: info
+      # The api base handed to clients in "direct" mode. Container-network
+      # name by default so sibling containers can reach it; override to
+      # http://localhost:8099/api when the client runs on the host.
+      PUBLIC_BASE: http://fake-sems:8099/api
+    networks:
+      default:
+        aliases:
+          # The client rewrites PowerStation calls onto these hosts. Aliasing
+          # them at the fake is what lets that branch run for real.
+          - eu.semsportal.com
+          - au.semsportal.com
+          - us.semsportal.com
+          - eu-gateway.semsportal.com
+          - www.semsportal.com
+          - semsplus.goodwe.com
+    healthcheck:
+      test: [
+        "CMD",
+        "deno",
+        "eval",
+        "await fetch('http://localhost:8099/health')",
+      ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  smoke:
+    build: .
+    image: fake-sems:local
+    profiles: ["smoke"]
+    depends_on:
+      fake-sems:
+        condition: service_healthy
+    environment:
+      SMOKE_BASE: http://fake-sems:8099
+      SMOKE_ACCOUNT: tester@example.com
+      SMOKE_PASSWORD: fake-password-123
+      SMOKE_REGION: eu
+      # Exercise the gateway rewrite end to end: the rewritten URL resolves to
+      # the fake through the network alias, over its self-signed cert.
+      SMOKE_GATEWAY: "1"
+      SMOKE_REGION_BASE: https://eu.semsportal.com/api
+      DENO_CERT: /certs/ca.crt
+    command: [
+      "deno",
+      "run",
+      "--allow-net",
+      "--allow-env",
+      "--allow-read",
+      "smoke.ts",
+    ]
+
+networks:
+  default:

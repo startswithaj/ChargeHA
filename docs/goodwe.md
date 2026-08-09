@@ -113,3 +113,21 @@ yours.
 Check the logs for a rate-limit warning. If SEMS is throttling, ChargeHA pauses
 and recovers on its own. Otherwise confirm the SEMS app itself shows live data —
 if it does not, the problem is between the inverter and GoodWe's cloud.
+
+## Testing without a SEMS account
+
+A simulator that speaks the SEMS wire protocol ships with the project, so the
+integration can be exercised end to end without a GoodWe account:
+
+```
+deno task sems:sim          # listens on http://localhost:8099
+```
+
+Point ChargeHA at it by setting `GOODWE_SEMS_BASE_URL=http://localhost:8099`.
+Leave that unset to talk to the real SEMS Portal.
+
+It serves four station profiles (three-phase without a battery, hybrid with a
+battery, multi-inverter, and one with no HomeKit fitted), simulates a daily
+solar curve, and can inject rate limits and expired tokens on demand. See
+[the simulator's README](../devtools/sems-simulator/README.md) for the full list
+of controls.

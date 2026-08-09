@@ -111,6 +111,7 @@ devtools/
   oidc/                      — Local OIDC provider for testing SSO (see devtools/oidc/README.md)
   quality/                   — Unused file check (see devtools/quality/README.md)
   sim/                       — Charge simulators + analysis tools (see devtools/sim/README.md)
+  sems-simulator/            — Fake GoodWe SEMS Portal API (see devtools/sems-simulator/README.md)
 docs/                        — Architecture docs, setup guides, design notes
 ```
 
@@ -425,6 +426,8 @@ See individual READMEs in each `devtools/` subdirectory for detailed usage:
   testing SSO
 - [Quality Checks](../devtools/quality/README.md) — unused file detection
 - [Simulators](../devtools/sim/README.md) — solar and charge simulations
+- [SEMS Simulator](../devtools/sems-simulator/README.md) — fake GoodWe SEMS
+  Portal API
 
 ## Lint
 
