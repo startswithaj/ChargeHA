@@ -269,6 +269,14 @@ A demo shortcut creates a simulated vehicle and skips plugin-specific config.
 - Core code should not reference specific plugin IDs. Use plugin registry
   interfaces. Plugins access the DB through `PluginDependencies`, not
   `AppDatabase` directly.
+- **Core code must not name a plugin's config key either.** A plugin's config is
+  its own; core code reading `"charger_id"` out of a row's JSON has hardcoded
+  one plugin's schema. The plugin advertises the key instead, through the option
+  metadata in `packages/plugins/pluginOptions.ts` — e.g. `identityConfigKey`,
+  which the OCPP plugin sets to `"charger_id"` and
+  `client/src/lib/chargePointIdentity.ts` reads back generically to show a
+  charge point's own id. Add an accessor there rather than a string literal at
+  the call site.
 
 ### Server: tRPC
 
