@@ -278,6 +278,98 @@ describe("AppDatabase", () => {
     });
   });
 
+  // The schedules table has no foreign key to chargers or vehicles, so
+  // deleting a target cannot cascade at the DB level — AppDatabase does it.
+  // Without these, a target could start leaving its schedules behind again and
+  // nothing would notice until they surfaced as orphans in the UI.
+  describe("deleting a target takes its schedules with it", () => {
+    const chargerKeyed: CreateScheduleInput = {
+      id: "sched-charger",
+      vehicleId: null,
+      chargerId: "cp-1",
+      scheduleType: "charge",
+      startTime: "00:00",
+      endTime: "06:00",
+      days: ["mon"],
+      chargeAmps: 32,
+      chargeLimitPct: null,
+    };
+    const vehicleKeyed: CreateScheduleInput = {
+      ...chargerKeyed,
+      id: "sched-vehicle",
+      vehicleId: "VIN1",
+      chargerId: null,
+      chargeLimitPct: 80,
+    };
+    const blockout: CreateScheduleInput = {
+      id: "sched-blockout",
+      vehicleId: null,
+      chargerId: null,
+      scheduleType: "blockout",
+      startTime: "17:00",
+      endTime: "21:00",
+      days: ["mon"],
+      chargeAmps: null,
+      chargeLimitPct: null,
+    };
+
+    const seed = async (): Promise<void> => {
+      await db.upsertCharger({
+        id: "cp-1",
+        name: "Wallbox",
+        chargerAdapterType: "ocpp",
+        kind: "smart",
+      });
+      await db.createSchedule(chargerKeyed);
+      await db.createSchedule(vehicleKeyed);
+      await db.createSchedule(blockout);
+    };
+
+    const remainingIds = async (): Promise<string[]> =>
+      (await db.getSchedules()).map((s) => s.id).toSorted();
+
+    it("deleting a charger removes only its charger-keyed schedules", async () => {
+      await seed();
+
+      await db.deleteCharger("cp-1");
+
+      // The vehicle-keyed schedule stays: that car may be plugged into a
+      // different charger tomorrow.
+      expect(await remainingIds()).toEqual(["sched-blockout", "sched-vehicle"]);
+    });
+
+    it("deleting a vehicle removes only its vehicle-keyed schedules", async () => {
+      await seed();
+
+      await db.deleteVehicle("VIN1");
+
+      expect(await remainingIds()).toEqual(["sched-blockout", "sched-charger"]);
+    });
+
+    it("leaves blockouts alone, which have no target to be deleted with", async () => {
+      await seed();
+
+      await db.deleteCharger("cp-1");
+      await db.deleteVehicle("VIN1");
+
+      expect(await remainingIds()).toEqual(["sched-blockout"]);
+    });
+
+    it("deactivating a charging point keeps its schedules", async () => {
+      await seed();
+
+      // vehicle_api points are deactivated rather than deleted precisely so
+      // their schedules survive a control-path switch (ChargingPointManager).
+      await db.updateChargerActive("cp-1", false);
+
+      expect(await remainingIds()).toEqual([
+        "sched-blockout",
+        "sched-charger",
+        "sched-vehicle",
+      ]);
+    });
+  });
+
   describe("vehicle charge readings", () => {
     const sampleReading: VehicleChargeReadingInput = {
       vehicleId: "VIN1",
