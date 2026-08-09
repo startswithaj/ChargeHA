@@ -24,7 +24,15 @@ if (!up.success) {
 }
 
 const test = await new Deno.Command(Deno.execPath(), {
-  args: ["test", "--allow-net", "--allow-env", `e2e/${suite}.e2e.test.ts`],
+  // --allow-run=docker: the OCPP suite restarts the app container to prove a
+  // charger reconnects afterwards. Scoped to docker rather than blanket.
+  args: [
+    "test",
+    "--allow-net",
+    "--allow-env",
+    "--allow-run=docker",
+    `e2e/${suite}.e2e.test.ts`,
+  ],
   stdout: "inherit",
   stderr: "inherit",
 }).output();

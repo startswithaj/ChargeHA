@@ -36,7 +36,11 @@
   },
   "stationTemplateUrls": [
     {
-      "file": "vcp-test.station-template.json",
+      "file": "sap-test.station-template.json",
+      "numberOfStations": 1
+    },
+    {
+      "file": "sap-basic.station-template.json",
       "numberOfStations": 1
     }
   ]

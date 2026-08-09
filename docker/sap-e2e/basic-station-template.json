@@ -1,9 +1,9 @@
 {
   "$schemaVersion": 1,
   "idTagsFile": "idtags.json",
-  "baseName": "sap-test",
+  "baseName": "sap-basic",
   "fixedName": true,
-  "chargePointModel": "ChargeHA AC7.4",
+  "chargePointModel": "ChargeHA Basic",
   "chargePointVendor": "ChargeHA",
   "power": 7400,
   "powerUnit": "W",
@@ -20,12 +20,12 @@
       {
         "key": "MeterValuesSampledData",
         "readonly": false,
-        "value": "Current.Import,Voltage,Power.Active.Import,Energy.Active.Import.Register,SoC"
+        "value": "Energy.Active.Import.Register"
       },
       {
         "key": "MeterValueSampleInterval",
         "readonly": false,
-        "value": "10"
+        "value": "60"
       },
       {
         "key": "SupportedFeatureProfiles",

@@ -93,9 +93,22 @@ export class OcppChargerPlugin implements ChargerPlugin {
     };
   }
 
+  /** Every OCPP row that has a charge point id. A row without one is
+   *  unconfigured and stays silent in every check. */
+  private async configuredPoints(): Promise<
+    Array<{ name: string; chargePointId: string }>
+  > {
+    const entries = await this.deps.resolveChargerConfigs();
+    return entries
+      .map((e) => ({ name: e.row.name, chargePointId: e.config.charger_id }))
+      .filter(
+        (p): p is { name: string; chargePointId: string } =>
+          p.chargePointId !== undefined,
+      );
+  }
+
   getHealthChecks(): PluginHealthCheck[] {
-    // One check across every OCPP row. Rows with no charge point id yet are
-    // unconfigured and stay silent.
+    // Both checks run across every OCPP row.
     return [{
       name: "ocpp-connection",
       timeoutMs: 2000,
@@ -104,17 +117,7 @@ export class OcppChargerPlugin implements ChargerPlugin {
         "The charger is not connected to ChargeHA. Check the charger's OCPP " +
         "server URL and network connection.",
       run: async () => {
-        const entries = await this.deps.resolveChargerConfigs();
-        const configured = entries
-          .map((e) => ({
-            name: e.row.name,
-            chargePointId: e.config.charger_id,
-          }))
-          .filter(
-            (p): p is { name: string; chargePointId: string } =>
-              p.chargePointId !== undefined,
-          );
-        const disconnected = configured
+        const disconnected = (await this.configuredPoints())
           .filter((p) => !this.centralSystem.getData(p.chargePointId).connected)
           .map((p) => p.name);
         if (disconnected.length === 0) return { status: "ok" };
@@ -122,6 +125,24 @@ export class OcppChargerPlugin implements ChargerPlugin {
           status: "error",
           message: `Not connected: ${disconnected.join(", ")}`,
         };
+      },
+    }, {
+      // A warning, never an error: a charger that will not report current
+      // still charges correctly, it is only steered less precisely.
+      name: "ocpp-measurands",
+      timeoutMs: 2000,
+      warningTitle: "Charger not reporting current",
+      warningMessage:
+        "The charger is not reporting the current it is drawing, so " +
+        "ChargeHA estimates it instead. Charging still works, but solar " +
+        "tracking is less precise.",
+      run: async () => {
+        const degraded = (await this.configuredPoints()).flatMap((p) => {
+          const reason = this.centralSystem.measurandWarning(p.chargePointId);
+          return reason === null ? [] : [`${p.name} ${reason}`];
+        });
+        if (degraded.length === 0) return { status: "ok" };
+        return { status: "warning", message: degraded.join(" ") };
       },
     }];
   }

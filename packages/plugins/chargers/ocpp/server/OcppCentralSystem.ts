@@ -7,9 +7,12 @@ import {
   type ChargePointStatus,
   chargingProfilePayload,
   meterValuesReq,
+  type SampledValue,
   startTransactionReq,
   statusNotificationReq,
 } from "./OcppMessages.ts";
+import { measurandWarningFor } from "./OcppMeasurands.ts";
+import { OcppMeasurandNegotiator } from "./OcppMeasurandNegotiator.ts";
 
 export interface OcppChargerInfo {
   vendor: string;
@@ -47,6 +50,12 @@ export interface OcppLiveData {
   /** Latest measurand readings (nulls = charger never sent them). */
   powerW: number | null;
   currentA: number | null;
+  /** Sum of the per-phase currents, when the charger reported them per
+   *  phase. null when it reported a single unphased current — the adapter
+   *  then scales by the configured phase count instead. Kept alongside the
+   *  average because the adapter reads only this cache; parsing measurands
+   *  there would break the push-based boundary. */
+  currentSumA: number | null;
   voltageV: number | null;
   energyRegisterWh: number | null;
   lastMeterValuesAt: number | null;
@@ -87,6 +96,7 @@ const freshData = (): OcppLiveData => ({
   meterStartWh: null,
   powerW: null,
   currentA: null,
+  currentSumA: null,
   voltageV: null,
   energyRegisterWh: null,
   lastMeterValuesAt: null,
@@ -128,6 +138,9 @@ export class OcppCentralSystem {
    *  before listening started retries every couple of seconds; that is a
    *  signal worth showing the user, not noise to bury in the log. */
   private knocking: { chargerId: string; at: number } | null = null;
+  /** Owned here rather than per connection: the reconnect it has to survive
+   *  destroys the connection object. */
+  private readonly negotiator: OcppMeasurandNegotiator;
 
   constructor(
     private readonly logger: Logger,
@@ -137,7 +150,13 @@ export class OcppCentralSystem {
      *  saving a row must take effect on an already-open socket's very next
      *  message, with no reconnect. */
     private readonly hasChargerRow: (chargePointId: string) => Promise<boolean>,
-  ) {}
+  ) {
+    this.negotiator = new OcppMeasurandNegotiator(
+      (id, action, payload) => this.send(id, action, payload),
+      logger,
+      dbLog,
+    );
+  }
 
   /** Disconnected chargers report fresh state rather than nothing, so callers
    *  never have to special-case "no connection yet". */
@@ -391,6 +410,12 @@ export class OcppCentralSystem {
         ? OcppFraming.error(frame.id, "NotImplemented", frame.action)
         : OcppFraming.result(frame.id, payload);
       socket?.send(message);
+      // After the boot is answered, never before: a charge point is not
+      // obliged to answer our CALLs until we have accepted its
+      // BootNotification, and this is the first moment we have.
+      if (frame.action === "BootNotification") {
+        void this.afterBoot(chargePointId);
+      }
     } catch (error) {
       // OCPP-J: a CALL with a bad payload still gets a targeted CALLERROR —
       // never a silent drop that leaves the charger waiting on its timeout.
@@ -399,6 +424,28 @@ export class OcppCentralSystem {
         OcppFraming.error(frame.id, "FormationViolation", String(error)),
       );
     }
+  }
+
+  /** A saved charger has just booted. Negotiation is gated on the charger row
+   *  because BootNotification is the one action `resolveAction` lets through
+   *  without one: a pairing window accepts unknown chargers so the user can
+   *  identify them, and pushing configuration into a charger the user may
+   *  then discard is not ours to do. */
+  private async afterBoot(chargePointId: string): Promise<void> {
+    if (!(await this.hasChargerRow(chargePointId))) return;
+    await this.negotiator.negotiate(chargePointId);
+  }
+
+  /** Why this charger's telemetry is degraded, or null. Read by the plugin's
+   *  health check. Evidence-based: what the charger answered is checked
+   *  against what has actually arrived since, so a charger that said
+   *  Accepted and changed nothing is caught, and an idle charger sending
+   *  nothing at all is not accused. */
+  measurandWarning(chargePointId: string): string | null {
+    return measurandWarningFor(
+      this.negotiator.outcome(chargePointId),
+      this.getData(chargePointId),
+    );
   }
 
   /** Gates on the honest source of truth — a charger row — before handing off
@@ -548,33 +595,41 @@ export class OcppCentralSystem {
     chargePointId: string,
     mv: ReturnType<typeof meterValuesReq.parse>,
   ): Partial<OcppLiveData> {
-    const samples = mv.meterValue.flatMap((entry) => entry.sampledValue);
-    const sampleFor = (measurand: string) =>
-      samples.find(
-        (s) => (s.measurand ?? "Energy.Active.Import.Register") === measurand,
-      );
-    const read = (measurand: string) => {
-      const sample = sampleFor(measurand);
-      return sample ? parseFloat(sample.value) : null;
-    };
-    const powerSample = sampleFor("Power.Active.Import");
-    const rawPower = powerSample ? parseFloat(powerSample.value) : null;
+    const groups = groupSamples(
+      mv.meterValue.flatMap((entry) => entry.sampledValue),
+    );
+    const power = readGroup(groups, "Power.Active.Import", aggregateAdditive);
+    const current = readGroup(groups, "Current.Import", aggregateCurrent);
+    const voltage = readGroup(groups, "Voltage", aggregateVoltage);
+    const register = readGroup(
+      groups,
+      "Energy.Active.Import.Register",
+      aggregateAdditive,
+    );
     // The register carries its own unit, so it must be normalised the same
-    // way power is — a kWh charger otherwise reads 1000x low.
-    const registerSample = sampleFor("Energy.Active.Import.Register");
-    const energyRegisterWh = registerSample
-      ? toWattHours(parseFloat(registerSample.value), registerSample.unit)
-      : null;
+    // way power is — a kWh charger otherwise reads 1000x low. Normalisation
+    // runs after aggregation: every phase of one measurand shares a unit,
+    // so scaling the total once is both cheaper and lossless.
+    const energyRegisterWh = register.value === null
+      ? null
+      : toWattHours(register.value, register.unit);
+    // PRD fallback chain tier 2: no power measurand → derive from how fast
+    // the register counts up. Tier 3 (current × voltage) stays in the
+    // adapter for when neither power nor a register delta exists.
+    const powerW = power.value === null
+      ? this.derivePowerFromRegister(chargePointId, energyRegisterWh)
+      : toWatts(power.value, power.unit);
+    const currentFields = {
+      currentA: current.value,
+      currentSumA: currentSum(groups),
+    };
+    // A shielded reading omits its key rather than writing null, so a lone
+    // neutral sample cannot wipe the good reading we already hold.
     return {
-      // PRD fallback chain tier 2: no power measurand → derive from how
-      // fast the register counts up. Tier 3 (current × voltage) stays in
-      // the adapter for when neither power nor a register delta exists.
-      powerW: rawPower === null
-        ? this.derivePowerFromRegister(chargePointId, energyRegisterWh)
-        : toWatts(rawPower, powerSample?.unit),
-      currentA: read("Current.Import"),
-      voltageV: read("Voltage"),
-      energyRegisterWh,
+      ...(power.shielded ? {} : { powerW }),
+      ...(current.shielded ? {} : currentFields),
+      ...(voltage.shielded ? {} : { voltageV: voltage.value }),
+      ...(register.shielded ? {} : { energyRegisterWh }),
     };
   }
 
@@ -638,6 +693,177 @@ export class OcppCentralSystem {
       lastUpdated: new Date().toISOString(),
     };
   }
+}
+
+// ── Measurand aggregation ──────────────────────────────────────────────
+// A 3-phase charger reports one sample per phase. Flattening those and
+// taking the first match reads power at a third of actual, and can take a
+// line-to-line voltage for a line-to-neutral one. Rules follow the HA OCPP
+// integration's process_phases.
+
+const PHASES_L123 = ["L1", "L2", "L3"] as const;
+const PHASES_L_N = ["L1-N", "L2-N", "L3-N"] as const;
+const PHASES_L_L = ["L1-L2", "L2-L3", "L3-L1"] as const;
+const SQRT3 = Math.sqrt(3);
+
+/** One sample, parsed. The finiteness check happens once, here, and nothing
+ *  downstream re-parses. */
+interface ParsedSample {
+  value: number;
+  phase: string | undefined;
+  unit: string | undefined;
+}
+
+/** One measurand's samples. `total` is the sample that carried no `phase`
+ *  field; `phases` is keyed by the raw OCPP phase label. */
+interface MeasurandGroup {
+  unit: string | undefined;
+  total: number | null;
+  phases: Map<string, number>;
+}
+
+/** What a measurand resolved to. `shielded` means "do not write this key" —
+ *  the payload said nothing about the installation and must not disturb
+ *  what we already hold. */
+interface Reading {
+  value: number | null;
+  unit: string | undefined;
+  shielded: boolean;
+}
+
+const NO_READING: Reading = { value: null, unit: undefined, shielded: false };
+
+/** An absent measurand means Energy.Active.Import.Register (OCPP 1.6). */
+const measurandOf = (sample: SampledValue): string =>
+  sample.measurand ?? "Energy.Active.Import.Register";
+
+function groupSamples(samples: SampledValue[]): Map<string, MeasurandGroup> {
+  const names = [...new Set(samples.map(measurandOf))];
+  return new Map(
+    names.map((name) => [
+      name,
+      buildGroup(samples.filter((s) => measurandOf(s) === name)),
+    ]),
+  );
+}
+
+function buildGroup(samples: SampledValue[]): MeasurandGroup {
+  // A value that will not parse is dropped outright. Letting it through as
+  // NaN would poison the sum and take its healthy sibling phases with it.
+  const usable = samples.flatMap((s): ParsedSample[] => {
+    const value = parseFloat(s.value);
+    return Number.isFinite(value)
+      ? [{ value, phase: s.phase, unit: s.unit }]
+      : [];
+  });
+  const unphased = usable.filter((s) => s.phase === undefined);
+  return {
+    unit: usable.at(-1)?.unit,
+    // Last wins. A batched MeterValues carries several meterValue entries
+    // oldest first, so the tail is the freshest reading — which is also
+    // what the Map below does for repeated phase labels.
+    total: unphased.at(-1)?.value ?? null,
+    phases: new Map(
+      usable.flatMap((s) =>
+        s.phase === undefined ? [] : [[s.phase, s.value] as const]
+      ),
+    ),
+  };
+}
+
+/** The values actually present for these phase labels. An absent phase is
+ *  dropped everywhere; a zero survives here and is dropped only by
+ *  averaging. */
+const valuesFor = (
+  group: MeasurandGroup,
+  phases: readonly string[],
+): number[] =>
+  phases.flatMap((phase) => {
+    const value = group.phases.get(phase);
+    return value === undefined ? [] : [value];
+  });
+
+/** Average over the non-zero entries. Amps are the control quantity: a
+ *  charger limited to 16 A draws 16 A on each ACTIVE phase, so 16/16/0 is
+ *  16, not 10.67 — averaging an idle phase's zero would report headroom
+ *  that does not exist. All-zero is still a reading, so it returns 0. */
+function averageNonZero(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const nonZero = values.filter((value) => value !== 0);
+  if (nonZero.length === 0) return 0;
+  return nonZero.reduce((a, b) => a + b, 0) / nonZero.length;
+}
+
+const sumOf = (values: number[]): number | null =>
+  values.length === 0 ? null : values.reduce((a, b) => a + b, 0);
+
+/** The per-phase current set: L1/L2/L3, ignoring N. Some chargers misuse
+ *  the line-to-neutral labels for current, so those are the fallback. One
+ *  selector serves both the average and the sum, so the two can never
+ *  disagree about which set they read. */
+function currentPhaseValues(group: MeasurandGroup): number[] {
+  const line = valuesFor(group, PHASES_L123);
+  return line.length > 0 ? line : valuesFor(group, PHASES_L_N);
+}
+
+const aggregateCurrent = (group: MeasurandGroup): number | null =>
+  averageNonZero(currentPhaseValues(group));
+
+/** Power.* and Energy.*: the installation total is the sum of its phases. */
+function aggregateAdditive(group: MeasurandGroup): number | null {
+  const line = valuesFor(group, PHASES_L123);
+  if (line.length > 0) return sumOf(line);
+  return sumOf(valuesFor(group, PHASES_L_N));
+}
+
+function aggregateVoltage(group: MeasurandGroup): number | null {
+  const neutral = valuesFor(group, PHASES_L_N);
+  if (neutral.length > 0) return averageNonZero(neutral);
+  const lineToLine = averageNonZero(valuesFor(group, PHASES_L_L));
+  // Line-to-line is √3 larger than line-to-neutral for the same supply;
+  // everything downstream assumes line-to-neutral.
+  if (lineToLine !== null) return lineToLine / SQRT3;
+  // Workaround for chargers that label line-to-neutral volts as bare
+  // L1/L2/L3, against engineering convention.
+  return averageNonZero(valuesFor(group, PHASES_L123));
+}
+
+/** A measurand whose only phase is N. Skipped entirely: a lone neutral
+ *  sample is not a reading of the installation, and must not be taken as
+ *  one nor allowed to overwrite the reading we already have. */
+const neutralOnly = (group: MeasurandGroup): boolean =>
+  group.phases.size > 0 &&
+  [...group.phases.keys()].every((phase) => phase === "N");
+
+function readGroup(
+  groups: Map<string, MeasurandGroup>,
+  measurand: string,
+  aggregate: (group: MeasurandGroup) => number | null,
+): Reading {
+  const group = groups.get(measurand);
+  if (group === undefined) return NO_READING;
+  if (neutralOnly(group)) {
+    return { value: null, unit: group.unit, shielded: true };
+  }
+  // An unphased sample wins over per-phase entries for the same measurand.
+  // Chargers exist that send both a total and its phases, and counting both
+  // double-counts. Inferred from field behaviour, not stated by OCPP 1.6.
+  return {
+    value: group.total ?? aggregate(group),
+    unit: group.unit,
+    shielded: false,
+  };
+}
+
+/** Sum of the per-phase currents, for the adapter's tier-3 power
+ *  derivation. null when the charger reported a single unphased current:
+ *  there is nothing to sum, and the adapter must scale by the configured
+ *  phase count instead. */
+function currentSum(groups: Map<string, MeasurandGroup>): number | null {
+  const group = groups.get("Current.Import");
+  if (group === undefined || group.total !== null) return null;
+  if (neutralOnly(group)) return null;
+  return sumOf(currentPhaseValues(group));
 }
 
 function isAccepted(res: unknown): boolean {

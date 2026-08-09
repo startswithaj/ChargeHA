@@ -6,82 +6,25 @@
 // the message handler rather than asserting on internal flags.
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { Logger } from "@chargeha/server/lib/Logger";
-import { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
-import { OcppCentralSystem } from "./OcppCentralSystem.ts";
-
-/** [messageTypeId, id, ...rest] — a decoded OCPP-J frame, in either
- *  direction (CALL out, CALLRESULT/CALLERROR in reply to a charger CALL). */
-type Frame = [number, string, ...unknown[]];
+import {
+  attached,
+  call,
+  type FakeSocket,
+  meterValues as sendMeterValues,
+} from "./test-helpers/ocppHarness.ts";
 
 describe("OCPP transaction adoption", () => {
   const CP = "ABB-83214";
 
-  /** Minimal stand-in for the upgraded socket: records every frame we send
-   *  (replies to charger CALLs, and our own outgoing CALLs) and lets a test
-   *  push charger-initiated CALLs in. */
-  const fakeSocket = () => {
-    const sent: Frame[] = [];
-    const socket = {
-      sent,
-      readyState: 1,
-      close: () => {},
-      send: (raw: string) => {
-        sent.push(JSON.parse(raw) as Frame);
-      },
-      onmessage: (_e: { data: string }) => {},
-      onclose: () => {},
-      onerror: (_e: unknown) => {},
-    };
-    return socket;
-  };
-
-  /** A charge point with a charger row, already attached. */
-  const attached = () => {
-    const logger = new Logger("OcppTest", "error");
-    const cs = new OcppCentralSystem(
-      logger,
-      new PluginDbLogger(() => Promise.resolve(), logger),
-      () => Promise.resolve(true),
-    );
-    const socket = fakeSocket();
-    cs.attach(socket as unknown as WebSocket, { chargerId: CP });
-    return { cs, socket };
-  };
-
-  /** Deliver a charger-initiated CALL and return what we replied. */
-  const call = async (
-    socket: ReturnType<typeof fakeSocket>,
-    action: string,
-    payload: Record<string, unknown>,
-  ): Promise<Frame> => {
-    const before = socket.sent.length;
-    socket.onmessage({
-      data: JSON.stringify([2, `id-${action}-${before}`, action, payload]),
-    });
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    return socket.sent[before];
-  };
-
   const meterValues = (
-    socket: ReturnType<typeof fakeSocket>,
+    socket: FakeSocket,
     opts: { transactionId?: number; registerWh: number },
   ) =>
-    call(socket, "MeterValues", {
-      connectorId: 1,
-      ...(opts.transactionId !== undefined
-        ? { transactionId: opts.transactionId }
-        : {}),
-      meterValue: [{
-        timestamp: new Date().toISOString(),
-        sampledValue: [{ value: String(opts.registerWh) }],
-      }],
+    sendMeterValues(socket, [{ value: String(opts.registerWh) }], {
+      transactionId: opts.transactionId,
     });
 
-  const startTransaction = (
-    socket: ReturnType<typeof fakeSocket>,
-    meterStart: number,
-  ) =>
+  const startTransaction = (socket: FakeSocket, meterStart: number) =>
     call(socket, "StartTransaction", {
       connectorId: 1,
       idTag: "tag",
@@ -90,7 +33,7 @@ describe("OCPP transaction adoption", () => {
     });
 
   it("adopts a transaction id from MeterValues when it has none", async () => {
-    const { cs, socket } = attached();
+    const { cs, socket } = attached(CP);
     expect(cs.getData(CP).transactionId).toBeNull();
 
     await meterValues(socket, { transactionId: 7, registerWh: 5000 });
@@ -99,7 +42,7 @@ describe("OCPP transaction adoption", () => {
   });
 
   it("baselines the adopted transaction at the register reading, and measures later energy from it", async () => {
-    const { cs, socket } = attached();
+    const { cs, socket } = attached(CP);
 
     await meterValues(socket, { transactionId: 7, registerWh: 5000 });
     expect(cs.getData(CP).meterStartWh).toBe(5000);
@@ -110,7 +53,7 @@ describe("OCPP transaction adoption", () => {
   });
 
   it("does not overwrite an existing StartTransaction baseline", async () => {
-    const { cs, socket } = attached();
+    const { cs, socket } = attached(CP);
 
     await startTransaction(socket, 2000);
     expect(cs.getData(CP).meterStartWh).toBe(2000);
@@ -124,7 +67,7 @@ describe("OCPP transaction adoption", () => {
   });
 
   it("changes nothing and does not throw when MeterValues carries no transactionId", async () => {
-    const { cs, socket } = attached();
+    const { cs, socket } = attached(CP);
 
     const reply = await meterValues(socket, { registerWh: 4000 });
 
@@ -134,7 +77,7 @@ describe("OCPP transaction adoption", () => {
   });
 
   it("scales a kWh energy register to Wh — OCPP allows either unit", async () => {
-    const { cs, socket } = attached();
+    const { cs, socket } = attached(CP);
 
     // Raw call rather than the meterValues helper: the point of this test is
     // the unit field, which the helper deliberately omits.
@@ -155,7 +98,7 @@ describe("OCPP transaction adoption", () => {
   });
 
   it("keeps the transaction counter ahead of an adopted id — the next StartTransaction returns 8", async () => {
-    const { cs, socket } = attached();
+    const { cs, socket } = attached(CP);
 
     await meterValues(socket, { transactionId: 7, registerWh: 5000 });
     expect(cs.getData(CP).transactionId).toBe(7);
@@ -166,7 +109,7 @@ describe("OCPP transaction adoption", () => {
   });
 
   it("remoteStop with no transaction id sends a 0A ChargePointMaxProfile on connectorId 0 and resolves true when accepted", async () => {
-    const { cs, socket } = attached();
+    const { cs, socket } = attached(CP);
     expect(cs.getData(CP).transactionId).toBeNull();
 
     const before = socket.sent.length;
@@ -195,7 +138,7 @@ describe("OCPP transaction adoption", () => {
   });
 
   it("remoteStop with a transaction id still sends RemoteStopTransaction (happy-path regression guard)", async () => {
-    const { cs, socket } = attached();
+    const { cs, socket } = attached(CP);
     await startTransaction(socket, 1000);
 
     const before = socket.sent.length;

@@ -126,14 +126,13 @@ export class OcppChargerAdapter implements ChargerAdapter {
     }
     this.wasStale = meterStale;
     const disconnected = !data.connected || meterStale;
-    const status = resolveStatus(disconnected, data.status);
+    const charging = isChargingNow(data);
+    const status = resolveStatus(disconnected, data.status, charging);
 
     return {
       chargerId: this.config.chargerId,
-      isCharging: !disconnected && data.status === "Charging",
-      isPluggedIn: data.status === null
-        ? null
-        : PLUGGED_STATUSES.has(data.status),
+      isCharging: !disconnected && charging,
+      isPluggedIn: resolvePluggedIn(data.status, charging),
       // Measurand fallback chain: power measurand → register-delta
       // derivation (both in OcppCentralSystem.readMeterValues) → current ×
       // voltage (derivedPowerKw below) → null (recorded as zero).
@@ -142,7 +141,7 @@ export class OcppChargerAdapter implements ChargerAdapter {
       chargeAmpsMin: this.config.minAmps,
       chargePowerKw: data.powerW !== null
         ? data.powerW / 1000
-        : derivedPowerKw(data),
+        : derivedPowerKw(data, this.config.phases),
       chargerVoltage: data.voltageV,
       chargerPhases: this.config.phases,
       energyAddedKwh: sessionEnergyKwh(data),
@@ -156,15 +155,59 @@ export class OcppChargerAdapter implements ChargerAdapter {
 function resolveStatus(
   disconnected: boolean,
   status: ChargePointStatus | null,
+  charging: boolean,
 ): ChargerStatus {
   if (disconnected) return "faulted";
-  if (status === null) return "available";
+  // A live session with no status yet is not "available" — that reads as
+  // nothing plugged in while energy is flowing.
+  if (status === null) return charging ? "charging" : "available";
   return STATUS_MAP[status];
 }
 
-function derivedPowerKw(data: OcppLiveData): number | null {
-  if (data.currentA === null || data.voltageV === null) return null;
-  return (data.currentA * data.voltageV) / 1000;
+/** null means "unknown", which the controller engine treats as plugged in —
+ *  only a definite false blocks charging. A session running with no status yet
+ *  is definitely plugged in, so say so rather than leaving it unknown. */
+function resolvePluggedIn(
+  status: ChargePointStatus | null,
+  charging: boolean,
+): boolean | null {
+  if (status !== null) return PLUGGED_STATUSES.has(status);
+  return charging ? true : null;
+}
+
+/** A charger that reconnects mid-session re-announces its connector status but
+ *  has no reason to resend Charging — from its side nothing changed. Our own
+ *  `status` is reset on every new socket, so after a ChargeHA restart the live
+ *  transaction and real power are the only honest evidence a session is
+ *  running. Trust them over a status that predates the current socket.
+ *  Power must be non-zero: SuspendedEV/SuspendedEVSE hold a transaction open
+ *  at zero power and must keep reporting not-charging. */
+function isChargingNow(data: OcppLiveData): boolean {
+  if (data.status === "Charging") return true;
+  // Inference fills a gap; it must never contradict the charger. Any other
+  // explicit status (SuspendedEV/EVSE, Finishing, Available, Reserved...)
+  // is the charger saying it is not delivering energy, and it wins even
+  // while a stale power reading lingers in the cache. Only "no status yet"
+  // and Preparing — the two states a mid-session reconnect leaves behind —
+  // are open to inference.
+  if (data.status !== null && data.status !== "Preparing") return false;
+  return data.transactionId !== null && (data.powerW ?? 0) > 0;
+}
+
+/** Tier 3 of the measurand fallback chain: no power measurand and no
+ *  register delta, so derive from amps × volts. Two explicit paths rather
+ *  than one averaged round trip.
+ *  - Per-phase currents: the sum already carries the phase count, and stays
+ *    exact on an unbalanced load. config.phases is not consulted at all —
+ *    the charger's own report beats the declared installation.
+ *  - One unphased current: nothing to sum, so scale by config.phases. */
+function derivedPowerKw(data: OcppLiveData, phases: number): number | null {
+  if (data.voltageV === null) return null;
+  if (data.currentSumA !== null) {
+    return (data.currentSumA * data.voltageV) / 1000;
+  }
+  if (data.currentA === null) return null;
+  return (data.currentA * data.voltageV * phases) / 1000;
 }
 
 function sessionEnergyKwh(data: OcppLiveData): number {

@@ -43,7 +43,13 @@ services:
 
   ocpp-vcp:
     # Only the ocpp suites start the charger simulator — a tapo run must
-    # never build or crash-loop it.
+    # never build or crash-loop it. Kept running (not removed yet — see
+    # e2e/ocppHelpers.ts) alongside ocpp-sap, on its own charge point id
+    # ("vcp-test"). ocpp-sap uses a distinct id ("sap-test") — two simulators
+    # sharing one id would evict each other's socket in the app on every
+    # reconnect (OcppCentralSystem.attach() closes the previous socket for an
+    # id when a new one arrives, which is correct for a real reconnect but
+    # thrashes forever between two simulators both claiming the same id).
     profiles: ["ocpp"]
     build:
       context: ..

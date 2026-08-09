@@ -1,6 +1,6 @@
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import type { OcppAppRouter } from "../packages/plugins/chargers/ocpp/routerType.ts";
-import { APP_URL } from "./helpers.ts";
+import { APP_URL, waitFor } from "./helpers.ts";
 
 export const SAP_UI_URL = Deno.env.get("E2E_SAP_UI_URL") ??
   "ws://localhost:19998";
@@ -8,7 +8,12 @@ const SAP_UI_USERNAME = "admin";
 const SAP_UI_PASSWORD = "admin";
 // The station id baked into docker/sap-e2e/station-template.json
 // (baseName + fixedName: true).
-const SAP_STATION_ID = "vcp-test";
+export const SAP_STATION_ID = "sap-test";
+
+/** The second station (docker/sap-e2e/basic-station-template.json): reports
+ *  only the energy register, on a 60s interval. sap-test already reports
+ *  every measurand we ask for, so it is this one that exercises negotiation. */
+export const SAP_BASIC_STATION_ID = "sap-basic";
 
 export const ocppTrpc = createTRPCClient<OcppAppRouter>({
   links: [httpBatchLink({ url: `${APP_URL}/trpc` })],
@@ -60,7 +65,15 @@ class SapUiClient {
   }
 
   private async getWs(): Promise<WebSocket> {
-    this.ws ??= this.connect();
+    // Retry rather than connect once: `compose up --wait` returns as soon as
+    // the container is healthy, but the ui-server binds its port a moment
+    // later, so the very first connection of a run would otherwise fail
+    // outright and take the whole suite's beforeAll with it.
+    this.ws ??= waitFor(() => this.connect().catch(() => null), {
+      timeoutMs: 30_000,
+      intervalMs: 500,
+      label: `SAP UI server at ${SAP_UI_URL}`,
+    });
     try {
       return await this.ws;
     } catch (e) {
@@ -101,23 +114,71 @@ const sapUi = new SapUiClient();
 /** hashIds — not charge point ids — are how the SAP UI server targets a
  *  station on every broadcast procedure. Resolved lazily (and not cached):
  *  the e2e stack's stations restart independently of the test process. */
-async function sapHashId(): Promise<string> {
+function sapHashId(stationId: string = SAP_STATION_ID): Promise<string> {
+  // Polled, not read once: the ui-server answers before the simulator has
+  // finished spawning its stations from the template, so the first listing of
+  // a run can legitimately come back empty.
+  return waitFor(async () => {
+    const res = await sapUi.request<
+      {
+        chargingStations: {
+          stationInfo: { chargingStationId: string; hashId: string };
+        }[];
+      }
+    >("listChargingStations", {});
+    return res.chargingStations.find((s) =>
+      s.stationInfo.chargingStationId === stationId
+    )?.stationInfo.hashId;
+  }, {
+    timeoutMs: 30_000,
+    intervalMs: 500,
+    label: `SAP station '${stationId}' to appear`,
+  });
+}
+
+/** Force the SAP station to (re)open its OCPP websocket to the app right now,
+ *  instead of waiting out its own reconnect backoff. Needed because at stack
+ *  startup there is no charger row yet, so the app 404s the station's first
+ *  connect attempt (packages/plugins/chargers/ocpp/server/wsRoutes.ts) and
+ *  the station then backs off for `retryBackOffRepeatInterval`-shaped delay —
+ *  30s by default, which the row-creation step in `beforeAll` cannot beat.
+ *  vcp doesn't need this: it retries on a hardcoded 2s loop (docker/vcp.Dockerfile).
+ *  `openConnection`'s response status is not meaningful here — the SAP
+ *  broadcast-channel response classifier (ChargingStationWorkerBroadcastChannel
+ *  .commandResponseToResponseStatus) has no case for it and falls through to
+ *  its default (failure) even on a successful call, since the underlying
+ *  handler returns void — so this deliberately ignores the response and lets
+ *  the caller's own connected-status poll be the source of truth. */
+export async function sapReconnect(
+  stationId: string = SAP_STATION_ID,
+): Promise<void> {
+  const hashId = await sapHashId(stationId);
+  await sapUi.request("openConnection", { hashIds: [hashId] });
+}
+
+/** One OCPP configuration key as the station itself currently holds it.
+ *  This is the station's own view, not ours, so it is the honest way to
+ *  prove a ChangeConfiguration actually landed rather than merely being
+ *  answered `Accepted`. Undefined when the station does not have the key. */
+export async function sapConfigValue(
+  stationId: string,
+  key: string,
+): Promise<string | undefined> {
   const res = await sapUi.request<
     {
       chargingStations: {
-        stationInfo: { chargingStationId: string; hashId: string };
+        stationInfo: { chargingStationId: string };
+        ocppConfiguration: {
+          configurationKey?: { key: string; value?: string }[];
+        };
       }[];
     }
   >("listChargingStations", {});
   const station = res.chargingStations.find((s) =>
-    s.stationInfo.chargingStationId === SAP_STATION_ID
+    s.stationInfo.chargingStationId === stationId
   );
-  if (!station) {
-    throw new Error(
-      `SAP simulator has no station with id '${SAP_STATION_ID}'`,
-    );
-  }
-  return station.stationInfo.hashId;
+  return station?.ocppConfiguration.configurationKey
+    ?.find((k) => k.key === key)?.value;
 }
 
 /** Inject a charger-initiated OCPP message via the SAP UI server. Replaces

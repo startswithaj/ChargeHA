@@ -24,7 +24,11 @@ RUN npm install -g --ignore-scripts corepack && corepack enable
 # extend upstream's bundled src/assets before the build step copies
 # src/assets/** into dist/assets/**.
 COPY docker/sap-e2e/config.json src/assets/config.json
-COPY docker/sap-e2e/station-template.json src/assets/station-templates/vcp-test.station-template.json
+COPY docker/sap-e2e/station-template.json src/assets/station-templates/sap-test.station-template.json
+# A second station that reports only the energy register, on a slower sample
+# interval — the shape a stock charger ships in. sap-test already reports
+# everything we want, so without this nothing exercises measurand negotiation.
+COPY docker/sap-e2e/basic-station-template.json src/assets/station-templates/sap-basic.station-template.json
 COPY docker/sap-e2e/ev-profiles-e2e.json src/assets/ev-profiles-e2e.json
 COPY docker/sap-e2e/idtags.json src/assets/idtags.json
 

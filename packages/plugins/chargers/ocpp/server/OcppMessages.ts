@@ -34,6 +34,7 @@ export const sampledValue = z.object({
   unit: z.string().optional(),
   phase: z.string().optional(),
 }).passthrough();
+export type SampledValue = z.infer<typeof sampledValue>;
 
 export const meterValuesReq = z.object({
   connectorId: z.number(),
@@ -61,6 +62,28 @@ export const authorizeReq = z.object({ idTag: z.string() }).passthrough();
 
 export const remoteResponse = z.object({
   status: z.enum(["Accepted", "Rejected"]),
+}).passthrough();
+
+/** GetConfiguration.conf. `configurationKey` holds what the charger has;
+ *  `unknownKey` lists what it does not. Both are optional in practice —
+ *  chargers omit an empty array rather than sending one. */
+export const getConfigurationRes = z.object({
+  configurationKey: z.array(
+    z.object({
+      key: z.string(),
+      readonly: z.boolean().optional(),
+      value: z.string().optional(),
+    }).passthrough(),
+  ).optional(),
+  unknownKey: z.array(z.string()).optional(),
+}).passthrough();
+
+/** ChangeConfiguration.conf. `status` is deliberately a bare string rather
+ *  than the spec's enum: an unrecognised vendor status must map to
+ *  "rejected" (a real outcome we handle), not throw and be recorded as a
+ *  failed round trip that never happened. */
+export const changeConfigurationRes = z.object({
+  status: z.string(),
 }).passthrough();
 
 /** Three-tier charging profile payloads (HA-integration pattern). */
