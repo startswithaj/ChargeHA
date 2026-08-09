@@ -16,7 +16,13 @@ import type {
 // ── Health Check Types ──────────────────────────────────────────────────────
 
 export interface HealthCheckResult {
-  status: "ok" | "error" | "timeout";
+  /** "warning" is degraded-but-working: the plugin is doing its job, but with
+   *  reduced capability the user should know about. Reserve "error" for
+   *  conditions the user must act on for charging to work at all. */
+  status: "ok" | "warning" | "error" | "timeout";
+  /** Shown to the user in place of `warningMessage` when present, so a check
+   *  that can fail in more than one way describes the failure it actually
+   *  hit. Write it for the user, not for the log. */
   message?: string;
 }
 
@@ -232,6 +238,12 @@ export interface ResolvedChargerRow extends ChargerRowConfig {
 export interface ChargerPlugin extends BasePlugin {
   readonly vendor: string;
   readonly settingsComponentKey: string | null;
+  /** True when this plugin's charging points move no real electricity, so no
+   *  meter can observe them and their draw is added to every energy reading.
+   *  Defaults to false: a real charger's draw is already on the real meter,
+   *  and a simulator speaking a hardware protocol (OCPP) is indistinguishable
+   *  from one over the wire. See docs/simulated-load.md. */
+  readonly loadIsUnmetered?: boolean;
   /**
    * Build the middleware for one charger row.
    *

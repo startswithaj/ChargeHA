@@ -25,6 +25,10 @@ export class SimulatedChargerPlugin implements ChargerPlugin {
   readonly settingsComponentKey = "simulated_charger-settings";
   readonly configDef = simulatedChargerConfigDef;
   readonly secretKeys: readonly string[] = [];
+  /** An in-memory EVSE draws nothing, so nothing can meter it. Unlike the
+   *  OCPP simulator, this one is only ever reached in-process — there is no
+   *  real charger it could be mistaken for. */
+  readonly loadIsUnmetered = true;
 
   private readonly adapters = new Map<string, SimulatedChargerAdapter>();
 

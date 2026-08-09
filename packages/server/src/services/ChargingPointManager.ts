@@ -33,11 +33,29 @@ interface ChargerEntry {
   // What we last asked for — the engine compares against this, not the
   // measured draw, so a car taking fewer amps never triggers re-commands.
   lastCommandedAmps?: number | null;
+  // Set when a passive point has been given its standing permission for the
+  // current plug-in. Cleared on unplug and when control comes back.
+  heldOpen?: boolean;
 }
 
 export interface VehicleResolution {
   kind: "linked" | "inferred" | "ambiguous" | "none";
   vehicleId: string | null;
+}
+
+/** Which side is deciding for this charging point right now.
+ *
+ *  `"self"` — this point makes its own decisions: mode, schedules, solar
+ *  tracking, amp adjustment.
+ *
+ *  `"vehicle_api"` — the car on it is driven by its own API, so this point
+ *  decides nothing. It is NOT unregistered: it still reports state, and it
+ *  must still physically allow current or the car's API has no path to
+ *  charge through. See `holdOpen`. */
+export interface ControlPath {
+  owner: "self" | "vehicle_api";
+  /** The self-driven vehicle this point is passing current to. */
+  passiveForVehicleId: string | null;
 }
 
 interface CommandBackoffState {
@@ -211,7 +229,11 @@ export class ChargingPointManager {
     const pluggedIn = state?.isPluggedIn ?? null;
     const unplugged = entry.lastPluggedIn === true && pluggedIn === false;
     entry.lastPluggedIn = pluggedIn ?? entry.lastPluggedIn;
-    if (!unplugged || entry.row.mode === "auto") return;
+    if (!unplugged) return;
+    // A different car may plug in next, so the standing permission a passive
+    // hold left behind must be re-issued rather than assumed.
+    entry.heldOpen = false;
+    if (entry.row.mode === "auto") return;
     this.logger.info(`Unplugged: resetting ${entry.row.id} to auto`);
     await this.setMode(entry.row.id, "auto", ctx);
   }
@@ -268,19 +290,31 @@ export class ChargingPointManager {
     );
   }
 
-  /** Drops charging points whose vehicle no longer exists. Creating points
-   *  for new vehicles is the vehicle-creation path's job, not an event's. */
+  /** Cleans up after a deleted vehicle. Creating points for new vehicles is
+   *  the vehicle-creation path's job, not an event's.
+   *
+   *  Only the vehicle's own API point is deleted — it exists solely to drive
+   *  that one car, so it has nothing left to do. Any other point merely had
+   *  the car assigned to it: that is hardware the user still owns, so the
+   *  assignment is cleared and the row stays. Deleting it instead would take
+   *  the charger-keyed schedules set on it too, since deleteCharger cascades
+   *  them (AppDatabase.deleteCharger). */
   async syncVehicleChargingPoints(): Promise<void> {
     const [vehicles, rows] = await Promise.all([
       this.db.getVehicles(),
       this.db.getChargers(),
     ]);
     const vehicleIds = new Set(vehicles.map((v) => v.id));
-    const orphans = rows.filter((r) =>
+    const stale = rows.filter((r) =>
       r.vehicleId !== null && !vehicleIds.has(r.vehicleId)
     );
-    await orphans.reduce(
-      (chain, r) => chain.then(() => this.deleteCharger(r.id)),
+    await stale.reduce(
+      (chain, r) =>
+        chain.then(() =>
+          r.kind === "vehicle_api"
+            ? this.deleteCharger(r.id)
+            : this.setChargerVehicleId(r.id, null)
+        ),
       Promise.resolve(),
     );
   }
@@ -523,6 +557,116 @@ export class ChargingPointManager {
       : { kind: pluggedIn.length > 1 ? "ambiguous" : "none", vehicleId: null };
   }
 
+  // ── Control path ─────────────────────────────────────────────────────
+
+  /** Vehicles driven by their own API that could be on a charger right now:
+   *  an active vehicle_api point, plugged in, and not known to be away.
+   *  isHome is null when unknown, so only an explicit false rules one out —
+   *  the same test inferVehicle uses.
+   *
+   *  Public because it is the per-pass cache for `getControlPath`: a caller
+   *  looking at every charger computes this once and threads it in, rather
+   *  than paying two DB reads per charger per controller loop. */
+  async getSelfDrivenVehicles(): Promise<Set<string>> {
+    const [rows, states] = await Promise.all([
+      this.db.getChargers(),
+      this.vehicleManager.getAllStates(),
+    ]);
+    return new Set(
+      rows
+        .filter((r) => r.kind === "vehicle_api" && r.active)
+        .flatMap((r) => r.vehicleId === null ? [] : [r.vehicleId])
+        .filter((id) => {
+          const v = states.get(id);
+          return v?.isPluggedIn === true && v.isHome !== false;
+        }),
+    );
+  }
+
+  /** Derived, never stored: a smart charger goes passive only while a
+   *  self-driven car is the one on it. A second, dumb car on the same
+   *  charger resolves normally and the charger keeps full control for it.
+   *
+   *  Deriving this rather than storing a second flag is deliberate — a
+   *  stored "passive" bit and the row's `active` bit could disagree, and
+   *  `active` is per-row so it could not vary by which car is plugged in
+   *  anyway.
+   *
+   *  `selfDriven` is the optional per-pass cache from
+   *  `getSelfDrivenVehicles`; omit it and one is computed for this call.
+   *
+   *  Clears a stale hold as a side effect when control comes back: the next
+   *  controlled loop must re-decide amps from scratch, not inherit the
+   *  standing maximum that passive left behind. */
+  async getControlPath(
+    id: string,
+    selfDriven?: ReadonlySet<string>,
+  ): Promise<ControlPath> {
+    const entry = this.chargers.get(id);
+    if (!entry || entry.row.kind !== "smart") {
+      return { owner: "self", passiveForVehicleId: null };
+    }
+    const vehicleId = await this.passiveVehicleFor(
+      id,
+      selfDriven ?? await this.getSelfDrivenVehicles(),
+    );
+    if (vehicleId === null) {
+      this.releaseHold(id);
+      return { owner: "self", passiveForVehicleId: null };
+    }
+    return { owner: "vehicle_api", passiveForVehicleId: vehicleId };
+  }
+
+  /** The self-driven vehicle this smart charger is passing current to, or
+   *  null when it is deciding for itself. */
+  private async passiveVehicleFor(
+    id: string,
+    selfDriven: ReadonlySet<string>,
+  ): Promise<string | null> {
+    if (selfDriven.size === 0) return null;
+    const resolved = (await this.resolveVehicle(id)).vehicleId;
+    if (resolved !== null) return selfDriven.has(resolved) ? resolved : null;
+    // Resolution found nobody precisely because inferVehicle skips
+    // self-driven cars. Exactly one such car plugged in at home is the one
+    // on this charger; more than one is as ambiguous as any other pair.
+    const [only] = [...selfDriven];
+    return selfDriven.size === 1 ? only : null;
+  }
+
+  private releaseHold(id: string): void {
+    const entry = this.chargers.get(id);
+    if (!entry?.heldOpen) return;
+    entry.heldOpen = false;
+    entry.lastCommandedAmps = null;
+  }
+
+  /** Passive hold for a smart charger whose car is driven by its own API.
+   *
+   *  Doing nothing is not passive enough to work. An OCPP charger keeps the
+   *  last ChargingProfile it was sent, so a charger left at 6A by solar
+   *  tracking caps the car at 6A however much its own API asks for; and a
+   *  charger that never received RemoteStart never closes its contactor at
+   *  all. Passive therefore means a standing permission — the connector's
+   *  own maximum, and one start — after which the point issues nothing: no
+   *  stop, no amp adjustment, no schedules, no solar tracking.
+   *
+   *  Once per plug-in, NOT once per loop. Do not "fix" this into a per-loop
+   *  re-start. If the car's own API ends the charge the transaction ends
+   *  with it, and re-issuing RemoteStart every loop would fight the car for
+   *  as long as it stayed plugged in. The accepted cost is the other side of
+   *  that trade: a car that finishes mid-session leaves the charger armed
+   *  but idle until the cable is pulled, which draws nothing and is
+   *  cleared by resetModeOnUnplug's unplug edge. */
+  async holdOpen(id: string, ctx: CallContext): Promise<void> {
+    const entry = this.chargers.get(id);
+    if (!entry || entry.heldOpen) return;
+    const state = this.getState(id);
+    if (!state?.isPluggedIn) return;
+    entry.heldOpen = true;
+    this.logger.info(`Passive hold: ${id} opened to ${state.chargeAmpsMax}A`);
+    await this.startChargingAt(id, state.chargeAmpsMax, ctx, state);
+  }
+
   /** Explicit vehicle assignment for a smart charger — resolveVehicle prefers
    *  this over inference. `null` clears it, returning to inference. Updates
    *  the in-memory row so the next controller loop or resolveVehicle call
@@ -643,13 +787,31 @@ export class ChargingPointManager {
   async getChargingLoadW(): Promise<
     { unmeteredW: number; meteredW: number }
   > {
+    const selfDriven = await this.getSelfDrivenVehicles();
     const perCharger = await Promise.all(
-      [...this.chargers].map(async ([id, entry]) => ({
-        // Raw cached state rather than getState(): enrich() reads the energy
-        // snapshot back, and this figure is about to feed the energy adapter.
-        powerW: watts(entry.middleware.getCachedState()?.chargePowerKw),
-        vehicleId: (await this.resolveVehicle(id)).vehicleId,
-      })),
+      [...this.chargers].map(async ([id, entry]) => {
+        const path = await this.getControlPath(id, selfDriven);
+        return {
+          // Raw cached state rather than getState(): enrich() reads the energy
+          // snapshot back, and this figure is about to feed the energy adapter.
+          powerW: watts(entry.middleware.getCachedState()?.chargePowerKw),
+          // Declared by the plugin behind this point, whichever kind it is —
+          // a vehicle_api point is the car's own API and a smart point is the
+          // charger, and either can be a simulation that moves no
+          // electricity. Without this a simulated car vanishes from a real
+          // inverter's reading, the one case docs/simulated-load.md says must
+          // be added.
+          // Explicit true only: metered is the safe default, so a plugin that
+          // says nothing stays out of a measuring adapter's reading.
+          unmetered: this.chargerPlugins.get(entry.row.chargerAdapterType)
+            ?.loadIsUnmetered === true,
+          // A passive charger's car reports the same physical draw through
+          // its own API, and resolveVehicle deliberately returns nobody for
+          // it. Claim it here or the one session is counted twice.
+          vehicleId: path.passiveForVehicleId ??
+            (await this.resolveVehicle(id)).vehicleId,
+        };
+      }),
     );
     const claimed = new Set(
       perCharger.flatMap((c) => c.vehicleId === null ? [] : [c.vehicleId]),
@@ -674,24 +836,35 @@ export class ChargingPointManager {
         0,
       );
 
+    const sumChargers = (unmetered: boolean) =>
+      perCharger.reduce(
+        (total, c) => c.unmetered === unmetered ? total + c.powerW : total,
+        0,
+      );
+
     return {
-      unmeteredW: sumVehicles(true),
-      // Chargers count as metered: a real charger's draw is on the real meter,
-      // and a simulated one is indistinguishable from it over the wire.
-      meteredW: sumVehicles(false) +
-        perCharger.reduce((total, c) => total + c.powerW, 0),
+      unmeteredW: sumVehicles(true) + sumChargers(true),
+      meteredW: sumVehicles(false) + sumChargers(false),
     };
   }
 
   async getChargersWithState() {
-    const rows = await this.db.getChargers();
+    const [rows, selfDriven] = await Promise.all([
+      this.db.getChargers(),
+      this.getSelfDrivenVehicles(),
+    ]);
     return await Promise.all(rows.map(async (row) => {
-      const resolution = await this.resolveVehicle(row.id);
+      const [resolution, controlPath] = await Promise.all([
+        this.resolveVehicle(row.id),
+        this.getControlPath(row.id, selfDriven),
+      ]);
       return {
         ...row,
         state: this.getState(row.id),
         resolvedVehicleId: resolution.vehicleId,
         vehicleResolution: resolution.kind,
+        controlOwner: controlPath.owner,
+        passiveForVehicleId: controlPath.passiveForVehicleId,
       };
     }));
   }

@@ -55,9 +55,14 @@ So live load is reported as two figures:
 - **metered** — real draw a physical meter would have caught. Added only when
   the active adapter measured nothing, i.e. the simulated inverter.
 
-Chargers always count as metered. A real charger's draw is on the real meter,
-and a simulated OCPP charger is indistinguishable from a real one over the wire,
-so assuming "real" is the safe default.
+Both figures are decided by the plugin behind the charging point, not by what
+kind of point it is. A car's own charging point and a smart charger can each be
+a simulation that moves no electricity, and each declares `loadIsUnmetered`.
+
+Metered is the default, so anything that does not declare itself is assumed
+real. The in-memory simulated charger declares itself unmetered; the OCPP
+simulator does not, because it is indistinguishable from real hardware over the
+wire.
 
 ## Where it happens
 
