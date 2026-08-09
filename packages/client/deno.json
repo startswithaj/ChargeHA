@@ -19,7 +19,7 @@
     "@vitest/coverage-v8": "npm:@vitest/coverage-v8@^3",
     "vite": "npm:vite@^6",
     "@vitejs/plugin-react": "npm:@vitejs/plugin-react@^4",
-    "@deno/vite-plugin": "npm:@deno/vite-plugin@^1",
+    "@deno/vite-plugin": "npm:@deno/vite-plugin@^2",
     "@tanstack/react-query": "npm:@tanstack/react-query@^5",
     "@tanstack/react-query-devtools": "npm:@tanstack/react-query-devtools@^5",
     "qrcode.react": "npm:qrcode.react@^4",
