@@ -55,7 +55,19 @@ describe("OCPP e2e", () => {
     // station's very first connect attempt. sap-test's own reconnect backoff
     // (30s) is too slow for the tests below, so force an immediate reconnect
     // now that the row exists rather than racing it.
-    await sapReconnect();
+    //
+    // Only when it is not already connected. `openConnection` on a live socket
+    // opens a SECOND one; the app then closes the first (attach() evicts the
+    // previous socket for an id, which is right for a real reconnect), the
+    // station sees that close and schedules its own 30s retry, and that timer
+    // opens another duplicate — a self-sustaining 30s reconnect loop. Every
+    // cycle resets the charge point to freshData(), losing transaction id,
+    // status and meterStartWh, which is what made these suites flaky.
+    const alreadyConnected = await ocppTrpc.plugin.charger.ocpp.status
+      .query({ chargerRowId: await ocppRowId() })
+      .then((s) => s.connected)
+      .catch(() => false);
+    if (!alreadyConnected) await sapReconnect();
   });
 
   it("charger connects and reports boot info", async () => {
