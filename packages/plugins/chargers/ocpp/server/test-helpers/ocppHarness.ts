@@ -35,17 +35,25 @@ export const fakeSocket = () => {
 export type FakeSocket = ReturnType<typeof fakeSocket>;
 
 /** A charge point with a charger row, already attached. `hasRow: false`
- *  models a pairing-window charger the user has not saved yet. */
+ *  models a pairing-window charger the user has not saved yet.
+ *
+ *  `hasChargerRow` gives a test full control over the row lookup — e.g. to
+ *  make one call resolve slower than another, to reproduce DB-latency-
+ *  dependent ordering deterministically instead of by luck. It takes
+ *  priority over `hasRow` when both are given. */
 export const attached = (
   chargerId: string,
-  opts: { hasRow?: boolean } = {},
+  opts: {
+    hasRow?: boolean;
+    hasChargerRow?: (chargePointId: string) => Promise<boolean>;
+  } = {},
 ) => {
   const hasRow = opts.hasRow ?? true;
   const logger = new Logger("OcppTest", "error");
   const cs = new OcppCentralSystem(
     logger,
     new PluginDbLogger(() => Promise.resolve(), logger),
-    () => Promise.resolve(hasRow),
+    opts.hasChargerRow ?? (() => Promise.resolve(hasRow)),
   );
   const socket = fakeSocket();
   cs.attach(socket as unknown as WebSocket, { chargerId });

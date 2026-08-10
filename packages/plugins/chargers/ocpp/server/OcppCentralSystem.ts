@@ -1,6 +1,7 @@
 import type { Logger } from "@chargeha/server/lib/Logger";
 import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import { type OcppFrame, OcppFraming, PendingCalls } from "./OcppFraming.ts";
+import { OcppMessageQueue } from "./OcppMessageQueue.ts";
 import {
   authorizeReq,
   bootNotificationReq,
@@ -113,6 +114,12 @@ interface OcppConnection {
    *  to another. */
   pending: PendingCalls;
   transactionCounter: number;
+  /** Per socket, not keyed globally by charge point id — a reconnect must
+   *  get a fresh queue rather than inherit a dead socket's backlog. Runs
+   *  charger-initiated CALLs one at a time, in wire order, so handling never
+   *  depends on how fast this connection's charger-row lookups happen to
+   *  resolve. See OcppMessageQueue. */
+  queue: OcppMessageQueue;
 }
 
 /** A central system bound to one charge point. Adapters take this rather than
@@ -236,6 +243,7 @@ export class OcppCentralSystem {
       data: { ...freshData(), connected: true },
       pending: new PendingCalls(),
       transactionCounter: 0,
+      queue: new OcppMessageQueue(this.logger, id),
     };
     this.connections.set(id, connection);
     // deno-lint-ignore custom-no-param-mutation/no-param-mutation -- WebSocket handler wiring
@@ -391,9 +399,36 @@ export class OcppCentralSystem {
     if (connection === undefined) return;
     try {
       const frame = OcppFraming.decode(raw);
+      // Settling a CALLRESULT/CALLERROR must stay synchronous and OUTSIDE the
+      // queue below — never move this after the `frame.kind !== "call"`
+      // check. A queued CALL handler can itself be mid-`send()`, awaiting a
+      // reply from this very charger (RemoteStart, GetConfiguration,
+      // SetChargingProfile...); that reply is exactly what gets settled
+      // here. Routing it through the queue would make it wait behind the
+      // handler it is the answer to — a deadlock, not just a delay.
       if (connection.pending.settle(frame)) return;
       if (frame.kind !== "call") return;
-      this.reply(chargePointId, frame);
+      const queued = connection.queue.enqueue(async () => {
+        // A reconnect replaces `connection` in the map with a fresh object
+        // (see attach()) — patch() always resolves the CURRENT connection by
+        // chargePointId, so a handler still queued against a since-replaced
+        // connection must not run at all. Running it would write into the
+        // new socket's state on behalf of a charger that already hung up.
+        if (this.connections.get(chargePointId) !== connection) return;
+        await this.reply(chargePointId, frame);
+      });
+      if (!queued) {
+        // Bounded, not dropped: OCPP 1.6 chargers retry a CALL that comes
+        // back as a CALLERROR, so this is recoverable for them in a way a
+        // silent drop is not.
+        connection.socket.send(
+          OcppFraming.error(
+            frame.id,
+            "InternalError",
+            `Too many pending messages for ${chargePointId}`,
+          ),
+        );
+      }
     } catch (error) {
       this.logger.warn(`Bad OCPP message dropped: ${error}`);
     }
