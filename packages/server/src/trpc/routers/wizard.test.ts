@@ -60,7 +60,7 @@ describe("Wizard tRPC Router", () => {
       } as never,
       authService,
       oidcService,
-      () => stubChargingPoints,
+      stubChargingPoints,
     );
     return createCaller(throwingMock<TrpcContext>("TrpcContext", {
       db,
@@ -103,7 +103,7 @@ describe("Wizard tRPC Router", () => {
       } as never,
       {} as never,
       {} as never,
-      () => stubChargingPoints,
+      stubChargingPoints,
     );
     return {
       caller: createCaller(throwingMock<TrpcContext>("TrpcContext", {
@@ -358,7 +358,7 @@ describe("Wizard tRPC Router", () => {
           } as never,
           authSvc,
           oidcSvc,
-          () => stubChargingPoints,
+          stubChargingPoints,
         ),
         authService: authSvc,
         oidcService: oidcSvc,

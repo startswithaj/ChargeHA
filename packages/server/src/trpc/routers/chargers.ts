@@ -39,6 +39,16 @@ export const chargersRouter = router({
     },
   ),
 
+  // Find-or-create by adapter type: safe for the wizard to repeat on
+  // Back/Next, unlike create, which mints a new row every call.
+  ensure: publicProcedure.input(createInput).mutation(
+    async ({ ctx, input }) => {
+      return await ctx.chargingPointManager.ensureCharger(
+        input.chargerAdapterType,
+      );
+    },
+  ),
+
   setAmps: publicProcedure.input(setAmpsInput).mutation(
     async ({ ctx, input }) => {
       const state = ctx.chargingPointManager.getState(input.id);

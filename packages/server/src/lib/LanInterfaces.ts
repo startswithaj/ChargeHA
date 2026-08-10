@@ -1,5 +1,7 @@
 /// <reference lib="deno.ns" />
 
+import { sortLanAddresses } from "@chargeha/shared/lanAddresses";
+
 // Single place that reads Deno.networkInterfaces() and turns it into the LAN
 // addresses ChargeHA itself is reachable on. Used both to tell a charger
 // where to dial (OCPP's connection URL) and to default a subnet-scan field
@@ -28,9 +30,9 @@ export function detectLanAddresses(
   networkInterfaces: typeof Deno.networkInterfaces = Deno.networkInterfaces,
 ): string[] {
   try {
-    return networkInterfaces()
-      .filter(isRealLanAddress)
-      .map((i) => i.address);
+    return sortLanAddresses(
+      networkInterfaces().filter(isRealLanAddress).map((i) => i.address),
+    );
   } catch (error) {
     // Reading interfaces needs --allow-sys, which the test task does not
     // grant. A settings page must not fail over a missing permission.

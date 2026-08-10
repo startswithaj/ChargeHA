@@ -5,6 +5,7 @@ import { WizardService } from "./WizardService.ts";
 describe("WizardService", () => {
   const stubChargingPoints = {
     ensureVehicleChargingPoint: () => Promise.resolve(),
+    ensureCharger: () => Promise.resolve({}),
   } as never;
   const mockLogger = {
     info: () => {},
@@ -62,6 +63,7 @@ describe("WizardService", () => {
     vehicleManager?: MockVehicleMgr;
     authService?: MockAuth;
     oidcService?: MockOidc;
+    chargingPoints?: unknown;
   } = {}): WizardService {
     const db = overrides.db ?? defaultDb();
     const tunnelManager = overrides.tunnelManager ?? defaultTunnel();
@@ -76,7 +78,7 @@ describe("WizardService", () => {
       vehicleManager as never,
       authService as never,
       oidcService as never,
-      () => stubChargingPoints,
+      (overrides.chargingPoints ?? stubChargingPoints) as never,
     );
   }
 
@@ -166,6 +168,7 @@ describe("WizardService", () => {
           },
         },
         db: {
+          getConfig: () => Promise.resolve(null),
           setConfig: (key: string, value: string) => {
             configSet[key] = value;
             return Promise.resolve();
@@ -196,6 +199,7 @@ describe("WizardService", () => {
           },
         },
         db: {
+          getConfig: () => Promise.resolve(null),
           setConfig: () => Promise.resolve(),
         },
       });
@@ -250,6 +254,7 @@ describe("WizardService", () => {
       const configSet: Record<string, string> = {};
       const service = makeService({
         db: {
+          getConfig: () => Promise.resolve(null),
           setConfig: (key: string, value: string) => {
             configSet[key] = value;
             return Promise.resolve();
@@ -274,6 +279,7 @@ describe("WizardService", () => {
       const configSet: Record<string, string> = {};
       const service = makeService({
         db: {
+          getConfig: () => Promise.resolve(null),
           setConfig: (key: string, value: string) => {
             configSet[key] = value;
             return Promise.resolve();
@@ -290,6 +296,7 @@ describe("WizardService", () => {
       const configSet: Record<string, string> = {};
       const service = makeService({
         db: {
+          getConfig: () => Promise.resolve(null),
           setConfig: (key: string, value: string) => {
             configSet[key] = value;
             return Promise.resolve();

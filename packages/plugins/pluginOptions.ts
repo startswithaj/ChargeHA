@@ -56,6 +56,9 @@ export interface ChargerPluginOption {
   /** Needs no config — settings adds it with charger.create directly,
    *  never routing through the plugin setup flow. */
   directAdd?: boolean;
+  /** The wizard creates the row (charger.ensure) the moment this type is
+   *  selected — for types with no setup step of their own. */
+  ensureOnSelect?: boolean;
   /** Storage key in a row's `chargerConfig` holding the charge point's own
    *  identifier (OCPP's charge point id). Lets a host show which physical
    *  charger a row is without naming any plugin's config key itself. Absent

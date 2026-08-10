@@ -39,8 +39,7 @@ export class WizardService {
     private vehicleManager: VehicleManager,
     private authService: AuthService,
     private oidcService: OidcService,
-    // Resolved lazily: ChargingPointManager is built after this service.
-    private chargingPoints: () => ChargingPointManager,
+    private chargingPoints: ChargingPointManager,
   ) {}
 
   async getStatus() {
@@ -219,7 +218,7 @@ export class WizardService {
       const row = await this.db.getVehicle("DEMO-001");
       if (row) {
         await this.vehicleManager.addVehicle(row);
-        await this.chargingPoints().ensureVehicleChargingPoint(row);
+        await this.chargingPoints.ensureVehicleChargingPoint(row);
       }
 
       this.logger.info("Demo setup completed");

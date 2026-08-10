@@ -15,6 +15,7 @@
     "./async": "./async.ts",
     "./chargingPoints": "./chargingPoints.ts",
     "./geo": "./geo.ts",
+    "./lanAddresses": "./lanAddresses.ts",
     "./solarAttribution": "./solarAttribution.ts",
     "./geocode": "./geocode.ts",
     "./notifications": "./notificationProviders.ts"
