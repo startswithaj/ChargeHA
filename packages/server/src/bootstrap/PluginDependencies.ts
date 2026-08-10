@@ -13,7 +13,6 @@ import type {
   ResolvedChargerRow,
   VehicleRequestContext,
 } from "@chargeha/shared/plugins";
-import type { EnergyAdapterManager } from "../services/EnergyAdapterManager.ts";
 import {
   enrichVehicleRows,
   type VehicleWithLiveState,
@@ -37,7 +36,6 @@ export interface PluginDependenciesInit {
   db: AppDatabase;
   vehicleManager: VehicleManager;
   chargingPoints: ChargingPointManager;
-  energyManager: EnergyAdapterManager;
   tunnel: PluginTunnelApi;
   geocode: (query: string) => Promise<GeocodeResult>;
   /** Whether ENCRYPTION_KEY is configured — secrets are stored encrypted. */
@@ -69,7 +67,6 @@ export class PluginDependencies<K extends string = string> {
   private readonly db: AppDatabase;
   private readonly vehicleManager: VehicleManager;
   private readonly chargingPoints: ChargingPointManager;
-  private readonly energyManager: EnergyAdapterManager;
   private readonly prefix: string;
 
   static create(init: PluginDependenciesInit): PluginDependencies {
@@ -80,7 +77,6 @@ export class PluginDependencies<K extends string = string> {
     this.db = init.db;
     this.vehicleManager = init.vehicleManager;
     this.chargingPoints = init.chargingPoints;
-    this.energyManager = init.energyManager;
     this.tunnel = init.tunnel;
     this.geocode = init.geocode;
     this.encryptionConfigured = init.encryptionConfigured;

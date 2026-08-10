@@ -593,7 +593,6 @@ export async function bootstrap(
       db,
       vehicleManager: services.vehicleManager,
       chargingPoints: services.chargingPointManager,
-      energyManager: services.energyManager,
       tunnel: {
         getUrl: () => services.tunnelManager.tunnelUrl,
         start: async () => ({ url: await services.tunnelManager.start() }),
