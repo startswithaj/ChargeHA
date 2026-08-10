@@ -16,7 +16,7 @@ RUN npm install -g --ignore-scripts corepack && corepack enable
 # public/config.json is served TO the browser, so its host/port are resolved by
 # the browser on the host machine — not from inside this container. It must
 # therefore name the published port (18080), never the compose service name.
-COPY web-config.json ui/web/public/config.json
+COPY devtools/sap-ocpp-simulator/web-config.json ui/web/public/config.json
 
 RUN pnpm install --ignore-scripts --frozen-lockfile \
   && pnpm --filter web build

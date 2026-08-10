@@ -1,7 +1,7 @@
 {
   "$schemaVersion": 1,
   "idTagsFile": "idtags.json",
-  "baseName": "vcp-dev-2",
+  "baseName": "sap-test",
   "fixedName": true,
   "chargePointModel": "ChargeHA AC7.4",
   "chargePointVendor": "ChargeHA",
@@ -14,7 +14,7 @@
   "numberOfConnectors": 1,
   "randomConnectors": false,
   "coherentMeterValues": true,
-  "evProfilesFile": "ev-profiles-vcp-dev-2.json",
+  "evProfilesFile": "ev-profiles.json",
   "Configuration": {
     "configurationKey": [
       {
@@ -55,7 +55,6 @@
     ]
   },
   "AutomaticTransactionGenerator": {
-    "//": "Off so ChargeHA drives sessions via RemoteStartTransaction. With it on, the generator starts and stops sessions on its own schedule and overrides a STOP from the app within minDelayBetweenTwoTransactions seconds.",
     "enable": false,
     "minDuration": 600,
     "maxDuration": 3600,
@@ -68,8 +67,7 @@
   "Connectors": {
     "0": {},
     "1": {
-      "//": "Preparing, not Available: the charger boots with a car plugged in and waiting. ChargeHA only sends RemoteStartTransaction once it sees the connector plugged in, and with the transaction generator off nothing else would ever plug one in — Available would deadlock.",
-      "bootStatus": "Preparing",
+      "bootStatus": "Available",
       "maximumPower": 7400,
       "MeterValues": [
         {

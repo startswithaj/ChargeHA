@@ -41,40 +41,18 @@ services:
       e2e:
         ipv4_address: 172.30.99.50
 
-  ocpp-vcp:
-    # Only the ocpp suites start the charger simulator — a tapo run must
-    # never build or crash-loop it. Kept running (not removed yet — see
-    # e2e/ocppHelpers.ts) alongside ocpp-sap, on its own charge point id
-    # ("vcp-test"). ocpp-sap uses a distinct id ("sap-test") — two simulators
-    # sharing one id would evict each other's socket in the app on every
-    # reconnect (OcppCentralSystem.attach() closes the previous socket for an
-    # id when a new one arrives, which is correct for a real reconnect but
-    # thrashes forever between two simulators both claiming the same id).
-    profiles: ["ocpp"]
-    build:
-      context: ..
-      dockerfile: docker/vcp.Dockerfile
-    environment:
-      - WS_URL=ws://app:8000/api/charger/ocpp
-      - CP_ID=vcp-test
-      - ADMIN_PORT=9999
-    ports:
-      - "19999:9999" # admin API for the test runner
-    depends_on:
-      app:
-        condition: service_healthy # start only once the app probe passes
-    restart: on-failure # belt-and-braces if the first connect still races
-    networks:
-      e2e:
-        ipv4_address: 172.30.99.60
-
   ocpp-sap:
-    # SAP simulator, ported in alongside ocpp-vcp (not replacing it yet — see
-    # e2e/ocppHelpers.ts). Only the ocpp suites start it.
+    # Only the ocpp suites start the charger simulator — a tapo run must never
+    # build or crash-loop it. Two stations come out of this one container:
+    # sap-test reports every measurand ChargeHA asks for, sap-basic only the
+    # energy register, so measurand negotiation has something to negotiate.
     profiles: ["ocpp"]
     build:
       context: ..
-      dockerfile: docker/sap.e2e.Dockerfile
+      dockerfile: devtools/sap-ocpp-simulator/Dockerfile
+      args:
+        # Same image as the dev simulator; the config set is what differs.
+        CONFIG_SET: e2e
     ports:
       - "19998:8080" # UI server (ws, admin/admin) for the test runner
     depends_on:

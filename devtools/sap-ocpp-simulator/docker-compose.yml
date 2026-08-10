@@ -1,11 +1,17 @@
 # Standalone OCPP 1.6 charge point simulator (SAP/e-mobility-charging-stations-simulator).
 # Connects to a dev server running on the host, not to the e2e app container.
-# Usage: docker compose -f devtools/sap-simulator/docker-compose.yml up -d --build
+# Usage: docker compose -f devtools/sap-ocpp-simulator/docker-compose.yml up -d --build
+#
+# Build context is the repo root because the Dockerfile is shared with the e2e
+# stack (docker/docker-compose.e2e.yml), which selects its own config set.
 services:
   sap-sim:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: devtools/sap-ocpp-simulator/Dockerfile
+      args:
+        # One station on host.docker.internal. The e2e stack passes `e2e`.
+        CONFIG_SET: dev
     ports:
       # ui-server admin API (basic auth admin/admin) — overridable so a second
       # instance (docker compose -p ...) can bind its own port.
@@ -22,8 +28,8 @@ services:
   # the published port, so it needs no link to the sap-sim service.
   sap-sim-web:
     build:
-      context: .
-      dockerfile: web.Dockerfile
+      context: ../..
+      dockerfile: devtools/sap-ocpp-simulator/web.Dockerfile
     ports:
       - "${WEB_UI_HOST_PORT:-3030}:3030"
     restart: on-failure
