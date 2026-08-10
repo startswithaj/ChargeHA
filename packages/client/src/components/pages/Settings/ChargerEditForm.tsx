@@ -1,4 +1,4 @@
-import { type ComponentType, useState } from "react";
+import { type ComponentType, useEffect, useState } from "react";
 import { Button, Text } from "@radix-ui/themes";
 import {
   pluginSettingsComponents,
@@ -48,6 +48,7 @@ export function ChargerEditForm(
     busy,
     autoFocus,
     onSubmit,
+    onSaved,
     onCancel,
   }: {
     typeId: string;
@@ -62,13 +63,37 @@ export function ChargerEditForm(
      *  control-path confirm dialog must be answered before it runs, so
      *  declining creates nothing. */
     onSubmit: (commit: () => void) => void;
+    /** Called once the panel reports its save landed — the host closes the
+     *  form here, not in onSubmit, so a failed save stays visible. */
+    onSaved: () => void;
     onCancel: () => void;
   },
 ) {
   const [panel, setPanel] = useState<PluginSettingsState | null>(null);
+  const [submitted, setSubmitted] = useState(false);
   const Panel = pluginSettingsComponents[`${typeId}-settings`];
 
-  const submit = () => onSubmit(() => panel?.save());
+  const submit = () => {
+    if (!panel) {
+      onSubmit(() => {});
+      onSaved();
+      return;
+    }
+    setSubmitted(true);
+    onSubmit(() => panel.save());
+  };
+
+  const saveState = panel?.saveStatus.state;
+  useEffect(() => {
+    if (!submitted) return;
+    if (saveState === "saved") onSaved();
+    if (saveState === "error") setSubmitted(false); // re-enable Save to retry
+  }, [submitted, saveState, onSaved]);
+
+  const panelError = saveState === "error"
+    ? panel?.saveStatus.message ?? "Failed to save"
+    : null;
+  const pending = busy || (submitted && saveState !== "error");
 
   return (
     <div
@@ -86,7 +111,9 @@ export function ChargerEditForm(
         autoFocus={autoFocus === true}
       />
 
-      {error && <Text size="2" color="red">{error}</Text>}
+      {(error ?? panelError) && (
+        <Text size="2" color="red">{error ?? panelError}</Text>
+      )}
 
       <div
         style={{
@@ -99,8 +126,8 @@ export function ChargerEditForm(
         <Button size="2" variant="soft" color="gray" onClick={onCancel}>
           Cancel
         </Button>
-        <Button size="2" disabled={busy} onClick={submit}>
-          {busy ? "Saving..." : submitLabel}
+        <Button size="2" disabled={pending} onClick={submit}>
+          {pending ? "Saving..." : submitLabel}
         </Button>
       </div>
     </div>

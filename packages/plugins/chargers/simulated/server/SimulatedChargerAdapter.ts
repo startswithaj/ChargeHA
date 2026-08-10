@@ -31,7 +31,7 @@ export class SimulatedChargerAdapter implements ChargerAdapter {
     lastTickMs: Date.now(),
   };
 
-  constructor(private readonly chargerId: string) {}
+  constructor(readonly chargerId: string) {}
 
   pollIntervalSeconds(): number {
     return 2;
@@ -109,6 +109,7 @@ export class SimulatedChargerAdapter implements ChargerAdapter {
 
   /** Dev-panel view of current state — no ChargerState ceremony. */
   devStatus(): {
+    chargerRowId: string;
     pluggedIn: boolean;
     carMaxAmps: number;
     on: boolean;
@@ -117,6 +118,7 @@ export class SimulatedChargerAdapter implements ChargerAdapter {
   } {
     const s = this.state;
     return {
+      chargerRowId: this.chargerId,
       pluggedIn: s.pluggedIn,
       carMaxAmps: s.carMaxAmps,
       on: s.on,

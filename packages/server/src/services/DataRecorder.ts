@@ -137,17 +137,36 @@ export class DataRecorder {
     if (!this.latestRealtime) return;
 
     const points = await this.chargingPointManager.getChargersWithState();
+    // A passive smart charger and the car's own point are one physical
+    // session: key both to the vehicle (same rule as getChargingLoadW) and
+    // record once, preferring the point that resolves the vehicle.
+    const active = points
+      .filter((p) => p.active && p.state?.isCharging === true)
+      .sort((a, b) =>
+        Number(a.resolvedVehicleId === null) -
+        Number(b.resolvedVehicleId === null)
+      );
+    const deduped = [
+      ...active.reduce(
+        (acc, p) =>
+          acc.has(p.passiveForVehicleId ?? p.resolvedVehicleId ?? p.id)
+            ? acc
+            : acc.set(p.passiveForVehicleId ?? p.resolvedVehicleId ?? p.id, p),
+        new Map<string, (typeof points)[number]>(),
+      ).values(),
+    ];
     const charging = await Promise.all(
-      points
-        .filter((p) => p.active && p.state?.isCharging === true)
-        .map(async (p) => ({
-          id: p.resolvedVehicleId ?? p.id,
+      deduped.map(async (p) => {
+        const vehicleId = p.passiveForVehicleId ?? p.resolvedVehicleId;
+        return {
+          id: vehicleId ?? p.id,
           chargePowerKw: p.state?.chargePowerKw ?? 0,
           chargeAmps: p.state?.chargeAmps ?? 0,
-          vehicle: p.resolvedVehicleId !== null
-            ? await this.vehicleManager.getState(p.resolvedVehicleId)
+          vehicle: vehicleId !== null
+            ? await this.vehicleManager.getState(vehicleId)
             : null,
-        })),
+        };
+      }),
     );
     const totalChargePowerW = charging
       .reduce((sum, p) => sum + p.chargePowerKw * 1000, 0);

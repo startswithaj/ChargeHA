@@ -131,6 +131,7 @@ export const chargerHandlers: Record<string, QueryHandler> = {
         // disagree with the card about a solar-limited auto charge.
         const amps = simDrawAmps(s, c);
         return {
+          chargerRowId: c.id,
           pluggedIn,
           carMaxAmps,
           on: c.mode !== "stop",

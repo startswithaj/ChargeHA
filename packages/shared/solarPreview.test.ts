@@ -149,6 +149,24 @@ describe("previewSolarAllocation", () => {
     expect(result.vehicles[0].allocatedAmps).toBe(13);
   });
 
+  it("labels a charging car's solar-funded draw as solar, not grid", () => {
+    // Grid reads 0 because the car's own draw consumes the surplus. The
+    // display budget must add that draw back, exactly as the engine does —
+    // otherwise this fully solar-funded charge is labelled 100% grid.
+    const chargingCar = makeVehicle({ isCharging: true, chargeAmps: 16 });
+    const result = previewSolarAllocation(
+      makeConfig(),
+      [chargingCar],
+      { ...baseInputs, solarProductionKw: 5, homeConsumptionKw: 5 },
+    );
+    expect(result.vehicles[0].action).toBe("charging");
+    expect(result.vehicles[0].solarKw).toBeCloseTo(
+      result.vehicles[0].allocatedKw,
+      2,
+    );
+    expect(result.vehicles[0].gridKw).toBeCloseTo(0, 2);
+  });
+
   it("surplus is capped at panel output even with a large add-back", () => {
     const chargingCar = makeVehicle({
       isCharging: true,

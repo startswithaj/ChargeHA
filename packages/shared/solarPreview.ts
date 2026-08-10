@@ -158,6 +158,23 @@ function toEnergyData(inputs: PreviewInputs, nowIso: string): EnergyData {
   };
 }
 
+/** Display budget for the solar/grid split — built exactly the way the
+ *  engine budgets (resolveAvailableW: EV add-back, margin, gross mode). */
+function attributionBudgetKw(
+  config: ControllerConfig,
+  energy: EnergyData,
+  vehicles: PreviewVehicle[],
+  states: Map<string, ReturnType<typeof toVehicleChargeState>>,
+): number {
+  const addBackW = vehicles.reduce((sum, v) => {
+    const state = states.get(v.id);
+    if (!state) return sum;
+    return sum +
+      SolarAllocator.addBackW(config, state, v.chargerVoltage, v.chargerPhases);
+  }, 0);
+  return SolarAllocator.resolveAvailableW(config, energy, addBackW) / 1000;
+}
+
 export function previewSolarAllocation(
   config: ControllerConfig,
   vehicles: PreviewVehicle[],
@@ -190,12 +207,8 @@ export function previewSolarAllocation(
     timestamp: now.getTime(),
   });
 
-  // Budget used only to attribute kW to "solar" vs "grid" for display. Starts
-  // from the same solar surplus SolarAllocator itself starts from (net of
-  // battery discharge, capped at panel output), so the split can't
-  // double-count or exceed what the engine considered available.
   const remaining = {
-    kw: Math.max(0, SolarAllocator.surplusW(energy, 0) / 1000),
+    kw: attributionBudgetKw(config, energy, vehicles, vehicleStates),
   };
 
   const results: PreviewVehicleResult[] = [...vehicles]
