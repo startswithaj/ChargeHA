@@ -16,7 +16,6 @@ import type {
   ChargerRowConfig,
 } from "@chargeha/shared/plugins";
 import type { VehicleManager } from "./VehicleManager.ts";
-import type { EnergyPoller } from "./EnergyPoller.ts";
 import type { ConfigService } from "./ConfigService.ts";
 import type { TypedEventEmitter } from "./TypedEventEmitter.ts";
 import { ChargingPointManager } from "./ChargingPointManager.ts";
@@ -121,9 +120,6 @@ describe("ChargingPointManager vehicle deletion", () => {
         Promise.resolve(new Map<string, VehicleChargeState>()),
       loadIsUnmetered: () => false,
     });
-    const poller = throwingMock<EnergyPoller>("EnergyPoller", {
-      tryGetRealtimeSnapshot: () => null,
-    });
     const configService = throwingMock<ConfigService>("ConfigService", {
       getSolar: () => Promise.resolve({ ...SOLAR_DEFAULTS }),
     });
@@ -132,7 +128,6 @@ describe("ChargingPointManager vehicle deletion", () => {
       db,
       registry,
       vehicleManager,
-      poller,
       configService,
       emitter as unknown as TypedEventEmitter,
       testLogger,

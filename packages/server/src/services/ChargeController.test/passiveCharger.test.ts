@@ -222,7 +222,6 @@ describe("ChargeController — passive smart charger", () => {
       db,
       chargers,
       manager,
-      poller as unknown as EnergyPoller,
       configService,
       emitter,
       testLogger,

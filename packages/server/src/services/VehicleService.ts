@@ -49,8 +49,7 @@ export class VehicleService {
   private readonly vehiclePlugins: VehiclePluginRegistry;
   private readonly eventEmitter: TypedEventEmitter;
   private readonly logger: Logger;
-  // Resolved lazily: ChargingPointManager is built after this service.
-  private readonly chargingPoints: () => ChargingPointManager;
+  private readonly chargingPoints: ChargingPointManager;
 
   constructor(
     db: AppDatabase,
@@ -58,7 +57,7 @@ export class VehicleService {
     vehiclePlugins: VehiclePluginRegistry,
     eventEmitter: TypedEventEmitter,
     logger: Logger,
-    chargingPoints: () => ChargingPointManager,
+    chargingPoints: ChargingPointManager,
   ) {
     this.db = db;
     this.chargingPoints = chargingPoints;
@@ -151,7 +150,7 @@ export class VehicleService {
       const vehicleRow = await this.db.getVehicle(input.id);
       if (vehicleRow) {
         await this.vehicleManager.addVehicle(vehicleRow);
-        await this.chargingPoints().ensureVehicleChargingPoint(vehicleRow);
+        await this.chargingPoints.ensureVehicleChargingPoint(vehicleRow);
       }
     } catch (err) {
       this.logger.warn(

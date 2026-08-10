@@ -2,6 +2,7 @@ import type {
   CallContext,
   ChargerState,
   ChargingPointMode,
+  EnergyData,
   VehicleChargeState,
   VehicleResolutionKind,
 } from "@chargeha/shared";
@@ -11,7 +12,6 @@ import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { ChargerRow, VehicleRow } from "../db/types.ts";
 import type { TypedEventEmitter } from "./TypedEventEmitter.ts";
 import type { VehicleManager } from "./VehicleManager.ts";
-import type { EnergyPoller } from "./EnergyPoller.ts";
 import type { ConfigService } from "./ConfigService.ts";
 import type { Logger } from "../lib/Logger.ts";
 import type {
@@ -69,12 +69,14 @@ export class ChargingPointManager {
   private commandBackoff = new Map<string, CommandBackoffState>();
   // Cached at init; enrich() runs on hot paths and must not hit the DB.
   private cachedGridVoltage: number | null = null;
+  // Last good energy reading, cached from energy_update; cleared on a failed
+  // poll so enrich() never resolves voltage from a zeroed breadcrumb.
+  private latestEnergy: EnergyData | null = null;
 
   constructor(
     private readonly db: AppDatabase,
     private readonly chargerPlugins: ChargerPluginRegistry,
     private readonly vehicleManager: VehicleManager,
-    private readonly poller: EnergyPoller,
     private readonly configService: ConfigService,
     private readonly eventEmitter: TypedEventEmitter,
     private readonly logger: Logger,
@@ -259,7 +261,7 @@ export class ChargingPointManager {
     if (state.chargeAmps !== null || state.chargePowerKw === null) return state;
     if (this.cachedGridVoltage === null) return state;
 
-    const energy = this.poller.tryGetRealtimeSnapshot()?.realtime ?? null;
+    const energy = this.latestEnergy;
     const voltage = SolarAllocator.resolveVoltage(
       state.chargerVoltage,
       energy,
@@ -285,6 +287,9 @@ export class ChargingPointManager {
     });
     this.eventEmitter.subscribe("vehicles_changed", async () => {
       await this.syncVehicleChargingPoints();
+    });
+    this.eventEmitter.subscribe("energy_update", (data) => {
+      this.latestEnergy = data.pollFailed ? null : data;
     });
     const rows = await this.db.getChargers();
     await rows.reduce(

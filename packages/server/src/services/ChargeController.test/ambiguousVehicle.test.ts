@@ -212,7 +212,6 @@ describe("ChargeController — ambiguous vehicle resolution", () => {
       db,
       chargers,
       manager,
-      poller as unknown as EnergyPoller,
       configService,
       emitter,
       testLogger,

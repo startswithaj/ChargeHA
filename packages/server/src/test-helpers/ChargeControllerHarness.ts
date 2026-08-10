@@ -282,7 +282,6 @@ async function buildControllerStack(
     db,
     registries.chargers,
     manager,
-    poller as unknown as EnergyPoller,
     configService,
     trackingEmitter,
     new Logger("ChargingPointManager", "error"),

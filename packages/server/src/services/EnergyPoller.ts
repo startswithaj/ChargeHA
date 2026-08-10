@@ -3,12 +3,14 @@ import { observable } from "@trpc/server/observable";
 import type { Observable } from "@trpc/server/observable";
 import type { TypedEventEmitter } from "./TypedEventEmitter.ts";
 import type { EnergyAdapterManager } from "./EnergyAdapterManager.ts";
+import type { ChargingPointManager } from "./ChargingPointManager.ts";
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { Logger } from "../lib/Logger.ts";
 import { ServiceError } from "../lib/ServiceError.ts";
 
 export class EnergyPoller {
   private readonly em: EnergyAdapterManager;
+  private readonly chargingPoints: ChargingPointManager;
   private readonly eventEmitter: TypedEventEmitter;
   private readonly db: AppDatabase;
   private readonly logger: Logger;
@@ -20,11 +22,13 @@ export class EnergyPoller {
 
   constructor(
     em: EnergyAdapterManager,
+    chargingPoints: ChargingPointManager,
     eventEmitter: TypedEventEmitter,
     db: AppDatabase,
     logger: Logger,
   ) {
     this.em = em;
+    this.chargingPoints = chargingPoints;
     this.eventEmitter = eventEmitter;
     this.db = db;
     this.logger = logger;
@@ -122,7 +126,8 @@ export class EnergyPoller {
 
   private async poll(): Promise<void> {
     try {
-      const realtime = await this.em.getRealtimeData();
+      const load = await this.chargingPoints.getChargingLoadW();
+      const realtime = await this.em.getRealtimeData(load);
       const adapterName = this.em.constructor.name;
       this.logger.debug(
         `${adapterName} → solar=${realtime.solarProductionW}W grid=${realtime.gridPowerW}W consumption=${realtime.homeConsumptionW}W` +

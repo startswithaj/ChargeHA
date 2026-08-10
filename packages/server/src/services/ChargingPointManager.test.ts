@@ -16,7 +16,6 @@ import type {
   ChargerRowConfig,
 } from "@chargeha/shared/plugins";
 import type { VehicleManager } from "./VehicleManager.ts";
-import type { EnergyPoller } from "./EnergyPoller.ts";
 import type { ConfigService } from "./ConfigService.ts";
 import type { TypedEventEmitter } from "./TypedEventEmitter.ts";
 import { ChargingPointManager } from "./ChargingPointManager.ts";
@@ -212,7 +211,6 @@ describe("ChargingPointManager", () => {
   let emitter: MockEventEmitter;
   let vehicleStates: Map<string, VehicleChargeState>;
   let vehicleManager: VehicleManager;
-  let poller: EnergyPoller;
   let gridVoltage: number;
   let configService: ConfigService;
   let manager: ChargingPointManager;
@@ -290,10 +288,6 @@ describe("ChargingPointManager", () => {
       getAllStates: () => Promise.resolve(vehicleStates),
     });
 
-    poller = throwingMock<EnergyPoller>("EnergyPoller", {
-      tryGetRealtimeSnapshot: () => null,
-    });
-
     gridVoltage = 230;
     configService = throwingMock<ConfigService>("ConfigService", {
       getSolar: () => Promise.resolve({ ...SOLAR_DEFAULTS, gridVoltage }),
@@ -303,7 +297,6 @@ describe("ChargingPointManager", () => {
       db,
       registry,
       vehicleManager,
-      poller,
       configService,
       emitter as unknown as TypedEventEmitter,
       testLogger,
@@ -395,7 +388,6 @@ describe("ChargingPointManager", () => {
         db,
         registry,
         vehicleManager,
-        poller,
         configService,
         emitter as unknown as TypedEventEmitter,
         testLogger,
@@ -428,7 +420,6 @@ describe("ChargingPointManager", () => {
         db,
         registry,
         vehicleManager,
-        poller,
         configService,
         emitter as unknown as TypedEventEmitter,
         testLogger,
@@ -456,7 +447,6 @@ describe("ChargingPointManager", () => {
         db,
         registry,
         vehicleManager,
-        poller,
         configService,
         emitter as unknown as TypedEventEmitter,
         testLogger,

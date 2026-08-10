@@ -10,6 +10,8 @@ import { Logger } from "../lib/Logger.ts";
 import { testable } from "../test-helpers/Testable.ts";
 import { MockEnergyPollerAdapter } from "../test-helpers/MockEnergyPollerAdapter.ts";
 import { MockEventEmitter } from "../test-helpers/MockEventEmitter.ts";
+import { throwingMock } from "../test-helpers/throwingMock.ts";
+import type { ChargingPointManager } from "./ChargingPointManager.ts";
 
 describe("EnergyPoller", () => {
   const BASE_REALTIME: EnergyData = {
@@ -23,6 +25,10 @@ describe("EnergyPoller", () => {
   };
 
   const testLogger = new Logger("EnergyPoller", "error");
+  const noLoadChargingPoints = throwingMock<ChargingPointManager>(
+    "ChargingPointManager",
+    { getChargingLoadW: () => Promise.resolve({ unmeteredW: 0, meteredW: 0 }) },
+  );
 
   let db: AppDatabase;
   let adapter: MockEnergyPollerAdapter;
@@ -37,6 +43,7 @@ describe("EnergyPoller", () => {
 
     poller = new EnergyPoller(
       adapter as unknown as EnergyAdapterManager,
+      noLoadChargingPoints,
       emitter as unknown as TypedEventEmitter,
       db,
       testLogger,
@@ -209,6 +216,7 @@ describe("EnergyPoller", () => {
       await subDb.init();
       subPoller = new EnergyPoller(
         adapter as unknown as EnergyAdapterManager,
+        noLoadChargingPoints,
         realEmitter,
         subDb,
         testLogger,

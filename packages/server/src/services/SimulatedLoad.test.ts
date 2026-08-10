@@ -24,7 +24,6 @@ import { EnergyPluginRegistry } from "@chargeha/server/bootstrap/EnergyPluginReg
 import { ChargingPointManager } from "./ChargingPointManager.ts";
 import { EnergyAdapterManager } from "./EnergyAdapterManager.ts";
 import type { VehicleManager } from "./VehicleManager.ts";
-import type { EnergyPoller } from "./EnergyPoller.ts";
 import type { ConfigService } from "./ConfigService.ts";
 import type { TypedEventEmitter } from "./TypedEventEmitter.ts";
 import { Logger } from "../lib/Logger.ts";
@@ -84,7 +83,11 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
       measuresLoad: boolean;
       pointKind?: ChargerRow["kind"];
     },
-  ): { manager: EnergyAdapterManager; registerPoint: () => Promise<void> } {
+  ): {
+    manager: EnergyAdapterManager;
+    chargingPoints: ChargingPointManager;
+    registerPoint: () => Promise<void>;
+  } {
     const states = new Map<string, VehicleChargeState>([[
       "car-1",
       buildVehicleChargeState({ isCharging: true, chargePowerKw: CAR_KW }),
@@ -158,9 +161,6 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
       db,
       chargerPlugins,
       vehicleManager,
-      throwingMock<EnergyPoller>("EnergyPoller", {
-        tryGetRealtimeSnapshot: () => null,
-      }),
       throwingMock<ConfigService>("ConfigService", {}),
       emitter as unknown as TypedEventEmitter,
       testLogger,
@@ -188,8 +188,8 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
         db,
         energyPlugins,
         testLogger,
-        () => chargingPoints.getChargingLoadW(),
       ),
+      chargingPoints,
       registerPoint: () => chargingPoints.addCharger(pointRow),
     };
   }
@@ -203,10 +203,13 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
     withChargingPoint?: boolean;
     pointKind?: ChargerRow["kind"];
   }) => {
-    const { manager, registerPoint } = build(opts);
+    const { manager, chargingPoints, registerPoint } = build(opts);
     if (opts.withChargingPoint) await registerPoint();
     await manager.ready();
-    return await manager.getRealtimeData();
+    // Same orchestration as EnergyPoller.poll: fetch the load, pass it in.
+    return await manager.getRealtimeData(
+      await chargingPoints.getChargingLoadW(),
+    );
   };
 
   it("1. simulated inverter + simulated car — nothing measured anything, so the draw is added", async () => {
