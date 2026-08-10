@@ -158,6 +158,9 @@ export const chargerMutations: ChargerMutations = {
   "plugin.charger.simulated_charger.updateState": (input) => {
     const patch = (c: DemoCharger): DemoCharger => {
       if (c.chargerAdapterType !== "simulated_charger") return c;
+      if (input.chargerRowId !== undefined && c.id !== input.chargerRowId) {
+        return c;
+      }
       return {
         ...c,
         simPluggedIn: input.pluggedIn ?? c.simPluggedIn,

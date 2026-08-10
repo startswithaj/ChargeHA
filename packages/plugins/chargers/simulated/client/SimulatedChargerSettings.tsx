@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Badge, Switch, TextField } from "@radix-ui/themes";
+import type { PluginSettingsProps } from "../../../pluginOptions.ts";
 import { SettingsRow } from "../../../hostUi.ts";
 import { trpc } from "./trpc.ts";
 
@@ -8,7 +9,9 @@ const clampAmps = (value: string): number =>
 
 /** Dev controls for the simulated charger: plugged-in state and the fake
  *  car's appetite, plus a live readout of the adapter's reported state. */
-export function SimulatedChargerSettings(): JSX.Element | null {
+export function SimulatedChargerSettings(
+  { chargerId }: PluginSettingsProps,
+): JSX.Element | null {
   const statusQuery = trpc.plugin.charger.simulated_charger.status.useQuery(
     undefined,
     { refetchInterval: 3000 },
@@ -20,8 +23,8 @@ export function SimulatedChargerSettings(): JSX.Element | null {
 
   const [carMaxAmps, setCarMaxAmps] = useState("16");
 
-  const status = statusQuery.data?.[0];
-  if (!status) return null;
+  const status = statusQuery.data?.find((s) => s.chargerRowId === chargerId);
+  if (chargerId == null || !status) return null;
 
   return (
     <>
@@ -29,7 +32,8 @@ export function SimulatedChargerSettings(): JSX.Element | null {
         <Switch
           size="2"
           checked={status.pluggedIn}
-          onCheckedChange={(pluggedIn) => updateMutation.mutate({ pluggedIn })}
+          onCheckedChange={(pluggedIn) =>
+            updateMutation.mutate({ chargerRowId: chargerId, pluggedIn })}
         />
       </SettingsRow>
       <SettingsRow
@@ -45,7 +49,10 @@ export function SimulatedChargerSettings(): JSX.Element | null {
           onChange={(e: { target: { value: string } }) =>
             setCarMaxAmps(e.target.value)}
           onBlur={() =>
-            updateMutation.mutate({ carMaxAmps: clampAmps(carMaxAmps) })}
+            updateMutation.mutate({
+              chargerRowId: chargerId,
+              carMaxAmps: clampAmps(carMaxAmps),
+            })}
           style={{ width: 80 }}
         />
       </SettingsRow>

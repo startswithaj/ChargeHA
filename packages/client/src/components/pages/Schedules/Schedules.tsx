@@ -347,6 +347,7 @@ function toNoticePoints(chargers: Chargers, vehicles: Vehicles): NoticePoint[] {
       vehicles.find((v) => v.id === c.resolvedVehicleId)?.name ?? null,
     kind: c.kind,
     vehicleResolution: c.vehicleResolution,
+    vehicleId: c.vehicleId,
   }));
 }
 

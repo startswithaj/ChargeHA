@@ -131,6 +131,7 @@ function ChargerList(
               error={settings.error}
               busy={settings.busy}
               onSubmit={settings.submitEdit}
+              onSaved={settings.cancelEdit}
               onCancel={settings.cancelEdit}
             />
           </div>
@@ -176,6 +177,7 @@ function ChargerListItem(
           error={settings.error}
           busy={settings.busy}
           onSubmit={settings.submitEdit}
+          onSaved={settings.cancelEdit}
           onCancel={settings.cancelEdit}
         />
       )}

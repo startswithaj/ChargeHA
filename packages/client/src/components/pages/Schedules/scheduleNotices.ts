@@ -15,6 +15,8 @@ import {
 export interface NoticePoint extends ConflictPoint {
   kind: ChargerKind;
   vehicleResolution: VehicleResolutionKind;
+  /** The charger row's assigned vehicle — not the resolved one. */
+  vehicleId: string | null;
 }
 
 /** Either schedule can carry a chargeLimitPct, and the engine stops at the
@@ -84,6 +86,22 @@ function ambiguousNotice(
   };
 }
 
+function assignedUnpluggedNotice(
+  vehicleName: string,
+  points: NoticePoint[],
+): ScheduleNotice {
+  return {
+    id: "vehicle-assigned-unplugged",
+    severity: "warning",
+    title: "These schedules are not running right now",
+    message:
+      `More than one vehicle is plugged into ${pointNames(points)} and ` +
+      `none of them can be identified as ${vehicleName} — it is assigned ` +
+      `to this charger but does not appear to be plugged in. Plug ` +
+      `${vehicleName} in there to run these schedules.`,
+  };
+}
+
 function idleNotice(vehicleName: string): ScheduleNotice {
   return {
     id: "vehicle-idle",
@@ -115,6 +133,15 @@ export function vehicleNotices(
   const running = smart.filter((p) => p.resolvedVehicleId === vehicleId);
   if (running.length > 0) return [runningNotice(vehicleName, running)];
   const ambiguous = smart.filter((p) => p.vehicleResolution === "ambiguous");
-  if (ambiguous.length > 0) return [ambiguousNotice(vehicleName, ambiguous)];
+  // Assigned but unresolvable = this car isn't the one plugged in. Telling
+  // the user to assign it again is a no-op; the fix is plugging it in.
+  const assignedHere = ambiguous.filter((p) => p.vehicleId === vehicleId);
+  if (assignedHere.length > 0) {
+    return [assignedUnpluggedNotice(vehicleName, assignedHere)];
+  }
+  const unassigned = ambiguous.filter((p) => p.vehicleId === null);
+  if (unassigned.length > 0) {
+    return [ambiguousNotice(vehicleName, unassigned)];
+  }
   return [idleNotice(vehicleName)];
 }

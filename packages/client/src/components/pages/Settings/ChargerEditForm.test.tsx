@@ -34,6 +34,7 @@ describe("ChargerEditForm", () => {
         error={null}
         busy={false}
         onSubmit={() => {}}
+        onSaved={() => {}}
         onCancel={() => {}}
       />,
     );
@@ -51,6 +52,7 @@ describe("ChargerEditForm", () => {
         error={null}
         busy={false}
         onSubmit={() => {}}
+        onSaved={() => {}}
         onCancel={() => {}}
       />,
     );
@@ -68,6 +70,7 @@ describe("ChargerEditForm", () => {
         error={null}
         busy={false}
         onSubmit={onSubmit}
+        onSaved={() => {}}
         onCancel={() => {}}
       />,
     );

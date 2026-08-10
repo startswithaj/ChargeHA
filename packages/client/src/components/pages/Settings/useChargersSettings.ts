@@ -89,20 +89,15 @@ export function useChargersSettings() {
   };
 
   // The panel's own save is what creates/configures the charger; this only
-  // decides whether it may run yet (control-path confirm) and closes the form.
+  // decides whether it may run yet (control-path confirm). The form closes
+  // itself via onSaved once the save lands, so a failure stays visible.
   const submitEdit = (commit: () => void) => {
-    if (editing?.mode !== "add") {
-      commit();
-      setEditing(null);
-      return;
-    }
-    if (needsAddConfirm) {
+    if (editing?.mode === "add" && needsAddConfirm) {
       setConfirm({ kind: "add", typeId: editing.typeId, commit });
       setEditing(null);
       return;
     }
     commit();
-    setEditing(null);
   };
 
   const requestRemove = (chargerId: string) => {

@@ -215,7 +215,13 @@ function useAllocationStatus(
           if (isSolarCharging && p === topCharging) {
             return [p.id, "Priority: receiving all solar"];
           }
-          if (!p.state?.isCharging && topCharging) {
+          // Only a point that could actually charge is "waiting": stopped,
+          // unplugged, or higher-priority points have their own story.
+          const couldCharge = p.mode !== "stop" &&
+            p.state?.isPluggedIn === true && !p.state?.isCharging;
+          const outranked = topCharging !== undefined &&
+            p.priority > topCharging.priority;
+          if (couldCharge && outranked) {
             return [p.id, "Waiting for priority vehicle"];
           }
           return null;

@@ -420,6 +420,43 @@ describe("DataRecorder", () => {
       expect(chargeReadingVehicleIds(db)).toEqual(["VIN1"]);
     });
 
+    it("records a passive charger and the car's own point as one session", async () => {
+      vehicleManager.setVehicleState("VIN1", CHARGE_STATE);
+      const passivePair = {
+        getChargersWithState: () =>
+          Promise.resolve([
+            {
+              id: "cp-VIN1",
+              active: true,
+              resolvedVehicleId: "VIN1",
+              passiveForVehicleId: null,
+              state: { isCharging: true, chargePowerKw: 7, chargeAmps: 30 },
+            },
+            {
+              id: "charger-row-1",
+              active: true,
+              resolvedVehicleId: null,
+              passiveForVehicleId: "VIN1",
+              state: { isCharging: true, chargePowerKw: 7, chargeAmps: 30 },
+            },
+          ]),
+      } as unknown as ChargingPointManager;
+      const r = new DataRecorder(
+        db,
+        vehicleManager as unknown as VehicleManager,
+        passivePair,
+        tariffService,
+        emitter,
+        testLogger,
+      );
+      await r.stop();
+      feedEnergy(emitter, ENERGY_DATA);
+
+      await testable(r).record();
+
+      expect(chargeReadingVehicleIds(db)).toEqual(["VIN1"]);
+    });
+
     it("does not record vehicle charge data for non-charging vehicles", async () => {
       const notCharging = {
         ...CHARGE_STATE,
