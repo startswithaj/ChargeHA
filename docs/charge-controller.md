@@ -2,8 +2,9 @@
 
 The charge controller is the core automation loop that decides when and how to
 charge each vehicle. It runs as a background service on a configurable timer
-(default 30 seconds, `controller_loop_seconds`) and evaluates every configured
-vehicle on each cycle.
+(default 30 seconds, `controller_loop_seconds`) and evaluates every charging
+point on each cycle — a vehicle driven by its own API, or a smart charger with
+whatever car it resolves to.
 
 ## Architecture
 
@@ -312,8 +313,8 @@ check, fetch fresh data, or wake the car — based on the context flags
 model. See `data-collection.md` for the full request/cache/wake flow.
 
 A `suspendable` hint is included on each engine decision and persisted with the
-log entry, but it is not currently acted on by the controller — wake suppression
-is now the middleware's job.
+log entry. The controller does not act on it — wake suppression belongs to the
+middleware.
 
 ## Smart charger vehicle resolution
 

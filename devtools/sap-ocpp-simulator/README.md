@@ -5,9 +5,9 @@ Standalone OCPP 1.6 virtual charge point for local development, using
 (Apache-2.0). Built from a pinned git clone in `Dockerfile` — upstream source is
 not vendored into this repo.
 
-Unlike the retired vcp simulator, this one adds a
-physics-based EV battery/SoC model and real smart-charging throttling: it reads
-`SetChargingProfile` limits and caps its simulated power draw to match.
+Unlike the retired vcp simulator, this one adds a physics-based EV battery/SoC
+model and real smart-charging throttling: it reads `SetChargingProfile` limits
+and caps its simulated power draw to match.
 
 ## Usage
 
@@ -36,11 +36,11 @@ docker compose -f devtools/sap-ocpp-simulator/docker-compose.yml down
 
 ## How the id and URL work
 
-- `station-template.json` sets `"baseName": "sap-dev"` and
-  `"fixedName": true`. `fixedName: true` makes the simulator use `baseName`
-  unchanged as the charge point id (no numeric suffix). `config.json` sets
-  `numberOfStations: 1` for this template — with `fixedName: true`, more than
-  one station would collide on the same id.
+- `station-template.json` sets `"baseName": "sap-dev"` and `"fixedName": true`.
+  `fixedName: true` makes the simulator use `baseName` unchanged as the charge
+  point id (no numeric suffix). `config.json` sets `numberOfStations: 1` for
+  this template — with `fixedName: true`, more than one station would collide on
+  the same id.
 - `config.json`'s `supervisionUrls` is
   `ws://host.docker.internal:8000/api/charger/ocpp` — the simulator appends
   `/<chargingStationId>` itself, giving the URL above, which matches our
@@ -58,12 +58,12 @@ before starting the container.
 ## The EV / battery model
 
 - `station-template.json` sets `"coherentMeterValues": true` and
-  `"evProfilesFile": "ev-profiles-sap-dev.json"`. This turns on the
-  simulator's physics-based MeterValues generation (voltage → power → current →
-  energy → SoC) instead of random values.
-- `ev-profiles-sap-dev.json` describes the simulated car: battery capacity,
-  max onboard charge power, starting SoC range, and a charging curve (power
-  fraction vs. SoC, e.g. tapering near full).
+  `"evProfilesFile": "ev-profiles-sap-dev.json"`. This turns on the simulator's
+  physics-based MeterValues generation (voltage → power → current → energy →
+  SoC) instead of random values.
+- `ev-profiles-sap-dev.json` describes the simulated car: battery capacity, max
+  onboard charge power, starting SoC range, and a charging curve (power fraction
+  vs. SoC, e.g. tapering near full).
 - The connector's `MeterValues` array in `station-template.json` explicitly
   declares `Current.Import`, `Voltage`, `Power.Active.Import`, and
   `Energy.Active.Import.Register` (plus `SoC`). Coherent mode only fills in
@@ -112,5 +112,5 @@ bundler's copy glob only picks up that path, not `station-templates/`.
 
 ## Multiple chargers
 
-Give each instance its own compose project
-name, station template baseName/id, and host port.
+Give each instance its own compose project name, station template baseName/id,
+and host port.

@@ -109,7 +109,9 @@ devtools/
   lint-plugins/              — Custom Deno lint plugins (see devtools/lint-plugins/README.md)
   oidc/                      — Local OIDC provider for testing SSO (see devtools/oidc/README.md)
   quality/                   — Unused file check (see devtools/quality/README.md)
+  sap-ocpp-simulator/        — Standalone OCPP charge point (see devtools/sap-ocpp-simulator/README.md)
   sim/                       — Charge simulators + analysis tools (see devtools/sim/README.md)
+  tapo-simulator/            — Fake Tapo smart plug (see devtools/tapo-simulator/README.md)
 docs/                        — Architecture docs, setup guides, design notes
 ```
 
@@ -428,6 +430,10 @@ See individual READMEs in each `devtools/` subdirectory for detailed usage:
   testing SSO
 - [Quality Checks](../devtools/quality/README.md) — unused file detection
 - [Simulators](../devtools/sim/README.md) — solar and charge simulations
+- [OCPP Simulator](../devtools/sap-ocpp-simulator/README.md) — standalone charge
+  point for local development
+- [Tapo Simulator](../devtools/tapo-simulator/README.md) — fake smart plug for
+  local development
 
 ## Lint
 

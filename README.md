@@ -206,8 +206,8 @@ follows real-time production — at the cost of more API calls.
 
 ## How It Works
 
-ChargeHA runs a **configurable decision loop** (default 10 seconds) that
-evaluates each vehicle through a priority pipeline:
+ChargeHA runs a **configurable decision loop** (default 30 seconds) that
+evaluates each charging point through a priority pipeline:
 
 1. **Pre-checks** — is the vehicle plugged in, at home, and below its charge
    limit?
