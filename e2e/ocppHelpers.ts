@@ -152,6 +152,10 @@ export async function sapReconnect(
   stationId: string = SAP_STATION_ID,
 ): Promise<void> {
   const hashId = await sapHashId(stationId);
+  // Close first: openConnection on a live socket opens a duplicate and feeds
+  // the app's attach()-eviction 30s reconnect loop (see ocpp.e2e.test.ts
+  // beforeAll). closeConnection is a no-op when already down.
+  await sapUi.request("closeConnection", { hashIds: [hashId] });
   await sapUi.request("openConnection", { hashIds: [hashId] });
 }
 

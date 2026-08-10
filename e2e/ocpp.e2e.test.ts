@@ -51,21 +51,14 @@ describe("OCPP e2e", () => {
       chargerRowId: null,
       values: { ocppChargerId: CP_ID },
     });
-    // At stack startup there's no charger row yet, so the app 404s the
-    // station's very first connect attempt. sap-test's own reconnect backoff
-    // (30s) is too slow for the tests below, so force an immediate reconnect
-    // now that the row exists rather than racing it.
-    //
-    // Only when it is not already connected. `openConnection` on a live socket
-    // opens a SECOND one; the app then closes the first (attach() evicts the
-    // previous socket for an id, which is right for a real reconnect), the
-    // station sees that close and schedules its own 30s retry, and that timer
-    // opens another duplicate — a self-sustaining 30s reconnect loop. Every
-    // cycle resets the charge point to freshData(), losing transaction id,
-    // status and meterStartWh, which is what made these suites flaky.
-    const alreadyConnected = await ocppTrpc.plugin.charger.ocpp.status
-      .query({ chargerRowId: await ocppRowId() })
-      .then((s) => s.connected)
+    // The app 404s the station's pre-row connect; it retries on a ~30s
+    // backoff. Poll past that backoff — a one-shot check races the station's
+    // own connect and a forced reconnect then duplicates the socket (loop).
+    const alreadyConnected = await waitFor(async () => {
+      const s = await ocppTrpc.plugin.charger.ocpp.status
+        .query({ chargerRowId: await ocppRowId() });
+      return s.connected || null;
+    }, { timeoutMs: 40_000, label: "sap-test connects on its own" })
       .catch(() => false);
     if (!alreadyConnected) await sapReconnect();
   });
@@ -335,10 +328,16 @@ describe("OCPP measurand negotiation e2e", () => {
       chargerRowId: null,
       values: { ocppChargerId: SAP_BASIC_STATION_ID },
     });
-    // Same reason as the sap-test row: the app 404s the station's first
-    // connect because no row existed yet, and its own backoff is far slower
-    // than this suite.
-    await sapReconnect(SAP_BASIC_STATION_ID);
+    // Same as the sap-test suite: poll past the station's own ~30s backoff;
+    // an unconditional forced reconnect can duplicate a live socket and start
+    // the 30s evict/reconnect loop.
+    const alreadyConnected = await waitFor(async () => {
+      const s = await ocppTrpc.plugin.charger.ocpp.status
+        .query({ chargerRowId: await ocppRowId(SAP_BASIC_STATION_ID) });
+      return s.connected || null;
+    }, { timeoutMs: 40_000, label: "sap-basic connects on its own" })
+      .catch(() => false);
+    if (!alreadyConnected) await sapReconnect(SAP_BASIC_STATION_ID);
   });
 
   it("widens a register-only charger's measurand list", async () => {
