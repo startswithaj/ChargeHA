@@ -706,6 +706,28 @@ describe("Schedules", () => {
       ).toBeInTheDocument();
     });
 
+    it("names the stricter limit when both schedules set one", () => {
+      setOverlapPoints();
+      withSchedules({ chargeLimitPct: 70 }, { chargeLimitPct: 80 });
+
+      renderWithProviders(<Schedules />);
+
+      expect(
+        screen.getByText(/stricter of the two limits \(70%\) stops the charge/),
+      ).toBeInTheDocument();
+    });
+
+    it("names the charger's own limit when the vehicle sets none", () => {
+      setOverlapPoints();
+      withSchedules({ chargeLimitPct: 65 }, { chargeLimitPct: null });
+
+      renderWithProviders(<Schedules />);
+
+      expect(
+        screen.getByText(/this charger's 65% limit stops the charge/),
+      ).toBeInTheDocument();
+    });
+
     it("names only the overlapping window for a partial overlap", () => {
       setOverlapPoints();
       withSchedules({}, { startTime: "05:00", endTime: "08:00" });

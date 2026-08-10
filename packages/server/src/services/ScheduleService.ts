@@ -188,9 +188,12 @@ export class ScheduleService {
           "BAD_REQUEST",
         );
       }
-      if (merged.vehicleId == null && merged.chargeLimitPct != null) {
+      if (
+        merged.chargeLimitPct != null &&
+        (merged.chargeLimitPct < 1 || merged.chargeLimitPct > 100)
+      ) {
         throw new ServiceError(
-          "chargeLimitPct only applies to vehicle-keyed schedules",
+          "chargeLimitPct must be between 1 and 100",
           "BAD_REQUEST",
         );
       }

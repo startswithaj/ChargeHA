@@ -141,7 +141,9 @@ export function createAuthMiddleware(
     const path = new URL(c.req.url).pathname;
     if (
       isExemptPath(method, path) ||
-      publicPrefixes.some((prefix) => path.startsWith(prefix))
+      publicPrefixes.some((prefix) =>
+        path === prefix || path.startsWith(`${prefix}/`)
+      )
     ) {
       return next();
     }

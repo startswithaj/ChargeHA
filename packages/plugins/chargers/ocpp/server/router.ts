@@ -89,8 +89,6 @@ function pairingProcedures(centralSystem: OcppCentralSystem) {
           expiresInMs: pairing.expiresAt === null
             ? null
             : Math.max(0, pairing.expiresAt - Date.now()),
-          announcedId: pairing.announcedId,
-          info: pairing.info,
           // Every charger seen this window, so the panel can offer a choice
           // rather than silently keeping whichever connected last.
           seen: pairing.seen,

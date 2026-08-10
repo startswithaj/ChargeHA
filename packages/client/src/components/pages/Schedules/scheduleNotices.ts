@@ -1,4 +1,8 @@
-import type { ChargerKind, ChargeSchedule } from "@chargeha/shared";
+import type {
+  ChargerKind,
+  ChargeSchedule,
+  VehicleResolutionKind,
+} from "@chargeha/shared";
 import type { ScheduleNotice } from "./ScheduleNotice.tsx";
 import {
   type ConflictPoint,
@@ -8,22 +12,26 @@ import {
   type ScheduleConflict,
 } from "./scheduleConflicts.ts";
 
-/** Mirrors the resolution kinds ChargingPointManager.resolveVehicle returns.
- *  Not exported from shared, so declared here as ChargerCard.tsx does. */
-export type ResolutionKind = "linked" | "inferred" | "ambiguous" | "none";
-
 export interface NoticePoint extends ConflictPoint {
   kind: ChargerKind;
-  vehicleResolution: ResolutionKind;
+  vehicleResolution: VehicleResolutionKind;
 }
 
-/** A charger-keyed schedule carries no chargeLimitPct (no battery
- *  visibility), so the vehicle's limit is the strictest one the engine
- *  merges in — see selectActiveChargeSchedule. */
-const limitClause = (c: ScheduleConflict): string =>
-  c.vehicleLimitPct === null
-    ? `${c.vehicleName}'s schedule sets no charge limit`
-    : `${c.vehicleName}'s ${c.vehicleLimitPct}% limit still stops the charge`;
+/** Either schedule can carry a chargeLimitPct, and the engine stops at the
+ *  strictest of the two — see selectActiveChargeSchedule. */
+const limitClause = (c: ScheduleConflict): string => {
+  if (c.chargerLimitPct === null && c.vehicleLimitPct === null) {
+    return "neither schedule sets a charge limit";
+  }
+  if (c.chargerLimitPct === null) {
+    return `${c.vehicleName}'s ${c.vehicleLimitPct}% limit still stops the charge`;
+  }
+  if (c.vehicleLimitPct === null) {
+    return `this charger's ${c.chargerLimitPct}% limit stops the charge`;
+  }
+  const strictest = Math.min(c.chargerLimitPct, c.vehicleLimitPct);
+  return `the stricter of the two limits (${strictest}%) stops the charge`;
+};
 
 const pointNames = (points: NoticePoint[]): string =>
   points.map((p) => p.name).join(", ");

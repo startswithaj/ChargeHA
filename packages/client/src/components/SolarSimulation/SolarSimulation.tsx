@@ -490,7 +490,7 @@ function useSolarSimState(
   );
 
   const hasBattery = config.batteryPriorityEnabled ||
-    currentEnergy?.batterySoc !== null;
+    (currentEnergy != null && currentEnergy.batterySoc !== null);
 
   const result = useMemo(
     () =>

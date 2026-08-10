@@ -3,6 +3,7 @@ import type {
   ChargerState,
   ChargingPointMode,
   VehicleChargeState,
+  VehicleResolutionKind,
 } from "@chargeha/shared";
 import { SolarAllocator } from "@chargeha/shared/engine";
 import { linkedChargingPointId } from "@chargeha/shared/chargingPoints";
@@ -39,7 +40,7 @@ interface ChargerEntry {
 }
 
 export interface VehicleResolution {
-  kind: "linked" | "inferred" | "ambiguous" | "none";
+  kind: VehicleResolutionKind;
   vehicleId: string | null;
 }
 
@@ -135,6 +136,8 @@ export class ChargingPointManager {
     if (entry) {
       await entry.middleware.shutdown();
       this.chargers.delete(id);
+      this.chargerPlugins.get(entry.row.chargerAdapterType)
+        ?.onChargerRemoved?.(id);
     }
     await this.db.deleteCharger(id);
     await this.db.resequenceChargerPriorities();

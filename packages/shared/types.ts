@@ -162,6 +162,13 @@ export type ChargerControlMode = "amps" | "switch";
  *  charging point drives one specific car through its own API. */
 export type ChargerKind = "smart" | "vehicle_api";
 
+/** How a charging point's vehicle was determined. */
+export type VehicleResolutionKind =
+  | "linked"
+  | "inferred"
+  | "ambiguous"
+  | "none";
+
 export type ChargerStatus =
   | "available"
   | "preparing"

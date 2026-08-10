@@ -2,6 +2,7 @@ import { ArrowDownIcon, ArrowUpIcon } from "@radix-ui/react-icons";
 import { Badge, IconButton, Select, Text } from "@radix-ui/themes";
 import { Pencil, Trash2, X } from "lucide-react";
 import type { ChargerStatus, ChargingPointMode } from "@chargeha/shared";
+import { CHARGER_STATUS_LABELS } from "../../../lib/chargerLabels.ts";
 import {
   type ChargerWithState,
   isSmartCharger,
@@ -12,21 +13,10 @@ import {
 // translated back to null at the call site. Never stored or sent as "".
 const AUTOMATIC = "__automatic__";
 
-export const MODE_LABELS: Record<ChargingPointMode, string> = {
+const MODE_LABELS: Record<ChargingPointMode, string> = {
   auto: "Auto",
   charge_now: "Charge now",
   stop: "Stop",
-};
-
-export const STATUS_LABELS: Record<ChargerStatus, string> = {
-  available: "Available",
-  preparing: "Preparing",
-  charging: "Charging",
-  suspended: "Paused",
-  faulted: "Fault",
-  finishing: "Finishing",
-  no_draw: "No draw",
-  unconfigured: "Setup needed",
 };
 
 const STATUS_COLORS: Record<ChargerStatus, "green" | "red" | "gray" | "amber"> =
@@ -121,7 +111,7 @@ export function ChargerRow(
         </Badge>
         {status && (
           <Badge variant="soft" size="1" color={STATUS_COLORS[status]}>
-            {labelFor(STATUS_LABELS, status)}
+            {labelFor(CHARGER_STATUS_LABELS, status)}
           </Badge>
         )}
         <Badge variant="outline" size="1">

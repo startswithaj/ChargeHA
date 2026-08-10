@@ -23,6 +23,10 @@ interface ScheduleFormProps {
   onCancel: () => void;
 }
 
+/** 100% never stops a charge, so it is the neutral starting point for a
+ *  charger-keyed schedule, whose linked car may not report battery level. */
+const NO_LIMIT_PCT = 100;
+
 const DEFAULT_FORM: ScheduleFormData = {
   scheduleType: "charge",
   vehicleId: null,
@@ -57,9 +61,11 @@ function useInitForm(
         chargeAmps: editingSchedule.scheduleType === "charge"
           ? editingSchedule.chargeAmps
           : 32,
+        // Charger schedules stored before the limit was exposed have none;
+        // 100% is the inert default the stepper starts from.
         chargeLimitPct: editingSchedule.scheduleType === "charge"
-          ? editingSchedule.chargeLimitPct
-          : 80,
+          ? editingSchedule.chargeLimitPct ?? NO_LIMIT_PCT
+          : DEFAULT_FORM.chargeLimitPct,
       });
     } else {
       setForm({
@@ -67,8 +73,9 @@ function useInitForm(
         scheduleType,
         vehicleId,
         chargerId,
-        // Charger-keyed schedules have no battery visibility — no limit.
-        chargeLimitPct: chargerId !== null ? null : DEFAULT_FORM.chargeLimitPct,
+        chargeLimitPct: chargerId !== null
+          ? NO_LIMIT_PCT
+          : DEFAULT_FORM.chargeLimitPct,
         ...(defaultStartTime && { startTime: defaultStartTime }),
         ...(defaultEndTime && { endTime: defaultEndTime }),
       });
@@ -175,7 +182,8 @@ export function ScheduleForm({
         {isCharge && (
           <ChargeSettings
             chargeAmps={form.chargeAmps}
-            chargeLimitPct={form.chargeLimitPct}
+            chargeLimitPct={form.chargeLimitPct ?? NO_LIMIT_PCT}
+            isChargerKeyed={form.chargerId !== null}
             maxAmps={maxAmps}
             updateField={updateField}
           />

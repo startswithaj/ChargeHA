@@ -151,26 +151,7 @@ describe("VehicleSettings", () => {
     const buttons = screen.getAllByRole("button");
     // The delete button is just before the "Add Simulated Vehicle" button
     fireEvent.click(buttons[buttons.length - 2]);
-  });
-
-  it("calls handleMovePriority when priority buttons clicked", () => {
-    const handleMovePriority = vi.fn();
-    hookRef.current = makeHookReturn({
-      vehicles: [
-        { id: "VIN1", name: "Model 3", adapterType: "tesla", priority: 1 },
-        { id: "VIN2", name: "Model Y", adapterType: "tesla", priority: 2 },
-      ],
-      handleMovePriority,
-    });
-    renderWithProviders(<VehicleSettings />);
-    const buttons = screen.getAllByRole("button");
-    // The priority section has ArrowUp and ArrowDown for each vehicle
-    // First vehicle: up disabled, down enabled
-    // Second vehicle: up enabled, down disabled
-    const enabledButtons = buttons.filter((b) => !b.hasAttribute("disabled"));
-    if (enabledButtons.length > 0) {
-      fireEvent.click(enabledButtons[0]);
-    }
+    expect(handleDelete).toHaveBeenCalledWith("VIN1");
   });
 
   it("calls handleAddSimulatedVehicle when add sim button clicked", () => {

@@ -103,6 +103,7 @@ describe("ChargingPointManager vehicle deletion", () => {
         _row: ChargerRow,
         _resolved: ChargerRowConfig,
       ) => Promise.resolve(new StubChargerMiddleware()),
+      onChargerRemoved: () => {},
     }));
   };
 

@@ -41,6 +41,10 @@ export class SimulatedChargerPlugin implements ChargerPlugin {
     return new PollingChargerMiddleware(adapter, this.deps.log);
   }
 
+  onChargerRemoved(rowId: string): void {
+    this.adapters.delete(rowId);
+  }
+
   /** All live adapters, keyed by charger row id. Router helper. */
   getAdapters(): SimulatedChargerAdapter[] {
     return [...this.adapters.values()];

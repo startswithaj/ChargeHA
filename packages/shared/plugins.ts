@@ -261,5 +261,8 @@ export interface ChargerPlugin extends BasePlugin {
     row: ChargerRow,
     resolved: ChargerRowConfig,
   ): Promise<ChargerMiddleware>;
+  /** Called after a charger row is deleted (not on rebuild), so a plugin
+   *  holding per-row state can release it. */
+  onChargerRemoved?(rowId: string): void;
   getChargerHttpRoutes(): PluginHttpRoutes | null;
 }

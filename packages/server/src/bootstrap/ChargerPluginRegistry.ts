@@ -43,6 +43,16 @@ export class ChargerPluginRegistry {
   }
 
   async shutdownAll(): Promise<void> {
-    await Promise.all([...this.plugins.values()].map((p) => p.shutdown()));
+    // allSettled, not all: one plugin failing must not skip the others.
+    const results = await Promise.allSettled(
+      [...this.plugins.values()].map((p) => p.shutdown()),
+    );
+    const failures = results.filter((r) => r.status === "rejected");
+    if (failures.length > 0) {
+      throw new AggregateError(
+        failures.map((f) => f.reason),
+        "One or more charger plugins failed to shut down",
+      );
+    }
   }
 }

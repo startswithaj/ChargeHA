@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { AlertTriangle, Ban, Car, Info, Plus, Settings } from "lucide-react";
 import { Button, Card, Text } from "@radix-ui/themes";
 import type {
-  ChargerKind,
   ChargeSchedule,
   Schedule,
   ScheduleFormData,
@@ -23,7 +22,6 @@ import { chargePointIdentifier } from "../../../lib/chargePointIdentity.ts";
 import {
   chargerNotices,
   type NoticePoint,
-  type ResolutionKind,
   vehicleNotices,
 } from "./scheduleNotices.ts";
 import type { ScheduleNotice } from "./ScheduleNotice.tsx";
@@ -347,8 +345,8 @@ function toNoticePoints(chargers: Chargers, vehicles: Vehicles): NoticePoint[] {
     resolvedVehicleId: c.resolvedVehicleId,
     resolvedVehicleName:
       vehicles.find((v) => v.id === c.resolvedVehicleId)?.name ?? null,
-    kind: c.kind as ChargerKind,
-    vehicleResolution: c.vehicleResolution as ResolutionKind,
+    kind: c.kind,
+    vehicleResolution: c.vehicleResolution,
   }));
 }
 
