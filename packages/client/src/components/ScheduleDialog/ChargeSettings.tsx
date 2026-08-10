@@ -4,7 +4,8 @@ import styles from "./ScheduleDialog.module.css";
 
 interface ChargeSettingsProps {
   chargeAmps: number;
-  chargeLimitPct: number | null;
+  chargeLimitPct: number;
+  isChargerKeyed: boolean;
   maxAmps: number;
   updateField: <K extends keyof ScheduleFormData>(
     key: K,
@@ -16,6 +17,7 @@ interface ChargeSettingsProps {
 export function ChargeSettings({
   chargeAmps,
   chargeLimitPct,
+  isChargerKeyed,
   maxAmps,
   updateField,
 }: ChargeSettingsProps) {
@@ -65,43 +67,47 @@ export function ChargeSettings({
         </div>
       </div>
 
-      {/* Charger-keyed schedules have no battery visibility — no limit. */}
-      {chargeLimitPct !== null && (
-        <div className={styles.field}>
-          <Text size="2" weight="medium">Charge Limit</Text>
-          <div className={styles.stepperRow}>
-            <Button
-              type="button"
-              variant="ghost"
-              size="1"
-              disabled={chargeLimitPct <= 50}
-              onClick={() =>
-                updateField(
-                  "chargeLimitPct",
-                  Math.max(50, chargeLimitPct - 5),
-                )}
-            >
-              −
-            </Button>
-            <Text size="3" weight="bold" className={styles.stepperValue}>
-              {chargeLimitPct}%
-            </Text>
-            <Button
-              type="button"
-              variant="ghost"
-              size="1"
-              disabled={chargeLimitPct >= 100}
-              onClick={() =>
-                updateField(
-                  "chargeLimitPct",
-                  Math.min(100, chargeLimitPct + 5),
-                )}
-            >
-              +
-            </Button>
-          </div>
+      <div className={styles.field}>
+        <Text size="2" weight="medium">Charge Limit</Text>
+        <div className={styles.stepperRow}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="1"
+            disabled={chargeLimitPct <= 50}
+            onClick={() =>
+              updateField(
+                "chargeLimitPct",
+                Math.max(50, chargeLimitPct - 5),
+              )}
+          >
+            −
+          </Button>
+          <Text size="3" weight="bold" className={styles.stepperValue}>
+            {chargeLimitPct}%
+          </Text>
+          <Button
+            type="button"
+            variant="ghost"
+            size="1"
+            disabled={chargeLimitPct >= 100}
+            onClick={() =>
+              updateField(
+                "chargeLimitPct",
+                Math.min(100, chargeLimitPct + 5),
+              )}
+          >
+            +
+          </Button>
         </div>
-      )}
+        {isChargerKeyed && (
+          <Text size="1" color="gray">
+            Only applies when a car linked to this charger reports its battery
+            level (SOC) through its API. Otherwise the schedule charges for the
+            full window.
+          </Text>
+        )}
+      </div>
     </>
   );
 }

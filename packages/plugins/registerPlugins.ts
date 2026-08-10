@@ -42,6 +42,7 @@ export function registerPlugins(
     teslaDeps,
     new TeslaProxyManager(teslaDeps, teslaDeps.log),
   );
+
   vehicleRegistry.register(teslaPlugin);
   chargerRegistry.register(teslaPlugin);
 

@@ -175,8 +175,7 @@ export class EnergyAdapterManager implements EnergySourceAdapter {
       displayName: plugin.displayName,
       vendor: plugin.vendor,
       settingsComponentKey: plugin.settingsComponentKey,
-      configured: this.adapter !== null &&
-        !(this.adapter instanceof NullEnergyAdapter),
+      configured: this.activeType === plugin.id,
     }));
   }
 

@@ -91,6 +91,7 @@ describe("ChargingPointManager vehicle control path", () => {
         middlewares.set(row.id, mw);
         return Promise.resolve(mw);
       },
+      onChargerRemoved: () => {},
     }));
   };
 

@@ -227,6 +227,12 @@ export class TapoChargerAdapter implements ChargerAdapter {
     this.unreachableAt ??= new Date().toISOString();
     return {
       ...(this.lastState ?? this.unknownDevice()),
+      // Unreachable is not "still drawing": measured fields are unknown now,
+      // and stale ones would keep feeding charge history and the solar budget.
+      isCharging: false,
+      isPluggedIn: null,
+      chargeAmps: null,
+      chargePowerKw: null,
       status: "faulted",
       statusDetail: "unreachable",
       lastUpdated: this.unreachableAt,

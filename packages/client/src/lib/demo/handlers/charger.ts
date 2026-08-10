@@ -127,12 +127,15 @@ export const chargerHandlers: Record<string, QueryHandler> = {
       .map((c) => {
         const pluggedIn = c.simPluggedIn ?? true;
         const carMaxAmps = c.simCarMaxAmps ?? 16;
+        // Same amps the charger state reports, so the dev panel cannot
+        // disagree with the card about a solar-limited auto charge.
+        const amps = simDrawAmps(s, c);
         return {
           pluggedIn,
           carMaxAmps,
           on: c.mode !== "stop",
-          commandedAmps: c.mode === "stop" ? 0 : carMaxAmps,
-          drawAmps: pluggedIn && c.mode !== "stop" ? carMaxAmps : 0,
+          commandedAmps: amps,
+          drawAmps: pluggedIn ? amps : 0,
         };
       }),
 };

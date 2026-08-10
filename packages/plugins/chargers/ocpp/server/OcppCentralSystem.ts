@@ -1,6 +1,7 @@
 import type { Logger } from "@chargeha/server/lib/Logger";
 import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import { type OcppFrame, OcppFraming, PendingCalls } from "./OcppFraming.ts";
+import { OcppMessageQueue } from "./OcppMessageQueue.ts";
 import {
   authorizeReq,
   bootNotificationReq,
@@ -32,9 +33,6 @@ export interface OcppSeenCharger {
 export interface OcppPairingState {
   armed: boolean;
   expiresAt: number | null;
-  /** Most recent arrival — kept for the single-charger case. */
-  announcedId: string | null;
-  info: OcppChargerInfo | null;
   /** Everything that connected during this window, newest last. */
   seen: OcppSeenCharger[];
 }
@@ -62,15 +60,9 @@ export interface OcppLiveData {
   lastUpdated: string;
 }
 
-/** A socket that reached us without a charge point id — should not happen,
- *  but keys the map rather than silently sharing one entry. */
-const UNKNOWN_CHARGER = "";
-
 const idlePairing = (): OcppPairingState => ({
   armed: false,
   expiresAt: null,
-  announcedId: null,
-  info: null,
   seen: [],
 });
 
@@ -113,6 +105,12 @@ interface OcppConnection {
    *  to another. */
   pending: PendingCalls;
   transactionCounter: number;
+  /** Per socket, not keyed globally by charge point id — a reconnect must
+   *  get a fresh queue rather than inherit a dead socket's backlog. Runs
+   *  charger-initiated CALLs one at a time, in wire order, so handling never
+   *  depends on how fast this connection's charger-row lookups happen to
+   *  resolve. See OcppMessageQueue. */
+  queue: OcppMessageQueue;
 }
 
 /** A central system bound to one charge point. Adapters take this rather than
@@ -138,6 +136,9 @@ export class OcppCentralSystem {
    *  before listening started retries every couple of seconds; that is a
    *  signal worth showing the user, not noise to bury in the log. */
   private knocking: { chargerId: string; at: number } | null = null;
+  /** Tracked separately from `knocking`: every retry refreshes that one, so
+   *  rate-limiting on it would log a given id exactly once, ever. */
+  private lastLogged: { chargerId: string; at: number } | null = null;
   /** Owned here rather than per connection: the reconnect it has to survive
    *  destroys the connection object. */
   private readonly negotiator: OcppMeasurandNegotiator;
@@ -184,8 +185,6 @@ export class OcppCentralSystem {
       expiresAt: Date.now() + ttlMs,
       // Keep across a renewal — the panel renews every minute while open, and
       // forgetting what was found would empty the picker.
-      announcedId: previous.armed ? previous.announcedId : null,
-      info: previous.armed ? previous.info : null,
       seen: previous.armed ? previous.seen : [],
     };
     this.logger.info(`OCPP pairing armed for ${Math.round(ttlMs / 1000)}s`);
@@ -225,8 +224,8 @@ export class OcppCentralSystem {
    *  this id may act beyond BootNotification is decided fresh on every
    *  message via `hasChargerRow`, not cached here — so once Save creates the
    *  row, this same socket's next message is handled normally. */
-  attach(socket: WebSocket, opts: { chargerId?: string } = {}): void {
-    const id = opts.chargerId ?? UNKNOWN_CHARGER;
+  attach(socket: WebSocket, opts: { chargerId: string }): void {
+    const id = opts.chargerId;
     // Close only the previous socket for THIS charge point — that is a
     // reconnect. A different id is a different charger and must be left
     // alone; closing it is what made a second charger evict the first.
@@ -236,6 +235,7 @@ export class OcppCentralSystem {
       data: { ...freshData(), connected: true },
       pending: new PendingCalls(),
       transactionCounter: 0,
+      queue: new OcppMessageQueue(this.logger, id),
     };
     this.connections.set(id, connection);
     // deno-lint-ignore custom-no-param-mutation/no-param-mutation -- WebSocket handler wiring
@@ -277,9 +277,11 @@ export class OcppCentralSystem {
   /** True the first time an id is turned away, then at most once a minute —
    *  a charger retrying on a 2s loop must not fill the log. */
   shouldLogRejection(chargerId: string): boolean {
-    const last = this.knocking;
-    return last === null || last.chargerId !== chargerId ||
+    const last = this.lastLogged;
+    const due = last === null || last.chargerId !== chargerId ||
       Date.now() - last.at > 60_000;
+    if (due) this.lastLogged = { chargerId, at: Date.now() };
+    return due;
   }
 
   /** Record a charger that announced itself during the window. Re-announcing
@@ -289,7 +291,6 @@ export class OcppCentralSystem {
     if (!this.pairingState().armed) return;
     this.pairing = {
       ...this.pairing,
-      announcedId: chargerId,
       seen: withCharger(this.pairing.seen, chargerId),
     };
   }
@@ -391,9 +392,36 @@ export class OcppCentralSystem {
     if (connection === undefined) return;
     try {
       const frame = OcppFraming.decode(raw);
+      // Settling a CALLRESULT/CALLERROR must stay synchronous and OUTSIDE the
+      // queue below — never move this after the `frame.kind !== "call"`
+      // check. A queued CALL handler can itself be mid-`send()`, awaiting a
+      // reply from this very charger (RemoteStart, GetConfiguration,
+      // SetChargingProfile...); that reply is exactly what gets settled
+      // here. Routing it through the queue would make it wait behind the
+      // handler it is the answer to — a deadlock, not just a delay.
       if (connection.pending.settle(frame)) return;
       if (frame.kind !== "call") return;
-      this.reply(chargePointId, frame);
+      const queued = connection.queue.enqueue(async () => {
+        // A reconnect replaces `connection` in the map with a fresh object
+        // (see attach()) — patch() always resolves the CURRENT connection by
+        // chargePointId, so a handler still queued against a since-replaced
+        // connection must not run at all. Running it would write into the
+        // new socket's state on behalf of a charger that already hung up.
+        if (this.connections.get(chargePointId) !== connection) return;
+        await this.reply(chargePointId, frame);
+      });
+      if (!queued) {
+        // Bounded, not dropped: OCPP 1.6 chargers retry a CALL that comes
+        // back as a CALLERROR, so this is recoverable for them in a way a
+        // silent drop is not.
+        connection.socket.send(
+          OcppFraming.error(
+            frame.id,
+            "InternalError",
+            `Too many pending messages for ${chargePointId}`,
+          ),
+        );
+      }
     } catch (error) {
       this.logger.warn(`Bad OCPP message dropped: ${error}`);
     }
@@ -495,12 +523,11 @@ export class OcppCentralSystem {
           firmwareVersion: boot.firmwareVersion ?? "unknown",
         };
         this.patch(chargePointId, { info });
-        // Surface vendor/model on the pairing state too, so the panel can
-        // name the charger that turned up before it is adopted.
+        // Surface vendor/model on the seen row too, so the panel can name the
+        // charger that turned up before it is adopted.
         if (this.pairingState().armed) {
           this.pairing = {
             ...this.pairing,
-            info,
             seen: this.pairing.seen.map((c) =>
               c.chargerId === chargePointId ? { ...c, info } : c
             ),

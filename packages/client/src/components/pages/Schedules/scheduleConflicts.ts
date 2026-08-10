@@ -22,6 +22,7 @@ export interface ScheduleConflict {
   windows: OverlapWindow[];
   days: DayOfWeek[];
   chargerAmps: number;
+  chargerLimitPct: number | null;
   vehicleLimitPct: number | null;
 }
 
@@ -158,6 +159,7 @@ export function findScheduleConflicts(
               windows,
               days,
               chargerAmps: charger.chargeAmps,
+              chargerLimitPct: charger.chargeLimitPct,
               vehicleLimitPct: vehicle.chargeLimitPct,
             }];
           })

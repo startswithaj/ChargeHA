@@ -96,7 +96,7 @@ describe("Tapo charger plugin", () => {
       );
     });
 
-    it("succeeds with a full bundle and applies the row's numeric knobs", async () => {
+    it("builds middleware from a full bundle", async () => {
       const plugin = new TapoChargerPlugin(deps());
       const mw = await plugin.createChargerMiddleware(ROW, {
         config: {
@@ -106,9 +106,8 @@ describe("Tapo charger plugin", () => {
         },
         secrets: { password: "hunter2" },
       });
-      // Middleware is constructed successfully — the numeric knob is exercised
-      // via tapoCredentials + numberConfig above; deeper adapter behaviour is
-      // covered by TapoChargerAdapter.test.ts.
+      // Construction only — fixed_draw_amps reaching the adapter is asserted
+      // in TapoChargerAdapter.test.ts ("fixed draw amps from config").
       expect(mw).toBeDefined();
       await mw.shutdown();
     });

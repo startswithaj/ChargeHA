@@ -11,7 +11,6 @@ import { TypedEventEmitter } from "../../../../server/src/services/TypedEventEmi
 import { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
 import { EnergyPluginRegistry } from "@chargeha/server/bootstrap/EnergyPluginRegistry";
 import { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
-import type { EnergyAdapterManager } from "../../../../server/src/services/EnergyAdapterManager.ts";
 import { throwingMock } from "../../../../server/src/test-helpers/throwingMock.ts";
 import type { TeslaServiceIo } from "./TeslaService.ts";
 import { Logger } from "@chargeha/server/lib/Logger";
@@ -78,10 +77,6 @@ describe("Tesla Plugin Router", () => {
       testLogger,
       vehicleRegistry,
     );
-    const energyManager = throwingMock<EnergyAdapterManager>(
-      "EnergyAdapterManager",
-    );
-
     const deps = PluginDependencies.create({
       db,
       vehicleManager,
@@ -89,7 +84,6 @@ describe("Tesla Plugin Router", () => {
         "ChargingPointManager",
         { ensureVehicleChargingPoint: () => Promise.resolve() },
       ),
-      energyManager,
       tunnel: {
         getUrl: () => null,
         start: () => Promise.reject(new Error("tunnel not mocked")),

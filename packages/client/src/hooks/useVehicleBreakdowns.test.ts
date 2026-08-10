@@ -14,6 +14,8 @@ const hoisted = vi.hoisted(() => ({
     queriesResults: [] as Array<
       { data: Record<string, unknown> | undefined; isPending: boolean }
     >,
+    // What the hook asked tRPC for: procedure name plus its input, in order.
+    queryCalls: [] as Array<{ procedure: string; input: unknown }>,
   },
 }));
 
@@ -34,15 +36,19 @@ vi.mock("../trpc.ts", () => ({
       },
     },
     useQueries: (fn: (t: Record<string, unknown>) => unknown[]) => {
-      // Call the factory to exercise the switch branches
-      const t = {
-        stats: {
-          day: vi.fn((..._args: unknown[]) => ({})),
-          month: vi.fn((..._args: unknown[]) => ({})),
-          year: vi.fn((..._args: unknown[]) => ({})),
-        },
+      // Record what the factory requests so the period → procedure mapping
+      // and the query inputs are assertable.
+      const record = (procedure: string) => (input: unknown) => {
+        hoisted.state.queryCalls.push({ procedure, input });
+        return {};
       };
-      fn(t);
+      fn({
+        stats: {
+          day: record("day"),
+          month: record("month"),
+          year: record("year"),
+        },
+      });
       return hoisted.state.queriesResults;
     },
   },
@@ -100,6 +106,64 @@ describe("useVehicleBreakdowns", () => {
     hoisted.state.listData = undefined;
     hoisted.state.listIsPending = false;
     hoisted.state.queriesResults = [];
+    hoisted.state.queryCalls = [];
+  });
+
+  describe("query inputs per period", () => {
+    const tz = -(new Date().getTimezoneOffset() / 60);
+
+    const runWithOneVehicle = (overrides: Partial<Args>) => {
+      hoisted.state.listData = { vehicles: [{ id: "VIN1", name: "Model 3" }] };
+      hoisted.state.queriesResults = [{ data: undefined, isPending: false }];
+      runHook(overrides);
+      return hoisted.state.queryCalls;
+    };
+
+    it("day period asks stats.day for the cursor date", () => {
+      const calls = runWithOneVehicle({ period: "day" });
+
+      expect(calls).toEqual([{
+        procedure: "day",
+        input: {
+          date: "2026-01-15",
+          vehicleId: "VIN1",
+          tz,
+          resolution: undefined,
+        },
+      }]);
+    });
+
+    it("day period forwards the 15m resolution", () => {
+      const calls = runWithOneVehicle({ period: "day", resolution: "15m" });
+
+      expect(calls).toEqual([{
+        procedure: "day",
+        input: {
+          date: "2026-01-15",
+          vehicleId: "VIN1",
+          tz,
+          resolution: "15m",
+        },
+      }]);
+    });
+
+    it("month period asks stats.month with a 1-based month", () => {
+      const calls = runWithOneVehicle({ period: "month" });
+
+      expect(calls).toEqual([{
+        procedure: "month",
+        input: { year: 2026, month: 1, vehicleId: "VIN1", tz },
+      }]);
+    });
+
+    it("year period asks stats.year with no month", () => {
+      const calls = runWithOneVehicle({ period: "year" });
+
+      expect(calls).toEqual([{
+        procedure: "year",
+        input: { year: 2026, vehicleId: "VIN1", tz },
+      }]);
+    });
   });
 
   it("returns defaults when no vehicles and no data", () => {

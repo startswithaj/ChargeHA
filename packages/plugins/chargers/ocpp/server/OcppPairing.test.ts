@@ -90,7 +90,7 @@ describe("OCPP pairing", () => {
     cs.attach(socket as unknown as WebSocket, { chargerId: CP });
 
     expect(cs.getData(CP).connected).toBe(true);
-    expect(cs.pairingState().announcedId).toBe(CP);
+    expect(cs.pairingState().seen.map((c) => c.chargerId)).toEqual([CP]);
   });
 
   it("surfaces vendor and model from BootNotification even with no charger row", async () => {
@@ -104,8 +104,8 @@ describe("OCPP pairing", () => {
 
     expect(reply.messageTypeId).toBe(3); // CALLRESULT
     expect((reply.payloadOrCode as { status: string }).status).toBe("Accepted");
-    expect(cs.pairingState().info?.vendor).toBe("ACME");
-    expect(cs.pairingState().info?.model).toBe("Wallbox9000");
+    expect(cs.pairingState().seen[0].info?.vendor).toBe("ACME");
+    expect(cs.pairingState().seen[0].info?.model).toBe("Wallbox9000");
   });
 
   it("refuses StartTransaction from an id with no charger row", async () => {

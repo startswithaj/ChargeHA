@@ -7,7 +7,6 @@ import { Logger } from "@chargeha/server/lib/Logger";
 import { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import type { VehicleManager } from "@chargeha/server/services/VehicleManager";
 import type { ChargingPointManager } from "@chargeha/server/services/ChargingPointManager";
-import type { EnergyAdapterManager } from "../../../../server/src/services/EnergyAdapterManager.ts";
 import { throwingMock } from "../../../../server/src/test-helpers/throwingMock.ts";
 
 describe("TeslaTokenManager", () => {
@@ -21,7 +20,6 @@ describe("TeslaTokenManager", () => {
         "ChargingPointManager",
         { ensureVehicleChargingPoint: () => Promise.resolve() },
       ),
-      energyManager: throwingMock<EnergyAdapterManager>("EnergyAdapterManager"),
       tunnel: {
         getUrl: () => null,
         start: () => Promise.reject(new Error("tunnel not mocked")),
@@ -62,7 +60,6 @@ describe("TeslaTokenManager", () => {
         "ChargingPointManager",
         { ensureVehicleChargingPoint: () => Promise.resolve() },
       ),
-      energyManager: throwingMock<EnergyAdapterManager>("EnergyAdapterManager"),
       tunnel: {
         getUrl: () => null,
         start: () => Promise.reject(new Error("tunnel not mocked")),
@@ -363,24 +360,48 @@ describe("TeslaTokenManager", () => {
       freshDb.close();
     });
 
-    it("token access still works after credentials change", async () => {
+    it("refreshes with the current client_id after credentials change", async () => {
       await db.setPluginConfig("tesla.client_id", "refresh-client-id");
       await db.setPluginConfig("tesla.client_secret", "refresh-secret");
 
-      const d = makeDeps(db);
-      const m = new TeslaTokenManager(d, testLogger);
+      const bodies: string[] = [];
+      const fakeFetch = (_url: string | URL | Request, init?: RequestInit) => {
+        bodies.push(String(init?.body));
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              access_token: "fresh-access",
+              refresh_token: "fresh-refresh",
+              expires_in: 3600,
+            }),
+            { status: 200 },
+          ),
+        );
+      };
+      const m = new TeslaTokenManager(makeDeps(db), testLogger, fakeFetch);
 
-      const expiresAt = new Date(Date.now() + 3600000).toISOString();
-      await seedTokens(db, "access-token", "refresh-token", expiresAt);
+      try {
+        // Unexpired: served from storage, so no refresh request is made.
+        const valid = new Date(Date.now() + 3600000).toISOString();
+        await seedTokens(db, "access-token", "refresh-token", valid);
+        expect(await m.getAccessToken()).toBe("access-token");
+        expect(bodies).toHaveLength(0);
 
-      const token = await m.getAccessToken();
-      expect(token).toBe("access-token");
+        // Credentials rotate, and the stored token expires — the refresh must
+        // use the new client_id, not the one captured at construction.
+        await db.setPluginConfig("tesla.client_id", "updated-client-id");
+        const expired = new Date(Date.now() - 1000).toISOString();
+        await seedTokens(db, "access-token", "refresh-token", expired);
 
-      await db.setPluginConfig("tesla.client_id", "updated-client-id");
-
-      const token2 = await m.getAccessToken();
-      expect(token2).toBe("access-token");
-      m.stopAutoRefresh();
+        expect(await m.getAccessToken()).toBe("fresh-access");
+        expect(bodies).toHaveLength(1);
+        const params = new URLSearchParams(bodies[0]);
+        expect(params.get("client_id")).toBe("updated-client-id");
+        expect(params.get("grant_type")).toBe("refresh_token");
+        expect(params.get("refresh_token")).toBe("refresh-token");
+      } finally {
+        m.stopAutoRefresh();
+      }
     });
   });
 });

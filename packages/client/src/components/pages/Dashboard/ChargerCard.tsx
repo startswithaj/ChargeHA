@@ -13,11 +13,11 @@ import {
   Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { ChargerState, ChargingPointMode } from "@chargeha/shared";
-
-// Mirrors ChargingPointManager's VehicleResolution["kind"] — kept local
-// since the type isn't shared, only the tRPC output that carries it.
-type VehicleResolutionKind = "linked" | "inferred" | "ambiguous" | "none";
+import type {
+  ChargerState,
+  ChargingPointMode,
+  VehicleResolutionKind,
+} from "@chargeha/shared";
 
 // Mirrors ChargingPointManager's ControlPath["owner"]. "vehicle_api" only ever
 // describes a SMART charger gone passive — getControlPath returns "self" for a
@@ -33,19 +33,9 @@ import {
   CHARGERS_ANCHOR_ID,
   revealSettingsSection,
 } from "../../../lib/settingsAnchors.ts";
+import { CHARGER_STATUS_LABELS } from "../../../lib/chargerLabels.ts";
 import { Spinner } from "../../ui/Spinner.tsx";
 import layout from "../../ui/CardLayout.module.css";
-
-const STATUS_LABELS: Record<ChargerState["status"], string> = {
-  available: "Available",
-  preparing: "Preparing",
-  charging: "Charging",
-  suspended: "Suspended",
-  faulted: "Faulted",
-  finishing: "Finishing",
-  no_draw: "No draw",
-  unconfigured: "Setup needed",
-};
 
 const STATUS_BADGE_COLORS: Record<
   ChargerState["status"],
@@ -170,12 +160,12 @@ function getStatusText(
   if (state.status === "unconfigured") {
     return state.statusDetail
       ? sentenceCase(state.statusDetail)
-      : STATUS_LABELS.unconfigured;
+      : CHARGER_STATUS_LABELS.unconfigured;
   }
   if (state.isCharging) {
     return `${label}Charging at ${kwValue((state.chargePowerKw ?? 0) * 1000)}`;
   }
-  return `${label}${STATUS_LABELS[state.status]}`;
+  return `${label}${CHARGER_STATUS_LABELS[state.status]}`;
 }
 
 /** What the charger resolved to, in the user's words.
@@ -366,7 +356,7 @@ export function ChargerCard(
           variant="soft"
           color={state ? STATUS_BADGE_COLORS[state.status] : "gray"}
         >
-          {state ? STATUS_LABELS[state.status] : "Connecting"}
+          {state ? CHARGER_STATUS_LABELS[state.status] : "Connecting"}
         </Badge>
       </div>
 

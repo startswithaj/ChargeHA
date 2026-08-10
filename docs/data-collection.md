@@ -89,10 +89,9 @@ interval.
 
 ## Vehicle data collection
 
-The vehicle path was previously timer-driven (a per-vehicle `VehiclePoller` with
-adaptive intervals). It is now **request-driven** through a middleware layer.
-Rationale and migration history live in
-`docs/design-vehicle-data-middleware.md`.
+The vehicle path is **request-driven** through a middleware layer. The
+controller asks for a vehicle's state each loop and the plugin's middleware
+decides whether to serve cache, probe, fetch, or wake.
 
 ### Vehicle adapters
 
@@ -191,8 +190,8 @@ Source: `packages/server/src/services/VehicleFetchLogger.ts`
 
 A small subscriber on `vehicle_update` that writes a row to the
 `vehicle_poll_logs` table for every successful fetch (battery / plug / charging
-/ amps snapshot). The table keeps the legacy "poll" name because renaming would
-require a migration; it is now populated on-demand, not from a timer.
+/ amps snapshot). Rows are written on demand, when a fetch happens. The table
+keeps the "poll" name because renaming it would require a migration.
 
 ## Data recording
 

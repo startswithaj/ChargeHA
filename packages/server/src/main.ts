@@ -1,10 +1,13 @@
-import { loadEnv } from "@chargeha/server/lib/loadEnv";
-import { bootstrap } from "@chargeha/server/bootstrap";
+import { loadEnv } from "./lib/loadEnv.ts";
+import { bootstrap } from "./bootstrap/bootstrap.ts";
 import { registerPlugins } from "@chargeha/plugins/registerPlugins";
 
 // Load .env into the environment before bootstrap reads it.
 await loadEnv();
 
+// The plugin list is passed in, never imported by the server itself — that
+// inversion is what keeps `server` free of a dependency on `plugins`. Nothing
+// imports this file, so naming both packages here creates no cycle.
 const { shutdown } = await bootstrap(registerPlugins);
 
 Deno.addSignalListener("SIGINT", async () => {

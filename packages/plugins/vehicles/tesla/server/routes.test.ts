@@ -4,7 +4,6 @@ import { AppDatabase } from "@chargeha/server/db";
 import { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import type { VehicleManager } from "@chargeha/server/services/VehicleManager";
 import type { ChargingPointManager } from "@chargeha/server/services/ChargingPointManager";
-import type { EnergyAdapterManager } from "../../../../server/src/services/EnergyAdapterManager.ts";
 import { throwingMock } from "../../../../server/src/test-helpers/throwingMock.ts";
 import { Logger } from "@chargeha/server/lib/Logger";
 import { TeslaTokenManager } from "./TeslaTokenManager.ts";
@@ -24,7 +23,6 @@ describe("Tesla HTTP routes", () => {
         "ChargingPointManager",
         { ensureVehicleChargingPoint: () => Promise.resolve() },
       ),
-      energyManager: throwingMock<EnergyAdapterManager>("EnergyAdapterManager"),
       tunnel: {
         getUrl: () => null,
         start: () => Promise.reject(new Error("tunnel not mocked")),

@@ -5,9 +5,9 @@ Standalone OCPP 1.6 virtual charge point for local development, using
 (Apache-2.0). Built from a pinned git clone in `Dockerfile` — upstream source is
 not vendored into this repo.
 
-Unlike `devtools/ocpp-simulator` (a simple charge point), this simulator adds a
-physics-based EV battery/SoC model and real smart-charging throttling: it reads
-`SetChargingProfile` limits and caps its simulated power draw to match.
+Unlike the retired vcp simulator, this one adds a physics-based EV battery/SoC
+model and real smart-charging throttling: it reads `SetChargingProfile` limits
+and caps its simulated power draw to match.
 
 ## Usage
 
@@ -15,32 +15,32 @@ Start the dev server first, then:
 
 ```sh
 deno task dev
-docker compose -f devtools/sap-simulator/docker-compose.yml up -d --build
+docker compose -f devtools/sap-ocpp-simulator/docker-compose.yml up -d --build
 ```
 
-- Charge point id: `vcp-dev-2`
-- Connects to: `ws://host.docker.internal:8000/api/charger/ocpp/vcp-dev-2`
+- Charge point id: `sap-dev`
+- Connects to: `ws://host.docker.internal:8000/api/charger/ocpp/sap-dev`
 - Admin UI API: `ws://localhost:18080` (basic auth `admin` / `admin`)
 
 Logs:
 
 ```sh
-docker compose -f devtools/sap-simulator/docker-compose.yml logs -f
+docker compose -f devtools/sap-ocpp-simulator/docker-compose.yml logs -f
 ```
 
 Stop:
 
 ```sh
-docker compose -f devtools/sap-simulator/docker-compose.yml down
+docker compose -f devtools/sap-ocpp-simulator/docker-compose.yml down
 ```
 
 ## How the id and URL work
 
-- `station-template.json` sets `"baseName": "vcp-dev-2"` and
-  `"fixedName": true`. `fixedName: true` makes the simulator use `baseName`
-  unchanged as the charge point id (no numeric suffix). `config.json` sets
-  `numberOfStations: 1` for this template — with `fixedName: true`, more than
-  one station would collide on the same id.
+- `station-template.json` sets `"baseName": "sap-dev"` and `"fixedName": true`.
+  `fixedName: true` makes the simulator use `baseName` unchanged as the charge
+  point id (no numeric suffix). `config.json` sets `numberOfStations: 1` for
+  this template — with `fixedName: true`, more than one station would collide on
+  the same id.
 - `config.json`'s `supervisionUrls` is
   `ws://host.docker.internal:8000/api/charger/ocpp` — the simulator appends
   `/<chargingStationId>` itself, giving the URL above, which matches our
@@ -52,18 +52,18 @@ docker compose -f devtools/sap-simulator/docker-compose.yml down
 The app only adopts a charge point id already configured on an OCPP charger row,
 unless the panel's pairing mode ("Listen") is active — in which case an
 unrecognised id is accepted provisionally so you can pair it. Either pair
-`vcp-dev-2` via the panel, or add an OCPP charger row configured with that id
+`sap-dev` via the panel, or add an OCPP charger row configured with that id
 before starting the container.
 
 ## The EV / battery model
 
 - `station-template.json` sets `"coherentMeterValues": true` and
-  `"evProfilesFile": "ev-profiles-vcp-dev-2.json"`. This turns on the
-  simulator's physics-based MeterValues generation (voltage → power → current →
-  energy → SoC) instead of random values.
-- `ev-profiles-vcp-dev-2.json` describes the simulated car: battery capacity,
-  max onboard charge power, starting SoC range, and a charging curve (power
-  fraction vs. SoC, e.g. tapering near full).
+  `"evProfilesFile": "ev-profiles-sap-dev.json"`. This turns on the simulator's
+  physics-based MeterValues generation (voltage → power → current → energy →
+  SoC) instead of random values.
+- `ev-profiles-sap-dev.json` describes the simulated car: battery capacity, max
+  onboard charge power, starting SoC range, and a charging curve (power fraction
+  vs. SoC, e.g. tapering near full).
 - The connector's `MeterValues` array in `station-template.json` explicitly
   declares `Current.Import`, `Voltage`, `Power.Active.Import`, and
   `Energy.Active.Import.Register` (plus `SoC`). Coherent mode only fills in
@@ -72,7 +72,7 @@ before starting the container.
 
 ### Changing the simulated car
 
-Edit `ev-profiles-vcp-dev-2.json`:
+Edit `ev-profiles-sap-dev.json`:
 
 - `batteryCapacityWh` — pack size.
 - `maxPowerW` — max power the car's onboard charger will draw (the station's own
@@ -84,7 +84,7 @@ Edit `ev-profiles-vcp-dev-2.json`:
 
 Multiple profiles can be listed with a `weight` each, and one is picked at
 random per transaction. Rebuild after editing:
-`docker compose -f devtools/sap-simulator/docker-compose.yml up -d --build`.
+`docker compose -f devtools/sap-ocpp-simulator/docker-compose.yml up -d --build`.
 
 ## Smart charging / throttling
 
@@ -112,5 +112,5 @@ bundler's copy glob only picks up that path, not `station-templates/`.
 
 ## Multiple chargers
 
-Same pattern as `ocpp-simulator`: give each instance its own compose project
-name, station template baseName/id, and host port.
+Give each instance its own compose project name, station template baseName/id,
+and host port.

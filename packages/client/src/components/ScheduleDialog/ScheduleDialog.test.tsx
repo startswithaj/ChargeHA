@@ -321,6 +321,82 @@ describe("ScheduleForm", () => {
     expect(stepperButtons(symbol)[1]).toBeDisabled();
   });
 
+  const chargerProps = {
+    ...defaultProps,
+    vehicleId: null,
+    chargerId: "charger-1",
+  };
+
+  const socNote = /reports its battery level \(SOC\) through its API/;
+
+  it("renders the charge limit at 100% for a new charger schedule", () => {
+    renderWithProviders(<ScheduleForm {...chargerProps} />);
+
+    expect(screen.getByText("Charge Limit")).toBeInTheDocument();
+    expect(screen.getByText("100%")).toBeInTheDocument();
+  });
+
+  it("shows the SOC helper note on a charger schedule", () => {
+    renderWithProviders(<ScheduleForm {...chargerProps} />);
+
+    expect(screen.getByText(socNote)).toBeInTheDocument();
+  });
+
+  it("omits the SOC helper note on a vehicle schedule", () => {
+    renderWithProviders(<ScheduleForm {...defaultProps} />);
+
+    expect(screen.queryByText(socNote)).not.toBeInTheDocument();
+  });
+
+  it("submits the charge limit for a charger schedule", async () => {
+    const onSave = vi.fn().mockResolvedValue(null);
+
+    renderWithProviders(<ScheduleForm {...chargerProps} onSave={onSave} />);
+
+    clickStepper("limit", "-");
+    submitForm();
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chargerId: "charger-1",
+          vehicleId: null,
+          chargeLimitPct: 95,
+        }),
+      );
+    });
+  });
+
+  it("shows an existing charger schedule's limit when editing", () => {
+    renderWithProviders(
+      <ScheduleForm
+        {...chargerProps}
+        editingSchedule={makeEditingSchedule({
+          vehicleId: null,
+          chargerId: "charger-1",
+          chargeLimitPct: 70,
+        })}
+      />,
+    );
+
+    expect(screen.getByText("70%")).toBeInTheDocument();
+  });
+
+  it("falls back to 100% for a charger schedule stored without a limit", () => {
+    renderWithProviders(
+      <ScheduleForm
+        {...chargerProps}
+        editingSchedule={makeEditingSchedule({
+          vehicleId: null,
+          chargerId: "charger-1",
+          chargeLimitPct: null,
+        })}
+      />,
+    );
+
+    expect(screen.getByText("100%")).toBeInTheDocument();
+  });
+
   it("populates form with editing schedule data for charge type", () => {
     renderWithProviders(
       <ScheduleForm

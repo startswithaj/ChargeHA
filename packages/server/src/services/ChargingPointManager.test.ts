@@ -106,6 +106,7 @@ describe("ChargingPointManager", () => {
         middlewares.set(row.id, mw);
         return Promise.resolve(mw);
       },
+      onChargerRemoved: () => {},
     }));
   };
 

@@ -593,7 +593,6 @@ export async function bootstrap(
       db,
       vehicleManager: services.vehicleManager,
       chargingPoints: services.chargingPointManager,
-      energyManager: services.energyManager,
       tunnel: {
         getUrl: () => services.tunnelManager.tunnelUrl,
         start: async () => ({ url: await services.tunnelManager.start() }),
@@ -628,15 +627,23 @@ export async function bootstrap(
 
   return {
     shutdown: async () => {
+      // Every step runs even if an earlier one throws, so one bad plugin
+      // cannot leave the tunnel up or the DB open.
+      const step = async (name: string, fn: () => Promise<void> | void) => {
+        try {
+          await fn();
+        } catch (err) {
+          serverLogger.error(`Shutdown step "${name}" failed:`, err);
+        }
+      };
       // Stop the HTTP server first so in-flight requests don't hit a closed DB.
-      await server.shutdown();
+      await step("http server", () => server.shutdown());
       // Tesla plugin's shutdown() reaps the tesla-http-proxy subprocess
-      await vehicleRegistry.shutdownAll();
-      await energyRegistry.shutdownAll();
-      await chargerRegistry.shutdownAll();
-
-      await services.tunnelManager.stop();
-      db.close();
+      await step("vehicle plugins", () => vehicleRegistry.shutdownAll());
+      await step("energy plugins", () => energyRegistry.shutdownAll());
+      await step("charger plugins", () => chargerRegistry.shutdownAll());
+      await step("tunnel", () => services.tunnelManager.stop());
+      await step("database", () => db.close());
     },
   };
 }

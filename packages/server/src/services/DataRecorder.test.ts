@@ -104,6 +104,12 @@ describe("DataRecorder", () => {
     emitter.emit("energy_update", { ...data, ...CUMULATIVE_DEFAULTS });
   }
 
+  /** Rows actually written to vehicle_charge_readings, oldest first. */
+  const chargeReadingVehicleIds = (database: AppDatabase): string[] =>
+    (testable(database).sqlite.prepare(
+      "SELECT vehicle_id FROM vehicle_charge_readings ORDER BY id",
+    ).all() as Array<{ vehicle_id: string }>).map((r) => r.vehicle_id);
+
   let db: AppDatabase;
   let vehicleManager: MockRecorderVehicleManager;
   let tariffService: TariffService;
@@ -136,9 +142,24 @@ describe("DataRecorder", () => {
   });
 
   describe("energy_update subscription", () => {
-    it("stores latest realtime data from event", () => {
+    it("stores latest realtime data from event", async () => {
       feedEnergy(emitter, ENERGY_DATA);
-      // No crash — data stored internally
+      // A second event must overwrite the first: the recorder keeps the
+      // latest snapshot, not the one it happened to see first.
+      feedEnergy(emitter, { ...ENERGY_DATA, solarProductionW: 1234 });
+
+      await testable(recorder).record();
+
+      const readings = await db.getRecentReadings(10);
+      expect(readings).toHaveLength(1);
+      expect(readings[0].solarProductionW).toBe(1234);
+    });
+
+    it("records nothing until an energy_update arrives", async () => {
+      await testable(recorder).record();
+
+      const readings = await db.getRecentReadings(10);
+      expect(readings).toHaveLength(0);
     });
   });
 
@@ -396,6 +417,7 @@ describe("DataRecorder", () => {
 
       const readings = await db.getRecentReadings(10);
       expect(readings).toHaveLength(1);
+      expect(chargeReadingVehicleIds(db)).toEqual(["VIN1"]);
     });
 
     it("does not record vehicle charge data for non-charging vehicles", async () => {
@@ -411,6 +433,8 @@ describe("DataRecorder", () => {
 
       const readings = await db.getRecentReadings(10);
       expect(readings).toHaveLength(1);
+      // The energy reading is still written; the charge table must stay empty.
+      expect(chargeReadingVehicleIds(db)).toEqual([]);
     });
 
     it("handles multiple charging vehicles with solar attribution", async () => {
@@ -803,14 +827,90 @@ describe("DataRecorder", () => {
   });
 
   describe("pruning logic", () => {
+    /** Drives the recorder's own prune tick (every 100th) and reports the
+     *  retention day counts it passed to each prune call. */
+    const pruneDaysOnTick = async (): Promise<{
+      energy: number[];
+      charge: number[];
+      pollLogs: number[];
+      pluginLogs: number[];
+    }> => {
+      const calls = {
+        energy: [] as number[],
+        charge: [] as number[],
+        pollLogs: [] as number[],
+        pluginLogs: [] as number[],
+      };
+      const stubs = [
+        stub(db, "pruneEnergyReadings", (d: number) => {
+          calls.energy.push(d);
+          return Promise.resolve();
+        }),
+        stub(db, "pruneVehicleChargeReadings", (d: number) => {
+          calls.charge.push(d);
+          return Promise.resolve();
+        }),
+        stub(db, "pruneVehiclePollLogs", (d: number) => {
+          calls.pollLogs.push(d);
+          return Promise.resolve();
+        }),
+        stub(db, "prunePluginLogs", (d: number) => {
+          calls.pluginLogs.push(d);
+          return Promise.resolve();
+        }),
+      ];
+      try {
+        // 99 ticks already elapsed, so this one is the pruning tick.
+        testable(recorder).tickCount = 99;
+        await testable(recorder).tick();
+      } finally {
+        stubs.forEach((s) => s.restore());
+        await recorder.stop();
+      }
+      return calls;
+    };
+
     it("prunes old data based on retention days", async () => {
       feedEnergy(emitter, ENERGY_DATA);
-      await db.setConfig("data_retention_days", "730");
+      // Deliberately not the 730 default, so a hardcoded fallback fails here.
+      await db.setConfig("data_retention_days", "365");
+      await db.setConfig("log_retention_days", "3");
 
-      const val = await db.getConfig("data_retention_days");
-      const days = parseInt(val ?? "730", 10) || 730;
-      await db.pruneEnergyReadings(days);
-      await db.pruneVehicleChargeReadings(days);
+      const calls = await pruneDaysOnTick();
+
+      expect(calls.energy).toEqual([365]);
+      expect(calls.charge).toEqual([365]);
+      expect(calls.pollLogs).toEqual([365]);
+      // Plugin logs use the separate, shorter log retention.
+      expect(calls.pluginLogs).toEqual([3]);
+    });
+
+    it("falls back to default retention when config is unset", async () => {
+      feedEnergy(emitter, ENERGY_DATA);
+
+      const calls = await pruneDaysOnTick();
+
+      expect(calls.energy).toEqual([730]);
+      expect(calls.charge).toEqual([730]);
+      expect(calls.pollLogs).toEqual([730]);
+      expect(calls.pluginLogs).toEqual([30]);
+    });
+
+    it("does not prune on a non-hundredth tick", async () => {
+      feedEnergy(emitter, ENERGY_DATA);
+      const pruned: number[] = [];
+      const s = stub(db, "pruneEnergyReadings", (d: number) => {
+        pruned.push(d);
+        return Promise.resolve();
+      });
+      try {
+        testable(recorder).tickCount = 0;
+        await testable(recorder).tick();
+      } finally {
+        s.restore();
+        await recorder.stop();
+      }
+      expect(pruned).toEqual([]);
     });
   });
 });

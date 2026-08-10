@@ -62,7 +62,12 @@ export async function checkTeslaProxyHealth(
  * awaits so teardown never races an in-flight boot.
  */
 export class TeslaVehiclePlugin implements VehiclePlugin, ChargerPlugin {
-  private readonly middlewares = new Map<string, TeslaVehicleMiddleware>();
+  // Promises, not instances: the vehicle and charger paths can ask for the
+  // same VIN concurrently, and caching only the result would build two.
+  private readonly middlewares = new Map<
+    string,
+    Promise<TeslaVehicleMiddleware>
+  >();
 
   readonly id = "tesla";
   readonly displayName = "Tesla";
@@ -117,11 +122,19 @@ export class TeslaVehiclePlugin implements VehiclePlugin, ChargerPlugin {
     return await this.sharedMiddleware(row);
   }
 
-  private async sharedMiddleware(
-    row: VehicleRow,
-  ): Promise<TeslaVehicleMiddleware> {
+  private sharedMiddleware(row: VehicleRow): Promise<TeslaVehicleMiddleware> {
     const existing = this.middlewares.get(row.id);
     if (existing) return existing;
+    const created = this.buildMiddleware(row);
+    this.middlewares.set(row.id, created);
+    // A failed build must not be cached, or the VIN can never be retried.
+    created.catch(() => this.middlewares.delete(row.id));
+    return created;
+  }
+
+  private async buildMiddleware(
+    row: VehicleRow,
+  ): Promise<TeslaVehicleMiddleware> {
     const proxyUrl = (await this.deps.getConfig("proxy_url")) ??
       DEFAULT_PROXY_URL;
     const adapter = new TeslaAdapter(
@@ -131,9 +144,7 @@ export class TeslaVehiclePlugin implements VehiclePlugin, ChargerPlugin {
       this.deps.log,
       this.deps.dbLog,
     );
-    const middleware = new TeslaVehicleMiddleware(adapter, this.deps.log);
-    this.middlewares.set(row.id, middleware);
-    return middleware;
+    return new TeslaVehicleMiddleware(adapter, this.deps.log);
   }
 
   async createChargerMiddleware(row: ChargerRow): Promise<ChargerMiddleware> {

@@ -39,8 +39,6 @@ vi.mock("./trpc.ts", () => ({
                 pairing: {
                   armed: false,
                   expiresAt: null,
-                  announcedId: null,
-                  info: null,
                   seen: [],
                 },
                 knocking: null,

@@ -14,5 +14,7 @@ coverage_*
 docs/
 prds/
 devtools/
-# Except the e2e device simulator — its image builds from the repo root
+# Except the device simulators — their images build from the repo root, so
+# excluding them here makes their own COPY lines fail to resolve.
 !devtools/tapo-simulator/
+!devtools/sap-ocpp-simulator/
