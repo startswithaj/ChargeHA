@@ -26,7 +26,7 @@ describe("loadEnv", () => {
     // Guards the regression where a restructure dropped .env loading entirely,
     // leaving ENCRYPTION_KEY (which has no code default) unset.
     const src = await Deno.readTextFile(
-      new URL("../../../app/main.ts", import.meta.url),
+      new URL("../main.ts", import.meta.url),
     );
     expect(src).toContain("loadEnv()");
   });

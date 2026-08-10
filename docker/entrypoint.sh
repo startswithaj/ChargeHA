@@ -19,4 +19,4 @@ exec deno run \
   --allow-sys=networkInterfaces \
   --unstable-ffi \
   --unsafely-ignore-certificate-errors=localhost \
-  packages/app/main.ts
+  packages/server/src/main.ts

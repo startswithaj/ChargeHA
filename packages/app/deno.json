@@ -1,7 +1,0 @@
-{
-  "name": "@chargeha/app",
-  "version": "0.0.1",
-  "exports": {
-    ".": "./main.ts"
-  }
-}

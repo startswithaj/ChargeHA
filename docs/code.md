@@ -22,8 +22,8 @@
 | Build          | Vite (client), Deno (server)                                 |
 | Misc           | qrcode.react (QR codes)                                      |
 
-Deno workspace with five members: `packages/app/`, `packages/shared/`,
-`packages/server/`, `packages/client/`, `packages/plugins/`.
+Deno workspace with four members: `packages/shared/`, `packages/server/`,
+`packages/client/`, `packages/plugins/`.
 
 ### Dev server flag
 
@@ -35,9 +35,6 @@ see denoland/deno#28632. Remove once this behavior becomes Deno's default.
 ## Project Structure
 
 ```
-packages/app/
-  main.ts                    — Entry point. The only file that imports both the
-                               server and the list of plugins, and wires them together.
 packages/shared/
   types.ts                   — All shared types (EnergyData, VehicleChargeState,
                                StatsResponse, Schedule, VehicleRow, ChargerRow, etc.)
@@ -63,6 +60,9 @@ packages/plugins/
     tesla/                      — Tesla Fleet API plugin (adapter, proxy, tokens, router)
     simulated/                  — Simulated vehicle for dev/demo
 packages/server/src/
+  main.ts                    — Entry point. The only file that names both the
+                               server and the list of plugins, and wires them
+                               together. Nothing imports it.
   healthcheck.ts             — Standalone health probe (used by Docker)
   bootstrap/                 — App creation, service wiring, lifecycle, and the
                                EnergyPluginRegistry / VehiclePluginRegistry that
@@ -133,8 +133,8 @@ Plugin routers are merged into the app router dynamically via
 Imports flow one way. There are no exceptions.
 
 ```
-app  ──▶  server  ──▶  shared
- └───▶  plugins  ──▶  server  ──▶  shared
+main.ts  ──▶  server  ──▶  shared
+   └─────▶  plugins  ──▶  server  ──▶  shared
 ```
 
 - **`shared` imports nothing** from the other packages.
@@ -143,7 +143,9 @@ app  ──▶  server  ──▶  shared
   import.
 - **`server` must never import `plugins`.** It reaches plugins through
   `@chargeha/shared/plugins` and the three registries instead.
-- **Only `packages/app` imports both**, and nothing imports `packages/app`.
+- **Only the entrypoint imports both.** `packages/server/src/main.ts` names the
+  server and the plugin list in the same file, which is safe because nothing
+  imports it — a cycle needs an import back in, and an entrypoint has none.
 
 When two packages import each other, that is a cycle. Cycles cause errors that
 point at the wrong file, and they drag the whole server into the client's
@@ -189,7 +191,8 @@ The plugin class already matches this, so nothing at the call site changes.
 **2. Startup code importing the list of plugins.**
 
 `bootstrap()` takes `registerPlugins` as an argument rather than importing it.
-`packages/app/main.ts` is the only file allowed to name which plugins exist.
+`packages/server/src/main.ts` is the only file allowed to name which plugins
+exist.
 
 **`import type` still counts.** TypeScript deletes those imports when it
 compiles, so they cost nothing at runtime — but Deno and Vite still follow them
@@ -200,8 +203,9 @@ real cycle.
 
 `deno info --json <file>` lists every file that file imports, directly or
 indirectly, including type-only imports. Follow those lists from both starting
-points — `packages/app/main.ts` and `packages/plugins/componentRegistry.ts` —
-since neither reaches the whole tree alone. Both must report zero cycles.
+points — `packages/server/src/main.ts` and
+`packages/plugins/componentRegistry.ts` — since neither reaches the whole tree
+alone. Both must report zero cycles.
 
 ## Wizard Steps
 
