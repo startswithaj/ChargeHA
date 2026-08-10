@@ -9,6 +9,7 @@
 import { useEffect, useRef } from "react";
 import { Badge, Button, Spinner, Text, TextField } from "@radix-ui/themes";
 import { Search } from "lucide-react";
+import { isLikelyDockerNetwork } from "@chargeha/shared/lanAddresses";
 
 /** Defaults `subnet` to the first server-detected LAN subnet, once, the
  *  first time detection results arrive with the field still untouched. Every
@@ -163,6 +164,15 @@ export function NetworkDeviceSearch<T extends NetworkSearchResult>(
             </Button>
           ))}
         </div>
+      )}
+
+      {isLikelyDockerNetwork(subnet) && (
+        <Text size="1" color="orange">
+          {subnet}.* looks like a Docker internal network, not your real one —
+          scanning it will find nothing. Enter the network your {deviceNoun}
+          {" "}
+          are on, usually starting with 192.168.
+        </Text>
       )}
 
       {isPending && (

@@ -2,13 +2,42 @@ import { useEffect, useState } from "react";
 import { Badge, Button, Code, Text, TextField } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
 import { Spinner, TestResultBadge, type TestStatus } from "../../../hostUi.ts";
+import {
+  isLikelyDockerNetwork,
+  isPrivateLanIpv4,
+} from "@chargeha/shared/lanAddresses";
 
-/** Fallback only, for the moment before the server reports its own addresses.
- *  The browser's location is the wrong answer — it is the address *you* typed,
- *  not one the charger can route to. */
-function browserGuessUrl(): string {
+const WS_PATH = "/api/charger/ocpp";
+const PLACEHOLDER_HOST = "<chargeha-lan-ip-address>";
+
+const hostOf = (wsUrl: string): string =>
+  wsUrl.split("://")[1]?.split(":")[0] ?? "";
+
+const wsUrlFor = (host: string): string => {
   const port = globalThis.location.port ? `:${globalThis.location.port}` : "";
-  return `ws://${globalThis.location.hostname}${port}/api/charger/ocpp`;
+  return `ws://${host}${port}${WS_PATH}`;
+};
+
+type AddressWarning = "docker" | "unknown" | null;
+
+/** Inside a container the host's LAN address is invisible to the server, but
+ *  the address the user reached us on is routable by definition. */
+function chooseBase(
+  serverUrls: string[],
+): { base: string; warn: AddressWarning } {
+  const { hostname } = globalThis.location;
+  const candidates = isPrivateLanIpv4(hostname)
+    ? [...serverUrls, wsUrlFor(hostname)]
+    : serverUrls;
+  const best = candidates.find((u) => !isLikelyDockerNetwork(hostOf(u))) ??
+    candidates[0];
+  if (best === undefined) {
+    return { base: wsUrlFor(PLACEHOLDER_HOST), warn: "unknown" };
+  }
+  return {
+    base: best,
+    warn: isLikelyDockerNetwork(hostOf(best)) ? "docker" : null,
+  };
 }
 
 const block = {
@@ -85,10 +114,32 @@ function Step(
 /** The address, plus the two shapes a charger's settings screen can take.
  *  Both get equal billing because chargers split roughly evenly between them —
  *  some want URL and ID separately, others one combined URL. */
-function AddressStep({ base, others }: { base: string; others: string[] }) {
+function AddressStep(
+  { base, others, warn }: {
+    base: string;
+    others: string[];
+    warn: AddressWarning;
+  },
+) {
   return (
     <div>
       <Code size="2">{base}</Code>
+      {warn === "docker" && (
+        <Text size="1" color="orange" as="div" style={{ marginTop: 6 }}>
+          {hostOf(base)}{" "}
+          looks like a Docker internal address, not your real network address —
+          your charger cannot reach it. Use the LAN address of the machine
+          running ChargeHA, usually starting with 192.168.
+        </Text>
+      )}
+      {warn === "unknown" && (
+        <Text size="1" color="orange" as="div" style={{ marginTop: 6 }}>
+          ChargeHA could not detect its own network address. Replace{" "}
+          <Code size="1">{PLACEHOLDER_HOST}</Code>{" "}
+          with the LAN address of the machine running ChargeHA — usually starts
+          with 192.168.
+        </Text>
+      )}
       <Text size="1" color="gray" as="div" style={{ marginTop: 6 }}>
         Leave your charger's own ID field as it is. If your charger has only one
         URL field, put any name on the end{" "}
@@ -346,7 +397,7 @@ function usePairingWindow() {
   const pairing = status.data?.pairing;
   const listening = pairing?.armed === true;
   const baseUrls = status.data?.baseUrls ?? [];
-  const base = baseUrls[0] ?? browserGuessUrl();
+  const { base, warn } = chooseBase(baseUrls);
   const expiresAt = pairing?.expiresAt ?? null;
 
   // The deadline on the local clock. Taken from the server's own "time left"
@@ -371,7 +422,9 @@ function usePairingWindow() {
     listening,
     seen: (pairing?.seen ?? []) as SeenCharger[],
     base,
-    baseUrls,
+    warn,
+    // The chosen address is shown on its own; this is only the alternates.
+    baseUrls: baseUrls.filter((u) => u !== base),
     port: base.split(":")[2]?.split("/")[0] ?? "",
     remainingMs: (deadline ?? now) - now,
     /** How long this window has been open with the user watching. Zero while
@@ -415,7 +468,7 @@ export function OcppConnectBlock(
   },
 ) {
   const pairing = usePairingWindow();
-  const { listening, seen, base, baseUrls, port, remainingMs } = pairing;
+  const { listening, seen, base, baseUrls, port, remainingMs, warn } = pairing;
 
   // Adopt the id the charger announced. Detecting it and then still showing
   // "not detected yet" until the user clicks a link is the contradiction this
@@ -450,7 +503,8 @@ export function OcppConnectBlock(
       <Step n={2} title="Put this address into your charger">
         <AddressStep
           base={base}
-          others={baseUrls.slice(1)}
+          others={baseUrls}
+          warn={warn}
         />
       </Step>
 
