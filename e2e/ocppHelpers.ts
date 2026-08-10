@@ -6,11 +6,11 @@ export const SAP_UI_URL = Deno.env.get("E2E_SAP_UI_URL") ??
   "ws://localhost:19998";
 const SAP_UI_USERNAME = "admin";
 const SAP_UI_PASSWORD = "admin";
-// The station id baked into docker/sap-e2e/station-template.json
+// The station id baked into devtools/sap-ocpp-simulator/config/e2e/station-templates/sap-test.station-template.json
 // (baseName + fixedName: true).
 export const SAP_STATION_ID = "sap-test";
 
-/** The second station (docker/sap-e2e/basic-station-template.json): reports
+/** The second station (devtools/sap-ocpp-simulator/config/e2e/station-templates/sap-basic.station-template.json): reports
  *  only the energy register, on a 60s interval. sap-test already reports
  *  every measurand we ask for, so it is this one that exercises negotiation. */
 export const SAP_BASIC_STATION_ID = "sap-basic";
@@ -142,7 +142,6 @@ function sapHashId(stationId: string = SAP_STATION_ID): Promise<string> {
  *  connect attempt (packages/plugins/chargers/ocpp/server/wsRoutes.ts) and
  *  the station then backs off for `retryBackOffRepeatInterval`-shaped delay —
  *  30s by default, which the row-creation step in `beforeAll` cannot beat.
- *  vcp doesn't need this: it retries on a hardcoded 2s loop (docker/vcp.Dockerfile).
  *  `openConnection`'s response status is not meaningful here — the SAP
  *  broadcast-channel response classifier (ChargingStationWorkerBroadcastChannel
  *  .commandResponseToResponseStatus) has no case for it and falls through to
@@ -179,6 +178,30 @@ export async function sapConfigValue(
   );
   return station?.ocppConfiguration.configurationKey
     ?.find((k) => k.key === key)?.value;
+}
+
+/** Connector 1's transaction state as the STATION holds it. The app's own
+ *  charger state only shows what it believes; this is what actually happened
+ *  on the wire, so a RemoteStart/RemoteStop that was never sent cannot pass. */
+export async function sapTransactionStarted(
+  stationId: string = SAP_STATION_ID,
+): Promise<boolean> {
+  const res = await sapUi.request<
+    {
+      chargingStations: {
+        stationInfo: { chargingStationId: string };
+        connectors: {
+          connectorId: number;
+          connectorStatus: { transactionStarted?: boolean };
+        }[];
+      }[];
+    }
+  >("listChargingStations", {});
+  const station = res.chargingStations.find((s) =>
+    s.stationInfo.chargingStationId === stationId
+  );
+  return station?.connectors.find((c) => c.connectorId === 1)
+    ?.connectorStatus.transactionStarted === true;
 }
 
 /** Inject a charger-initiated OCPP message via the SAP UI server. Replaces

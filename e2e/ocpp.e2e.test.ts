@@ -8,14 +8,18 @@ import {
   SAP_STATION_ID,
   sapConfigValue,
   sapReconnect,
+  sapTransactionStarted,
   vcpSend,
 } from "./ocppHelpers.ts";
 
 describe("OCPP e2e", () => {
-  // ocpp-sap's station id (docker/sap-e2e/station-template.json baseName) —
-  // distinct from ocpp-vcp's "vcp-test" so the two simulators, both started
-  // by the "ocpp" compose profile, don't evict each other's socket in the
-  // app on reconnect.
+  // ocpp-sap's first station id — the `baseName` in
+  // devtools/sap-ocpp-simulator/config/e2e/station-templates/sap-test.station-template.json.
+  // Distinct from the second station ("sap-basic") because two stations
+  // sharing one id would evict each other's socket in the app on every
+  // reconnect: OcppCentralSystem.attach() closes the previous socket for an
+  // id when a new one arrives, which is right for a real reconnect but
+  // thrashes forever between two stations both claiming the same id.
   const CP_ID = "sap-test";
 
   // No row exists until beforeAll's setConfig creates one with
@@ -50,8 +54,7 @@ describe("OCPP e2e", () => {
     // At stack startup there's no charger row yet, so the app 404s the
     // station's very first connect attempt. sap-test's own reconnect backoff
     // (30s) is too slow for the tests below, so force an immediate reconnect
-    // now that the row exists rather than racing it. vcp doesn't need this —
-    // it retries every 2s via a shell loop in docker/vcp.Dockerfile.
+    // now that the row exists rather than racing it.
     await sapReconnect();
   });
 
@@ -62,7 +65,7 @@ describe("OCPP e2e", () => {
       });
       return s.connected ? s : null;
     }, { label: "sap-test connected", timeoutMs: 60_000 });
-    // chargePointVendor/chargePointModel from docker/sap-e2e/station-template.json.
+    // chargePointVendor/chargePointModel from devtools/sap-ocpp-simulator/config/e2e/station-templates/sap-test.station-template.json.
     expect(status.info?.vendor).toBe("ChargeHA");
     expect(status.info?.model).toBe("ChargeHA AC7.4");
     expect(status.wsPath).toBe(`/api/charger/ocpp/${CP_ID}`);
@@ -124,16 +127,39 @@ describe("OCPP e2e", () => {
     }, { label: "meter values reflected" });
     expect(state.chargerVoltage).toBe(240);
     expect(state.chargeAmps).toBeCloseTo(30, 0);
-    expect(state.energyAddedKwh).toBeCloseTo(1.5, 1); // meterStart was 0
+
+    // energyAddedKwh = energyRegisterWh - meterStartWh. meterStartWh is
+    // normally set once, from the real StartTransaction (0 here) — but
+    // OcppCentralSystem's adopt path can instead win a race against that
+    // StartTransaction and baseline it to whatever register THIS test's own
+    // injected MeterValues happened to carry, if that message is processed
+    // first (a real race in the app: see OcppCentralSystem.adoptTransaction).
+    // Once set, the baseline is latched for the rest of the transaction, so
+    // re-injecting the same 1500Wh reading again can never correct it —
+    // asserting an absolute energyAddedKwh here would assume a baseline the
+    // test does not control. The DELTA between two distinct readings
+    // cancels meterStartWh out under either baseline, so it's what's
+    // actually guaranteed, and it still fails if energy accounting breaks
+    // (wrong scale, register not tracked, stuck value, etc).
+    const state2 = await waitFor(async () => {
+      await vcpSend("MeterValues", meterValuesPayload(9000, 3000));
+      const list = await trpc.charger.list.query();
+      const s = list.find((c) => c.state?.chargePowerKw === 9)?.state;
+      return s ?? null;
+    }, { label: "second meter values reflected" });
+    expect(state2.energyAddedKwh - state.energyAddedKwh).toBeCloseTo(1.5, 1);
   });
 
   it("SuspendedEV maps to suspended with raw statusDetail", async () => {
-    await vcpSend("StatusNotification", {
-      connectorId: 1,
-      errorCode: "NoError",
-      status: "SuspendedEV",
-    });
     const state = await waitFor(async () => {
+      // Re-inject each attempt, same reason as the MeterValues test above:
+      // a one-shot StatusNotification races the station's own periodic one
+      // and can be gone before the poll ever sees it.
+      await vcpSend("StatusNotification", {
+        connectorId: 1,
+        errorCode: "NoError",
+        status: "SuspendedEV",
+      });
       const list = await trpc.charger.list.query();
       const s = list.find((c) => c.state?.status === "suspended")?.state;
       return s ?? null;
@@ -144,12 +170,13 @@ describe("OCPP e2e", () => {
 
   it("Reserved maps to suspended with raw statusDetail", async () => {
     // Booked ≠ ready: Reserved must not read as "available" (STATUS_MAP).
-    await vcpSend("StatusNotification", {
-      connectorId: 1,
-      errorCode: "NoError",
-      status: "Reserved",
-    });
     const state = await waitFor(async () => {
+      // Re-injected per attempt too — see the SuspendedEV test above.
+      await vcpSend("StatusNotification", {
+        connectorId: 1,
+        errorCode: "NoError",
+        status: "Reserved",
+      });
       const s = (await ocppRow())?.state;
       return s?.statusDetail === "Reserved" ? s : null;
     }, { label: "reserved status" });
@@ -158,41 +185,47 @@ describe("OCPP e2e", () => {
   });
 
   it("stop mode sends RemoteStop and the transaction ends", async () => {
-    const list = await trpc.charger.list.query();
-    const charger = list.find((c) =>
-      c.chargerAdapterType === "ocpp" &&
-      (JSON.parse(c.chargerConfig) as { charger_id?: string }).charger_id ===
-        CP_ID
-    );
-    expect(charger).toBeTruthy();
-    await trpc.charger.setMode.mutate({
-      id: charger?.id ?? "",
-      mode: "stop",
+    const chargerId = await ocppRowId();
+    // Prove the precondition. remoteStop() falls back to suspendCharging()
+    // when it holds no transaction id, so without a live transaction this
+    // test would pass while proving nothing.
+    await waitFor(async () => await sapTransactionStarted() || null, {
+      label: "station transaction running before stop",
     });
-    await vcpSend("StatusNotification", {
-      connectorId: 1,
-      errorCode: "NoError",
-      status: "Finishing",
+
+    await trpc.charger.setMode.mutate({ id: chargerId, mode: "stop" });
+
+    // The station's own state, not a status the test injected: a remoteStop()
+    // that never sends RemoteStopTransaction must fail here.
+    await waitFor(async () => await sapTransactionStarted() ? null : true, {
+      label: "station ended the transaction after RemoteStop",
     });
-    // Wait for Finishing itself — !isCharging is already true from the
-    // earlier status-injection tests and would return a stale state.
+
     const state = await waitFor(async () => {
       const s = (await trpc.charger.list.query())
-        .find((c) => c.id === charger?.id)?.state;
-      return s?.status === "finishing" ? s : null;
-    }, { label: "stopped" });
-    expect(state.status).toBe("finishing");
+        .find((c) => c.id === chargerId)?.state;
+      return s?.isCharging === false ? s : null;
+    }, { label: "app sees charging stopped" });
+    expect(state.isCharging).toBe(false);
   });
 
   it("Available maps to available with no cable", async () => {
-    await vcpSend("StatusNotification", {
-      connectorId: 1,
-      errorCode: "NoError",
-      status: "Available",
-    });
     const state = await waitFor(async () => {
+      // Re-injected per attempt too — see the SuspendedEV test above. Also
+      // guards on isPluggedIn !== null: "available" is not only reached via
+      // a raw Available status, it is also the inferred default while raw
+      // status is still null (resolveStatus), and in that branch
+      // isPluggedIn stays null (unknown) rather than the real false —
+      // so a poll must not accept "available" on its own, or the assertion
+      // below can run against that unresolved state instead of the one this
+      // test actually injected.
+      await vcpSend("StatusNotification", {
+        connectorId: 1,
+        errorCode: "NoError",
+        status: "Available",
+      });
       const s = (await ocppRow())?.state;
-      return s?.status === "available" ? s : null;
+      return s?.status === "available" && s.isPluggedIn !== null ? s : null;
     }, { label: "available status" });
     expect(state.isPluggedIn).toBe(false); // Available = no cable
   });
@@ -248,7 +281,7 @@ describe("OCPP e2e", () => {
 // A stock charger ships reporting only the mandatory energy register, on
 // whatever sample interval its vendor chose. sap-test already reports every
 // measurand ChargeHA asks for, so it can never exercise this — hence the
-// second station (docker/sap-e2e/basic-station-template.json), which starts
+// second station (devtools/sap-ocpp-simulator/config/e2e/station-templates/sap-basic.station-template.json), which starts
 // register-only at 60s and must be reconfigured on connect.
 describe("OCPP measurand negotiation e2e", () => {
   const MEASURANDS_KEY = "MeterValuesSampledData";
