@@ -198,6 +198,24 @@ describe("OCPP e2e", () => {
 
   it("stop mode sends RemoteStop and the transaction ends", async () => {
     const chargerId = await ocppRowId();
+    // Re-establish a real charging state rather than inheriting whatever the
+    // status-mapping tests above left behind. They inject SuspendedEV and
+    // Reserved, which move the APP's view to not-charging while the STATION
+    // keeps its transaction open — and the controller has no reason to send
+    // RemoteStop for a charge point it already believes is stopped. Driving
+    // both sides back into agreement is what makes this test about stop
+    // control rather than about test ordering.
+    await waitFor(async () => {
+      await vcpSend("StatusNotification", {
+        connectorId: 1,
+        errorCode: "NoError",
+        status: "Charging",
+      });
+      const s = (await trpc.charger.list.query())
+        .find((c) => c.id === chargerId)?.state;
+      return s?.isCharging === true ? s : null;
+    }, { label: "app sees charging again before stop" });
+
     // Prove the precondition. remoteStop() falls back to suspendCharging()
     // when it holds no transaction id, so without a live transaction this
     // test would pass while proving nothing.
