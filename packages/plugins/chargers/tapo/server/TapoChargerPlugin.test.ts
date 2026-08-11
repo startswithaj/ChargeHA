@@ -9,7 +9,7 @@ import type { ChargerRow } from "@chargeha/shared";
 import type { ResolvedChargerRow } from "@chargeha/shared/plugins";
 import { throwingMock } from "../../../../server/src/test-helpers/throwingMock.ts";
 import { startTapoSimulator } from "../../../../../devtools/tapo-simulator/main.ts";
-import { TapoChargerPlugin, tapoCredentials } from "./index.ts";
+import { TapoChargerPlugin, tapoCredentials } from "./TapoChargerPlugin.ts";
 
 describe("Tapo charger plugin", () => {
   const log = new Logger("TapoTest", "error");

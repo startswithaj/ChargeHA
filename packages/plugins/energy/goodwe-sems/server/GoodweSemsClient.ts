@@ -249,9 +249,13 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
   /** The reference client posts no body here; match it rather than sending
    *  "{}" to an undocumented endpoint. */
   async getStations(): Promise<SemsStationSummary[]> {
-    const parsed = stationListSchema.safeParse(
-      await this.call(STATION_LIST_PATH, null),
-    );
+    const data = await this.call(STATION_LIST_PATH, null);
+    // Single-station accounts get the bare station id back — the endpoint is
+    // "GetPowerStationId" (singular) — rather than a list of station objects.
+    if (typeof data === "string") {
+      return [{ id: data, name: data }];
+    }
+    const parsed = stationListSchema.safeParse(data);
     if (!parsed.success) {
       this.logger.warn(
         `SEMS station list arrived in an unrecognised shape: ${parsed.error.message}`,

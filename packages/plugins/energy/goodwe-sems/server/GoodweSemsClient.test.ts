@@ -378,6 +378,15 @@ describe("GoodweSemsClient", () => {
       ]);
     });
 
+    it("treats a bare station-id string as a single station", async () => {
+      mock.setPathResponse(NEW_LOGIN_PATH, loginOk("tok", GATEWAY_API));
+      mock.setPathResponse(STATION_LIST_PATH, semsOk("station-uuid-1"));
+
+      expect(await makeClient().getStations()).toEqual([
+        { id: "station-uuid-1", name: "station-uuid-1" },
+      ]);
+    });
+
     it("returns an empty list when the payload is not an array", async () => {
       mock.setPathResponse(NEW_LOGIN_PATH, loginOk("tok", GATEWAY_API));
       mock.setPathResponse(STATION_LIST_PATH, semsOk({ unexpected: true }));

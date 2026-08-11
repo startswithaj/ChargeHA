@@ -3,7 +3,7 @@ import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
 import { GOODWE_SEMS_SECRET_KEYS, goodweSemsConfigDef } from "./config.ts";
 import { createPluginConfigProcedures } from "../../../createPluginConfigProcedures.ts";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
-import type { GoodweSemsPlugin } from "./index.ts";
+import type { GoodweSemsPlugin } from "./GoodweSemsPlugin.ts";
 
 // ── Typed Zod schemas for GoodWe SEMS plugin procedures ─────────────────────
 

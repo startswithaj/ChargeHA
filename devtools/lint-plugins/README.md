@@ -15,7 +15,9 @@ via `deno task lint` and `deno task check:all`.
 | **no-imperative-loops**    | Bans `for`, `for...of`, `for...in`, `while`, `do...while`. Use `.map()` / `.filter()` / `.reduce()`.   |
 | **no-let**                 | Bans `let` declarations. Use `const` with early returns, ternaries, or reduce.                         |
 | **no-param-mutation**      | No mutating objects passed as function parameters. Return new values instead.                          |
+| **no-plugin-index-code**   | A plugin's `index.ts` holds re-exports only — no class, function, const, or type declarations.         |
 | **no-plugin-refs**         | No hardcoded plugin IDs (`tesla`, `fronius`, `simulated`) outside `plugins/`.                          |
+| **no-router-logic**        | Routers: no data-layer or crypto imports, no `index.ts` imports, 180-line cap.                         |
 | **no-select-side-effects** | No store mutations or side effects inside React Query `select` callbacks.                              |
 | **no-swallowed-catch**     | Catch blocks must do something with the error (log, rethrow, or assign).                               |
 

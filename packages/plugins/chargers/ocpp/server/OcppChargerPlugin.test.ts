@@ -7,7 +7,7 @@ import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDepend
 import type { ChargerRow } from "@chargeha/shared";
 import type { ResolvedChargerRow } from "@chargeha/shared/plugins";
 import { throwingMock } from "../../../../server/src/test-helpers/throwingMock.ts";
-import { OcppChargerPlugin } from "./index.ts";
+import { OcppChargerPlugin } from "./OcppChargerPlugin.ts";
 
 describe("OCPP charger plugin", () => {
   const log = new Logger("OcppTest", "error");

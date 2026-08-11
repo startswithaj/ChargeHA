@@ -132,6 +132,9 @@ should not reference specific plugin IDs — interact through registry interface
 Plugin routers are merged into the app router dynamically via
 `createAppRouter(pluginRouters)` in `trpc/root.ts`.
 
+A plugin's `index.ts` holds `export ... from` lines only. The class goes in a
+file named after it, `GoodweSemsPlugin.ts`. Enforced by `no-plugin-index-code`.
+
 ## Package Dependencies
 
 Imports flow one way. There are no exceptions.
@@ -179,8 +182,9 @@ registry. If `wizardSteps.ts` imports its option type back out of
 option types live in `pluginOptions.ts` instead.
 
 The same thing happens inside a single plugin. `index.ts` imports `router.ts`,
-so `router.ts` must not import the plugin class back from `index.ts`. Write out
-only the methods the router actually calls:
+so `router.ts` must not import from `index.ts`. `import type` from the class's
+own file is fine — it's erased. For a value, write out only the methods the
+router calls:
 
 ```ts
 // router.ts — NOT `import type { TeslaVehiclePlugin } from "./index.ts"`
@@ -273,7 +277,9 @@ A demo shortcut creates a simulated vehicle and skips plugin-specific config.
   instantiated in `main.ts` and available on `TrpcContext`.
 - When a service covers multiple concerns, split into a facade + sub-services
   (e.g. `AuthService` delegates to `AuthLocalService` and `AuthOIDCService`).
-- tRPC routers are thin — validate input, call a service, return the result.
+- tRPC routers are thin — validate input, call a service, return the result. No
+  data-layer or crypto imports, no `index.ts` imports, 180-line cap. Enforced by
+  `no-router-logic`.
 - Core code should not reference specific plugin IDs. Use plugin registry
   interfaces. Plugins access the DB through `PluginDependencies`, not
   `AppDatabase` directly.

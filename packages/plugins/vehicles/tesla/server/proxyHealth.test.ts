@@ -1,6 +1,6 @@
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { checkTeslaProxyHealth } from "./index.ts";
+import { checkTeslaProxyHealth } from "./TeslaVehiclePlugin.ts";
 
 describe("checkTeslaProxyHealth", () => {
   it("returns ok without probing the proxy when Tesla is not set up", async () => {

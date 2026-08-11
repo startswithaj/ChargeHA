@@ -1,13 +1,13 @@
 import { z } from "zod";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
 import { discoverFronius } from "./FroniusDiscovery.ts";
-import { FroniusLocalAdapter } from "./FroniusLocalAdapter.ts";
 import { froniusLocalConfigDef } from "./config.ts";
 import {
   createNetworkDiscoveryProcedures,
   createPluginConfigProcedures,
 } from "../../../createPluginConfigProcedures.ts";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
+import type { FroniusLocalPlugin } from "./FroniusLocalPlugin.ts";
 
 const discoverInput = z.object({
   subnet: z.string().optional(),
@@ -18,7 +18,10 @@ const testConnectionInput = z.object({
   meterDeviceId: z.number().optional(),
 });
 
-export function createFroniusLocalRouter(deps: PluginDependencies) {
+export function createFroniusLocalRouter(
+  deps: PluginDependencies,
+  plugin: Pick<FroniusLocalPlugin, "testConnection">,
+) {
   return router({
     ...createPluginConfigProcedures(
       deps,
@@ -36,25 +39,8 @@ export function createFroniusLocalRouter(deps: PluginDependencies) {
 
     testConnection: publicProcedure
       .input(testConnectionInput)
-      .mutation(async ({ input }) => {
-        const adapter = new FroniusLocalAdapter(
-          input.host,
-          input.meterDeviceId ?? 0,
-          deps.log,
-        );
-        try {
-          await adapter.connect();
-          const [device, realtime] = await Promise.all([
-            adapter.getDeviceInfo(),
-            adapter.getRealtimeData(),
-          ]);
-          return { success: true as const, device, realtime };
-        } catch (err) {
-          return {
-            success: false as const,
-            error: err instanceof Error ? err.message : "Connection failed",
-          };
-        }
-      }),
+      .mutation(({ input }) =>
+        plugin.testConnection(input.host, input.meterDeviceId ?? 0)
+      ),
   });
 }

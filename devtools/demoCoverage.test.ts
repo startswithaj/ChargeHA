@@ -7,17 +7,20 @@ import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createAppRouter } from "../packages/server/src/trpc/root.ts";
 import { createTeslaRouter } from "../packages/plugins/vehicles/tesla/server/router.ts";
-import type { TeslaVehiclePlugin } from "../packages/plugins/vehicles/tesla/server/index.ts";
+import type { TeslaVehiclePlugin } from "../packages/plugins/vehicles/tesla/server/TeslaVehiclePlugin.ts";
 import { createSimulatedRouter } from "../packages/plugins/vehicles/simulated/server/router.ts";
-import type { SimulatedVehiclePlugin } from "../packages/plugins/vehicles/simulated/server/index.ts";
+import type { SimulatedVehiclePlugin } from "../packages/plugins/vehicles/simulated/server/SimulatedVehiclePlugin.ts";
 import { createFroniusLocalRouter } from "../packages/plugins/energy/fronius-local/server/router.ts";
+import type { FroniusLocalPlugin } from "../packages/plugins/energy/fronius-local/server/FroniusLocalPlugin.ts";
 import { createFroniusCloudRouter } from "../packages/plugins/energy/fronius-cloud/server/router.ts";
+import type { FroniusCloudPlugin } from "../packages/plugins/energy/fronius-cloud/server/FroniusCloudPlugin.ts";
 import { createSimulatedEnergyRouter } from "../packages/plugins/energy/simulated/server/router.ts";
 import { createTapoRouter } from "../packages/plugins/chargers/tapo/server/router.ts";
 import { createOcppRouter } from "../packages/plugins/chargers/ocpp/server/router.ts";
 import type { OcppCentralSystem } from "../packages/plugins/chargers/ocpp/server/OcppCentralSystem.ts";
 import { createSimulatedChargerRouter } from "../packages/plugins/chargers/simulated/server/router.ts";
 import type { PluginDependencies } from "../packages/server/src/bootstrap/PluginDependencies.ts";
+import { throwingMock } from "../packages/server/src/test-helpers/throwingMock.ts";
 import {
   GATED_MUTATIONS,
   GATED_QUERIES,
@@ -47,8 +50,14 @@ const realPaths = (type: "query" | "mutation"): string[] => {
       ),
     },
     energy: {
-      fronius_local: createFroniusLocalRouter(stubDeps("fronius_local")),
-      fronius_cloud: createFroniusCloudRouter(stubDeps("fronius_cloud")),
+      fronius_local: createFroniusLocalRouter(
+        stubDeps("fronius_local"),
+        throwingMock<FroniusLocalPlugin>("FroniusLocalPlugin"),
+      ),
+      fronius_cloud: createFroniusCloudRouter(
+        stubDeps("fronius_cloud"),
+        throwingMock<FroniusCloudPlugin>("FroniusCloudPlugin"),
+      ),
       simulated_energy: createSimulatedEnergyRouter(
         stubDeps("simulated_energy"),
       ),
