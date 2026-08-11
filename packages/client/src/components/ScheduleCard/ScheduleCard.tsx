@@ -1,7 +1,11 @@
 import { Pencil, Trash2 } from "lucide-react";
-import { Card, IconButton, Switch, Text } from "@radix-ui/themes";
+import { Badge, Card, IconButton, Switch, Text } from "@radix-ui/themes";
 import type { Schedule } from "@chargeha/shared";
-import { formatDays, formatTime12h } from "../../utils/Format.ts";
+import {
+  formatCalendarDate,
+  formatDays,
+  formatTime12h,
+} from "../../utils/Format.ts";
 import styles from "./ScheduleCard.module.css";
 
 interface ScheduleCardProps {
@@ -42,7 +46,11 @@ export function ScheduleCard({
     return `${durM}m`;
   })();
 
-  const daysText = formatDays(schedule.days);
+  // One-off charges run on a single date rather than a weekly pattern
+  const oneOffDate = isCharge ? schedule.oneOffDate : null;
+  const daysText = oneOffDate
+    ? formatCalendarDate(oneOffDate)
+    : formatDays(schedule.days);
 
   const detailText = isCharge
     ? `Charge at ${schedule.chargeAmps}A to ${schedule.chargeLimitPct}%`
@@ -65,18 +73,27 @@ export function ScheduleCard({
             <Text size="2" weight="bold">{timeText}</Text>
             <Text size="1" color="gray">({durationText})</Text>
             <Text size="1" color="gray">{daysText}</Text>
+            {oneOffDate && (
+              <Badge size="1" variant="soft" color="blue">One-off</Badge>
+            )}
           </div>
           <Text size="1" color="gray">{detailText}</Text>
         </div>
         <div className={styles.actions}>
-          <IconButton
-            variant="soft"
-            size="1"
-            aria-label="Edit schedule"
-            onClick={() => onEdit(schedule)}
-          >
-            <Pencil size={14} />
-          </IconButton>
+          {
+            /* One-offs are edited from the vehicle card's schedule dialog — the
+              recurring form would let you give them a weekly day pattern. */
+          }
+          {!oneOffDate && (
+            <IconButton
+              variant="soft"
+              size="1"
+              aria-label="Edit schedule"
+              onClick={() => onEdit(schedule)}
+            >
+              <Pencil size={14} />
+            </IconButton>
+          )}
           <IconButton
             variant="soft"
             color="red"

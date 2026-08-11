@@ -1,0 +1,1 @@
+ALTER TABLE `schedules` ADD `one_off_date` text;

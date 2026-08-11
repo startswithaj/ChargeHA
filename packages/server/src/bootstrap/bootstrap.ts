@@ -267,6 +267,7 @@ function buildServices(
     poller,
     db,
     configService,
+    scheduleService,
     eventEmitter,
     new Logger("ChargeController", logLevel),
   );

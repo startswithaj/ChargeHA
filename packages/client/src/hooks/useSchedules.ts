@@ -60,6 +60,9 @@ export function validateScheduleOverlap(
     (s) =>
       s.id !== excludeId &&
       s.scheduleType === "charge" &&
+      // One-offs are transient and warn about clashes in their own dialog —
+      // they shouldn't block editing a recurring schedule.
+      !s.oneOffDate &&
       s.vehicleId === data.vehicleId,
   );
 

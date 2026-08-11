@@ -6,7 +6,7 @@ import type { CreateTariffPeriodInput, TariffPeriodRow } from "../db/types.ts";
 import {
   getApplicablePeriodForTime,
   parseTimeToMinutes,
-} from "../lib/Tariffs.ts";
+} from "@chargeha/shared/tariffs";
 import type { Logger } from "../lib/Logger.ts";
 
 const DAY_ABBRS: DayOfWeek[] = [

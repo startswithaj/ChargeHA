@@ -137,6 +137,27 @@ vi.mock("../../../trpc.ts", () => ({
       active: {
         useQuery: vi.fn(() => ({ data: [], isLoading: false, error: null })),
       },
+      list: {
+        useQuery: vi.fn(() => ({
+          data: { schedules: [] },
+          isLoading: false,
+          error: null,
+        })),
+      },
+      createOneOff: {
+        useMutation: vi.fn(() => ({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn(),
+          isPending: false,
+        })),
+      },
+      delete: {
+        useMutation: vi.fn(() => ({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn(),
+          isPending: false,
+        })),
+      },
     },
     vehicle: {
       command: {
@@ -163,6 +184,9 @@ vi.mock("../../../trpc.ts", () => ({
         systemAlert: {
           invalidate: dashboardMocks.invalidateConfig,
         },
+      },
+      schedule: {
+        list: { invalidate: vi.fn() },
       },
     })),
   },

@@ -1,8 +1,11 @@
 import { ServiceError } from "../lib/ServiceError.ts";
 import type { DayOfWeek } from "@chargeha/shared";
 import type { AppDatabase } from "../db/AppDatabase.ts";
+import type { ScheduleRow } from "../db/types.ts";
 import type { Logger } from "../lib/Logger.ts";
-import { isScheduleActiveNow } from "@chargeha/shared/engine";
+import { isOneOffExpired, isScheduleActiveNow } from "@chargeha/shared/engine";
+import { dayOfWeekForDate } from "@chargeha/shared/localTime";
+import { resolveOneOffWindow } from "@chargeha/shared/oneOffCharge";
 
 function rowToSchedule(
   row: {
@@ -14,6 +17,7 @@ function rowToSchedule(
     days: string[];
     chargeAmps: number | null;
     chargeLimitPct: number | null;
+    oneOffDate?: string | null;
     enabled: boolean;
   },
 ) {
@@ -27,6 +31,7 @@ function rowToSchedule(
       days: row.days as DayOfWeek[],
       chargeAmps: row.chargeAmps as number,
       chargeLimitPct: row.chargeLimitPct as number,
+      oneOffDate: row.oneOffDate ?? null,
       enabled: row.enabled,
     };
   }
@@ -74,6 +79,98 @@ export class ScheduleService {
 
   private async getTimezone(): Promise<string> {
     return (await this.db.getConfig("timezone")) ?? "UTC";
+  }
+
+  /**
+   * Schedule a one-off charge on the next occurrence of `startTime`.
+   *
+   * Stored as a normal charge schedule carrying a calendar date, so the
+   * controller, wake logic and notifications treat it like any other charge
+   * window. A vehicle holds at most one pending one-off — creating another
+   * replaces it.
+   */
+  async createOneOff(input: {
+    vehicleId: string;
+    startTime: string;
+    durationMinutes: number;
+    chargeAmps: number;
+    chargeLimitPct: number;
+  }) {
+    const vehicle = await this.db.getVehicle(input.vehicleId);
+    if (!vehicle) {
+      throw new ServiceError("Vehicle not found", "NOT_FOUND");
+    }
+
+    const timezone = await this.getTimezone();
+    const window = resolveOneOffWindow(
+      input.startTime,
+      input.durationMinutes,
+      new Date(),
+      timezone,
+    );
+
+    // Replace any pending one-off for this vehicle
+    const existing = await this.db.getSchedules();
+    await Promise.all(
+      existing
+        .filter((s) =>
+          s.scheduleType === "charge" && s.vehicleId === input.vehicleId &&
+          !!s.oneOffDate
+        )
+        .map((s) => this.db.deleteSchedule(s.id)),
+    );
+
+    const id = crypto.randomUUID();
+    await this.db.createSchedule({
+      id,
+      vehicleId: input.vehicleId,
+      scheduleType: "charge",
+      startTime: input.startTime,
+      endTime: window.endTime,
+      // Day-of-week isn't consulted for one-offs, but the column is NOT NULL
+      // and keeps the row readable alongside recurring schedules.
+      days: [dayOfWeekForDate(window.oneOffDate)],
+      chargeAmps: input.chargeAmps,
+      chargeLimitPct: input.chargeLimitPct,
+      oneOffDate: window.oneOffDate,
+    });
+
+    const row = await this.db.getSchedule(id);
+    if (!row) {
+      throw new ServiceError(
+        "Failed to create one-off charge",
+        "INTERNAL_SERVER_ERROR",
+      );
+    }
+
+    this.logger.info(
+      `One-off charge created for ${vehicle.name}: ${window.oneOffDate} ${input.startTime}-${window.endTime} at ${input.chargeAmps}A to ${input.chargeLimitPct}% (${id})`,
+    );
+    return { schedule: rowToSchedule(row) };
+  }
+
+  /**
+   * Delete one-off charges whose window has fully elapsed, returning the
+   * schedules that survive.
+   *
+   * Called from the controller loop with the schedules it already loaded, so it
+   * costs no extra read, and the caller can carry on with the returned list.
+   */
+  async deleteExpiredOneOffs(
+    schedules: ScheduleRow[],
+    now: Date,
+    timezone: string,
+  ): Promise<ScheduleRow[]> {
+    const expired = schedules.filter((s) => isOneOffExpired(s, now, timezone));
+    if (expired.length === 0) return schedules;
+
+    await Promise.all(expired.map((s) => this.db.deleteSchedule(s.id)));
+    this.logger.info(
+      `Removed ${expired.length} expired one-off charge${
+        expired.length === 1 ? "" : "s"
+      }`,
+    );
+    return schedules.filter((s) => !expired.includes(s));
   }
 
   async create(input: {

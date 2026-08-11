@@ -23,6 +23,7 @@ describe("scheduleGapUtils", () => {
     days: [...ALL_DAYS],
     chargeAmps: 16,
     chargeLimitPct: 80,
+    oneOffDate: null,
     enabled: true,
   });
 

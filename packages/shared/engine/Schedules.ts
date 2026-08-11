@@ -1,4 +1,9 @@
 import type { DayOfWeek } from "../types.ts";
+import {
+  addDaysToDate,
+  getLocalDateTime,
+  timeToMinutes,
+} from "../localTime.ts";
 import type { EngineSchedule } from "./types.ts";
 
 const DAY_MAP: Record<string, DayOfWeek> = {
@@ -11,37 +16,6 @@ const DAY_MAP: Record<string, DayOfWeek> = {
   "6": "sat",
 };
 
-const WEEKDAY_TO_DAY: Record<string, number> = {
-  Sun: 0,
-  Mon: 1,
-  Tue: 2,
-  Wed: 3,
-  Thu: 4,
-  Fri: 5,
-  Sat: 6,
-};
-
-function parseTimezone(
-  now: Date,
-  timezone: string,
-): { day: number; hours: number; minutes: number } {
-  const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    hour: "numeric",
-    minute: "numeric",
-    weekday: "short",
-    hour12: false,
-  });
-  const parts = fmt.formatToParts(now);
-  return {
-    day: WEEKDAY_TO_DAY[
-      parts.find((p) => p.type === "weekday")?.value ?? ""
-    ] ?? now.getDay(),
-    hours: Number(parts.find((p) => p.type === "hour")?.value ?? 0),
-    minutes: Number(parts.find((p) => p.type === "minute")?.value ?? 0),
-  };
-}
-
 /** Check whether a schedule is active at the given time. */
 export function isScheduleActiveNow(
   schedule: EngineSchedule,
@@ -50,20 +24,29 @@ export function isScheduleActiveNow(
 ): boolean {
   // Get the current time in the configured timezone (schedules are defined
   // in the user's timezone, not the server's local time)
-  const { day, hours, minutes } = timezone
-    ? parseTimezone(now, timezone)
-    : { day: now.getDay(), hours: now.getHours(), minutes: now.getMinutes() };
+  const local = getLocalDateTime(now, timezone);
+  const currentMinutes = local.minutesSinceMidnight;
+  const startMinutes = timeToMinutes(schedule.startTime);
+  const endMinutes = timeToMinutes(schedule.endTime);
+
+  // One-off charges are anchored to a calendar date, so they match on date
+  // rather than day-of-week: a window that wraps past midnight runs into the
+  // next date, where the day-of-week no longer matches `days`.
+  if (schedule.oneOffDate) {
+    if (startMinutes <= endMinutes) {
+      return local.date === schedule.oneOffDate &&
+        currentMinutes >= startMinutes && currentMinutes < endMinutes;
+    }
+    if (local.date === schedule.oneOffDate) {
+      return currentMinutes >= startMinutes;
+    }
+    return local.date === addDaysToDate(schedule.oneOffDate, 1) &&
+      currentMinutes < endMinutes;
+  }
 
   // Check day of week
-  const dayKey = DAY_MAP[String(day)];
+  const dayKey = DAY_MAP[String(local.day)];
   if (!schedule.days.includes(dayKey)) return false;
-
-  // Parse time strings
-  const currentMinutes = hours * 60 + minutes;
-  const [startH, startM] = schedule.startTime.split(":").map(Number);
-  const [endH, endM] = schedule.endTime.split(":").map(Number);
-  const startMinutes = startH * 60 + startM;
-  const endMinutes = endH * 60 + endM;
 
   if (startMinutes <= endMinutes) {
     // Normal range (e.g. 09:00 - 17:00)
@@ -72,4 +55,25 @@ export function isScheduleActiveNow(
     // Overnight range (e.g. 22:00 - 06:00)
     return currentMinutes >= startMinutes || currentMinutes < endMinutes;
   }
+}
+
+/** True once a one-off charge's window has fully elapsed. Recurring schedules
+ *  never expire, so they always return false. */
+export function isOneOffExpired(
+  schedule: EngineSchedule,
+  now: Date,
+  timezone: string,
+): boolean {
+  if (!schedule.oneOffDate) return false;
+
+  const local = getLocalDateTime(now, timezone);
+  const startMinutes = timeToMinutes(schedule.startTime);
+  const endMinutes = timeToMinutes(schedule.endTime);
+  const endDate = startMinutes > endMinutes
+    ? addDaysToDate(schedule.oneOffDate, 1)
+    : schedule.oneOffDate;
+
+  if (local.date > endDate) return true;
+  return local.date === endDate &&
+    local.minutesSinceMidnight >= endMinutes;
 }

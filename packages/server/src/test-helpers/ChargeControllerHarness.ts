@@ -28,6 +28,7 @@ import { VehicleManager } from "../services/VehicleManager.ts";
 import type { EnergyPoller } from "../services/EnergyPoller.ts";
 import { ChargeController } from "../services/ChargeController.ts";
 import { ConfigService } from "../services/ConfigService.ts";
+import { ScheduleService } from "../services/ScheduleService.ts";
 import type { EnergyAdapterManager } from "../services/EnergyAdapterManager.ts";
 import { Logger } from "../lib/Logger.ts";
 import { testable } from "./Testable.ts";
@@ -236,6 +237,7 @@ async function buildControllerStack(
     poller as unknown as EnergyPoller,
     db,
     configService,
+    new ScheduleService(db, new Logger("ScheduleService", "error")),
     trackingEmitter,
     testControllerLogger,
   );

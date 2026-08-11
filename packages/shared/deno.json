@@ -12,6 +12,10 @@
     "./engine": "./engine/mod.ts",
     "./async": "./async.ts",
     "./geo": "./geo.ts",
+    "./tariffs": "./tariffs.ts",
+    "./localTime": "./localTime.ts",
+    "./oneOffCharge": "./oneOffCharge.ts",
+    "./chargeCostEstimate": "./chargeCostEstimate.ts",
     "./solarAttribution": "./solarAttribution.ts",
     "./geocode": "./geocode.ts",
     "./notifications": "./notificationProviders.ts"

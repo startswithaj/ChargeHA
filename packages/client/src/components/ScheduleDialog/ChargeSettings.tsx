@@ -1,14 +1,23 @@
 import { Button, Text } from "@radix-ui/themes";
-import type { ScheduleFormData } from "@chargeha/shared";
 import styles from "./ScheduleDialog.module.css";
+
+/** The only fields these steppers write, so the component can be reused by any
+ *  form carrying them (recurring schedules and one-off charges). */
+interface ChargeFields {
+  chargeAmps: number;
+  chargeLimitPct: number;
+}
 
 interface ChargeSettingsProps {
   chargeAmps: number;
   chargeLimitPct: number;
   maxAmps: number;
-  updateField: <K extends keyof ScheduleFormData>(
+  /** Lowest selectable current, from the vehicle's configured minimum.
+   *  Defaults to 1A for callers that don't know the vehicle's floor. */
+  minAmps?: number;
+  updateField: <K extends keyof ChargeFields>(
     key: K,
-    value: ScheduleFormData[K],
+    value: ChargeFields[K],
   ) => void;
 }
 
@@ -17,6 +26,7 @@ export function ChargeSettings({
   chargeAmps,
   chargeLimitPct,
   maxAmps,
+  minAmps = 1,
   updateField,
 }: ChargeSettingsProps) {
   return (
@@ -28,11 +38,11 @@ export function ChargeSettings({
             type="button"
             variant="ghost"
             size="1"
-            disabled={chargeAmps <= 1}
+            disabled={chargeAmps <= minAmps}
             onClick={() =>
               updateField(
                 "chargeAmps",
-                Math.max(1, chargeAmps - 1),
+                Math.max(minAmps, chargeAmps - 1),
               )}
           >
             −

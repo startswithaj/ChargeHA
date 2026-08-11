@@ -391,4 +391,57 @@ describe("VehicleCard", () => {
     renderVC({ state: makeVehicleState({ isCharging: false }) });
     expect(screen.getByText("Not Charging")).toBeInTheDocument();
   });
+
+  // --- one-off charge scheduling ---
+
+  describe("ADHOC CHARGE button", () => {
+    it("is hidden when no handler is supplied", () => {
+      renderVC();
+      expect(screen.queryByText("ADHOC CHARGE")).toBeNull();
+    });
+
+    it("opens the dialog via the handler", () => {
+      const onScheduleCharge = vi.fn();
+      renderVC({ onScheduleCharge });
+      fireEvent.click(screen.getByText("ADHOC CHARGE"));
+      expect(onScheduleCharge).toHaveBeenCalledTimes(1);
+    });
+
+    it("is disabled while unplugged", () => {
+      renderVC({
+        onScheduleCharge: vi.fn(),
+        state: makeVehicleState({ isPluggedIn: false }),
+      });
+      expect(screen.getByText("ADHOC CHARGE").closest("button")).toBeDisabled();
+    });
+
+    it("is disabled while a command is pending", () => {
+      renderVC({ onScheduleCharge: vi.fn(), commandPending: "start" });
+      expect(screen.getByText("ADHOC CHARGE").closest("button")).toBeDisabled();
+    });
+
+    it("does not change the vehicle mode", () => {
+      const onChangeMode = vi.fn();
+      renderVC({ onScheduleCharge: vi.fn(), onChangeMode });
+      fireEvent.click(screen.getByText("ADHOC CHARGE"));
+      expect(onChangeMode).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("scheduled charge badge", () => {
+    it("is absent when nothing is scheduled", () => {
+      renderVC({ onScheduleCharge: vi.fn(), scheduledCharge: null });
+      expect(screen.queryByText(/Charge scheduled/)).toBeNull();
+    });
+
+    it("shows the pending window in 12-hour time", () => {
+      renderVC({
+        onScheduleCharge: vi.fn(),
+        scheduledCharge: { startTime: "23:30", endTime: "02:30" },
+      });
+      expect(screen.getByText(/Charge scheduled/)).toBeInTheDocument();
+      expect(screen.getByText(/11:30 PM/)).toBeInTheDocument();
+      expect(screen.getByText(/2:30 AM/)).toBeInTheDocument();
+    });
+  });
 });

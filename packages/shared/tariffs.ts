@@ -1,5 +1,15 @@
-import type { DayOfWeek } from "@chargeha/shared";
-import type { TariffPeriodRow } from "../db/types.ts";
+import type { DayOfWeek } from "./types.ts";
+
+/** The tariff period fields needed to resolve a rate. Structurally satisfied
+ *  by the server's TariffPeriodRow and the client's tariff.list response. */
+export interface TariffPeriodLike {
+  label: string;
+  startTime: string;
+  endTime: string;
+  days: string[];
+  ratePerKwh: number;
+  enabled: boolean;
+}
 
 const ALL_DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri"];
@@ -57,11 +67,11 @@ export function parseTimeToMinutes(time: string): number {
  * conversion before calling. Returns the matching period, or null if no
  * period matches (meaning the default rate applies).
  */
-export function getApplicablePeriodForTime(
+export function getApplicablePeriodForTime<T extends TariffPeriodLike>(
   minutesSinceMidnight: number,
   dayAbbr: DayOfWeek,
-  tariffPeriods: TariffPeriodRow[],
-): TariffPeriodRow | null {
+  tariffPeriods: T[],
+): T | null {
   const matches = tariffPeriods
     .filter((p) => p.enabled)
     .filter((p) => p.days.includes(dayAbbr))

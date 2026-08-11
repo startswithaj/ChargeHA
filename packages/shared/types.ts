@@ -178,6 +178,9 @@ export interface ChargeSchedule {
   chargeAmps: number;
   chargeLimitPct: number;
   enabled: boolean;
+  /** Set for a one-off charge: the calendar date ("YYYY-MM-DD", user's
+   *  timezone) the window starts on. Null for recurring schedules. */
+  oneOffDate: string | null;
 }
 
 export interface BlockoutSchedule {
@@ -200,6 +203,17 @@ export interface ScheduleFormData {
   days: DayOfWeek[];
   chargeAmps: number;
   chargeLimitPct: number;
+}
+
+/** Modal form state for scheduling a one-off charge. */
+export interface OneOffChargeFormData {
+  startTime: string;
+  durationMinutes: number;
+  chargeAmps: number;
+  chargeLimitPct: number;
+  /** Flip the vehicle to auto mode on save (one-off charges, like all charge
+   *  schedules, only run in auto mode). */
+  switchToAuto: boolean;
 }
 
 // ---- Notification Types ----

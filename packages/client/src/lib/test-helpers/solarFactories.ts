@@ -44,6 +44,7 @@ export const makeChargeSchedule = (
   days: ["mon", "tue", "wed", "thu", "fri"],
   chargeAmps: 10,
   chargeLimitPct: 80,
+  oneOffDate: null,
   enabled: true,
   ...overrides,
 });

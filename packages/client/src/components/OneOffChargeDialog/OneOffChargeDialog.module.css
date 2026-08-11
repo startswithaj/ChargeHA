@@ -1,0 +1,64 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.timeRow {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.stepperRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stepperValue {
+  min-width: 48px;
+  text-align: center;
+}
+
+.estimate {
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--gray-a2);
+  border: 1px solid var(--gray-a5);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.estimateTotal {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.segmentRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.footerSpacer {
+  flex: 1;
+}

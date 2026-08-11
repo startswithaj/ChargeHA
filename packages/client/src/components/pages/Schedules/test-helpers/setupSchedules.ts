@@ -66,6 +66,7 @@ export const chargeSchedule: ChargeSchedule = {
   days: ["mon", "tue", "wed"] as DayOfWeek[],
   chargeAmps: 16,
   chargeLimitPct: 80,
+  oneOffDate: null,
   enabled: true,
 };
 

@@ -28,6 +28,7 @@ import type { VehicleManager } from "./VehicleManager.ts";
 import type { EnergyPoller } from "./EnergyPoller.ts";
 import type { TypedEventEmitter } from "./TypedEventEmitter.ts";
 import type { ConfigService } from "./ConfigService.ts";
+import type { ScheduleService } from "./ScheduleService.ts";
 import type { Logger } from "../lib/Logger.ts";
 
 // Default loop interval (overridden by config)
@@ -87,6 +88,7 @@ export class ChargeController {
   private readonly poller: EnergyPoller;
   private readonly db: AppDatabase;
   private readonly configService: ConfigService;
+  private readonly scheduleService: ScheduleService;
   private readonly eventEmitter: TypedEventEmitter;
   private readonly logger: Logger;
   private readonly engine = new ControllerEngine();
@@ -98,6 +100,7 @@ export class ChargeController {
     poller: EnergyPoller,
     db: AppDatabase,
     configService: ConfigService,
+    scheduleService: ScheduleService,
     eventEmitter: TypedEventEmitter,
     logger: Logger,
   ) {
@@ -105,6 +108,7 @@ export class ChargeController {
     this.poller = poller;
     this.db = db;
     this.configService = configService;
+    this.scheduleService = scheduleService;
     this.eventEmitter = eventEmitter;
     this.logger = logger;
     this.start();
@@ -137,9 +141,18 @@ export class ChargeController {
     const traceId = createTraceId();
     const config = await this.loadConfig();
     const vehicles = await this.db.getVehicles();
-    const schedules = await this.db.getSchedules();
+    const loadedSchedules = await this.db.getSchedules();
     const energySnapshot = this.poller.tryGetRealtimeSnapshot();
     const now = new Date();
+
+    // Drop one-off charges whose window has elapsed, so they neither linger in
+    // the UI nor get re-evaluated. Reuses the schedules already loaded.
+    const schedules = await this.scheduleService.deleteExpiredOneOffs(
+      loadedSchedules,
+      now,
+      config.timezone,
+    );
+
     const energy = energySnapshot?.realtime ?? null;
     const solarW = energy && Math.round(energy.solarProductionW);
     const gridW = energy && Math.round(energy.gridPowerW);

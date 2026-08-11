@@ -59,6 +59,9 @@ export interface EngineSchedule {
   chargeAmps: number | null;
   chargeLimitPct: number | null;
   enabled: boolean;
+  /** Calendar date ("YYYY-MM-DD", user's timezone) for a one-off charge.
+   *  Null/absent for recurring schedules. */
+  oneOffDate?: string | null;
 }
 
 /** Everything the engine needs to make decisions for one loop iteration. */

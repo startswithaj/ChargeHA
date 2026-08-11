@@ -43,6 +43,8 @@ export interface ScheduleRow {
   days: DayOfWeek[];
   chargeAmps: number | null;
   chargeLimitPct: number | null;
+  /** Calendar date ("YYYY-MM-DD") for a one-off charge; null when recurring. */
+  oneOffDate: string | null;
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
@@ -57,6 +59,7 @@ export interface CreateScheduleInput {
   days: DayOfWeek[];
   chargeAmps: number | null;
   chargeLimitPct: number | null;
+  oneOffDate?: string | null;
   enabled?: boolean;
 }
 
