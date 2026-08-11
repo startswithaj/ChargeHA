@@ -56,6 +56,11 @@ export class EnergyAdapterManager implements EnergySourceAdapter {
     this.initializationPromise = this.initialize();
   }
 
+  /** Plugin id of the currently selected energy adapter, null when none. */
+  get activePluginId(): string | null {
+    return this.activeType;
+  }
+
   /** True if writing this config key should trigger a reconfigure. */
   isRelevantConfigKey(key: string): boolean {
     if (key === ADAPTER_TYPE_KEY) return true;
@@ -216,6 +221,18 @@ export class EnergyAdapterManager implements EnergySourceAdapter {
     } catch (err) {
       this.logger.warn(
         `Energy plugin "${adapterType}" failed to create adapter: ${err} — falling back to none`,
+      );
+      await this.db.insertPluginLog({
+        pluginId: adapterType,
+        level: "warn",
+        message: `Failed to create adapter — falling back to none: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+        payload: null,
+        origin: null,
+        traceId: null,
+      }).catch((logErr) =>
+        this.logger.error("Failed to persist adapter fallback log:", logErr)
       );
       // Keep the selected type active so later writes to its keys retry the build.
       this.activeType = adapterType;

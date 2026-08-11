@@ -17,6 +17,8 @@ export class EnergyPoller {
   private polling: Promise<void> | null = null;
   private latestRealtime: EnergyData | null = null;
   private latestCumulative: CumulativeEnergyData | null = null;
+  private consecutivePollFailures = 0;
+  private lastFailureLoggedAtMs = 0;
 
   constructor(
     em: EnergyAdapterManager,
@@ -153,8 +155,18 @@ export class EnergyPoller {
 
       // Emit poll success for notification listener
       this.eventEmitter.emit("energy_poll_success", {});
+
+      if (this.consecutivePollFailures > 0) {
+        await this.recordPluginLog(
+          "info",
+          `Polling recovered after ${this.consecutivePollFailures} failed poll(s)`,
+        );
+        this.consecutivePollFailures = 0;
+        this.lastFailureLoggedAtMs = 0;
+      }
     } catch (error) {
       this.logger.error("Poll failed:", error);
+      await this.recordPollFailure(error);
 
       // Record the failure as a zero-valued breadcrumb so DataRecorder writes a
       // row with poll_failed=1 instead of silently re-recording the previous
@@ -185,6 +197,48 @@ export class EnergyPoller {
         error: error instanceof Error ? error.message : String(error),
       });
       // Don't rethrow — polling continues on next interval
+    }
+  }
+
+  /** First failure is logged immediately; repeats at most every 5 minutes,
+   *  carrying the consecutive-failure count, so a dead inverter fills the
+   *  Logs page with a heartbeat rather than one row per tick. */
+  private async recordPollFailure(error: unknown): Promise<void> {
+    this.consecutivePollFailures++;
+    const nowMs = Date.now();
+    const throttleMs = 5 * 60 * 1000;
+    if (
+      this.lastFailureLoggedAtMs !== 0 &&
+      nowMs - this.lastFailureLoggedAtMs < throttleMs
+    ) return;
+    this.lastFailureLoggedAtMs = nowMs;
+    await this.recordPluginLog(
+      "error",
+      `Poll failed: ${error instanceof Error ? error.message : String(error)}`,
+      this.consecutivePollFailures > 1
+        ? { consecutiveFailures: this.consecutivePollFailures }
+        : undefined,
+    );
+  }
+
+  private async recordPluginLog(
+    level: string,
+    message: string,
+    payload?: Record<string, unknown>,
+  ): Promise<void> {
+    const pluginId = this.em.activePluginId;
+    if (!pluginId) return;
+    try {
+      await this.db.insertPluginLog({
+        pluginId,
+        level,
+        message,
+        payload: payload ? JSON.stringify(payload) : null,
+        origin: null,
+        traceId: null,
+      });
+    } catch (err) {
+      this.logger.error("Failed to persist poll log entry:", err);
     }
   }
 

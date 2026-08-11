@@ -305,13 +305,10 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
         isRetry ? " (retry)" : ""
       }`,
     );
-    const dbEntry = {
-      payload: { path, code: code || null, dataEmpty, durationMs, isRetry },
-    };
-    if (SUCCESS_CODES.has(code) && !dataEmpty) {
-      this.dbLog.info(`POST ${path}`, dbEntry);
-    } else {
-      this.dbLog.warn(`POST ${path}`, dbEntry);
+    if (!SUCCESS_CODES.has(code) || dataEmpty) {
+      this.dbLog.warn(`POST ${path}`, {
+        payload: { path, code: code || null, dataEmpty, durationMs, isRetry },
+      });
     }
     if (code === RATE_LIMIT_CODE) {
       this.logger.warn(
