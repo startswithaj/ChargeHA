@@ -1,12 +1,69 @@
+import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Text, TextField } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
-import { SettingsRow } from "../../../hostUi.ts";
+import {
+  SettingsRow,
+  usePluginSettingsHost,
+  useSaveStatus,
+} from "../../../hostUi.ts";
 
 interface SigenergyLocalConfigValues {
   host: string;
   port: string;
   plantUnitId: string;
   deviceUnitId: string;
+}
+
+type SigenergyDraft = Partial<SigenergyLocalConfigValues>;
+
+/** Buffered like FroniusLocalConfig: a write per keystroke would rebuild the
+ *  energy adapter — and reopen the Modbus TCP connection — against every
+ *  half-typed host (config_changed → poller). */
+function useSigenergyDraft(config: SigenergyLocalConfigValues | undefined) {
+  const utils = trpc.useUtils();
+  const configMutation = trpc.plugin.energy.sigenergy_local.setConfig
+    .useMutation({
+      onSuccess: () =>
+        utils.plugin.energy.sigenergy_local.getConfig.invalidate(),
+    });
+  const [draft, setDraft] = useState<SigenergyDraft>({});
+  const { saveStatus, onMutate, onSuccess, onError } = useSaveStatus();
+
+  const host = draft.host ?? config?.host ?? "";
+  const port = draft.port ?? config?.port ?? "";
+  const plantUnitId = draft.plantUnitId ?? config?.plantUnitId ?? "";
+  const deviceUnitId = draft.deviceUnitId ?? config?.deviceUnitId ?? "";
+  const isDirty = Object.keys(draft).length > 0;
+
+  const save = useCallback(() => {
+    if (!isDirty) return;
+    onMutate();
+    configMutation.mutate({ host, port, plantUnitId, deviceUnitId }, {
+      onSuccess: () => {
+        onSuccess();
+        setDraft({});
+      },
+      onError,
+    });
+  }, [
+    isDirty,
+    host,
+    port,
+    plantUnitId,
+    deviceUnitId,
+    configMutation,
+    onMutate,
+    onSuccess,
+    onError,
+  ]);
+
+  const report = usePluginSettingsHost();
+  useEffect(() => {
+    report?.({ isDirty, save, saveStatus });
+  }, [report, isDirty, save, saveStatus]);
+  useEffect(() => () => report?.(null), [report]);
+
+  return { host, port, plantUnitId, deviceUnitId, setDraft };
 }
 
 function RealtimePreview(
@@ -41,18 +98,15 @@ function RealtimePreview(
 export function SigenergyLocalConfig(): JSX.Element | null {
   const { data: config } = trpc.plugin.energy.sigenergy_local.getConfig
     .useQuery();
-  const utils = trpc.useUtils();
-  const configMutation = trpc.plugin.energy.sigenergy_local.setConfig
-    .useMutation({
-      onSuccess: () =>
-        utils.plugin.energy.sigenergy_local.getConfig.invalidate(),
-    });
   const testMutation = trpc.plugin.energy.sigenergy_local.testConnection
     .useMutation();
 
+  const { host, port, plantUnitId, deviceUnitId, setDraft } = useSigenergyDraft(
+    config as SigenergyLocalConfigValues | undefined,
+  );
+
   if (!config) return null;
 
-  const cfg = config as SigenergyLocalConfigValues;
   const testSuccess = testMutation.isSuccess && testMutation.data.success
     ? testMutation.data
     : null;
@@ -66,9 +120,9 @@ export function SigenergyLocalConfig(): JSX.Element | null {
         <TextField.Root
           size="2"
           placeholder="192.168.1.50"
-          value={cfg.host}
+          value={host}
           onChange={(e: { target: { value: string } }) =>
-            configMutation.mutate({ host: e.target.value })}
+            setDraft((d) => ({ ...d, host: e.target.value }))}
           style={{ width: 150 }}
         />
       </SettingsRow>
@@ -77,9 +131,9 @@ export function SigenergyLocalConfig(): JSX.Element | null {
         <TextField.Root
           size="2"
           placeholder="502"
-          value={cfg.port}
+          value={port}
           onChange={(e: { target: { value: string } }) =>
-            configMutation.mutate({ port: e.target.value })}
+            setDraft((d) => ({ ...d, port: e.target.value }))}
           style={{ width: 80 }}
         />
       </SettingsRow>
@@ -91,9 +145,9 @@ export function SigenergyLocalConfig(): JSX.Element | null {
         <TextField.Root
           size="2"
           placeholder="247"
-          value={cfg.plantUnitId}
+          value={plantUnitId}
           onChange={(e: { target: { value: string } }) =>
-            configMutation.mutate({ plantUnitId: e.target.value })}
+            setDraft((d) => ({ ...d, plantUnitId: e.target.value }))}
           style={{ width: 80 }}
         />
       </SettingsRow>
@@ -105,9 +159,9 @@ export function SigenergyLocalConfig(): JSX.Element | null {
         <TextField.Root
           size="2"
           placeholder="1"
-          value={cfg.deviceUnitId}
+          value={deviceUnitId}
           onChange={(e: { target: { value: string } }) =>
-            configMutation.mutate({ deviceUnitId: e.target.value })}
+            setDraft((d) => ({ ...d, deviceUnitId: e.target.value }))}
           style={{ width: 80 }}
         />
       </SettingsRow>
@@ -116,13 +170,13 @@ export function SigenergyLocalConfig(): JSX.Element | null {
         <Button
           size="2"
           variant="soft"
-          disabled={!cfg.host || testMutation.isPending}
+          disabled={!host || testMutation.isPending}
           onClick={() =>
             testMutation.mutate({
-              host: cfg.host,
-              port: parseInt(cfg.port || "502", 10),
-              plantUnitId: parseInt(cfg.plantUnitId || "247", 10),
-              deviceUnitId: parseInt(cfg.deviceUnitId || "1", 10),
+              host,
+              port: parseInt(port || "502", 10),
+              plantUnitId: parseInt(plantUnitId || "247", 10),
+              deviceUnitId: parseInt(deviceUnitId || "1", 10),
             })}
         >
           {testMutation.isPending ? "Testing..." : "Test Connection"}

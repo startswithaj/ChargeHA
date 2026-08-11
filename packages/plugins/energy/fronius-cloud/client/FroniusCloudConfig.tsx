@@ -1,18 +1,91 @@
+import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Text, TextField } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
-import { SettingsRow } from "../../../hostUi.ts";
+import {
+  SettingsRow,
+  usePluginSettingsHost,
+  useSaveStatus,
+} from "../../../hostUi.ts";
 
-export function FroniusCloudConfig(): JSX.Element | null {
-  const { data: config } = trpc.plugin.energy.fronius_cloud.getConfig
-    .useQuery();
+interface FroniusCloudValues {
+  froniusCloudEmail: string;
+  froniusCloudPassword: string;
+  froniusCloudPvSystemId: string;
+}
+
+type FroniusCloudDraft = Partial<FroniusCloudValues>;
+
+/** Buffered like FroniusLocalConfig: a write per keystroke would rebuild the
+ *  energy adapter against every half-typed credential (config_changed →
+ *  poller). */
+function useFroniusCloudDraft(config: FroniusCloudValues | undefined) {
   const utils = trpc.useUtils();
   const configMutation = trpc.plugin.energy.fronius_cloud.setConfig.useMutation(
     {
       onSuccess: () => utils.plugin.energy.fronius_cloud.getConfig.invalidate(),
     },
   );
+  const [draft, setDraft] = useState<FroniusCloudDraft>({});
+  const { saveStatus, onMutate, onSuccess, onError } = useSaveStatus();
+
+  const froniusCloudEmail = draft.froniusCloudEmail ??
+    config?.froniusCloudEmail ?? "";
+  const froniusCloudPassword = draft.froniusCloudPassword ??
+    config?.froniusCloudPassword ?? "";
+  const froniusCloudPvSystemId = draft.froniusCloudPvSystemId ??
+    config?.froniusCloudPvSystemId ?? "";
+  const isDirty = Object.keys(draft).length > 0;
+
+  const save = useCallback(() => {
+    if (!isDirty) return;
+    onMutate();
+    configMutation.mutate(
+      { froniusCloudEmail, froniusCloudPassword, froniusCloudPvSystemId },
+      {
+        onSuccess: () => {
+          onSuccess();
+          setDraft({});
+        },
+        onError,
+      },
+    );
+  }, [
+    isDirty,
+    froniusCloudEmail,
+    froniusCloudPassword,
+    froniusCloudPvSystemId,
+    configMutation,
+    onMutate,
+    onSuccess,
+    onError,
+  ]);
+
+  const report = usePluginSettingsHost();
+  useEffect(() => {
+    report?.({ isDirty, save, saveStatus });
+  }, [report, isDirty, save, saveStatus]);
+  useEffect(() => () => report?.(null), [report]);
+
+  return {
+    froniusCloudEmail,
+    froniusCloudPassword,
+    froniusCloudPvSystemId,
+    setDraft,
+  };
+}
+
+export function FroniusCloudConfig(): JSX.Element | null {
+  const { data: config } = trpc.plugin.energy.fronius_cloud.getConfig
+    .useQuery();
   const testMutation = trpc.plugin.energy.fronius_cloud.testConnection
     .useMutation();
+
+  const {
+    froniusCloudEmail,
+    froniusCloudPassword,
+    froniusCloudPvSystemId,
+    setDraft,
+  } = useFroniusCloudDraft(config as FroniusCloudValues | undefined);
 
   if (!config) return null;
 
@@ -28,9 +101,9 @@ export function FroniusCloudConfig(): JSX.Element | null {
         <TextField.Root
           size="2"
           placeholder="your@email.com"
-          value={config.froniusCloudEmail}
+          value={froniusCloudEmail}
           onChange={(e: { target: { value: string } }) =>
-            configMutation.mutate({ froniusCloudEmail: e.target.value })}
+            setDraft((d) => ({ ...d, froniusCloudEmail: e.target.value }))}
           style={{ width: 220 }}
         />
       </SettingsRow>
@@ -40,9 +113,9 @@ export function FroniusCloudConfig(): JSX.Element | null {
           size="2"
           type="password"
           placeholder="Solar.web password"
-          value={config.froniusCloudPassword}
+          value={froniusCloudPassword}
           onChange={(e: { target: { value: string } }) =>
-            configMutation.mutate({ froniusCloudPassword: e.target.value })}
+            setDraft((d) => ({ ...d, froniusCloudPassword: e.target.value }))}
           style={{ width: 220 }}
         />
       </SettingsRow>
@@ -54,9 +127,9 @@ export function FroniusCloudConfig(): JSX.Element | null {
         <TextField.Root
           size="2"
           placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-          value={config.froniusCloudPvSystemId}
+          value={froniusCloudPvSystemId}
           onChange={(e: { target: { value: string } }) =>
-            configMutation.mutate({ froniusCloudPvSystemId: e.target.value })}
+            setDraft((d) => ({ ...d, froniusCloudPvSystemId: e.target.value }))}
           style={{ width: 320 }}
         />
       </SettingsRow>
@@ -66,15 +139,15 @@ export function FroniusCloudConfig(): JSX.Element | null {
         <Button
           size="2"
           variant="soft"
-          disabled={!config.froniusCloudEmail ||
-            !config.froniusCloudPassword ||
-            !config.froniusCloudPvSystemId ||
+          disabled={!froniusCloudEmail ||
+            !froniusCloudPassword ||
+            !froniusCloudPvSystemId ||
             testMutation.isPending}
           onClick={() =>
             testMutation.mutate({
-              email: config.froniusCloudEmail,
-              password: config.froniusCloudPassword,
-              pvSystemId: config.froniusCloudPvSystemId,
+              email: froniusCloudEmail,
+              password: froniusCloudPassword,
+              pvSystemId: froniusCloudPvSystemId,
             })}
         >
           {testMutation.isPending ? "Testing..." : "Test Connection"}

@@ -1,7 +1,11 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge, Button, Text, TextField } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
-import { SettingsRow } from "../../../hostUi.ts";
+import {
+  SettingsRow,
+  usePluginSettingsHost,
+  useSaveStatus,
+} from "../../../hostUi.ts";
 import { type StationOption, StationPicker } from "./StationPicker.tsx";
 
 type ListStationsMutation = ReturnType<
@@ -16,6 +20,71 @@ const rowStyle = {
   alignItems: "center",
   gap: 8,
 } as const;
+
+interface GoodweSemsValues {
+  goodweSemsAccount: string;
+  goodweSemsPassword: string;
+  goodweSemsStationId: string;
+}
+
+type GoodweSemsDraft = Partial<GoodweSemsValues>;
+
+/** Buffered like FroniusLocalConfig: a write per keystroke would rebuild the
+ *  energy adapter against every half-typed credential (config_changed →
+ *  poller). */
+function useGoodweSemsDraft(config: GoodweSemsValues | undefined) {
+  const utils = trpc.useUtils();
+  const configMutation = trpc.plugin.energy.goodwe_sems.setConfig.useMutation({
+    onSuccess: () => utils.plugin.energy.goodwe_sems.getConfig.invalidate(),
+  });
+  const [draft, setDraft] = useState<GoodweSemsDraft>({});
+  const { saveStatus, onMutate, onSuccess, onError } = useSaveStatus();
+
+  const goodweSemsAccount = draft.goodweSemsAccount ??
+    config?.goodweSemsAccount ?? "";
+  const goodweSemsPassword = draft.goodweSemsPassword ??
+    config?.goodweSemsPassword ?? "";
+  const goodweSemsStationId = draft.goodweSemsStationId ??
+    config?.goodweSemsStationId ?? "";
+  const isDirty = Object.keys(draft).length > 0;
+
+  const save = useCallback(() => {
+    if (!isDirty) return;
+    onMutate();
+    configMutation.mutate(
+      { goodweSemsAccount, goodweSemsPassword, goodweSemsStationId },
+      {
+        onSuccess: () => {
+          onSuccess();
+          setDraft({});
+        },
+        onError,
+      },
+    );
+  }, [
+    isDirty,
+    goodweSemsAccount,
+    goodweSemsPassword,
+    goodweSemsStationId,
+    configMutation,
+    onMutate,
+    onSuccess,
+    onError,
+  ]);
+
+  const report = usePluginSettingsHost();
+  useEffect(() => {
+    report?.({ isDirty, save, saveStatus });
+  }, [report, isDirty, save, saveStatus]);
+  useEffect(() => () => report?.(null), [report]);
+
+  return {
+    goodweSemsAccount,
+    goodweSemsPassword,
+    goodweSemsStationId,
+    setDraft,
+  };
+}
 
 /** Re-list the account's stations from Settings, so the station can be changed
  *  without walking back through the setup wizard. */
@@ -104,14 +173,17 @@ function TestConnectionRow(
 
 export function GoodweSemsConfig(): JSX.Element | null {
   const { data: config } = trpc.plugin.energy.goodwe_sems.getConfig.useQuery();
-  const utils = trpc.useUtils();
-  const configMutation = trpc.plugin.energy.goodwe_sems.setConfig.useMutation({
-    onSuccess: () => utils.plugin.energy.goodwe_sems.getConfig.invalidate(),
-  });
   const stationsMutation = trpc.plugin.energy.goodwe_sems.listStations
     .useMutation();
   const testMutation = trpc.plugin.energy.goodwe_sems.testConnection
     .useMutation();
+
+  const {
+    goodweSemsAccount,
+    goodweSemsPassword,
+    goodweSemsStationId,
+    setDraft,
+  } = useGoodweSemsDraft(config as GoodweSemsValues | undefined);
 
   if (!config) return null;
 
@@ -127,9 +199,9 @@ export function GoodweSemsConfig(): JSX.Element | null {
         <TextField.Root
           size="2"
           placeholder="your@email.com"
-          value={config.goodweSemsAccount}
+          value={goodweSemsAccount}
           onChange={(e: { target: { value: string } }) =>
-            configMutation.mutate({ goodweSemsAccount: e.target.value })}
+            setDraft((d) => ({ ...d, goodweSemsAccount: e.target.value }))}
           style={{ width: 220 }}
         />
       </SettingsRow>
@@ -139,9 +211,9 @@ export function GoodweSemsConfig(): JSX.Element | null {
           size="2"
           type="password"
           placeholder="SEMS Portal password"
-          value={config.goodweSemsPassword}
+          value={goodweSemsPassword}
           onChange={(e: { target: { value: string } }) =>
-            configMutation.mutate({ goodweSemsPassword: e.target.value })}
+            setDraft((d) => ({ ...d, goodweSemsPassword: e.target.value }))}
           style={{ width: 220 }}
         />
       </SettingsRow>
@@ -153,26 +225,26 @@ export function GoodweSemsConfig(): JSX.Element | null {
         <TextField.Root
           size="2"
           placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-          value={config.goodweSemsStationId}
+          value={goodweSemsStationId}
           onChange={(e: { target: { value: string } }) =>
-            configMutation.mutate({ goodweSemsStationId: e.target.value })}
+            setDraft((d) => ({ ...d, goodweSemsStationId: e.target.value }))}
           style={{ width: 320 }}
         />
       </SettingsRow>
 
       <StationSection
-        account={config.goodweSemsAccount}
-        password={config.goodweSemsPassword}
-        stationId={config.goodweSemsStationId}
+        account={goodweSemsAccount}
+        password={goodweSemsPassword}
+        stationId={goodweSemsStationId}
         stationsMutation={stationsMutation}
         onSelect={(goodweSemsStationId: string) =>
-          configMutation.mutate({ goodweSemsStationId })}
+          setDraft((d) => ({ ...d, goodweSemsStationId }))}
       />
 
       <TestConnectionRow
-        account={config.goodweSemsAccount}
-        password={config.goodweSemsPassword}
-        stationId={config.goodweSemsStationId}
+        account={goodweSemsAccount}
+        password={goodweSemsPassword}
+        stationId={goodweSemsStationId}
         testMutation={testMutation}
       />
     </>

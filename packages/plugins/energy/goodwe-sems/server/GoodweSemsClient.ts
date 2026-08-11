@@ -295,7 +295,17 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     });
 
     const code = String(json.code ?? "");
+    this.logger.debug(
+      `SEMS ${path} → code ${code || "(none)"}, dataEmpty=${
+        isEmptyData(json.data)
+      }${isRetry ? " (retry)" : ""}`,
+    );
     if (code === RATE_LIMIT_CODE) {
+      this.logger.warn(
+        `SEMS ${path} rate limited (${RATE_LIMIT_CODE}) — backing off ${
+          RATE_LIMIT_BACKOFF_MS / 1000
+        }s`,
+      );
       throw new GoodweSemsRateLimitError(RATE_LIMIT_BACKOFF_MS);
     }
 
@@ -339,7 +349,7 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
         throw new GoodweSemsRateLimitError(RATE_LIMIT_BACKOFF_MS);
       }
       if (!SUCCESS_CODES.has(String(json.code ?? ""))) {
-        this.logger.debug(`SEMS ${mode} login rejected (code ${json.code})`);
+        this.logger.warn(`SEMS ${mode} login rejected (code ${json.code})`);
         return null;
       }
 
@@ -355,6 +365,7 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
         this.logger.warn(`SEMS ${mode} login returned no api base`);
         return null;
       }
+      this.logger.info(`SEMS ${mode} login succeeded — api base ${api}`);
       return { ...payload, api };
     } catch (error) {
       if (error instanceof GoodweSemsRateLimitError) throw error;
@@ -403,6 +414,7 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     body: Record<string, unknown> | null,
     headers: Record<string, string>,
   ): Promise<Record<string, unknown>> {
+    const startedAt = performance.now();
     try {
       const response = await fetch(url, {
         method: "POST",
@@ -412,6 +424,10 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
         body: body === null ? undefined : JSON.stringify(body),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
+      const elapsedMs = Math.round(performance.now() - startedAt);
+      this.logger.debug(
+        `SEMS POST ${url} → HTTP ${response.status} in ${elapsedMs}ms`,
+      );
       if (!response.ok) {
         throw new GoodweSemsConnectionError(
           `SEMS returned HTTP ${response.status} for ${url}`,
@@ -419,6 +435,10 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
       }
       return await response.json() as Record<string, unknown>;
     } catch (error) {
+      const elapsedMs = Math.round(performance.now() - startedAt);
+      this.logger.debug(
+        `SEMS POST ${url} failed after ${elapsedMs}ms: ${error}`,
+      );
       if (
         error instanceof GoodweSemsConnectionError ||
         error instanceof GoodweSemsAuthError

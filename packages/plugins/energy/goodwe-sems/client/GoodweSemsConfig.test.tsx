@@ -111,7 +111,7 @@ describe("GoodweSemsConfig", () => {
     expect(screen.getAllByRole("button", { name: "Use" })).toHaveLength(1);
   });
 
-  it("Use saves the newly chosen station", () => {
+  it("Use stages the chosen station without saving", () => {
     mocks.listStationsState.data = {
       success: true,
       stations: [
@@ -124,9 +124,12 @@ describe("GoodweSemsConfig", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Use" }));
 
-    expect(mocks.setConfigMutate).toHaveBeenCalledWith({
-      goodweSemsStationId: "station-b",
-    });
+    // Buffered draft: the pick only moves the selection; the host Save
+    // button is what persists it. The Selected badge moves to the picked
+    // station and Use re-derives onto the other one.
+    expect(mocks.setConfigMutate).not.toHaveBeenCalled();
+    expect(screen.getByText("Selected")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Use" })).toHaveLength(1);
   });
 
   it("surfaces a listStations failure", () => {
