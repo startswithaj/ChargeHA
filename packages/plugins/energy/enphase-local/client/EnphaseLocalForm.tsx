@@ -225,8 +225,8 @@ function TestConnectionRow(
   );
 }
 
-/** Search state + the subnet default, split out to keep EnphaseLocalForm
- *  under the function-length limit. */
+// Search state + the subnet default, split out to keep EnphaseLocalForm
+// under the function-length limit.
 function useEnphaseSearch() {
   const [subnet, setSubnet] = useState("");
   const [searchResults, setSearchResults] = useState<EnphaseDevice[]>([]);

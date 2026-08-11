@@ -6,10 +6,8 @@ import { FRONIUS_CLOUD_SECRET_KEYS, froniusCloudConfigDef } from "./config.ts";
 import { FroniusCloudAdapter } from "./FroniusCloudAdapter.ts";
 import { createFroniusCloudRouter } from "./router.ts";
 
-/**
- * Fronius Cloud energy plugin — manages Solar.web API communication behind
- * the EnergyPlugin interface.
- */
+// Fronius Cloud energy plugin — manages Solar.web API communication behind
+// the EnergyPlugin interface.
 export class FroniusCloudPlugin implements EnergyPlugin {
   readonly id = "fronius_cloud";
   readonly displayName = "Fronius (Cloud)";

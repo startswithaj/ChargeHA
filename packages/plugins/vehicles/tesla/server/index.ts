@@ -26,11 +26,9 @@ import { createTeslaRouter } from "./router.ts";
 
 const DEFAULT_PROXY_URL = "https://localhost:4443";
 
-/**
- * Reachability check for the tesla-proxy health check. Returns "ok" (no
- * warning) when Tesla isn't set up — the proxy only runs once a private key
- * exists, so an unreachable proxy is only worth warning about then.
- */
+// Reachability check for the tesla-proxy health check. Returns "ok" (no
+// warning) when Tesla isn't set up — the proxy only runs once a private key
+// exists, so an unreachable proxy is only worth warning about then.
 export async function checkTeslaProxyHealth(
   deps: {
     getSecret(key: "ec_private_key"): Promise<string | null>;
@@ -53,14 +51,9 @@ export async function checkTeslaProxyHealth(
   }
 }
 
-/**
- * Tesla vehicle plugin — owns Tesla OAuth, Fleet API proxy, EC key
- * lifecycle, and vehicle adapter creation behind the VehiclePlugin interface.
- *
- * Construction kicks off async startup (proxy start, optional token
- * auto-refresh, DB vehicle load) saved as `startupPromise`, which `shutdown()`
- * awaits so teardown never races an in-flight boot.
- */
+// Tesla vehicle plugin — owns Tesla OAuth, Fleet API proxy, EC key lifecycle,
+// and vehicle adapter creation. Construction kicks off async startup saved
+// as `startupPromise`, which `shutdown()` awaits so teardown never races a boot.
 export class TeslaVehiclePlugin implements VehiclePlugin, ChargerPlugin {
   // Promises, not instances: the vehicle and charger paths can ask for the
   // same VIN concurrently, and caching only the result would build two.
@@ -224,7 +217,7 @@ export class TeslaVehiclePlugin implements VehiclePlugin, ChargerPlugin {
     return createTeslaRouter(this, this.deps);
   }
 
-  /** Commands need the tesla-http-proxy up and the virtual key paired. */
+  // Commands need the tesla-http-proxy up and the virtual key paired.
   async getCommandStatus(): Promise<CommandStatus> {
     const checks = this.getHealthChecks();
     const checkResults = checks.length > 0

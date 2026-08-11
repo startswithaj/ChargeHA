@@ -14,7 +14,7 @@ import { TapoConnectionError } from "./errors.ts";
 
 interface RawServer {
   host: string;
-  /** Raw request text, one entry per accepted connection. */
+  // Raw request text, one entry per accepted connection.
   seen: string[];
   stop: () => Promise<void>;
 }
@@ -23,9 +23,9 @@ describe("KlapHttp", () => {
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
 
-  /** A TCP server that returns caller-supplied bytes verbatim, so tests control
-   *  the exact response framing. Chunks are written separately to exercise
-   *  reassembly across TCP segments. */
+  // A TCP server that returns caller-supplied bytes verbatim, so tests
+  // control the exact response framing. Chunks are written separately to
+  // exercise reassembly across TCP segments.
   const startRawServer = (
     respond: (request: string) => Uint8Array[],
   ): RawServer => {
@@ -81,7 +81,7 @@ describe("KlapHttp", () => {
   const seed16 = (): Uint8Array<ArrayBuffer> =>
     crypto.getRandomValues(new Uint8Array(16));
 
-  /** 48-byte handshake1 reply: 16-byte remote seed + 32-byte server hash. */
+  // 48-byte handshake1 reply: 16-byte remote seed + 32-byte server hash.
   const handshake1Reply = (): Uint8Array[] => [
     encoder.encode(
       "HTTP/1.1 200 OK\r\nServer: SHIP 2.0\r\n" +

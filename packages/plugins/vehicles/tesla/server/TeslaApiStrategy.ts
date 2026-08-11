@@ -23,14 +23,13 @@ const CANT_CHARGE_MS = 20 * 60 * 1000;
 // Wake rate limit — max one wake per hour ($0.02 each)
 const WAKE_COOLDOWN_MS = 60 * 60 * 1000;
 
-/** Why a wake was triggered. Surfaces in plugin log origins so wakes can be
- *  attributed to their cause when investigating cost or behavior. */
+// Why a wake was triggered. Surfaces in plugin log origins so wakes can be
+// attributed to their cause when investigating cost or behavior.
 export type WakeReason = "schedule" | "solar" | "force_refresh";
 
-/** Pure decision logic for Tesla Fleet API usage. No I/O — takes state,
- *  returns decisions. Keeps all cost-aware reasoning in one testable place. */
+// Pure decision logic for Tesla Fleet API usage. No I/O — takes state,
+// returns decisions. Keeps all cost-aware reasoning in one testable place.
 export class TeslaApiStrategy {
-  /** Whether the cached state is fresh enough to skip a fetch. */
   isCacheFresh(
     context: VehicleRequestContext,
     cachedState: AdapterVehicleChargeState | null,
@@ -41,16 +40,9 @@ export class TeslaApiStrategy {
     return elapsed < this.staleness(context, cachedState);
   }
 
-  /** Whether a wake call ($0.02) is justified given the current context.
-   *  - Always wakes for user-initiated forceRefresh
-   *  - Allowed for schedules or solar (not blockouts)
-   *  - Skipped when cached state shows the car isn't plugged in
-   *    (Tesla wakes itself on plug-in, so the free /vehicles online check will
-   *    catch it — no reason to spend $0.02 waking an unplugged car)
-   *  - Skipped when cached battery is already at/over the charge limit
-   *    (battery only drops while asleep, so a cached "full" reading stays valid;
-   *    if the user drives the car it will come online naturally and refresh)
-   *  - Rate-limited to once per hour */
+  // Whether a wake call ($0.02) is justified: always for forceRefresh,
+  // allowed for schedules/solar (not blockouts), skipped when cached state
+  // shows unplugged or already at/over the charge limit, rate-limited to 1/hr.
   shouldWake(
     context: VehicleRequestContext,
     cachedState: AdapterVehicleChargeState | null,
@@ -78,7 +70,6 @@ export class TeslaApiStrategy {
     return "solar";
   }
 
-  /** How long before cached state is considered stale. */
   staleness(
     context: VehicleRequestContext,
     cachedState: AdapterVehicleChargeState | null,

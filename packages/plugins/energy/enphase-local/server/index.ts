@@ -7,10 +7,8 @@ import { EnphaseClient } from "./EnphaseClient.ts";
 import { EnphaseLocalAdapter } from "./EnphaseLocalAdapter.ts";
 import { createEnphaseLocalRouter } from "./router.ts";
 
-/**
- * Enphase Local energy plugin — reads an Enphase Envoy / IQ Gateway
- * (firmware 7+) on the local network over its token-authenticated HTTPS API.
- */
+// Enphase Local energy plugin — reads an Enphase Envoy / IQ Gateway
+// (firmware 7+) on the local network over its token-authenticated HTTPS API.
 export class EnphaseLocalPlugin implements EnergyPlugin {
   readonly id = "enphase_local";
   readonly displayName = "Enphase (Local)";

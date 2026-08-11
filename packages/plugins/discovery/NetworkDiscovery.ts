@@ -5,17 +5,13 @@ import { NetworkScan } from "./networkScan.ts";
 
 const BATCH_SIZE = 30;
 
-/**
- * Shared local-network discovery pipeline for the energy plugins: build
- * candidate IPs (explicit subnet → ARP table → interface detection →
- * 192.168.1.* fallback), then probe them in sequential batches to avoid
- * flooding the network. Subclasses implement `probeHost` for their protocol
- * (Fronius over HTTP, Sigenergy over Modbus TCP).
- */
+// Shared local-network discovery pipeline: build candidate IPs (explicit
+// subnet → ARP table → interface detection → 192.168.1.* fallback), then
+// probe in sequential batches. Subclasses implement `probeHost` per protocol.
 export abstract class NetworkDiscovery<TDevice extends { host: string }> {
   constructor(
     protected readonly logger: Logger,
-    /** Log prefix, e.g. "Fronius discovery". */
+    // Log prefix, e.g. "Fronius discovery".
     protected readonly label: string,
     private readonly subnet?: string,
     // Injected so tests can supply fakes instead of patching Deno globals.
@@ -24,14 +20,12 @@ export abstract class NetworkDiscovery<TDevice extends { host: string }> {
       Deno.networkInterfaces,
   ) {}
 
-  /** Probe one host; resolve null when it is not the target device. */
+  // Probe one host; resolve null when it is not the target device.
   protected abstract probeHost(host: string): Promise<TDevice | null>;
 
-  /**
-   * When true, discovery returns after the first batch containing a hit.
-   * ChargeHA supports a single inverter, so protocols with expensive probes
-   * (full TCP handshake per host) opt out of scanning the rest of the subnet.
-   */
+  // When true, discovery returns after the first batch containing a hit.
+  // ChargeHA supports a single inverter, so protocols with expensive probes
+  // (full TCP handshake per host) opt out of scanning the rest of the subnet.
   protected abstract readonly stopAtFirstHit: boolean;
 
   async discover(): Promise<TDevice[]> {
@@ -96,10 +90,9 @@ export abstract class NetworkDiscovery<TDevice extends { host: string }> {
     }
   }
 
-  /** Detect subnets from network interfaces, or fall back to 192.168.1.*.
-   *  Filtering (virtual/loopback/link-local/network-address exclusion, and
-   *  the missing `--allow-sys` case) lives in the shared `detectLanSubnets`,
-   *  the same helper OCPP uses to work out where it itself is reachable. */
+  // Detect subnets from network interfaces, or fall back to 192.168.1.*.
+  // Filtering lives in the shared `detectLanSubnets`, the same helper OCPP
+  // uses to work out where it itself is reachable.
   private candidatesFromInterfaces(): string[] {
     try {
       const subnets = detectLanSubnets(this.networkInterfaces);

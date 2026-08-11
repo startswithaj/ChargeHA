@@ -1,12 +1,6 @@
-/**
- * The host UI surface plugins are allowed to consume — the client-side
- * counterpart of `PluginDependencies`. Plugin production code must import
- * main's client code through this barrel only (enforced by the
- * `no-main-trpc` lint plugin); test files may deep-import test helpers.
- *
- * Main can refactor anything in `client/src` freely as long as these
- * exports keep their contracts.
- */
+// The host UI surface plugins are allowed to consume — the client-side
+// counterpart of `PluginDependencies`. Plugin code must import main's client
+// code through this barrel only (enforced by the `no-main-trpc` lint plugin).
 
 // Typed tRPC client factory — plugins widen it with their own router type.
 export { widenTrpc } from "../client/src/trpc.ts";

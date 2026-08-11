@@ -10,7 +10,7 @@ export interface SimulateUpdate {
   [key: string]: unknown;
 }
 
-/** Wrapper that renders one SimulatedVehicleDialog per simulated vehicle. */
+// Wrapper that renders one SimulatedVehicleDialog per simulated vehicle.
 export function SimulatedVehicleSettings(): JSX.Element | null {
   const vehiclesQuery = trpc.plugin.vehicle.simulated.listVehicles.useQuery(
     undefined,

@@ -2,10 +2,8 @@ import type { PluginStepDef } from "../../../hostUi.ts";
 import type { EnergyPluginOption } from "../../../pluginOptions.ts";
 import { froniusLocalSetupStep } from "./FroniusLocalSetupStep.tsx";
 
-/** Fronius Local wizard steps, in order. */
 export const froniusLocalWizardSteps: PluginStepDef[] = [froniusLocalSetupStep];
 
-/** Fronius Local option metadata for the inverter type selection step. */
 export const froniusLocalOption: EnergyPluginOption = {
   id: "fronius_local",
   label: "Fronius (Local)",

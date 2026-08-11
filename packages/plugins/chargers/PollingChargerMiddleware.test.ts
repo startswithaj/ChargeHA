@@ -18,9 +18,9 @@ interface Handlers {
   setChargeAmps: (amps: number) => Promise<boolean>;
 }
 
-/** Stub over the ChargerAdapter surface PollingChargerMiddleware calls.
- *  Records call order; unstubbed methods throw so a test only exercising
- *  a subset of the interface still catches unexpected device calls. */
+// Stub over the ChargerAdapter surface PollingChargerMiddleware calls.
+// Records call order; unstubbed methods throw so a test only exercising
+// a subset of the interface still catches unexpected device calls.
 class StubChargerAdapter implements ChargerAdapter {
   readonly calls: string[] = [];
   disconnectCalls = 0;
@@ -78,7 +78,7 @@ class StubChargerAdapter implements ChargerAdapter {
   }
 }
 
-/** Records error() calls instead of writing to the console. */
+// Records error() calls instead of writing to the console.
 class SpyLogger extends Logger {
   readonly errorCalls: Array<{ message: string; args: unknown[] }> = [];
 

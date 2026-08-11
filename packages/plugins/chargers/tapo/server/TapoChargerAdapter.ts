@@ -84,7 +84,7 @@ export class TapoChargerAdapter implements ChargerAdapter {
     return await this.setDeviceOn(false);
   }
 
-  /** Switch-only charger — the controller never calls this (controlMode). */
+  // Switch-only charger — the controller never calls this (controlMode).
   setChargeAmps(_amps: number, _ctx: CallContext): Promise<boolean> {
     return Promise.resolve(false);
   }
@@ -157,10 +157,9 @@ export class TapoChargerAdapter implements ChargerAdapter {
     };
   }
 
-  /** Draw-based session tracking: start on threshold crossing, end only after
-   *  SESSION_END_POLLS consecutive below-threshold readings. Session energy
-   *  accumulates today_energy deltas; a negative delta is the midnight reset,
-   *  where the new today value is the since-midnight contribution. */
+  // Draw-based session tracking: start on threshold crossing, end only after
+  // SESSION_END_POLLS consecutive below-threshold readings. Energy accumulates
+  // today_energy deltas; a negative delta is the midnight reset.
   private updateSession(
     aboveThreshold: boolean,
     todayWh: number,
@@ -193,9 +192,9 @@ export class TapoChargerAdapter implements ChargerAdapter {
     return active;
   }
 
-  /** A failed poll is not "stopped drawing": retain the last state, flip to
-   *  faulted only after the stale timeout. With no state to retain, the fault
-   *  is built from config so the dashboard can still say "unreachable". */
+  // A failed poll is not "stopped drawing": retain the last state, flip to
+  // faulted only after the stale timeout. With no state to retain, the fault
+  // is built from config so the dashboard can still say "unreachable".
   private staleState(error: unknown): ChargerState {
     const since = this.lastGoodAt ?? this.firstAttemptAt;
     const staleMs = this.config.staleTimeoutSeconds * 1000;
@@ -239,8 +238,8 @@ export class TapoChargerAdapter implements ChargerAdapter {
     };
   }
 
-  /** A plug that never answered: observed fields null (no invented zeroes),
-   *  amp limits from config. Status and timestamp are the caller's. */
+  // A plug that never answered: observed fields null (no invented zeroes),
+  // amp limits from config. Status and timestamp are the caller's.
   private unknownDevice(): Omit<
     ChargerState,
     "status" | "statusDetail" | "lastUpdated"

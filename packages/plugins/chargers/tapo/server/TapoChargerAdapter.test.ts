@@ -22,9 +22,9 @@ interface Handlers {
   set_device_info: (params?: Record<string, unknown>) => Promise<void>;
 }
 
-/** Minimal spy over the KlapClient surface TapoChargerAdapter calls: only
- *  `request()`. Records call order and hands each call its own index within
- *  that method (so a test can vary the response poll-by-poll). */
+// Minimal spy over the KlapClient surface TapoChargerAdapter calls: only
+// `request()`. Records call order and hands each call its own index within
+// that method (so a test can vary the response poll-by-poll).
 class SpyKlapClient extends KlapClient {
   readonly calls: string[] = [];
 

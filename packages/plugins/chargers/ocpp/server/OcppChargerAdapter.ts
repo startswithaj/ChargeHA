@@ -38,11 +38,11 @@ export interface OcppAdapterConfig {
   meterTimeoutSeconds: number;
   maxAmps: number;
   minAmps: number;
-  /** From the plugin's phases setting — a charger can't report this. */
+  // From the plugin's phases setting — a charger can't report this.
   phases: number;
 }
 
-/** Push-based adapter: all reads come from the central system's cache. */
+// Push-based adapter: all reads come from the central system's cache.
 export class OcppChargerAdapter implements ChargerAdapter {
   // Tracks whether the last computed state was stale, so the dashboard's
   // frequent polling only writes a log row on the transition, not every poll.
@@ -50,7 +50,7 @@ export class OcppChargerAdapter implements ChargerAdapter {
 
   constructor(
     private readonly config: OcppAdapterConfig,
-    /** Bound to this charger, so the adapter cannot command another one. */
+    // Bound to this charger, so the adapter cannot command another one.
     private readonly cs: OcppChargerHandle,
     private readonly dbLog: PluginDbLogger,
   ) {}
@@ -71,7 +71,7 @@ export class OcppChargerAdapter implements ChargerAdapter {
     return this.cs.remoteStop();
   }
 
-  /** Three-tier profile per the HA-integration pattern. */
+  // Three-tier profile per the HA-integration pattern.
   setChargeAmps(amps: number, _ctx: CallContext): Promise<boolean> {
     const tx = this.cs.getData().transactionId ?? undefined;
     return this.cs.setChargingProfiles([
@@ -164,9 +164,9 @@ function resolveStatus(
   return STATUS_MAP[status];
 }
 
-/** null means "unknown", which the controller engine treats as plugged in —
- *  only a definite false blocks charging. A session running with no status yet
- *  is definitely plugged in, so say so rather than leaving it unknown. */
+// null means "unknown", which the controller engine treats as plugged in —
+// only a definite false blocks charging. A session running with no status
+// yet is definitely plugged in, so say so rather than leaving it unknown.
 function resolvePluggedIn(
   status: ChargePointStatus | null,
   charging: boolean,
@@ -175,13 +175,9 @@ function resolvePluggedIn(
   return charging ? true : null;
 }
 
-/** A charger that reconnects mid-session re-announces its connector status but
- *  has no reason to resend Charging — from its side nothing changed. Our own
- *  `status` is reset on every new socket, so after a ChargeHA restart the live
- *  transaction and real power are the only honest evidence a session is
- *  running. Trust them over a status that predates the current socket.
- *  Power must be non-zero: SuspendedEV/SuspendedEVSE hold a transaction open
- *  at zero power and must keep reporting not-charging. */
+// A reconnecting charger re-announces connector status but has no reason to
+// resend Charging. After a ChargeHA restart the live transaction and real
+// power are the only honest evidence, trusted over a stale status.
 function isChargingNow(data: OcppLiveData): boolean {
   if (data.status === "Charging") return true;
   // Inference fills a gap; it must never contradict the charger. Any other
@@ -194,13 +190,9 @@ function isChargingNow(data: OcppLiveData): boolean {
   return data.transactionId !== null && (data.powerW ?? 0) > 0;
 }
 
-/** Tier 3 of the measurand fallback chain: no power measurand and no
- *  register delta, so derive from amps × volts. Two explicit paths rather
- *  than one averaged round trip.
- *  - Per-phase currents: the sum already carries the phase count, and stays
- *    exact on an unbalanced load. config.phases is not consulted at all —
- *    the charger's own report beats the declared installation.
- *  - One unphased current: nothing to sum, so scale by config.phases. */
+// Tier 3: no power measurand, no register delta, derive from amps × volts.
+// Per-phase currents: sum stays exact on unbalanced load, config.phases
+// unused. One unphased current: nothing to sum, scale by config.phases.
 function derivedPowerKw(data: OcppLiveData, phases: number): number | null {
   if (data.voltageV === null) return null;
   if (data.currentSumA !== null) {

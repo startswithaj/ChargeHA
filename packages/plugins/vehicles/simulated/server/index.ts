@@ -20,7 +20,7 @@ import { SimulatedVehicleMiddleware } from "./SimulatedVehicleMiddleware.ts";
 import { SimulatedChargerMiddleware } from "./SimulatedChargerMiddleware.ts";
 import { createSimulatedRouter } from "./router.ts";
 
-/** Parse a JSON string into SimulatedVehicleConfig, returning {} on failure. */
+// Parse a JSON string into SimulatedVehicleConfig, returning {} on failure.
 function parseVehicleConfig(
   json: string,
 ): SimulatedVehicleConfig | Record<string, never> {
@@ -31,15 +31,11 @@ function parseVehicleConfig(
   }
 }
 
-/** Empty config section — simulated vehicles have no configurable settings. */
 export const simulatedConfigDef = defineSection({});
 
-/**
- * Simulated vehicle plugin — creates SimulatedVehicleAdapter instances for
- * testing and demo use. Their charging draw reaches the energy figures by
- * being read from cached vehicle state, not reported from here; see
- * docs/simulated-load.md.
- */
+// Simulated vehicle plugin — creates SimulatedVehicleAdapter instances for
+// testing/demo use. Charging draw reaches the energy figures by being read
+// from cached vehicle state, not reported from here; see docs/simulated-load.md.
 export class SimulatedVehiclePlugin implements VehiclePlugin, ChargerPlugin {
   readonly id = "simulated";
   readonly displayName = "Simulated";
@@ -47,7 +43,7 @@ export class SimulatedVehiclePlugin implements VehiclePlugin, ChargerPlugin {
   readonly configDef = simulatedConfigDef;
   readonly secretKeys: readonly string[] = [];
   readonly settingsComponentKey = "simulated-settings";
-  /** These cars move no electricity, so nothing can meter them. */
+  // These cars move no electricity, so nothing can meter them.
   readonly loadIsUnmetered = true;
 
   private readonly adapters = new Map<string, SimulatedVehicleAdapter>();
@@ -110,7 +106,7 @@ export class SimulatedVehiclePlugin implements VehiclePlugin, ChargerPlugin {
     this.middlewares.clear();
   }
 
-  /** Total simulated power draw across all adapters. Router helper. */
+  // Total simulated power draw across all adapters. Router helper.
   getTotalPowerW(): number {
     return this.adapters.values().reduce(
       (total, adapter) => total + adapter.getCurrentPowerW(),
@@ -118,7 +114,7 @@ export class SimulatedVehiclePlugin implements VehiclePlugin, ChargerPlugin {
     );
   }
 
-  /** Look up a simulated adapter by vehicle id. Router helper. */
+  // Look up a simulated adapter by vehicle id. Router helper.
   getAdapter(vehicleId: string): SimulatedVehicleAdapter | undefined {
     return this.adapters.get(vehicleId);
   }
@@ -127,7 +123,7 @@ export class SimulatedVehiclePlugin implements VehiclePlugin, ChargerPlugin {
     return createSimulatedRouter(this, this.deps);
   }
 
-  /** Simulated vehicles are always commandable. */
+  // Simulated vehicles are always commandable.
   getCommandStatus(): Promise<CommandStatus> {
     return Promise.resolve({ commandsDisabled: false, reason: null });
   }

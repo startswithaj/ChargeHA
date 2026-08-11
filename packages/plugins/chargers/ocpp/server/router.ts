@@ -6,32 +6,32 @@ import { createChargerConfigProcedures } from "../../../createPluginConfigProced
 import { OCPP_SECRET_KEYS, ocppConfigDef } from "./config.ts";
 import type { OcppCentralSystem } from "./OcppCentralSystem.ts";
 
-/** Long enough to walk to the charger and paste a URL into its app, short
- *  enough that an unattended window closes on its own. */
+// Long enough to walk to the charger and paste a URL into its app, short
+// enough that an unattended window closes on its own.
 const PAIRING_TTL_MS = 5 * 60 * 1000;
 
-/** Same default as bootstrap.ts, which owns the actual listen port. */
+// Same default as bootstrap.ts, which owns the actual listen port.
 const serverPort = (): string => Deno.env.get("PORT") ?? "8000";
 
 const WS_PATH = "/api/charger/ocpp";
 
-/** Which charger row to act on. Named `chargerRowId` because OCPP already
- *  uses "charger id" for the device-announced charge point id, and mixing the
- *  two is the single easiest mistake to make in this file. */
+// Which charger row to act on. Named `chargerRowId` because OCPP already
+// uses "charger id" for the device-announced charge point id, and mixing the
+// two is the single easiest mistake to make in this file.
 const chargerInput = z.object({
   chargerRowId: z.string(),
 });
 
-/** Either identifier works. Settings acts on a saved row; the wizard has only
- *  the id the charger announced, because no row exists until Next saves. */
+// Either identifier works. Settings acts on a saved row; the wizard has only
+// the id the charger announced, because no row exists until Next saves.
 const testConnectionInput = z.union([
   chargerInput,
   z.object({ chargePointId: z.string().min(1) }),
 ]);
 
-/** The OCPP charge point id configured on one charger row, or null when that
- *  row has not been given one yet. The only place a row id becomes a charge
- *  point id in the router. */
+// The OCPP charge point id configured on one charger row, or null when that
+// row has not been given one yet. The only place a row id becomes a charge
+// point id in the router.
 async function chargePointIdFor(
   deps: PluginDependencies,
   chargerRowId: string,
@@ -40,10 +40,9 @@ async function chargePointIdFor(
   return config.charger_id ?? null;
 }
 
-/** LAN addresses a charger could plausibly dial. Interface filtering
- *  (virtual/loopback/link-local/network-address exclusion, and the missing
- *  `--allow-sys` fallback) lives in the shared `detectLanAddresses` — this
- *  just turns those addresses into connection URLs. */
+// LAN addresses a charger could plausibly dial. Interface filtering lives in
+// the shared `detectLanAddresses` — this just turns those addresses into
+// connection URLs.
 function lanBaseUrls(
   networkInterfaces: typeof Deno.networkInterfaces = Deno.networkInterfaces,
 ): string[] {
@@ -52,15 +51,14 @@ function lanBaseUrls(
   );
 }
 
-/** The pairing lifecycle, grouped so the main router stays readable.
- *  Session-authenticated: the whole /trpc mount sits behind
- *  createAuthMiddleware — only the charger websocket itself is public. */
+// The pairing lifecycle, grouped so the main router stays readable.
+// Session-authenticated: the whole /trpc mount sits behind
+// createAuthMiddleware — only the charger websocket itself is public.
 function pairingProcedures(centralSystem: OcppCentralSystem) {
   return {
-    /** Open a window in which a charger announcing any id may connect
-     *  provisionally, so it can prove it reaches us before an id is saved.
-     *  Plugin-wide by nature: the window is a property of the listener, not
-     *  of any one charger row. */
+    // Open a window in which a charger announcing any id may connect
+    // provisionally, so it can prove it reaches us before an id is saved.
+    // Plugin-wide: the window is a property of the listener, not any one row.
     beginPairing: publicProcedure.mutation(() => {
       centralSystem.armPairing(PAIRING_TTL_MS);
       return { expiresInMs: PAIRING_TTL_MS };
@@ -71,9 +69,8 @@ function pairingProcedures(centralSystem: OcppCentralSystem) {
       return { armed: false as const };
     }),
 
-    /** The pairing window's facts, row-independent by nature — this is what
-     *  add mode / the first-run wizard reads, since no charger row exists yet
-     *  for them to scope a query to. */
+    // The pairing window's facts, row-independent by nature — this is what
+    // add mode / the first-run wizard reads, since no charger row exists yet.
     pairingStatus: publicProcedure.query(() => {
       const pairing = centralSystem.pairingState();
       return {
@@ -109,8 +106,8 @@ export function createOcppRouter(
   return router({
     ...createChargerConfigProcedures(deps, ocppConfigDef, OCPP_SECRET_KEYS),
 
-    /** Connection status + charger info for settings/wizard live display,
-     *  for ONE charger row. */
+    // Connection status + charger info for settings/wizard live display,
+    // for ONE charger row.
     status: publicProcedure
       .input(chargerInput)
       .query(async ({ input }) => {

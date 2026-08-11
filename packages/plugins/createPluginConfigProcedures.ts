@@ -10,22 +10,9 @@ import type { SectionDef } from "@chargeha/shared/configSections";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import { publicProcedure } from "../server/src/trpc/trpc.ts";
 
-/**
- * Creates reusable getConfig/setConfig tRPC procedures for a plugin.
- *
- * Each plugin spreads these into its own router so config I/O lives on
- * the plugin's own tRPC path (e.g. trpc.plugin.vehicle.tesla.getConfig)
- * instead of a centralized pluginConfig router with hardcoded pluginId
- * strings. All storage goes through the plugin's own deps — configDef keys
- * are relative (e.g. "client_id") and deps prefixes them with the plugin id,
- * the single place namespacing happens.
- *
- * No reconfigure callback: `AppDatabase.setConfig` / `storeSecret` emit
- * `config_changed` events, and subscribers (e.g. EnergyPoller) drive any
- * adapter rebuild + timer restart themselves. Secret encryption is
- * encapsulated inside AppDatabase, so this helper never touches the
- * encryption key directly.
- */
+// Reusable getConfig/setConfig tRPC procedures for a plugin — deps prefixes
+// relative configDef keys with the plugin id. No reconfigure callback:
+// AppDatabase's config_changed events drive any adapter rebuild themselves.
 export function createPluginConfigProcedures(
   deps: PluginDependencies,
   configDef: SectionDef,
@@ -67,13 +54,9 @@ export function createPluginConfigProcedures(
   };
 }
 
-/**
- * The `lanSubnets` query every discovery-capable plugin (Fronius, Enphase,
- * Sigenergy, Tapo) spreads into its router so the "Search Network" subnet
- * field can default to where ChargeHA itself is actually running, instead of
- * an empty text box. One copy of the query definition; the interface
- * detection it calls lives in `PluginDependencies.lanSubnets`.
- */
+// The `lanSubnets` query every discovery-capable plugin spreads into its
+// router so the "Search Network" subnet field can default to where ChargeHA
+// itself runs. Interface detection it calls lives in PluginDependencies.lanSubnets.
 export function createNetworkDiscoveryProcedures(deps: PluginDependencies) {
   return {
     lanSubnets: publicProcedure.query(() => deps.lanSubnets()),
@@ -86,25 +69,9 @@ const chargerSetConfigInput = z.object({
   values: z.record(z.string(), z.unknown()),
 });
 
-/**
- * Creates row-scoped getConfig/setConfig tRPC procedures for a charger
- * plugin — one row can own its own credentials, so two chargers of the same
- * adapter type never collide.
- *
- * `chargerRowId: null` on setConfig means no row yet: the mutation creates
- * one via `deps.createChargerRow()` before writing, so add-mode and the
- * wizard can submit once with nothing created before that submit.
- *
- * Secret/plain split is the same `secretKeys` allowlist as the plugin-wide
- * factory. `getConfig` merges `{...config, ...secrets}` before
- * `deserializeSection` — credentials the user typed are returned, not
- * hidden; only encryption at rest is the requirement.
- *
- * The two patches run sequentially, not under `Promise.all` — both
- * read-modify-write the same `chargers` row. After writing, `rebuildCharger`
- * is awaited so the mutation resolves only once the running middleware
- * reflects what was saved.
- */
+// Row-scoped getConfig/setConfig for a charger plugin — one row owns its own
+// credentials, so two chargers of the same type never collide.
+// `chargerRowId: null` on setConfig means no row yet: creates one first.
 export function createChargerConfigProcedures(
   deps: PluginDependencies,
   configDef: SectionDef,

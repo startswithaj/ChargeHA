@@ -31,7 +31,7 @@ describe("TeslaTokenManager", () => {
       pluginId: "tesla",
     });
 
-  /** Seed tokens directly into the DB using namespaced config keys. */
+  // Seed tokens directly into the DB using namespaced config keys.
   const seedTokens = async (
     db: AppDatabase,
     access: string,

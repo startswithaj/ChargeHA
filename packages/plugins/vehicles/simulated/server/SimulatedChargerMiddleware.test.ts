@@ -17,9 +17,9 @@ interface Handlers {
   setChargeAmps: (amps: number) => Promise<boolean>;
 }
 
-/** Stub over the SimulatedVehicleMiddleware surface the charger view calls.
- *  Records call order and args; unstubbed methods throw so a test only
- *  exercising a subset of the interface still catches unexpected calls. */
+// Stub over the SimulatedVehicleMiddleware surface the charger view calls.
+// Records call order and args; unstubbed methods throw so a test only
+// exercising a subset of the interface still catches unexpected calls.
 class StubVehicleMiddleware {
   readonly calls: string[] = [];
   requestStateArgs: VehicleRequestContext[] = [];

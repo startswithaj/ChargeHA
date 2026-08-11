@@ -278,7 +278,6 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
     };
   }
 
-  /** Get current charge power in watts (0 if not charging). */
   getCurrentPowerW(): number {
     return this.isCharging ? this.calculatePowerKw() * 1000 : 0;
   }
@@ -289,7 +288,7 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
     return Math.min(powerKw, this.config.maxChargeRateKw);
   }
 
-  /** Advance battery SOC based on elapsed time and current charge power. */
+  // Advance battery SOC based on elapsed time and current charge power.
   private updateSoc(): void {
     if (!this.isCharging) return;
 

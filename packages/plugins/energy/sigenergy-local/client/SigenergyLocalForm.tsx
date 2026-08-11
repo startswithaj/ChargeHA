@@ -162,7 +162,6 @@ type TestVariables = {
   deviceUnitId?: number;
 };
 
-/** Build the test-connection mutation input from the form's string fields. */
 function testArgs(values: SigenergyLocalFormValues) {
   return {
     host: values.host,
@@ -172,7 +171,7 @@ function testArgs(values: SigenergyLocalFormValues) {
   };
 }
 
-/** On a successful test, echo the validated values (as strings) upward. */
+// On a successful test, echo the validated values (as strings) upward.
 const onTestSuccessHandler =
   (onTestSuccess: (values: SigenergyLocalFormValues) => void) =>
   (data: { success: boolean }, variables: TestVariables) => {

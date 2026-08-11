@@ -11,16 +11,15 @@ const VOLTAGE = 230;
 interface SimState {
   on: boolean;
   pluggedIn: boolean;
-  /** The fake car's appetite; 0 = absent or full. */
+  // The fake car's appetite; 0 = absent or full.
   carMaxAmps: number;
   commandedAmps: number;
   energyAddedKwh: number;
   lastTickMs: number;
 }
 
-/** In-memory EVSE: honours start/stop/setChargeAmps like real hardware,
- *  draws min(commanded, car appetite), accumulates session energy on a
- *  wall-clock tick. */
+// In-memory EVSE: honours start/stop/setChargeAmps like real hardware, draws
+// min(commanded, car appetite), accumulates session energy on a wall-clock tick.
 export class SimulatedChargerAdapter implements ChargerAdapter {
   private state: SimState = {
     on: false,
@@ -96,7 +95,7 @@ export class SimulatedChargerAdapter implements ChargerAdapter {
     });
   }
 
-  /** Dev controls (router): plug/unplug the fake car, set its appetite. */
+  // Dev controls (router): plug/unplug the fake car, set its appetite.
   updateState(patch: { pluggedIn?: boolean; carMaxAmps?: number }): void {
     this.tick();
     this.state = {
@@ -107,7 +106,7 @@ export class SimulatedChargerAdapter implements ChargerAdapter {
     };
   }
 
-  /** Dev-panel view of current state — no ChargerState ceremony. */
+  // Dev-panel view of current state — no ChargerState ceremony.
   devStatus(): {
     chargerRowId: string;
     pluggedIn: boolean;

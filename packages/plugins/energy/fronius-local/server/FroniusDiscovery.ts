@@ -47,7 +47,7 @@ class FroniusDiscovery extends NetworkDiscovery<Inverter> {
   }
 }
 
-/** Scan local network for Fronius inverters. */
+// Scan local network for Fronius inverters.
 export function discoverFronius(
   logger: Logger,
   subnet?: string,

@@ -1,8 +1,8 @@
 import type { PluginConfigField } from "../../../hostUi.ts";
 import { TapoDiscoverySection } from "./TapoControls.tsx";
 
-/** The one definition of Tapo's config. Rendered by both the wizard step and
- *  the settings panel, so labels, help and grouping cannot drift apart. */
+// The one definition of Tapo's config. Rendered by both the wizard step and
+// the settings panel, so labels, help and grouping cannot drift apart.
 export const TAPO_FIELDS: PluginConfigField[] = [
   {
     key: "tapoHost",
@@ -52,7 +52,7 @@ export const TAPO_FIELDS: PluginConfigField[] = [
   },
 ];
 
-/** Field keys with their defaults, for hosts that hold their own draft. */
+// Field keys with their defaults, for hosts that hold their own draft.
 export const TAPO_DEFAULTS: Record<string, string> = {
   tapoHost: "",
   tapoEmail: "",

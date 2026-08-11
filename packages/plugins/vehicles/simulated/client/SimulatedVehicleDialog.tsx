@@ -17,7 +17,7 @@ export interface SimulatedVehicleDialogProps {
   onCancel: () => void;
 }
 
-/** Validate lat/lng strings and return parsed values or an error message. */
+// Validate lat/lng strings and return parsed values or an error message.
 function parseLocation(
   lat: string,
   lng: string,

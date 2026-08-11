@@ -4,13 +4,13 @@ import { Logger } from "@chargeha/server/lib/Logger";
 import { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import { OcppCentralSystem } from "../OcppCentralSystem.ts";
 
-/** [messageTypeId, id, ...rest] — a decoded OCPP-J frame, in either
- *  direction (CALL out, CALLRESULT/CALLERROR in reply to a charger CALL). */
+// [messageTypeId, id, ...rest] — a decoded OCPP-J frame, in either direction
+// (CALL out, CALLRESULT/CALLERROR in reply to a charger CALL).
 export type Frame = [number, string, ...unknown[]];
 
-/** Minimal stand-in for the upgraded socket: records every frame we send
- *  (replies to charger CALLs, and our own outgoing CALLs) and lets a test
- *  push charger-initiated CALLs in. */
+// Minimal stand-in for the upgraded socket: records every frame we send
+// (replies to charger CALLs, and our own outgoing CALLs) and lets a test
+// push charger-initiated CALLs in.
 export const fakeSocket = () => {
   const sent: Frame[] = [];
   return {
@@ -34,13 +34,9 @@ export const fakeSocket = () => {
 
 export type FakeSocket = ReturnType<typeof fakeSocket>;
 
-/** A charge point with a charger row, already attached. `hasRow: false`
- *  models a pairing-window charger the user has not saved yet.
- *
- *  `hasChargerRow` gives a test full control over the row lookup — e.g. to
- *  make one call resolve slower than another, to reproduce DB-latency-
- *  dependent ordering deterministically instead of by luck. It takes
- *  priority over `hasRow` when both are given. */
+// A charge point with a charger row, already attached. `hasRow: false` models
+// a pairing-window charger not yet saved. `hasChargerRow` gives a test full
+// control over the row lookup to reproduce DB-latency-dependent ordering deterministically.
 export const attached = (
   chargerId: string,
   opts: {
@@ -60,11 +56,11 @@ export const attached = (
   return { cs, socket };
 };
 
-/** The CALLs we sent to the charger, in order, for one action. */
+// The CALLs we sent to the charger, in order, for one action.
 export const callsTo = (socket: FakeSocket, action: string): Frame[] =>
   socket.sent.filter((frame) => frame[0] === 2 && frame[2] === action);
 
-/** Answer the CALL we sent most recently, as the charger would. */
+// Answer the CALL we sent most recently, as the charger would.
 export const answer = async (
   socket: FakeSocket,
   payload: Record<string, unknown>,
@@ -78,7 +74,7 @@ export const answer = async (
   await new Promise((resolve) => setTimeout(resolve, 0));
 };
 
-/** Deliver a charger-initiated CALL and return what we replied. */
+// Deliver a charger-initiated CALL and return what we replied.
 export const call = async (
   socket: FakeSocket,
   action: string,
@@ -94,7 +90,7 @@ export const call = async (
   return socket.sent[before];
 };
 
-/** Deliver a MeterValues CALL carrying exactly these sampledValue entries. */
+// Deliver a MeterValues CALL carrying exactly these sampledValue entries.
 export const meterValues = (
   socket: FakeSocket,
   sampledValue: Array<Record<string, unknown>>,
@@ -108,7 +104,7 @@ export const meterValues = (
     meterValue: [{ timestamp: new Date().toISOString(), sampledValue }],
   });
 
-/** Per-phase sampledValue entries for one measurand: [phase, value] pairs. */
+// Per-phase sampledValue entries for one measurand: [phase, value] pairs.
 export const phased = (
   measurand: string,
   entries: Array<[string, string]>,

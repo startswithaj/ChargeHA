@@ -52,7 +52,7 @@ export class OcppFraming {
 
 const CALL_TIMEOUT_MS = 30_000;
 
-/** Correlates outgoing CALLs with their CALLRESULT/CALLERROR by unique id. */
+// Correlates outgoing CALLs with their CALLRESULT/CALLERROR by unique id.
 export class PendingCalls {
   private readonly pending = new Map<string, {
     resolve: (payload: unknown) => void;

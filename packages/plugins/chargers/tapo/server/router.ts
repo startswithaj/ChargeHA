@@ -22,8 +22,8 @@ const testConnectionInput = z.object({
   password: z.string(),
 });
 
-/** Which charger row to act on. `chargerRowId`, not `chargerId`, because a
- *  Tapo row has no device-side id and the two would be easy to confuse. */
+// Which charger row to act on. `chargerRowId`, not `chargerId`, because a
+// Tapo row has no device-side id and the two would be easy to confuse.
 const chargerInput = z.object({
   chargerRowId: z.string(),
 });
@@ -33,8 +33,8 @@ const setPowerInput = z.object({
   on: z.boolean(),
 });
 
-/** A client for the plug configured on ONE charger row. Two Tapo rows resolve
- *  to two different plugs; there is no "the" saved plug any more. */
+// A client for the plug configured on ONE charger row. Two Tapo rows resolve
+// to two different plugs; there is no "the" saved plug any more.
 async function savedClient(
   deps: PluginDependencies,
   chargerRowId: string,

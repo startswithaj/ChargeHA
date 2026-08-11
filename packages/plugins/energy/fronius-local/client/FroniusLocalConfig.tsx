@@ -109,8 +109,8 @@ type FroniusDraft = Partial<
   { froniusHost: string; froniusMeterDeviceId: string }
 >;
 
-/** Buffered like EnphaseLocalConfig: a write per keystroke would rebuild the
- *  energy adapter against every half-typed host (config_changed → poller). */
+// Buffered like EnphaseLocalConfig: a write per keystroke would rebuild the
+// energy adapter against every half-typed host (config_changed → poller).
 function useFroniusDraft(
   config: { froniusHost: string; froniusMeterDeviceId: string } | undefined,
 ) {

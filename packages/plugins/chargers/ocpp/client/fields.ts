@@ -1,11 +1,11 @@
 import type { PluginConfigField } from "../../../hostUi.ts";
 
-/** Shown in the Charger ID box and as the stand-in inside the connection
- *  URL, so the two obviously refer to the same value. */
+// Shown in the Charger ID box and as the stand-in inside the connection
+// URL, so the two obviously refer to the same value.
 export const CHARGER_ID_PLACEHOLDER = "my-wallbox";
 
-/** The one definition of OCPP's config. Rendered by both the wizard step and
- *  the settings panel, so labels, help and grouping cannot drift apart. */
+// The one definition of OCPP's config. Rendered by both the wizard step and
+// the settings panel, so labels, help and grouping cannot drift apart.
 export const OCPP_FIELDS: PluginConfigField[] = [
   {
     key: "ocppChargerId",
@@ -56,7 +56,7 @@ export const OCPP_FIELDS: PluginConfigField[] = [
   },
 ];
 
-/** Field keys with their defaults, for hosts that hold their own draft. */
+// Field keys with their defaults, for hosts that hold their own draft.
 export const OCPP_DEFAULTS: Record<string, string> = {
   ocppChargerId: "",
   ocppMaxAmps: "32",

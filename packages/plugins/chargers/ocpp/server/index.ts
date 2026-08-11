@@ -39,13 +39,9 @@ export class OcppChargerPlugin implements ChargerPlugin {
     deps.log.info("OCPP plugin initialized");
   }
 
-  /**
-   * The charger row that owns a given OCPP charge point id, or null.
-   *
-   * The central system speaks charge point ids (what the device announces);
-   * storage speaks charger row ids. This is the only translation between them,
-   * and it replaces every former plugin-wide `charger_id` read.
-   */
+  // The charger row that owns a given OCPP charge point id, or null. The
+  // central system speaks charge point ids (device-announced); storage
+  // speaks charger row ids. This is the only translation between them.
   private async rowForChargePoint(
     chargePointId: string,
   ): Promise<ResolvedChargerRow | null> {
@@ -53,7 +49,7 @@ export class OcppChargerPlugin implements ChargerPlugin {
     return entries.find((e) => e.config.charger_id === chargePointId) ?? null;
   }
 
-  /** Nothing is awaited: every value this needs arrives as an argument. */
+  // Nothing is awaited: every value this needs arrives as an argument.
   // deno-lint-ignore require-await
   async createChargerMiddleware(
     row: ChargerRow,
@@ -93,8 +89,8 @@ export class OcppChargerPlugin implements ChargerPlugin {
     };
   }
 
-  /** Every OCPP row that has a charge point id. A row without one is
-   *  unconfigured and stays silent in every check. */
+  // Every OCPP row that has a charge point id. A row without one is
+  // unconfigured and stays silent in every check.
   private async configuredPoints(): Promise<
     Array<{ name: string; chargePointId: string }>
   > {

@@ -21,9 +21,9 @@ export interface OcppChargerInfo {
   firmwareVersion: string;
 }
 
-/** One charger that turned up during a pairing window. More than one can:
- *  a household may have two, or an old id may still be retrying alongside a
- *  new one, so the user picks rather than us guessing. */
+// One charger that turned up during a pairing window. More than one can:
+// a household may have two, or an old id may still be retrying alongside a
+// new one, so the user picks rather than us guessing.
 export interface OcppSeenCharger {
   chargerId: string;
   info: OcppChargerInfo | null;
@@ -33,7 +33,7 @@ export interface OcppSeenCharger {
 export interface OcppPairingState {
   armed: boolean;
   expiresAt: number | null;
-  /** Everything that connected during this window, newest last. */
+  // Everything that connected during this window, newest last.
   seen: OcppSeenCharger[];
 }
 
@@ -43,16 +43,14 @@ export interface OcppLiveData {
   errorCode: string | null;
   info: OcppChargerInfo | null;
   transactionId: number | null;
-  /** Wh register at StartTransaction — session energy baseline. */
+  // Wh register at StartTransaction — session energy baseline.
   meterStartWh: number | null;
-  /** Latest measurand readings (nulls = charger never sent them). */
+  // Latest measurand readings (nulls = charger never sent them).
   powerW: number | null;
   currentA: number | null;
-  /** Sum of the per-phase currents, when the charger reported them per
-   *  phase. null when it reported a single unphased current — the adapter
-   *  then scales by the configured phase count instead. Kept alongside the
-   *  average because the adapter reads only this cache; parsing measurands
-   *  there would break the push-based boundary. */
+  // Sum of the per-phase currents, when reported per phase; null when the
+  // charger reported one unphased current, so the adapter scales by phase
+  // count instead. Kept separately so the adapter reads only this cache.
   currentSumA: number | null;
   voltageV: number | null;
   energyRegisterWh: number | null;
@@ -66,8 +64,8 @@ const idlePairing = (): OcppPairingState => ({
   seen: [],
 });
 
-/** Add a charger to the seen list, or refresh the one already there. Chargers
- *  reconnect often; a duplicate row per reconnect would be noise. */
+// Add a charger to the seen list, or refresh the one already there. Chargers
+// reconnect often; a duplicate row per reconnect would be noise.
 function withCharger(
   seen: OcppSeenCharger[],
   chargerId: string,
@@ -95,27 +93,25 @@ const freshData = (): OcppLiveData => ({
   lastUpdated: new Date().toISOString(),
 });
 
-/** Everything that belongs to one charge point's live socket. Held per
- *  connection rather than as fields on the class, so a second charger cannot
- *  evict the first nor share its transaction counter. */
+// Everything that belongs to one charge point's live socket. Held per
+// connection rather than as fields on the class, so a second charger cannot
+// evict the first nor share its transaction counter.
 interface OcppConnection {
   socket: WebSocket;
   data: OcppLiveData;
-  /** Per socket: a CALLRESULT from one charger must never settle a call sent
-   *  to another. */
+  // Per socket: a CALLRESULT from one charger must never settle a call sent
+  // to another.
   pending: PendingCalls;
   transactionCounter: number;
-  /** Per socket, not keyed globally by charge point id — a reconnect must
-   *  get a fresh queue rather than inherit a dead socket's backlog. Runs
-   *  charger-initiated CALLs one at a time, in wire order, so handling never
-   *  depends on how fast this connection's charger-row lookups happen to
-   *  resolve. See OcppMessageQueue. */
+  // Per socket, not keyed globally by charge point id — a reconnect gets a
+  // fresh queue rather than inheriting a dead socket's backlog. Runs
+  // charger-initiated CALLs one at a time, in wire order. See OcppMessageQueue.
   queue: OcppMessageQueue;
 }
 
-/** A central system bound to one charge point. Adapters take this rather than
- *  the whole central system, so an adapter cannot command a charger other than
- *  its own, and cannot reach plugin-wide operations like pairing. */
+// A central system bound to one charge point. Adapters take this rather than
+// the whole central system, so an adapter cannot command a charger other than
+// its own, and cannot reach plugin-wide operations like pairing.
 export interface OcppChargerHandle {
   getData(): OcppLiveData;
   remoteStart(): Promise<boolean>;
@@ -126,30 +122,29 @@ export interface OcppChargerHandle {
   ping(): Promise<{ latencyMs: number }>;
 }
 
-/** Plugin-internal OCPP 1.6J central system for a single charger.
- *  Owns the live socket, answers charger-initiated CALLs, tracks pushed
- *  state, and sends our CALLs (RemoteStart/Stop, SetChargingProfile...). */
+// Plugin-internal OCPP 1.6J central system for a single charger.
+// Owns the live socket, answers charger-initiated CALLs, tracks pushed
+// state, and sends our CALLs (RemoteStart/Stop, SetChargingProfile...).
 export class OcppCentralSystem {
   private readonly connections = new Map<string, OcppConnection>();
   private pairing: OcppPairingState = idlePairing();
-  /** Last charger turned away for an unknown id, and when. A charger set up
-   *  before listening started retries every couple of seconds; that is a
-   *  signal worth showing the user, not noise to bury in the log. */
+  // Last charger turned away for an unknown id, and when. A charger set up
+  // before listening started retries every couple of seconds; that is a
+  // signal worth showing the user, not noise to bury in the log.
   private knocking: { chargerId: string; at: number } | null = null;
-  /** Tracked separately from `knocking`: every retry refreshes that one, so
-   *  rate-limiting on it would log a given id exactly once, ever. */
+  // Tracked separately from `knocking`: every retry refreshes that one, so
+  // rate-limiting on it would log a given id exactly once, ever.
   private lastLogged: { chargerId: string; at: number } | null = null;
-  /** Owned here rather than per connection: the reconnect it has to survive
-   *  destroys the connection object. */
+  // Owned here rather than per connection: the reconnect it has to survive
+  // destroys the connection object.
   private readonly negotiator: OcppMeasurandNegotiator;
 
   constructor(
     private readonly logger: Logger,
     private readonly dbLog: PluginDbLogger,
-    /** The honest source of truth for whether a charge point id may act: does
-     *  any charger row exist for it? Async because it is a DB-backed lookup —
-     *  saving a row must take effect on an already-open socket's very next
-     *  message, with no reconnect. */
+    // The honest source of truth for whether a charge point id may act: does
+    // any charger row exist for it? Async because it is a DB-backed lookup —
+    // saving a row must take effect on an already-open socket's very next message.
     private readonly hasChargerRow: (chargePointId: string) => Promise<boolean>,
   ) {
     this.negotiator = new OcppMeasurandNegotiator(
@@ -159,19 +154,16 @@ export class OcppCentralSystem {
     );
   }
 
-  /** Disconnected chargers report fresh state rather than nothing, so callers
-   *  never have to special-case "no connection yet". */
+  // Disconnected chargers report fresh state rather than nothing, so callers
+  // never have to special-case "no connection yet".
   getData(chargePointId: string): OcppLiveData {
     return this.connections.get(chargePointId)?.data ?? freshData();
   }
 
   // ── Pairing ──────────────────────────────────────────────────────────
 
-  /** Open a time-boxed window in which a charger announcing any id may
-   *  connect provisionally. Lets the panel prove reachability before the user
-   *  commits a charger id, which otherwise cannot happen: the socket is
-   *  rejected until an id is saved, and the id cannot be verified until a
-   *  socket arrives. */
+  // Open a time-boxed window: lets the panel prove reachability before the
+  // user commits a charger id (otherwise unverifiable until a socket arrives).
   armPairing(ttlMs: number): void {
     // Re-arming must not forget a charger that is already paired. The panel
     // re-arms from polled state that can be a couple of seconds stale, so a
@@ -190,9 +182,9 @@ export class OcppCentralSystem {
     this.logger.info(`OCPP pairing armed for ${Math.round(ttlMs / 1000)}s`);
   }
 
-  /** Sockets tolerated only because pairing was open must not outlive it. A
-   *  connection whose charge point id now has a charger row is adopted and
-   *  left alone; everything else is a pairing-only socket. */
+  // Sockets tolerated only because pairing was open must not outlive it. A
+  // connection whose charge point id now has a charger row is adopted and
+  // left alone; everything else is a pairing-only socket.
   async cancelPairing(): Promise<void> {
     this.pairing = idlePairing();
     await Promise.all(
@@ -202,7 +194,7 @@ export class OcppCentralSystem {
     );
   }
 
-  /** Expired windows report themselves closed without needing a timer. */
+  // Expired windows report themselves closed without needing a timer.
   pairingState(): OcppPairingState {
     if (!this.pairing.armed) return this.pairing;
     if (
@@ -213,17 +205,15 @@ export class OcppCentralSystem {
     return this.pairing;
   }
 
-  /** wsRoutes gate: may a charger whose id is not the configured one connect
-   *  right now? */
+  // wsRoutes gate: may a charger whose id is not the configured one connect
+  // right now?
   acceptsPairing(): boolean {
     return this.pairingState().armed;
   }
 
-  /** Adopt an upgraded socket (from wsRoutes). A reconnect replaces the old
-   *  socket; state is retained (PRD: reconnection restores state). Whether
-   *  this id may act beyond BootNotification is decided fresh on every
-   *  message via `hasChargerRow`, not cached here — so once Save creates the
-   *  row, this same socket's next message is handled normally. */
+  // Adopt an upgraded socket (from wsRoutes). A reconnect replaces the old
+  // socket; state is retained. Whether this id may act beyond BootNotification
+  // is decided fresh per message via `hasChargerRow`, not cached here.
   attach(socket: WebSocket, opts: { chargerId: string }): void {
     const id = opts.chargerId;
     // Close only the previous socket for THIS charge point — that is a
@@ -247,8 +237,8 @@ export class OcppCentralSystem {
     this.logger.info(`Charger ${id} connected`);
   }
 
-  /** A bound view for one charge point. Adapters take this so they cannot
-   *  command another charger, nor reach plugin-wide operations. */
+  // A bound view for one charge point. Adapters take this so they cannot
+  // command another charger, nor reach plugin-wide operations.
   forCharger(chargePointId: string): OcppChargerHandle {
     return {
       getData: () => this.getData(chargePointId),
@@ -260,13 +250,13 @@ export class OcppCentralSystem {
     };
   }
 
-  /** A charger tried to connect but its id is not configured and no window is
-   *  open. Recorded so the panel can offer to accept it. */
+  // A charger tried to connect but its id is not configured and no window is
+  // open. Recorded so the panel can offer to accept it.
   noteRejected(chargerId: string): void {
     this.knocking = { chargerId, at: Date.now() };
   }
 
-  /** Who has been knocking in the last 30 seconds, if anyone. */
+  // Who has been knocking in the last 30 seconds, if anyone.
   knockingCharger(): string | null {
     if (this.knocking === null) return null;
     return Date.now() - this.knocking.at < 30_000
@@ -274,8 +264,8 @@ export class OcppCentralSystem {
       : null;
   }
 
-  /** True the first time an id is turned away, then at most once a minute —
-   *  a charger retrying on a 2s loop must not fill the log. */
+  // True the first time an id is turned away, then at most once a minute —
+  // a charger retrying on a 2s loop must not fill the log.
   shouldLogRejection(chargerId: string): boolean {
     const last = this.lastLogged;
     const due = last === null || last.chargerId !== chargerId ||
@@ -284,9 +274,9 @@ export class OcppCentralSystem {
     return due;
   }
 
-  /** Record a charger that announced itself during the window. Re-announcing
-   *  the same id updates its row rather than adding a duplicate — chargers
-   *  reconnect frequently. */
+  // Record a charger that announced itself during the window. Re-announcing
+  // the same id updates its row rather than adding a duplicate — chargers
+  // reconnect frequently.
   notePairedCharger(chargerId: string): void {
     if (!this.pairingState().armed) return;
     this.pairing = {
@@ -326,8 +316,8 @@ export class OcppCentralSystem {
     return accepted;
   }
 
-  /** Command outcomes (not the raw frame, already logged by `send`) — a
-   *  rare, user- or controller-triggered event, so info/warn is safe volume. */
+  // Command outcomes (not the raw frame, already logged by `send`) — a
+  // rare, user- or controller-triggered event, so info/warn is safe volume.
   private logOutcome(
     chargePointId: string,
     action: string,
@@ -342,10 +332,8 @@ export class OcppCentralSystem {
     }
   }
 
-  /** No transaction id to stop with — a reconnect after a restart never got
-   *  one via StartTransaction, and MeterValues has not adopted one yet.
-   *  Cap the draw at 0 A instead of failing into the command backoff. The
-   *  cap is lifted by the setChargeAmps that precedes any later start. */
+  // No transaction id to stop with (reconnect after a restart). Cap the draw
+  // at 0 A rather than fail; the setChargeAmps before any later start lifts it.
   private async suspendCharging(chargePointId: string): Promise<boolean> {
     this.logger.warn(
       `No transaction id for ${chargePointId}; suspending via a 0A ` +
@@ -458,21 +446,17 @@ export class OcppCentralSystem {
     }
   }
 
-  /** A saved charger has just booted. Negotiation is gated on the charger row
-   *  because BootNotification is the one action `resolveAction` lets through
-   *  without one: a pairing window accepts unknown chargers so the user can
-   *  identify them, and pushing configuration into a charger the user may
-   *  then discard is not ours to do. */
+  // A saved charger has just booted. Negotiation is gated on the charger row
+  // because BootNotification is the one action `resolveAction` lets through
+  // without one — pushing config into a charger the user may still discard is not ours to do.
   private async afterBoot(chargePointId: string): Promise<void> {
     if (!(await this.hasChargerRow(chargePointId))) return;
     await this.negotiator.negotiate(chargePointId);
   }
 
-  /** Why this charger's telemetry is degraded, or null. Read by the plugin's
-   *  health check. Evidence-based: what the charger answered is checked
-   *  against what has actually arrived since, so a charger that said
-   *  Accepted and changed nothing is caught, and an idle charger sending
-   *  nothing at all is not accused. */
+  // Why this charger's telemetry is degraded, or null. Read by the plugin's
+  // health check. Evidence-based: checks what actually arrived since against
+  // what the charger answered, so a false "Accepted" is caught but idle silence is not.
   measurandWarning(chargePointId: string): string | null {
     return measurandWarningFor(
       this.negotiator.outcome(chargePointId),
@@ -480,9 +464,9 @@ export class OcppCentralSystem {
     );
   }
 
-  /** Gates on the honest source of truth — a charger row — before handing off
-   *  to `handleAction`. A message from an id with no row is refused, except
-   *  BootNotification: needed to display vendor/model during pairing. */
+  // Gates on the honest source of truth — a charger row — before handing off
+  // to `handleAction`. A message from an id with no row is refused, except
+  // BootNotification: needed to display vendor/model during pairing.
   private async resolveAction(
     chargePointId: string,
     action: string,
@@ -503,7 +487,7 @@ export class OcppCentralSystem {
     return this.handleAction(chargePointId, action, payload);
   }
 
-  /** Returns the CALLRESULT payload, or null for unsupported actions. */
+  // Returns the CALLRESULT payload, or null for unsupported actions.
   private handleAction(
     chargePointId: string,
     action: string,
@@ -586,12 +570,9 @@ export class OcppCentralSystem {
     }
   }
 
-  /** Adopt a transaction id carried on a MeterValues sample. OCPP 1.6
-   *  chargers include `transactionId` on every in-transaction MeterValues
-   *  (~once a minute), so a reconnect after a restart — which never gets a
-   *  fresh StartTransaction — regains stop-control within a minute instead
-   *  of never. No-op when there is nothing to adopt: no id sent, no
-   *  connection, or the live id already matches. */
+  // Adopt a transaction id from a MeterValues sample. OCPP 1.6 chargers send
+  // `transactionId` on every in-transaction MeterValues (~once a minute), so
+  // a reconnect after a restart regains stop-control within a minute, not never.
   private adoptTransaction(
     chargePointId: string,
     transactionId: number | undefined,
@@ -664,9 +645,9 @@ export class OcppCentralSystem {
     };
   }
 
-  /** Watts from successive register readings: (ΔWh × 3600) / Δseconds.
-   *  Needs two readings — the first after boot/reconnect yields null; a
-   *  negative delta (register reset) yields null rather than a guess. */
+  // Watts from successive register readings: (ΔWh × 3600) / Δseconds. Needs
+  // two readings — the first after boot/reconnect yields null; a negative
+  // delta (register reset) yields null rather than a guess.
   private derivePowerFromRegister(
     chargePointId: string,
     registerWh: number | null,
@@ -737,25 +718,25 @@ const PHASES_L_N = ["L1-N", "L2-N", "L3-N"] as const;
 const PHASES_L_L = ["L1-L2", "L2-L3", "L3-L1"] as const;
 const SQRT3 = Math.sqrt(3);
 
-/** One sample, parsed. The finiteness check happens once, here, and nothing
- *  downstream re-parses. */
+// One sample, parsed. The finiteness check happens once, here, and nothing
+// downstream re-parses.
 interface ParsedSample {
   value: number;
   phase: string | undefined;
   unit: string | undefined;
 }
 
-/** One measurand's samples. `total` is the sample that carried no `phase`
- *  field; `phases` is keyed by the raw OCPP phase label. */
+// One measurand's samples. `total` is the sample that carried no `phase`
+// field; `phases` is keyed by the raw OCPP phase label.
 interface MeasurandGroup {
   unit: string | undefined;
   total: number | null;
   phases: Map<string, number>;
 }
 
-/** What a measurand resolved to. `shielded` means "do not write this key" —
- *  the payload said nothing about the installation and must not disturb
- *  what we already hold. */
+// What a measurand resolved to. `shielded` means "do not write this key" —
+// the payload said nothing about the installation and must not disturb
+// what we already hold.
 interface Reading {
   value: number | null;
   unit: string | undefined;
@@ -764,7 +745,7 @@ interface Reading {
 
 const NO_READING: Reading = { value: null, unit: undefined, shielded: false };
 
-/** An absent measurand means Energy.Active.Import.Register (OCPP 1.6). */
+// An absent measurand means Energy.Active.Import.Register (OCPP 1.6).
 const measurandOf = (sample: SampledValue): string =>
   sample.measurand ?? "Energy.Active.Import.Register";
 
@@ -802,9 +783,8 @@ function buildGroup(samples: SampledValue[]): MeasurandGroup {
   };
 }
 
-/** The values actually present for these phase labels. An absent phase is
- *  dropped everywhere; a zero survives here and is dropped only by
- *  averaging. */
+// The values actually present for these phase labels. An absent phase is
+// dropped everywhere; a zero survives here and is dropped only by averaging.
 const valuesFor = (
   group: MeasurandGroup,
   phases: readonly string[],
@@ -814,10 +794,9 @@ const valuesFor = (
     return value === undefined ? [] : [value];
   });
 
-/** Average over the non-zero entries. Amps are the control quantity: a
- *  charger limited to 16 A draws 16 A on each ACTIVE phase, so 16/16/0 is
- *  16, not 10.67 — averaging an idle phase's zero would report headroom
- *  that does not exist. All-zero is still a reading, so it returns 0. */
+// Average over the non-zero entries. Amps are the control quantity: a
+// charger limited to 16 A draws 16 A on each ACTIVE phase, so 16/16/0 is 16,
+// not 10.67. All-zero is still a reading, so it returns 0.
 function averageNonZero(values: number[]): number | null {
   if (values.length === 0) return null;
   const nonZero = values.filter((value) => value !== 0);
@@ -828,10 +807,9 @@ function averageNonZero(values: number[]): number | null {
 const sumOf = (values: number[]): number | null =>
   values.length === 0 ? null : values.reduce((a, b) => a + b, 0);
 
-/** The per-phase current set: L1/L2/L3, ignoring N. Some chargers misuse
- *  the line-to-neutral labels for current, so those are the fallback. One
- *  selector serves both the average and the sum, so the two can never
- *  disagree about which set they read. */
+// The per-phase current set: L1/L2/L3, ignoring N. Some chargers misuse the
+// line-to-neutral labels for current, so those are the fallback. One
+// selector serves both average and sum so they can never disagree.
 function currentPhaseValues(group: MeasurandGroup): number[] {
   const line = valuesFor(group, PHASES_L123);
   return line.length > 0 ? line : valuesFor(group, PHASES_L_N);
@@ -840,7 +818,7 @@ function currentPhaseValues(group: MeasurandGroup): number[] {
 const aggregateCurrent = (group: MeasurandGroup): number | null =>
   averageNonZero(currentPhaseValues(group));
 
-/** Power.* and Energy.*: the installation total is the sum of its phases. */
+// Power.* and Energy.*: the installation total is the sum of its phases.
 function aggregateAdditive(group: MeasurandGroup): number | null {
   const line = valuesFor(group, PHASES_L123);
   if (line.length > 0) return sumOf(line);
@@ -859,9 +837,8 @@ function aggregateVoltage(group: MeasurandGroup): number | null {
   return averageNonZero(valuesFor(group, PHASES_L123));
 }
 
-/** A measurand whose only phase is N. Skipped entirely: a lone neutral
- *  sample is not a reading of the installation, and must not be taken as
- *  one nor allowed to overwrite the reading we already have. */
+// A measurand whose only phase is N. Skipped entirely: a lone neutral sample
+// is not a reading of the installation, and must not overwrite the reading we already have.
 const neutralOnly = (group: MeasurandGroup): boolean =>
   group.phases.size > 0 &&
   [...group.phases.keys()].every((phase) => phase === "N");
@@ -886,10 +863,9 @@ function readGroup(
   };
 }
 
-/** Sum of the per-phase currents, for the adapter's tier-3 power
- *  derivation. null when the charger reported a single unphased current:
- *  there is nothing to sum, and the adapter must scale by the configured
- *  phase count instead. */
+// Sum of the per-phase currents, for the adapter's tier-3 power derivation.
+// null when the charger reported a single unphased current: nothing to sum,
+// the adapter scales by the configured phase count instead.
 function currentSum(groups: Map<string, MeasurandGroup>): number | null {
   const group = groups.get("Current.Import");
   if (group === undefined || group.total !== null) return null;
@@ -902,12 +878,12 @@ function isAccepted(res: unknown): boolean {
     (res as { status?: string }).status === "Accepted";
 }
 
-/** OCPP allows Power.Active.Import in W (default) or kW. */
+// OCPP allows Power.Active.Import in W (default) or kW.
 function toWatts(value: number, unit: string | undefined): number {
   return unit === "kW" ? value * 1000 : value;
 }
 
-/** OCPP allows Energy.Active.Import.Register in Wh (default) or kWh. */
+// OCPP allows Energy.Active.Import.Register in Wh (default) or kWh.
 function toWattHours(value: number, unit: string | undefined): number {
   return unit === "kWh" ? value * 1000 : value;
 }

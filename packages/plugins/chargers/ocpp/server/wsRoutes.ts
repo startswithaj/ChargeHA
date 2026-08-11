@@ -2,13 +2,9 @@ import { Hono } from "hono";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import type { OcppCentralSystem } from "./OcppCentralSystem.ts";
 
-/** The public: true mount. Path (relative to /api/charger/ocpp):
- *  GET /:chargerId — WS upgrade. `:chargerId` is the OCPP charge point id the
- *  device announces, which is what makes this route multi-charger capable:
- *  every charger dials its own URL, and OcppCentralSystem keys every socket,
- *  pending call and transaction counter by that id. Validates the id against
- *  the charge point ids configured across ALL OCPP charger rows, then upgrades
- *  and hands the socket to the central system. */
+// The public: true mount. GET /:chargerId — WS upgrade. `:chargerId` is the
+// OCPP charge point id the device announces; OcppCentralSystem keys every
+// socket, pending call and transaction counter by that id.
 export function createOcppWsRoutes(
   deps: PluginDependencies,
   centralSystem: OcppCentralSystem,

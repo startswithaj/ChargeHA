@@ -7,10 +7,9 @@ import type {
 import type { ChargerMiddleware } from "@chargeha/shared/plugins";
 import type { Logger } from "@chargeha/server/lib/Logger";
 
-/** Default middleware for free local-API chargers (Tapo, OCPP): caches
- *  state and enforces the adapter's poll interval. Push adapters
- *  (pollIntervalSeconds() === null) always serve current state. Cost-aware
- *  chargers (Tesla) implement ChargerMiddleware themselves instead. */
+// Default middleware for free local-API chargers (Tapo, OCPP): caches state
+// and enforces the adapter's poll interval. Push adapters
+// (pollIntervalSeconds() === null) always serve current state.
 export class PollingChargerMiddleware implements ChargerMiddleware {
   private cachedState: ChargerState | null = null;
   private lastFetchAt = 0;

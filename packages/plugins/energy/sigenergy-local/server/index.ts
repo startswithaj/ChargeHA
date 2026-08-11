@@ -7,10 +7,8 @@ import { SigenergyLocalAdapter } from "./SigenergyLocalAdapter.ts";
 import { JsmodbusReader } from "./SigenergyModbusClient.ts";
 import { createSigenergyLocalRouter } from "./router.ts";
 
-/**
- * Sigenergy energy plugin — reads a Sigenergy inverter / energy-storage system
- * on the local network over Modbus TCP (no authentication).
- */
+// Sigenergy energy plugin — reads a Sigenergy inverter / energy-storage
+// system on the local network over Modbus TCP (no authentication).
 export class SigenergyLocalPlugin implements EnergyPlugin {
   readonly id = "sigenergy_local";
   readonly displayName = "Sigenergy (Local)";
