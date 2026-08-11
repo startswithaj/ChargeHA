@@ -7,6 +7,7 @@ import { encodeHex } from "@std/encoding/hex";
 import { z } from "zod";
 import type { Logger } from "@chargeha/server/lib/Logger";
 import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
+import { SemsGatewayProbe } from "./SemsGatewayProbe.ts";
 
 // SEMS has two login endpoints. The newer SEMS+ one is tried first; accounts
 // not migrated to it still work on the legacy portal endpoint.
@@ -72,7 +73,7 @@ export class GoodweSemsRateLimitError extends Error {
 
 /** The token payload SEMS returns on login. Sent back verbatim, JSON-encoded,
  *  as the `token` header on every authenticated call. */
-interface SemsToken {
+export interface SemsToken {
   readonly api: string;
   readonly region?: string;
   readonly [key: string]: unknown;
@@ -210,49 +211,20 @@ export interface GoodweSemsStationReader {
   ): Promise<void>;
 }
 
-const GATEWAY_PROBE_INTERVAL_MS = 30 * 60 * 1000;
-
-function gatewayBase(token: SemsToken): string {
-  const api = token.api.replace(/\/$/, "");
-  if (api.includes("-gateway.semsportal.com")) return api;
-  const region = typeof token.region === "string" && token.region
-    ? token.region
-    : extractRegion(api) ?? "au";
-  return `https://${region}-gateway.semsportal.com/web/sems`;
-}
-
-/** X-Signature auth the SEMS+ web app sends on every gateway call:
- *  base64(sha256hex("{ms}@{uid}@{token}") + "@" + ms), recomputed per request,
- *  plus the semsPlusWeb client identity in the token header. */
-async function gatewayHeaders(
-  token: SemsToken,
-): Promise<Record<string, string>> {
-  const uid = String(token.uid ?? "");
-  const inner = String(token.token ?? "");
-  const ms = Date.now();
-  const digest = await globalThis.crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(`${ms}@${uid}@${inner}`),
-  );
-  return {
-    "Accept": "application/json, text/plain, */*",
-    "token": JSON.stringify({ ...token, client: "semsPlusWeb" }),
-    "X-Signature": btoa(`${encodeHex(new Uint8Array(digest))}@${ms}`),
-  };
-}
-
 export class GoodweSemsClient implements GoodweSemsStationReader {
   private token: SemsToken | null = null;
   /** Login mode that last succeeded, tried first next time. */
   private preferredMode: LoginMode | null = null;
-  private lastProbeAtMs = 0;
+  private readonly gatewayProbe: SemsGatewayProbe;
 
   constructor(
     private readonly account: string,
     private readonly password: string,
     private readonly logger: Logger,
     private readonly dbLog: PluginDbLogger,
-  ) {}
+  ) {
+    this.gatewayProbe = new SemsGatewayProbe(logger, dbLog);
+  }
 
   clearSession(): void {
     this.token = null;
@@ -282,43 +254,14 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     this.token = token;
   }
 
-  /** Shadow-mode migration probe: fetches the native SEMS+ gateway flow
-   *  endpoint and logs the raw response beside the legacy powerflow it should
-   *  mirror. Read-only diagnostics for the 2026-08-30 legacy shutdown — the
-   *  result is never used, and failures never affect the poll. */
+  /** Delegates to the self-contained shadow probe (SemsGatewayProbe.ts) —
+   *  no-op unless GOODWE_SEMS_GATEWAY_PROBE=1. */
   async probeGatewayFlow(
     stationId: string,
     legacy: SemsPowerflow | null,
   ): Promise<void> {
-    if (baseOverride()) return;
-    const now = Date.now();
-    if (now - this.lastProbeAtMs < GATEWAY_PROBE_INTERVAL_MS) return;
-    this.lastProbeAtMs = now;
-    const token = this.token;
-    if (!token) return;
-    try {
-      const url = `${
-        gatewayBase(token)
-      }/sems-plant/api/stations/flow?stationId=${
-        encodeURIComponent(stationId)
-      }`;
-      const startedAt = performance.now();
-      const response = await fetch(url, {
-        method: "GET",
-        headers: await gatewayHeaders(token),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      });
-      const body = (await response.text()).slice(0, 4000);
-      const durationMs = Math.round(performance.now() - startedAt);
-      this.logger.info(
-        `SEMS gateway probe ${url} → HTTP ${response.status} in ${durationMs}ms: ${body}`,
-      );
-      this.dbLog.info("SEMS gateway flow probe", {
-        payload: { url, status: response.status, body, legacy },
-      });
-    } catch (error) {
-      this.logger.warn(`SEMS gateway probe failed: ${error}`);
-    }
+    if (!this.token) return;
+    await this.gatewayProbe.probe(this.token, stationId, legacy);
   }
 
   /** The reference client posts no body here; match it rather than sending

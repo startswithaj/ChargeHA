@@ -126,6 +126,12 @@ deno task sems:sim          # listens on http://localhost:8099
 Point ChargeHA at it by setting `GOODWE_SEMS_BASE_URL=http://localhost:8099`.
 Leave that unset to talk to the real SEMS Portal.
 
+Setting `GOODWE_SEMS_GATEWAY_PROBE=1` (in the environment or `.env`) enables a
+shadow probe of the native SEMS+ gateway flow endpoint: every 30 minutes the raw
+gateway response is logged beside the legacy powerflow it should mirror, without
+affecting the data ChargeHA serves. Diagnostics for the 2026-08-30 legacy portal
+shutdown; implemented entirely in `SemsGatewayProbe.ts`.
+
 It serves four station profiles (three-phase without a battery, hybrid with a
 battery, multi-inverter, and one with no HomeKit fitted), simulates a daily
 solar curve, and can inject rate limits and expired tokens on demand. See
