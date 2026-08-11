@@ -166,11 +166,18 @@ export class GoodweSemsAdapter implements EnergySourceAdapter {
         return this.client.getStationDetail(this.stationId);
       });
       if (!detail.powerflow) {
+        this.logger.warn(
+          `SEMS station ${this.stationId} responded without a power flow block (hasPowerflow=${detail.hasPowerflow})`,
+        );
         throw new GoodweSemsConnectionError(
           "SEMS response carried no power flow block",
         );
       }
-      return this.remember(toEnergyData(detail.powerflow));
+      const data = this.remember(toEnergyData(detail.powerflow));
+      this.logger.info(
+        `SEMS poll: solar=${data.solarProductionW}W grid=${data.gridPowerW}W home=${data.homeConsumptionW}W battery=${data.batteryPowerW}W soc=${data.batterySoc} (raw pv=${detail.powerflow.pv} grid=${detail.powerflow.grid} load=${detail.powerflow.load} bettery=${detail.powerflow.bettery} gridStatus=${detail.powerflow.gridStatus})`,
+      );
+      return data;
     } catch (error) {
       if (error instanceof GoodweSemsRateLimitError) return this.serveCached();
       throw error;

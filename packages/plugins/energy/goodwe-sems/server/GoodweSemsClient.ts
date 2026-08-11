@@ -344,13 +344,12 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     const summary = `SEMS ${path} → code ${
       code || "(none)"
     }, dataEmpty=${dataEmpty} in ${durationMs}ms${isRetry ? " (retry)" : ""}`;
+    // Every call is visible at the default log level: a user's stdout excerpt
+    // must carry the full trace without asking them to redeploy with debug on.
     if (SUCCESS_CODES.has(code) && !dataEmpty) {
-      this.logger.debug(summary);
+      this.logger.info(summary);
       return;
     }
-    // Failures are loud — warn on stdout at the default log level plus a
-    // plugin_logs row — because failing calls are exactly what a user's log
-    // excerpt has to show.
     this.logger.warn(summary);
     this.dbLog.warn(`POST ${path}`, {
       payload: { path, code: code || null, dataEmpty, durationMs, isRetry },
@@ -451,7 +450,7 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
       const elapsedMs = Math.round(performance.now() - startedAt);
-      this.logger.debug(
+      this.logger.info(
         `SEMS POST ${url} → HTTP ${response.status} in ${elapsedMs}ms`,
       );
       if (!response.ok) {
