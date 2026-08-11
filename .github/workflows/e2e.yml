@@ -11,7 +11,7 @@ jobs:
   e2e:
     runs-on: ubuntu-latest # docker + compose preinstalled
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: denoland/setup-deno@v2
         with:
           deno-version: 2.9.4 # exact pin, matching test.yml and docker/Dockerfile
