@@ -351,9 +351,9 @@ export const NOTIFICATION_EVENTS: NotificationEventInfo[] = [
 
 // ---- WebSocket Message Types ----
 
-// Discriminated union multiplexing all real-time SSE events over one
-// subscription/connection: browsers cap concurrent HTTP/1.1 connections per
-// origin (6), and each useSubscription() would otherwise hold one permanently — HTTP/2 isn't available (plain HTTP behind a reverse proxy).
+// Single SSE subscription multiplexing all real-time events. Multiple
+// useSubscription() calls exhaust the browser's 6-connection HTTP/1.1 pool.
+// See docs/realtime.md for the full reasoning.
 export type SSEEvent =
   | { type: "energy_update"; data: EnergyData & CumulativeEnergyData }
   | { type: "vehicle_update"; data: VehicleChargeState }
