@@ -12,7 +12,6 @@ import { useVehicles } from "../../../hooks/useVehicles.ts";
 import { useToast } from "../../../hooks/useToast.tsx";
 import { useControllerStatuses } from "../../../hooks/controllerStatusStore.ts";
 import { useChargerCommands, useChargers } from "../../../hooks/useChargers.ts";
-import { chargePointIdentifier } from "../../../lib/chargePointIdentity.ts";
 import { VehicleCard } from "../../VehicleCard/VehicleCard.tsx";
 import { ChargerCard } from "./ChargerCard.tsx";
 import { trpc } from "../../../trpc.ts";
@@ -309,7 +308,6 @@ function SmartPointCards(
         controllerDetail={ctx.controllerStatuses[point.id]?.detail ?? null}
         controllerReason={ctx.controllerStatuses[point.id]?.reason ?? null}
         allocationStatus={ctx.allocationStatus[point.id] ?? null}
-        identifier={chargePointIdentifier(point)}
         onNavigateSettings={ctx.onNavigateSettings}
         vehicleResolution={point.vehicleResolution}
         resolvedVehicleName={vehicle?.name || null}
@@ -325,10 +323,7 @@ function SmartPointCards(
       {point.controlOwner === "self" && vehicle?.state && (
         <VehicleCard
           readOnly
-          chargingPoint={{
-            name: point.name,
-            identifier: chargePointIdentifier(point),
-          }}
+          chargingPoint={{ name: point.name }}
           name={vehicle.name || vehicle.state.vehicleName}
           state={vehicle.state}
           priority={point.priority}

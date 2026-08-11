@@ -1,6 +1,5 @@
 import type {
   CallContext,
-  ChargerInfo,
   ChargerState,
   ChargerStatus,
 } from "@chargeha/shared";
@@ -32,22 +31,6 @@ export class TeslaChargerMiddleware implements ChargerMiddleware {
   getCachedState(): ChargerState | null {
     const state = this.shared.getCachedState();
     return state ? this.toChargerState(state) : null;
-  }
-
-  getChargerInfo(_ctx: CallContext): Promise<ChargerInfo> {
-    const state = this.shared.getCachedState();
-    return Promise.resolve({
-      id: this.row.id,
-      name: this.row.name,
-      vendor: "Tesla",
-      model: state?.vehicleName ?? this.row.name,
-      firmwareVersion: "unknown",
-      maxAmps: state?.chargeAmpsMax ?? 32,
-      minAmps: state?.chargeAmpsMin ?? 5,
-      phases: state?.chargerPhases ?? 1,
-      connectorCount: 1,
-      controlMode: "amps",
-    });
   }
 
   startCharging(ctx: CallContext): Promise<boolean> {
@@ -83,6 +66,7 @@ export class TeslaChargerMiddleware implements ChargerMiddleware {
       status: teslaStatus(state),
       statusDetail:
         `SOC ${state.batteryLevel}%/${state.chargeLimit}%, ${state.chargeAmps}A`,
+      controlMode: "amps",
       lastUpdated: state.lastUpdated,
     };
   }

@@ -3,7 +3,6 @@ import { expect } from "@std/expect";
 import { assertExists } from "@std/assert";
 import type {
   CallContext,
-  ChargerInfo,
   ChargerState,
   VehicleChargeState,
 } from "@chargeha/shared";
@@ -25,29 +24,13 @@ import { throwingMock } from "../test-helpers/throwingMock.ts";
 
 // What happens to charging points and their schedules when the vehicle a point is attached to is deleted. Uses a real in-memory database rather
 // than a stubbed one, because the question is partly about what `AppDatabase.deleteCharger` cascades — a stub would answer with whatever the stub
-// was written to do. Inert middleware — these tests are about row lifecycle, not charging. Its ChargerInfo lives on the class because the lint rules put classes at module scope but keep consts inside describe().
+// was written to do. Inert middleware — these tests are about row lifecycle, not charging.
 class StubChargerMiddleware implements ChargerMiddleware {
-  private readonly info: ChargerInfo = {
-    id: "sim",
-    name: "Simulated",
-    vendor: "sim",
-    model: "sim-1",
-    firmwareVersion: "1.0",
-    maxAmps: 32,
-    minAmps: 6,
-    phases: 1,
-    connectorCount: 1,
-    controlMode: "amps",
-  };
-
   requestState(_ctx: CallContext): Promise<ChargerState | null> {
     return Promise.resolve(null);
   }
   getCachedState(): ChargerState | null {
     return null;
-  }
-  getChargerInfo(_ctx: CallContext): Promise<ChargerInfo> {
-    return Promise.resolve(this.info);
   }
   startCharging(_ctx: CallContext): Promise<boolean> {
     return Promise.resolve(true);

@@ -1,5 +1,7 @@
 import type {
   CallContext,
+  ChargerConfigMap,
+  ChargerSecretsMap,
   ChargerState,
   ChargingPointMode,
   EnergyData,
@@ -395,7 +397,6 @@ export class ChargingPointManager {
       return { success: false, error: "Command backoff active" };
     }
     try {
-      const info = await entry.middleware.getChargerInfo(ctx);
       const clamped = Math.max(
         state.chargeAmpsMin,
         Math.min(state.chargeAmpsMax, Math.round(amps)),
@@ -404,7 +405,7 @@ export class ChargingPointManager {
       const alreadyCommanded = entry.lastCommandedAmps === clamped &&
         state.isCharging;
       if (
-        info.controlMode === "amps" && !alreadyCommanded &&
+        state.controlMode === "amps" && !alreadyCommanded &&
         state.chargeAmps !== clamped
       ) {
         const ok = await entry.middleware.setChargeAmps(
@@ -673,7 +674,12 @@ export class ChargingPointManager {
   // exists — a second Tapo or a second OCPP charger is a new row, not a reuse of the first. Two rows of the same type would be indistinguishable
   // in the UI, so the second (and later) gets a count appended to its name.
   async createCharger(
-    input: { name: string; chargerAdapterType: string },
+    input: {
+      name: string;
+      chargerAdapterType: string;
+      config?: ChargerConfigMap;
+      secrets?: ChargerSecretsMap;
+    },
   ): Promise<ChargerRow> {
     const rows = await this.db.getChargers();
     const sameType = rows.filter((row) =>
@@ -686,7 +692,7 @@ export class ChargingPointManager {
       id: crypto.randomUUID(),
       name,
       chargerAdapterType: input.chargerAdapterType,
-      chargerConfig: "{}",
+      chargerConfig: JSON.stringify(input.config ?? {}),
       mode: "auto",
       priority: rows.length + 1,
       vehicleId: null,
@@ -695,7 +701,11 @@ export class ChargingPointManager {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    await this.db.upsertCharger(row);
+    await this.db.createChargerWithConfig(
+      row,
+      input.config ?? {},
+      input.secrets ?? {},
+    );
     await this.addCharger(row);
     // One control path per car: the first smart charger takes over.
     if (!rows.some((r) => r.kind === "smart")) {
@@ -707,11 +717,20 @@ export class ChargingPointManager {
   // Always creates, resolving the row's name from the plugin's own
   // `displayName` — used by every "add a charger of this type" path that doesn't already have a name to give (Settings' no-panel add, a plugin's
   // own add-mode save). `createCharger` does the actual insert and picks a distinguishing name if one of this type already exists.
-  async createChargerForType(chargerAdapterType: string): Promise<ChargerRow> {
+  async createChargerForType(
+    chargerAdapterType: string,
+    seed: {
+      name?: string;
+      config?: ChargerConfigMap;
+      secrets?: ChargerSecretsMap;
+    } = {},
+  ): Promise<ChargerRow> {
     const plugin = this.chargerPlugins.get(chargerAdapterType);
     return await this.createCharger({
-      name: plugin?.displayName ?? chargerAdapterType,
+      name: seed.name ?? plugin?.displayName ?? chargerAdapterType,
       chargerAdapterType,
+      config: seed.config,
+      secrets: seed.secrets,
     });
   }
 
@@ -804,8 +823,10 @@ export class ChargingPointManager {
         this.resolveVehicle(row.id),
         this.getControlPath(row.id, selfDriven),
       ]);
+      // Withheld: carries plug host addresses and account emails.
+      const { chargerConfig: _chargerConfig, ...wireRow } = row;
       return {
-        ...row,
+        ...wireRow,
         state: this.getState(row.id),
         resolvedVehicleId: resolution.vehicleId,
         vehicleResolution: resolution.kind,

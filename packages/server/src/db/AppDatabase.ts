@@ -333,6 +333,23 @@ export class AppDatabase {
     await this.chargers.setChargerSecretsRecord(id, value, isEncrypted);
   }
 
+  async createChargerWithConfig(
+    input: UpsertChargerInput,
+    config: ChargerConfigMap,
+    secrets: ChargerSecretsMap,
+  ): Promise<void> {
+    const { value, isEncrypted } = await maybeEncrypt(
+      JSON.stringify(secrets),
+      this.encryptionKey,
+    );
+    await this.chargers.insertCharger({
+      ...input,
+      chargerConfig: JSON.stringify(config),
+      chargerSecrets: value,
+      chargerSecretsEncrypted: isEncrypted,
+    });
+  }
+
   // Set/remove individual secret keys, leaving the rest intact.
   async patchChargerSecrets(
     id: string,

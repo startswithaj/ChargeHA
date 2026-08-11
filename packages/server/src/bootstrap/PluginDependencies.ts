@@ -7,7 +7,12 @@ import type {
 } from "../db/types.ts";
 import type { VehicleManager } from "../services/VehicleManager.ts";
 import type { ChargingPointManager } from "../services/ChargingPointManager.ts";
-import type { ChargerConfigPatch, VehicleChargeState } from "@chargeha/shared";
+import type {
+  ChargerConfigMap,
+  ChargerConfigPatch,
+  ChargerSecretsMap,
+  VehicleChargeState,
+} from "@chargeha/shared";
 import type {
   ChargerRowConfig,
   ResolvedChargerRow,
@@ -188,8 +193,14 @@ export class PluginDependencies<K extends string = string> {
 
   // Create a new charger row for this plugin. The adapter type is stamped
   // with the plugin's own id — a plugin cannot create another plugin's charger. Used by the row-scoped config path's add-mode: `setConfig` creates the row on first save, not before. Always creates — a second Tapo (or any other type) saved through its own add-mode form must be a second row, not a reuse of the first.
-  createChargerRow(): Promise<ChargerRow> {
-    return this.chargingPoints.createChargerForType(this.pluginId);
+  createChargerRow(
+    seed: {
+      name?: string;
+      config?: ChargerConfigMap;
+      secrets?: ChargerSecretsMap;
+    } = {},
+  ): Promise<ChargerRow> {
+    return this.chargingPoints.createChargerForType(this.pluginId, seed);
   }
 
   // ── Vehicle rows (filtered to this plugin's adapter type) ────────────

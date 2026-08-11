@@ -173,20 +173,9 @@ export interface ChargerState {
   status: ChargerStatus;
   // The adapter's native status, as close to the device as possible.
   statusDetail: string | null;
-  lastUpdated: string;
-}
-
-export interface ChargerInfo {
-  id: string;
-  name: string;
-  vendor: string;
-  model: string;
-  firmwareVersion: string;
-  maxAmps: number;
-  minAmps: number;
-  phases: number;
-  connectorCount: number;
+  // Whether this charger accepts an amperage setpoint or is on/off only.
   controlMode: ChargerControlMode;
+  lastUpdated: string;
 }
 
 export interface ChargerAdapter {
@@ -198,7 +187,6 @@ export interface ChargerAdapter {
   stopCharging(ctx: CallContext): Promise<boolean>;
   setChargeAmps(amps: number, ctx: CallContext): Promise<boolean>;
   getChargerState(ctx: CallContext): Promise<ChargerState>;
-  getChargerInfo(ctx: CallContext): Promise<ChargerInfo>;
   // null = push-based (no polling); a number = min seconds between fetches.
   pollIntervalSeconds(): number | null;
 }

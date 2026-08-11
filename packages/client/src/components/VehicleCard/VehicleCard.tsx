@@ -51,9 +51,9 @@ interface VehicleCardProps {
   // Data-only vehicle: charging is owned by a smart charger, so no
   // mode/start/stop/amps controls render.
   readOnly?: boolean;
-  // One object rather than two props so the name and its id cannot
-  // disagree, and so the absent case (no charger of its own) is one null.
-  chargingPoint?: { name: string; identifier: string | null } | null;
+  // An object rather than a bare string so the absent case (no charger of
+  // its own) is one null.
+  chargingPoint?: { name: string } | null;
 }
 
 function ChargerStatusLine(
@@ -119,19 +119,15 @@ const MODE_BUTTONS: {
   { value: "charge_now", label: "CHARGE NOW", color: "green" },
 ];
 
-// The name alone is not enough — a charging point is named after its
-// adapter by default, so two OCPP chargers read identically until the
-// charge point id separates them.
 function ChargingPointBadge(
   { chargingPoint }: {
-    chargingPoint: { name: string; identifier: string | null };
+    chargingPoint: { name: string };
   },
 ) {
   return (
     <Badge variant="soft" size="1" title="Charging on this charger">
       <Zap size={11} style={{ color: "var(--color-charging)" }} />
       {chargingPoint.name}
-      {chargingPoint.identifier && ` · ${chargingPoint.identifier}`}
     </Badge>
   );
 }
@@ -162,7 +158,7 @@ function VehicleCardHeader(
     isOnline: boolean;
     lastUpdatedText: string | null;
     onRefresh?: () => Promise<unknown>;
-    chargingPoint: { name: string; identifier: string | null } | null;
+    chargingPoint: { name: string } | null;
   },
 ) {
   const [refreshing, setRefreshing] = useState(false);

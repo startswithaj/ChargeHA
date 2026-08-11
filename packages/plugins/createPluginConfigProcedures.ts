@@ -63,10 +63,20 @@ export function createNetworkDiscoveryProcedures(deps: PluginDependencies) {
   };
 }
 
+const dropNulls = (patch: Record<string, string | null>) =>
+  Object.fromEntries(
+    Object.entries(patch).filter((entry): entry is [string, string] =>
+      entry[1] !== null
+    ),
+  );
+
 const chargerGetConfigInput = z.object({ chargerRowId: z.string() });
 const chargerSetConfigInput = z.object({
   chargerRowId: z.string().nullable(),
   values: z.record(z.string(), z.unknown()),
+  // The device's own name, where the wizard has already reached it. Used
+  // only when creating the row — an existing row keeps the name it has.
+  name: z.string().min(1).optional(),
 });
 
 // Row-scoped getConfig/setConfig for a charger plugin — one row owns its own
@@ -102,10 +112,20 @@ export function createChargerConfigProcedures(
           Object.entries(patch).filter(([key]) => secretKeySet.has(key)),
         );
 
-        const chargerRowId = input.chargerRowId ??
-          (await deps.createChargerRow()).id;
+        // Add mode is one insert: a failure between two writes would leave a
+        // row holding its config but not its credentials.
+        if (input.chargerRowId === null) {
+          const row = await deps.createChargerRow({
+            name: input.name,
+            config: dropNulls(plainPatch),
+            secrets: dropNulls(secretPatch),
+          });
+          deps.log.info("Charger created");
+          return { chargerRowId: row.id };
+        }
 
         // Sequential — both read-modify-write the same `chargers` row.
+        const chargerRowId = input.chargerRowId;
         await deps.patchChargerConfig(chargerRowId, plainPatch);
         await deps.patchChargerSecrets(chargerRowId, secretPatch);
         await deps.rebuildCharger(chargerRowId);

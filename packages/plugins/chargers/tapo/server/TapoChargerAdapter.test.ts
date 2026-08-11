@@ -138,6 +138,7 @@ describe("TapoChargerAdapter", () => {
     it("reports the configured fixed draw as both max and min amps", async () => {
       const client = new SpyKlapClient({
         get_device_info: () => Promise.resolve(buildDeviceInfo()),
+        get_energy_usage: () => Promise.resolve(buildEnergyUsage()),
       }, logger);
       const adapter = new TapoChargerAdapter(
         { ...CONFIG, fixedDrawAmps: 12 },
@@ -146,13 +147,13 @@ describe("TapoChargerAdapter", () => {
         dbLog,
       );
 
-      const info = await adapter.getChargerInfo(ctx);
+      const state = await adapter.getChargerState(ctx);
 
       // A switch-only plug can't modulate: the configured draw is the only
       // current figure the engine gets.
-      expect(info.maxAmps).toBe(12);
-      expect(info.minAmps).toBe(12);
-      expect(info.controlMode).toBe("switch");
+      expect(state.chargeAmpsMax).toBe(12);
+      expect(state.chargeAmpsMin).toBe(12);
+      expect(state.controlMode).toBe("switch");
     });
   });
 

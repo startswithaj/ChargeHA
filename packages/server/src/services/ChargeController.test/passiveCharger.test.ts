@@ -3,11 +3,7 @@
 import { afterEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { assertExists } from "@std/assert";
-import type {
-  ChargerInfo,
-  ChargerState,
-  VehicleChargeState,
-} from "@chargeha/shared";
+import type { ChargerState, VehicleChargeState } from "@chargeha/shared";
 import type {
   ChargerMiddleware,
   ChargerPlugin,
@@ -33,19 +29,6 @@ import {
 import { testable } from "../../test-helpers/Testable.ts";
 
 class StubChargerMiddleware implements ChargerMiddleware {
-  static readonly INFO: ChargerInfo = {
-    id: "sim-charger",
-    name: "Simulated",
-    vendor: "sim",
-    model: "sim-1",
-    firmwareVersion: "1.0",
-    maxAmps: 32,
-    minAmps: 6,
-    phases: 1,
-    connectorCount: 1,
-    controlMode: "amps",
-  };
-
   startCalls = 0;
   stopCalls = 0;
   ampCalls: number[] = [];
@@ -62,9 +45,6 @@ class StubChargerMiddleware implements ChargerMiddleware {
   }
   getCachedState(): ChargerState | null {
     return this.cached;
-  }
-  getChargerInfo(): Promise<ChargerInfo> {
-    return Promise.resolve(StubChargerMiddleware.INFO);
   }
   startCharging(): Promise<boolean> {
     this.startCalls++;
@@ -124,6 +104,7 @@ describe("ChargeController — passive smart charger", () => {
     energyAddedKwh: 0,
     status: "available",
     statusDetail: null,
+    controlMode: "amps",
     lastUpdated: "2024-01-01T00:00:00.000Z",
   };
 

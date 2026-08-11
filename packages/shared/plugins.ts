@@ -5,7 +5,6 @@ import type {
   AdapterVehicleChargeState,
   CallContext,
   ChargerConfigMap,
-  ChargerInfo,
   ChargerRow,
   ChargerSecretsMap,
   ChargerState,
@@ -164,7 +163,6 @@ export interface ChargerMiddleware {
   getCachedState(): ChargerState | null;
   // No `online` flag: it would lie for push adapters. Connectivity
   // surfaces through status: "faulted" + statusDetail instead.
-  getChargerInfo(ctx: CallContext): Promise<ChargerInfo>;
   startCharging(ctx: CallContext): Promise<boolean>;
   stopCharging(ctx: CallContext): Promise<boolean>;
   setChargeAmps(amps: number, ctx: CallContext): Promise<boolean>;

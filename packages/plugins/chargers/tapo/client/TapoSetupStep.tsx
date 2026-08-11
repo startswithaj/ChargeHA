@@ -31,6 +31,7 @@ export const tapoSetupStep: PluginStepDef = {
     const saveMutation = trpc.plugin.charger.tapo.setConfig.useMutation();
     const [form, setForm] = useState<Record<string, string>>(TAPO_DEFAULTS);
     const [validated, setValidated] = useState(false);
+    const [nickname, setNickname] = useState<string | null>(null);
 
     const patch = (key: string, value: string) => {
       setForm((f) => ({ ...f, [key]: value }));
@@ -42,6 +43,7 @@ export const tapoSetupStep: PluginStepDef = {
       const result = await saveMutation.mutateAsync({
         chargerRowId: chargerId,
         values: form,
+        name: nickname ?? undefined,
       });
       setChargerId(result.chargerRowId);
     };
@@ -64,7 +66,10 @@ export const tapoSetupStep: PluginStepDef = {
             host={form.tapoHost}
             email={form.tapoEmail}
             password={form.tapoPassword}
-            onValidated={() => setValidated(true)}
+            onValidated={(plugName) => {
+              setValidated(true);
+              setNickname(plugName);
+            }}
           />
         </div>
       ),

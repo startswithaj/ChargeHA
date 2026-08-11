@@ -1,7 +1,6 @@
 import type {
   CallContext,
   ChargerAdapter,
-  ChargerInfo,
   ChargerState,
 } from "@chargeha/shared";
 import type { ChargerMiddleware } from "@chargeha/shared/plugins";
@@ -37,10 +36,6 @@ export class PollingChargerMiddleware implements ChargerMiddleware {
 
   getCachedState(): ChargerState | null {
     return this.cachedState;
-  }
-
-  getChargerInfo(ctx: CallContext): Promise<ChargerInfo> {
-    return this.adapter.getChargerInfo(ctx);
   }
 
   startCharging(ctx: CallContext): Promise<boolean> {

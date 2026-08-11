@@ -50,8 +50,4 @@ export interface ChargerPluginOption {
   // The wizard creates the row (charger.ensure) the moment this type is
   // selected — for types with no setup step of their own.
   ensureOnSelect?: boolean;
-  // Storage key in a row's `chargerConfig` holding the charge point's own id.
-  // Lets a host name which physical charger a row is without naming any
-  // plugin's config key. Absent when the adapter has no such id.
-  identityConfigKey?: string;
 }

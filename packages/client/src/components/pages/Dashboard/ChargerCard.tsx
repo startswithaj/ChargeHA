@@ -261,7 +261,6 @@ export function ChargerCard(
     vehicleResolution,
     resolvedVehicleName,
     allocationStatus = null,
-    identifier,
     onNavigateSettings,
     controlOwner = "self",
     passiveForVehicleName = null,
@@ -286,9 +285,6 @@ export function ChargerCard(
     // Lives here rather than on the car's card because a paired card is
     // read-only and drops its whole charge-detail block.
     allocationStatus?: string | null;
-    // Null when the adapter has none. The heading is often just the
-    // plugin's label, so this is the only thing naming the physical charger.
-    identifier: string | null;
     // Same convention the vehicle cards use. Absent means the host has no
     // settings route, and the warning degrades to plain text.
     onNavigateSettings?: () => void;
@@ -325,11 +321,6 @@ export function ChargerCard(
         <div className={layout.headerLeft}>
           <Zap size={20} style={{ color: "var(--color-charging)" }} />
           <Text size="3" weight="bold">{name}</Text>
-          {identifier && (
-            <Badge variant="soft" size="1" title="Charge point id">
-              {identifier}
-            </Badge>
-          )}
         </div>
         <Badge
           variant="soft"

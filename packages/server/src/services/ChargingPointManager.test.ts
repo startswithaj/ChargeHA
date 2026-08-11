@@ -3,7 +3,6 @@ import { expect } from "@std/expect";
 import { assertExists } from "@std/assert";
 import type {
   CallContext,
-  ChargerInfo,
   ChargerState,
   VehicleChargeState,
 } from "@chargeha/shared";
@@ -32,15 +31,13 @@ class StubChargerMiddleware implements ChargerMiddleware {
   setAmpsCalls: Array<{ amps: number; origin: string }> = [];
   shutdownCalls = 0;
   nextState: ChargerState | null;
-  info: ChargerInfo;
   startResult = true;
   stopResult = true;
   setAmpsResult = true;
   private cached: ChargerState | null = null;
 
-  constructor(nextState: ChargerState | null, info: ChargerInfo) {
+  constructor(nextState: ChargerState | null) {
     this.nextState = nextState;
-    this.info = info;
   }
 
   requestState(ctx: CallContext): Promise<ChargerState | null> {
@@ -57,10 +54,6 @@ class StubChargerMiddleware implements ChargerMiddleware {
   // getState never triggers a device call.
   seedCache(state: ChargerState): void {
     this.cached = { ...state };
-  }
-
-  getChargerInfo(_ctx: CallContext): Promise<ChargerInfo> {
-    return Promise.resolve(this.info);
   }
 
   startCharging(ctx: CallContext): Promise<boolean> {
@@ -90,7 +83,6 @@ describe("ChargingPointManager", () => {
     middlewares: Map<string, StubChargerMiddleware>,
     type: string,
     displayName: string,
-    info: ChargerInfo,
     onCreate?: (row: ChargerRow, resolved: ChargerRowConfig) => void,
   ): void => {
     registry.register(throwingMock<ChargerPlugin>("ChargerPlugin", {
@@ -101,7 +93,7 @@ describe("ChargingPointManager", () => {
         resolved: ChargerRowConfig,
       ) => {
         onCreate?.(row, resolved);
-        const mw = new StubChargerMiddleware(null, info);
+        const mw = new StubChargerMiddleware(null);
         middlewares.set(row.id, mw);
         return Promise.resolve(mw);
       },
@@ -114,19 +106,6 @@ describe("ChargingPointManager", () => {
   const testLogger = new Logger("ChargingPointManager", "error");
 
   const CHARGER_TYPE = "sim";
-
-  const INFO: ChargerInfo = {
-    id: CHARGER_TYPE,
-    name: "Simulated",
-    vendor: "sim",
-    model: "sim-1",
-    firmwareVersion: "1.0",
-    maxAmps: 32,
-    minAmps: 6,
-    phases: 1,
-    connectorCount: 1,
-    controlMode: "amps",
-  };
 
   const ROW: ChargerRow = {
     id: "charger-1",
@@ -155,6 +134,7 @@ describe("ChargingPointManager", () => {
     energyAddedKwh: 0,
     status: "available",
     statusDetail: null,
+    controlMode: "amps",
     lastUpdated: "2024-01-01T00:00:00.000Z",
   };
 
@@ -229,6 +209,11 @@ describe("ChargingPointManager", () => {
         Promise.resolve(chargerConfigs.get(id) ?? {}),
       getChargerSecrets: (id: string) =>
         Promise.resolve(chargerSecrets.get(id) ?? {}),
+      createChargerWithConfig: (input, config, secrets) => {
+        chargerConfigs.set(input.id, config);
+        chargerSecrets.set(input.id, secrets);
+        return db.upsertCharger(input);
+      },
       upsertCharger: (input) => {
         chargerRows = [
           ...chargerRows.filter((r) => r.id !== input.id),
@@ -278,7 +263,6 @@ describe("ChargingPointManager", () => {
       middlewares,
       CHARGER_TYPE,
       "Simulated Charger",
-      INFO,
     );
 
     emitter = new MockEventEmitter();
@@ -379,7 +363,6 @@ describe("ChargingPointManager", () => {
         middlewares,
         CHARGER_TYPE,
         "Simulated Charger",
-        INFO,
         (_row, resolved) => {
           seen = resolved;
         },
@@ -411,7 +394,6 @@ describe("ChargingPointManager", () => {
         middlewares,
         CHARGER_TYPE,
         "Simulated Charger",
-        INFO,
         (_row, resolved) => {
           seen.push(resolved);
         },
@@ -582,10 +564,6 @@ describe("ChargingPointManager", () => {
         middlewares,
         "switch-type",
         "Switch Charger",
-        {
-          ...INFO,
-          controlMode: "switch",
-        },
       );
       await manager.addCharger(row);
       const mw = middlewares.get(row.id);
@@ -595,7 +573,7 @@ describe("ChargingPointManager", () => {
         row.id,
         16,
         CTX,
-        { ...STATE, isCharging: false, chargeAmps: 0 },
+        { ...STATE, isCharging: false, chargeAmps: 0, controlMode: "switch" },
       );
 
       expect(result.success).toBe(true);

@@ -10,6 +10,7 @@ import { TAPO_SECRET_KEYS, tapoConfigDef } from "./config.ts";
 import { discoverTapo } from "./TapoDiscovery.ts";
 import { KlapClient } from "./KlapClient.ts";
 import { TapoApiError, TapoAuthError, TapoLockedError } from "./errors.ts";
+import { decodeNickname } from "./TapoChargerAdapter.ts";
 import type { TapoDeviceInfo, TapoEnergyUsage } from "./TapoChargerAdapter.ts";
 
 const discoverInput = z.object({
@@ -84,11 +85,12 @@ export function createTapoRouter(deps: PluginDependencies) {
     testConnection: publicProcedure
       .input(testConnectionInput)
       .mutation(async ({ input }) => {
+        const logger = new Logger("Tapo", "error");
         const client = new KlapClient(
           input.host,
           input.email,
           input.password,
-          new Logger("Tapo", "error"),
+          logger,
           deps.dbLog,
           // No charger row exists yet during wizard setup — a stable label
           // instead of an id keeps this call distinguishable in the log.
@@ -116,6 +118,8 @@ export function createTapoRouter(deps: PluginDependencies) {
             success: true as const,
             model: info.model,
             firmwareVersion: info.fw_ver,
+            // The name set in the Tapo app — what the user calls this plug.
+            nickname: decodeNickname(info.nickname, logger),
             powerW: energy.current_power / 1000,
           };
         } catch (err) {

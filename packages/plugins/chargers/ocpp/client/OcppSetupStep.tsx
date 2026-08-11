@@ -57,6 +57,8 @@ export const ocppSetupStep: PluginStepDef = {
       const result = await saveMutation.mutateAsync({
         chargerRowId: chargerId,
         values,
+        // The announced id is the only thing telling two OCPP chargers apart.
+        name: values.ocppChargerId?.trim() || undefined,
       });
       setChargerId(result.chargerRowId);
     };

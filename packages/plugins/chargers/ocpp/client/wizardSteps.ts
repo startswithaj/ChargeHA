@@ -12,8 +12,4 @@ export const ocppChargerOption: ChargerPluginOption = {
     "brands) over your local network. The charger connects to ChargeHA — no " +
     "cloud required.",
   iconKey: "server",
-  // Storage key from the plugin's config definition (ocppChargerId ->
-  // charger_id). This is the id the charge point announces on connect, so it
-  // is what tells two OCPP chargers apart.
-  identityConfigKey: "charger_id",
 };

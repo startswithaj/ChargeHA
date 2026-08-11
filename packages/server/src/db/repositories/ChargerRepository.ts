@@ -64,6 +64,20 @@ export class ChargerRepository {
       });
   }
 
+  async insertCharger(
+    input: UpsertChargerInput & {
+      chargerSecrets: string;
+      chargerSecretsEncrypted: boolean;
+    },
+  ): Promise<void> {
+    const { chargerSecrets, chargerSecretsEncrypted, ...rest } = input;
+    await this.db.insert(chargers).values({
+      ...toColumns(rest),
+      chargerSecrets,
+      chargerSecretsEncrypted: chargerSecretsEncrypted ? 1 : 0,
+    });
+  }
+
   async updateChargerMode(id: string, mode: ChargingPointMode): Promise<void> {
     await this.db.update(chargers)
       .set({ mode, updatedAt: new Date().toISOString() })

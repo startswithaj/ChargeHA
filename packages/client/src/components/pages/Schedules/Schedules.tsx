@@ -18,7 +18,6 @@ import { ScheduleCard } from "../../ScheduleCard/ScheduleCard.tsx";
 import { ScheduleForm } from "../../ScheduleDialog/ScheduleDialog.tsx";
 import { EmptyState } from "../../ui/EmptyState.tsx";
 import { findNextGap } from "./scheduleGapUtils.ts";
-import { chargePointIdentifier } from "../../../lib/chargePointIdentity.ts";
 import {
   chargerNotices,
   type NoticePoint,
@@ -363,7 +362,6 @@ function chargerTargets(chargers: Chargers): ScheduleTarget[] {
       name: c.name,
       badge: chargerOption(c.chargerAdapterType)?.label ??
         c.chargerAdapterType,
-      identifier: chargePointIdentifier(c),
     }));
 }
 
@@ -391,8 +389,6 @@ function vehicleTargets(
       id,
       name: vehicle?.name ?? point?.name ?? id,
       badge: vehicle?.adapterType ?? point?.chargerAdapterType ?? "vehicle",
-      // A car has no charge point id of its own — that belongs to the charger.
-      identifier: null,
     };
   });
 }

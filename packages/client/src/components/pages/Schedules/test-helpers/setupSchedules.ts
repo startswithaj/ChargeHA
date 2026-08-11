@@ -93,7 +93,6 @@ export function makeChargerRow(
     id: "cp-1",
     name: "OCPP Smart Charger",
     chargerAdapterType: "ocpp",
-    chargerConfig: '{"charger_id":"vcp-dev-2"}',
     mode: "auto",
     priority: 1,
     kind: "smart",

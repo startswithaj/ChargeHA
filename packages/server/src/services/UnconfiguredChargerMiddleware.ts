@@ -1,4 +1,4 @@
-import type { CallContext, ChargerInfo, ChargerState } from "@chargeha/shared";
+import type { CallContext, ChargerState } from "@chargeha/shared";
 import type { ChargerMiddleware } from "@chargeha/shared/plugins";
 
 // Stands in for a charging point whose adapter could never be built (config
@@ -22,6 +22,9 @@ export class UnconfiguredChargerMiddleware implements ChargerMiddleware {
       energyAddedKwh: 0,
       status: "unconfigured",
       statusDetail: reason,
+      // Commands nothing either way; isControllable() keeps this point out of
+      // the controller entirely.
+      controlMode: "switch",
       // Fixed at construction; a moving timestamp would re-emit forever.
       lastUpdated: new Date().toISOString(),
     };
@@ -33,14 +36,6 @@ export class UnconfiguredChargerMiddleware implements ChargerMiddleware {
 
   getCachedState(): ChargerState | null {
     return this.state;
-  }
-
-  // Nothing is known about the hardware, so nothing is claimed about it —
-  // rejecting names the real problem where invented values would not.
-  getChargerInfo(_ctx: CallContext): Promise<ChargerInfo> {
-    return Promise.reject(
-      new Error(`Charger not configured: ${this.state.statusDetail}`),
-    );
   }
 
   startCharging(_ctx: CallContext): Promise<boolean> {

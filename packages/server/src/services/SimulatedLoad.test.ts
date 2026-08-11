@@ -135,12 +135,12 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
       energyAddedKwh: 0,
       status: "charging",
       statusDetail: null,
+      controlMode: "amps",
       lastUpdated: "2024-01-01T00:00:00.000Z",
     };
     const pointMiddleware: ChargerMiddleware = {
       requestState: () => Promise.resolve(pointState),
       getCachedState: () => pointState,
-      getChargerInfo: () => Promise.reject(new Error("not used")),
       startCharging: () => Promise.resolve(true),
       stopCharging: () => Promise.resolve(true),
       setChargeAmps: () => Promise.resolve(true),
