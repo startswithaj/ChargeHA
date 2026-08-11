@@ -363,11 +363,9 @@ function usePluginLogsTab() {
     },
     pageSize,
   );
-  const pluginIds = useMemo(() => {
-    return [
-      ...new Set(data.logs.map((log) => log.pluginId).filter(Boolean)),
-    ].sort();
-  }, [data.logs]);
+  // Fetched separately from the log rows: deriving options from the filtered
+  // page would make every other plugin vanish once one is selected.
+  const { data: pluginIds = [] } = trpc.log.pluginLogIds.useQuery();
   const activeFilterCount = (tf.timeRange !== "all" ? 1 : 0) +
     (selectedLevels.length < ALL_LEVELS.length ? 1 : 0) +
     (pluginFilter !== "all" ? 1 : 0) +

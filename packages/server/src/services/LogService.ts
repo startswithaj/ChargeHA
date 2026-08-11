@@ -115,6 +115,11 @@ export class LogService {
     return { logs, total };
   }
 
+  /** Every plugin id that has ever logged, for the filter dropdown. */
+  async getPluginLogIds(): Promise<string[]> {
+    return await this.db.logs.getPluginLogIds();
+  }
+
   /** Fetch paginated vehicle poll logs. */
   async getVehicleUpdates(input: {
     limit?: number;
