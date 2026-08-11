@@ -1,7 +1,6 @@
 import type {
   CallContext,
   ChargerAdapter,
-  ChargerInfo,
   ChargerState,
   ChargerStatus,
 } from "@chargeha/shared";
@@ -63,17 +62,23 @@ export class OcppChargerAdapter implements ChargerAdapter {
     return Promise.resolve();
   }
 
-  startCharging(_ctx: CallContext): Promise<boolean> {
+  startCharging(ctx: CallContext): Promise<boolean> {
+    this.command("info", "remoteStart", {}, ctx);
     return this.cs.remoteStart();
   }
 
-  stopCharging(_ctx: CallContext): Promise<boolean> {
+  stopCharging(ctx: CallContext): Promise<boolean> {
+    this.command("info", "remoteStop", {}, ctx);
     return this.cs.remoteStop();
   }
 
   // Three-tier profile per the HA-integration pattern.
-  setChargeAmps(amps: number, _ctx: CallContext): Promise<boolean> {
+  setChargeAmps(amps: number, ctx: CallContext): Promise<boolean> {
     const tx = this.cs.getData().transactionId ?? undefined;
+    this.command("debug", "setChargeAmps", {
+      amps,
+      transactionId: tx ?? null,
+    }, ctx);
     return this.cs.setChargingProfiles([
       chargingProfilePayload("ChargePointMaxProfile", amps),
       chargingProfilePayload("TxDefaultProfile", amps),
@@ -83,27 +88,24 @@ export class OcppChargerAdapter implements ChargerAdapter {
     ]);
   }
 
-  getChargerState(_ctx: CallContext): Promise<ChargerState> {
-    return Promise.resolve(this.buildState(this.cs.getData()));
+  getChargerState(ctx: CallContext): Promise<ChargerState> {
+    return Promise.resolve(this.buildState(this.cs.getData(), ctx));
   }
 
-  getChargerInfo(_ctx: CallContext): Promise<ChargerInfo> {
-    const data = this.cs.getData();
-    return Promise.resolve({
-      id: this.config.chargerId,
-      name: data.info?.model ?? this.config.chargerId,
-      vendor: data.info?.vendor ?? "unknown",
-      model: data.info?.model ?? "unknown",
-      firmwareVersion: data.info?.firmwareVersion ?? "unknown",
-      maxAmps: this.config.maxAmps,
-      minAmps: this.config.minAmps,
-      phases: this.config.phases,
-      connectorCount: 1,
-      controlMode: "amps",
+  private command(
+    level: "info" | "debug",
+    name: string,
+    payload: Record<string, unknown>,
+    ctx: CallContext,
+  ): void {
+    this.dbLog.log(level, `${name} (${this.config.chargerId})`, {
+      payload: { chargerId: this.config.chargerId, ...payload },
+      origin: ctx.origin,
+      traceId: ctx.traceId,
     });
   }
 
-  private buildState(data: OcppLiveData): ChargerState {
+  private buildState(data: OcppLiveData, ctx: CallContext): ChargerState {
     const meterAgeMs = data.lastMeterValuesAt === null
       ? null
       : Date.now() - data.lastMeterValuesAt;
@@ -118,10 +120,14 @@ export class OcppChargerAdapter implements ChargerAdapter {
           meterAgeMs,
           timeoutSeconds: this.config.meterTimeoutSeconds,
         },
+        origin: ctx.origin,
+        traceId: ctx.traceId,
       });
     } else if (!meterStale && this.wasStale) {
       this.dbLog.info(`Meter values fresh again (${this.config.chargerId})`, {
         payload: { chargerId: this.config.chargerId },
+        origin: ctx.origin,
+        traceId: ctx.traceId,
       });
     }
     this.wasStale = meterStale;
@@ -147,6 +153,7 @@ export class OcppChargerAdapter implements ChargerAdapter {
       energyAddedKwh: sessionEnergyKwh(data),
       status,
       statusDetail: statusDetail(data, disconnected),
+      controlMode: "amps",
       lastUpdated: data.lastUpdated,
     };
   }

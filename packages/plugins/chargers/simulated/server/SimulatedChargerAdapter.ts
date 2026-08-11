@@ -1,10 +1,10 @@
 import type {
   CallContext,
   ChargerAdapter,
-  ChargerInfo,
   ChargerState,
   ChargerStatus,
 } from "@chargeha/shared";
+import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 
 const VOLTAGE = 230;
 
@@ -30,7 +30,10 @@ export class SimulatedChargerAdapter implements ChargerAdapter {
     lastTickMs: Date.now(),
   };
 
-  constructor(readonly chargerId: string) {}
+  constructor(
+    readonly chargerId: string,
+    private readonly dbLog: PluginDbLogger,
+  ) {}
 
   pollIntervalSeconds(): number {
     return 2;
@@ -40,21 +43,37 @@ export class SimulatedChargerAdapter implements ChargerAdapter {
     return Promise.resolve();
   }
 
-  startCharging(_ctx: CallContext): Promise<boolean> {
+  startCharging(ctx: CallContext): Promise<boolean> {
     this.state = { ...this.state, on: true, lastTickMs: Date.now() };
+    this.command("info", "startCharging", {}, ctx);
     return Promise.resolve(true);
   }
 
-  stopCharging(_ctx: CallContext): Promise<boolean> {
+  stopCharging(ctx: CallContext): Promise<boolean> {
     this.tick();
     this.state = { ...this.state, on: false, energyAddedKwh: 0 };
+    this.command("info", "stopCharging", {}, ctx);
     return Promise.resolve(true);
   }
 
-  setChargeAmps(amps: number, _ctx: CallContext): Promise<boolean> {
+  setChargeAmps(amps: number, ctx: CallContext): Promise<boolean> {
     this.tick();
     this.state = { ...this.state, commandedAmps: amps };
+    this.command("debug", "setChargeAmps", { amps }, ctx);
     return Promise.resolve(true);
+  }
+
+  private command(
+    level: "info" | "debug",
+    name: string,
+    payload: Record<string, unknown>,
+    ctx: CallContext,
+  ): void {
+    this.dbLog.log(level, `${name} (${this.chargerId})`, {
+      payload: { chargerId: this.chargerId, ...payload },
+      origin: ctx.origin,
+      traceId: ctx.traceId,
+    });
   }
 
   getChargerState(_ctx: CallContext): Promise<ChargerState> {
@@ -76,22 +95,8 @@ export class SimulatedChargerAdapter implements ChargerAdapter {
       statusDetail: `simulated: ${
         s.pluggedIn ? `car appetite ${s.carMaxAmps}A` : "no cable"
       }, ${s.on ? `energized at ${s.commandedAmps}A` : "off"}`,
-      lastUpdated: new Date().toISOString(),
-    });
-  }
-
-  getChargerInfo(_ctx: CallContext): Promise<ChargerInfo> {
-    return Promise.resolve({
-      id: this.chargerId,
-      name: "Simulated Charger",
-      vendor: "ChargeHA",
-      model: "SimEVSE",
-      firmwareVersion: "sim",
-      maxAmps: 32,
-      minAmps: 6,
-      phases: 1,
-      connectorCount: 1,
       controlMode: "amps",
+      lastUpdated: new Date().toISOString(),
     });
   }
 

@@ -1,7 +1,6 @@
 import type {
   CallContext,
   ChargerAdapter,
-  ChargerInfo,
   ChargerState,
   ChargerStatus,
 } from "@chargeha/shared";
@@ -76,20 +75,25 @@ export class TapoChargerAdapter implements ChargerAdapter {
     return Promise.resolve();
   }
 
-  async startCharging(_ctx: CallContext): Promise<boolean> {
-    return await this.setDeviceOn(true);
+  async startCharging(ctx: CallContext): Promise<boolean> {
+    return await this.setDeviceOn(true, ctx);
   }
 
-  async stopCharging(_ctx: CallContext): Promise<boolean> {
-    return await this.setDeviceOn(false);
+  async stopCharging(ctx: CallContext): Promise<boolean> {
+    return await this.setDeviceOn(false, ctx);
   }
 
   // Switch-only charger — the controller never calls this (controlMode).
-  setChargeAmps(_amps: number, _ctx: CallContext): Promise<boolean> {
+  setChargeAmps(amps: number, ctx: CallContext): Promise<boolean> {
+    this.dbLog.debug(`setChargeAmps unsupported (${this.config.chargerId})`, {
+      payload: { chargerId: this.config.chargerId, amps },
+      origin: ctx.origin,
+      traceId: ctx.traceId,
+    });
     return Promise.resolve(false);
   }
 
-  async getChargerState(_ctx: CallContext): Promise<ChargerState> {
+  async getChargerState(ctx: CallContext): Promise<ChargerState> {
     this.firstAttemptAt ??= Date.now();
     try {
       // Sequential on purpose: one in-flight request per plug — the KLAP
@@ -105,24 +109,8 @@ export class TapoChargerAdapter implements ChargerAdapter {
       this.unreachableAt = null;
       return state;
     } catch (error) {
-      return this.staleState(error);
+      return this.staleState(error, ctx);
     }
-  }
-
-  async getChargerInfo(_ctx: CallContext): Promise<ChargerInfo> {
-    const info = await this.client.request<TapoDeviceInfo>("get_device_info");
-    return {
-      id: info.mac,
-      name: decodeNickname(info.nickname, this.logger),
-      vendor: "TP-Link",
-      model: info.model,
-      firmwareVersion: info.fw_ver,
-      maxAmps: this.config.fixedDrawAmps,
-      minAmps: this.config.fixedDrawAmps,
-      phases: 1,
-      connectorCount: 1,
-      controlMode: "switch",
-    };
   }
 
   private buildState(
@@ -153,6 +141,7 @@ export class TapoChargerAdapter implements ChargerAdapter {
       energyAddedKwh: this.session.addedKwh,
       status,
       statusDetail: statusDetail(info, powerW, this.config.detectionThresholdW),
+      controlMode: "switch",
       lastUpdated: new Date().toISOString(),
     };
   }
@@ -195,7 +184,7 @@ export class TapoChargerAdapter implements ChargerAdapter {
   // A failed poll is not "stopped drawing": retain the last state, flip to
   // faulted only after the stale timeout. With no state to retain, the fault
   // is built from config so the dashboard can still say "unreachable".
-  private staleState(error: unknown): ChargerState {
+  private staleState(error: unknown, ctx: CallContext): ChargerState {
     const since = this.lastGoodAt ?? this.firstAttemptAt;
     const staleMs = this.config.staleTimeoutSeconds * 1000;
     const isStale = since !== null && Date.now() - since >= staleMs;
@@ -221,6 +210,8 @@ export class TapoChargerAdapter implements ChargerAdapter {
           chargerId: this.config.chargerId,
           error: error instanceof Error ? error.message : String(error),
         },
+        origin: ctx.origin,
+        traceId: ctx.traceId,
       });
     }
     this.unreachableAt ??= new Date().toISOString();
@@ -255,10 +246,11 @@ export class TapoChargerAdapter implements ChargerAdapter {
       chargerVoltage: null,
       chargerPhases: 1,
       energyAddedKwh: 0,
+      controlMode: "switch",
     };
   }
 
-  private async setDeviceOn(on: boolean): Promise<boolean> {
+  private async setDeviceOn(on: boolean, ctx: CallContext): Promise<boolean> {
     const info = await this.client.request<TapoDeviceInfo>("get_device_info");
     if (info.device_on === on) return true;
     await this.client.request("set_device_info", { device_on: on });
@@ -268,6 +260,8 @@ export class TapoChargerAdapter implements ChargerAdapter {
       `Plug switched ${on ? "on" : "off"} (${this.config.chargerId})`,
       {
         payload: { chargerId: this.config.chargerId, on },
+        origin: ctx.origin,
+        traceId: ctx.traceId,
       },
     );
     return true;
@@ -296,7 +290,7 @@ function statusDetail(
     : `on, drawing ${watts} W (below ${thresholdW} W threshold)`;
 }
 
-function decodeNickname(base64: string, logger: Logger): string {
+export function decodeNickname(base64: string, logger: Logger): string {
   try {
     const decoded = new TextDecoder().decode(
       Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)),

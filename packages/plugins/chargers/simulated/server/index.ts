@@ -36,7 +36,7 @@ export class SimulatedChargerPlugin implements ChargerPlugin {
 
   // deno-lint-ignore require-await
   async createChargerMiddleware(row: ChargerRow): Promise<ChargerMiddleware> {
-    const adapter = new SimulatedChargerAdapter(row.id);
+    const adapter = new SimulatedChargerAdapter(row.id, this.deps.dbLog);
     this.adapters.set(row.id, adapter);
     return new PollingChargerMiddleware(adapter, this.deps.log);
   }
