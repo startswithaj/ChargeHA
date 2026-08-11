@@ -300,22 +300,8 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
 
     const code = String(json.code ?? "");
     const dataEmpty = isEmptyData(json.data);
-    this.logger.debug(
-      `SEMS ${path} → code ${code || "(none)"}, dataEmpty=${dataEmpty}${
-        isRetry ? " (retry)" : ""
-      }`,
-    );
-    if (!SUCCESS_CODES.has(code) || dataEmpty) {
-      this.dbLog.warn(`POST ${path}`, {
-        payload: { path, code: code || null, dataEmpty, durationMs, isRetry },
-      });
-    }
+    this.logCallOutcome(path, code, dataEmpty, durationMs, isRetry);
     if (code === RATE_LIMIT_CODE) {
-      this.logger.warn(
-        `SEMS ${path} rate limited (${RATE_LIMIT_CODE}) — backing off ${
-          RATE_LIMIT_BACKOFF_MS / 1000
-        }s`,
-      );
       throw new GoodweSemsRateLimitError(RATE_LIMIT_BACKOFF_MS);
     }
 
@@ -347,6 +333,25 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
    *  transport failures, so a SEMS+ endpoint that 500s on a legacy-only account
    *  still falls through to the legacy endpoint. Rate limits are not a mode
    *  failure and propagate. */
+  /** One line to stdout per call; a plugin_logs row only when it failed. */
+  private logCallOutcome(
+    path: string,
+    code: string,
+    dataEmpty: boolean,
+    durationMs: number,
+    isRetry: boolean,
+  ): void {
+    this.logger.debug(
+      `SEMS ${path} → code ${
+        code || "(none)"
+      }, dataEmpty=${dataEmpty} in ${durationMs}ms${isRetry ? " (retry)" : ""}`,
+    );
+    if (SUCCESS_CODES.has(code) && !dataEmpty) return;
+    this.dbLog.warn(`POST ${path}`, {
+      payload: { path, code: code || null, dataEmpty, durationMs, isRetry },
+    });
+  }
+
   private async attemptLogin(mode: LoginMode): Promise<SemsToken | null> {
     try {
       const json = await this.post(
