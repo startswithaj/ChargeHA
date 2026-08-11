@@ -8,8 +8,8 @@ describe("Tapo e2e", () => {
   const SIM_SUBNET = "172.30.99";
   const CREDS = { email: "user@example.com", password: "example-password" };
 
-  /** The row created by beforeAll's setConfig. Looked up rather than captured
-   *  so a test that runs standalone still finds it. */
+  // The row created by beforeAll's setConfig. Looked up rather than captured
+  // so a test that runs standalone still finds it.
   async function tapoRowId(): Promise<string> {
     const list = await trpc.charger.list.query();
     const row = list.find((c) => c.chargerAdapterType === "tapo");

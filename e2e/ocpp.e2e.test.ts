@@ -26,8 +26,8 @@ describe("OCPP e2e", () => {
   // chargerRowId: null — the same shape the client uses. Every test shares
   // it: `charger.create` would make a second row with no charge point id,
   // which could never connect.
-  /** Rows are matched by charge point id, not by adapter type: the stack
-   *  runs two OCPP stations now, so "the OCPP row" is ambiguous. */
+  // Rows are matched by charge point id, not by adapter type: the stack
+  // runs two OCPP stations now, so "the OCPP row" is ambiguous.
   async function ocppRow(chargePointId: string = CP_ID) {
     const list = await trpc.charger.list.query();
     return list.find((c) =>

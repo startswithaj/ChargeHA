@@ -10,22 +10,18 @@ const SAP_UI_PASSWORD = "admin";
 // (baseName + fixedName: true).
 export const SAP_STATION_ID = "sap-test";
 
-/** The second station (devtools/sap-ocpp-simulator/config/e2e/station-templates/sap-basic.station-template.json): reports
- *  only the energy register, on a 60s interval. sap-test already reports
- *  every measurand we ask for, so it is this one that exercises negotiation. */
+// The second station (devtools/sap-ocpp-simulator/config/e2e/station-templates/sap-basic.station-template.json): reports
+// only the energy register, on a 60s interval. sap-test already reports
+// every measurand we ask for, so it is this one that exercises negotiation.
 export const SAP_BASIC_STATION_ID = "sap-basic";
 
 export const ocppTrpc = createTRPCClient<OcppAppRouter>({
   links: [httpBatchLink({ url: `${APP_URL}/trpc` })],
 });
 
-/** One shared connection to the SAP simulator's UI server (ws, subprotocol
- *  `ui0.0.1`), reused across calls in a test run. Wire format verified
- *  against the pinned SAP source (src/charging-station/ui-server/): request
- *  `[uuid, procedureName, payload]`, response `[uuid, responsePayload]`.
- *  Auth is `protocol-basic-auth`: credentials ride as a second subprotocol
- *  entry, `authorization.basic.<base64(user:pass) without padding>`
- *  (ui/common/src/client/WebSocketClient.ts is the reference implementation). */
+// Shared connection to the SAP simulator's UI server (ws, subprotocol `ui0.0.1`).
+// Wire format: request `[uuid, procedureName, payload]`, response `[uuid, responsePayload]`.
+// Auth rides as a second subprotocol entry: `authorization.basic.<base64(user:pass) no padding>`.
 class SapUiClient {
   private ws: Promise<WebSocket> | undefined;
   private pending = new Map<
@@ -111,9 +107,9 @@ class SapUiClient {
 
 const sapUi = new SapUiClient();
 
-/** hashIds — not charge point ids — are how the SAP UI server targets a
- *  station on every broadcast procedure. Resolved lazily (and not cached):
- *  the e2e stack's stations restart independently of the test process. */
+// hashIds — not charge point ids — are how the SAP UI server targets a
+// station on every broadcast procedure. Resolved lazily (and not cached):
+// the e2e stack's stations restart independently of the test process.
 function sapHashId(stationId: string = SAP_STATION_ID): Promise<string> {
   // Polled, not read once: the ui-server answers before the simulator has
   // finished spawning its stations from the template, so the first listing of
@@ -136,18 +132,9 @@ function sapHashId(stationId: string = SAP_STATION_ID): Promise<string> {
   });
 }
 
-/** Force the SAP station to (re)open its OCPP websocket to the app right now,
- *  instead of waiting out its own reconnect backoff. Needed because at stack
- *  startup there is no charger row yet, so the app 404s the station's first
- *  connect attempt (packages/plugins/chargers/ocpp/server/wsRoutes.ts) and
- *  the station then backs off for `retryBackOffRepeatInterval`-shaped delay —
- *  30s by default, which the row-creation step in `beforeAll` cannot beat.
- *  `openConnection`'s response status is not meaningful here — the SAP
- *  broadcast-channel response classifier (ChargingStationWorkerBroadcastChannel
- *  .commandResponseToResponseStatus) has no case for it and falls through to
- *  its default (failure) even on a successful call, since the underlying
- *  handler returns void — so this deliberately ignores the response and lets
- *  the caller's own connected-status poll be the source of truth. */
+// Forces the SAP station to reopen its socket now, skipping its ~30s reconnect backoff —
+// no charger row exists at stack startup, so the app 404s the station's first connect attempt.
+// openConnection's response status is meaningless (SAP's classifier has no case for it); ignored — caller polls connected-status instead.
 export async function sapReconnect(
   stationId: string = SAP_STATION_ID,
 ): Promise<void> {
@@ -159,10 +146,8 @@ export async function sapReconnect(
   await sapUi.request("openConnection", { hashIds: [hashId] });
 }
 
-/** One OCPP configuration key as the station itself currently holds it.
- *  This is the station's own view, not ours, so it is the honest way to
- *  prove a ChangeConfiguration actually landed rather than merely being
- *  answered `Accepted`. Undefined when the station does not have the key. */
+// The station's own view of one OCPP config key — proves a ChangeConfiguration actually
+// landed, not just that it was answered `Accepted`. Undefined if the station lacks the key.
 export async function sapConfigValue(
   stationId: string,
   key: string,
@@ -184,9 +169,9 @@ export async function sapConfigValue(
     ?.find((k) => k.key === key)?.value;
 }
 
-/** Connector 1's transaction state as the STATION holds it. The app's own
- *  charger state only shows what it believes; this is what actually happened
- *  on the wire, so a RemoteStart/RemoteStop that was never sent cannot pass. */
+// Connector 1's transaction state as the STATION holds it. The app's own
+// charger state only shows what it believes; this is what actually happened
+// on the wire, so a RemoteStart/RemoteStop that was never sent cannot pass.
 export async function sapTransactionStarted(
   stationId: string = SAP_STATION_ID,
 ): Promise<boolean> {
@@ -208,13 +193,9 @@ export async function sapTransactionStarted(
     ?.connectorStatus.transactionStarted === true;
 }
 
-/** Inject a charger-initiated OCPP message via the SAP UI server. Replaces
- *  vcp's `POST /execute {action, payload}` — the SAP simulator has no such
- *  endpoint; instead each OCPP message type is its own UI procedure
- *  (`statusNotification`, `meterValues`, ...), broadcast to a station by
- *  hashId (see `sapHashId`). `action` here is the OCPP message name in the
- *  vcp/PascalCase form the tests already use; mapped to the SAP procedure's
- *  camelCase name. */
+// Injects a charger-initiated OCPP message via the SAP UI server, replacing vcp's
+// `POST /execute`. SAP has no such endpoint — each message type is its own UI procedure,
+// broadcast by hashId. `action` is mapped from vcp's PascalCase to the procedure's camelCase.
 export async function vcpSend(
   action: string,
   payload: Record<string, unknown>,
