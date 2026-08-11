@@ -1,8 +1,8 @@
 import type { ChargeSchedule, DayOfWeek } from "@chargeha/shared";
 
-/** A charging point as this page sees it. `resolvedVehicleId` is the server's
- *  live answer from ChargingPointManager.resolveVehicle — a fact about right
- *  now, not a permanent link. */
+// `resolvedVehicleId` is the server's live answer from
+// ChargingPointManager.resolveVehicle — a fact about right now, not a
+// permanent link.
 export interface ConflictPoint {
   id: string;
   name: string;
@@ -62,10 +62,9 @@ const toTime = (minutes: number): string => {
   return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
 };
 
-/** The engine matches a schedule's `days` against the current instant, not
- *  against the day the window started (see isScheduleActiveNow). A wrapping
- *  window is therefore two ranges inside the same day, never a carry into the
- *  next one. A zero-length window can never be active, so it yields nothing. */
+// The engine matches a schedule's `days` against the current instant (see
+// isScheduleActiveNow), so a wrapping window is two ranges inside the same
+// day, never a carry into the next. A zero-length window yields nothing.
 function ranges(window: { startTime: string; endTime: string }): Range[] {
   const start = toMinutes(window.startTime);
   const end = toMinutes(window.endTime);
@@ -74,8 +73,8 @@ function ranges(window: { startTime: string; endTime: string }): Range[] {
   return [[start, MINUTES_PER_DAY], [0, end]];
 }
 
-/** Half-open ranges, so a window ending at 06:00 and one starting at 06:00
- *  share no minute — the same boundary isScheduleActiveNow uses. */
+// Half-open ranges, so a window ending at 06:00 and one starting at 06:00
+// share no minute — the same boundary isScheduleActiveNow uses.
 function intersectRanges(a: Range[], b: Range[]): Range[] {
   return a.flatMap(([aStart, aEnd]) =>
     b.flatMap(([bStart, bEnd]): Range[] => {
@@ -86,9 +85,9 @@ function intersectRanges(a: Range[], b: Range[]): Range[] {
   );
 }
 
-/** Two wrapping windows intersect into a piece ending at midnight and a piece
- *  starting at midnight. They are one continuous window to the user, so join
- *  them back up before naming it. */
+// Two wrapping windows intersect into a piece ending at midnight and a
+// piece starting at midnight. One continuous window to the user, so join
+// them back up before naming it.
 function joinAcrossMidnight(parts: Range[]): Range[] {
   const first = parts[0];
   const last = parts[parts.length - 1];
@@ -98,8 +97,8 @@ function joinAcrossMidnight(parts: Range[]): Range[] {
   return [...parts.slice(1, -1), [last[0], first[1] + MINUTES_PER_DAY]];
 }
 
-/** The clock ranges two windows share, midnight crossings included. Empty when
- *  they never coincide. */
+// The clock ranges two windows share, midnight crossings included. Empty
+// when they never coincide.
 export function overlapWindows(
   a: { startTime: string; endTime: string },
   b: { startTime: string; endTime: string },
@@ -112,8 +111,8 @@ export function overlapWindows(
   }));
 }
 
-/** Days both schedules run on. A weekday-only and a weekend-only pair share
- *  none, so they never overlap however much their clock times do. */
+// A weekday-only and a weekend-only pair share none, so they never overlap
+// however much their clock times do.
 export function sharedDays(a: DayOfWeek[], b: DayOfWeek[]): DayOfWeek[] {
   return DAY_ORDER.filter((d) => a.includes(d) && b.includes(d));
 }
@@ -127,11 +126,9 @@ export function formatWindows(windows: OverlapWindow[]): string {
   return windows.map((w) => `${w.startTime}–${w.endTime}`).join(" and ");
 }
 
-/** A charger-keyed and a vehicle-keyed schedule can both drive one charging
- *  point: it matches the first directly and the second through the car
- *  currently plugged into it (see scheduleTargets in engine/Schedules.ts).
- *  Only the minutes they share are ambiguous — selectActiveChargeSchedule
- *  filters by time before anything merges. */
+// A charger-keyed and a vehicle-keyed schedule can both drive one point.
+// Only the minutes they share are ambiguous — selectActiveChargeSchedule
+// filters by time before anything merges.
 export function findScheduleConflicts(
   points: ConflictPoint[],
   chargeSchedules: ChargeSchedule[],

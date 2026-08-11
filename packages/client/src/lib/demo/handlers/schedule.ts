@@ -14,7 +14,6 @@ const DAY_ABBRS: DayOfWeek[] = [
   "sat",
 ];
 
-/** Map a stored schedule to the server's discriminated charge/blockout shape. */
 export const toSchedule = (r: DemoSchedule) => {
   const base = {
     id: r.id,
@@ -46,7 +45,7 @@ const minutesOf = (t: string): number => {
   return h * 60 + m;
 };
 
-/** True if the schedule is enabled and its window contains `now` (handles wrap). */
+// Handles a window that wraps past midnight.
 export const isActiveNow = (r: DemoSchedule, now: Date): boolean => {
   if (!r.enabled || !r.days.includes(DAY_ABBRS[now.getDay()])) return false;
   const cur = minuteOfDay(now);

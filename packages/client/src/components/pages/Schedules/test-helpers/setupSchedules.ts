@@ -70,8 +70,7 @@ export const chargeSchedule: ChargeSchedule = {
   enabled: true,
 };
 
-/** A charge schedule keyed to the charging point itself rather than a car —
- *  charger-keyed schedules carry no chargeLimitPct (no battery visibility). */
+// Charger-keyed schedules carry no chargeLimitPct (no battery visibility).
 export const chargerKeyedSchedule: ChargeSchedule = {
   id: "sched-charger-1",
   vehicleId: null,
@@ -85,8 +84,8 @@ export const chargerKeyedSchedule: ChargeSchedule = {
   enabled: true,
 };
 
-/** A `charger.list` row as the page consumes it. Loosely typed because the
- *  page reads a handful of fields off an inferred tRPC output type. */
+// Loosely typed because the page reads a handful of fields off an
+// inferred tRPC output type.
 export function makeChargerRow(
   overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {

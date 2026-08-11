@@ -18,7 +18,7 @@ export type ChargerConfirm =
   | { kind: "add"; typeId: string; commit: () => void }
   | { kind: "removeLast"; chargerId: string };
 
-/** Editing an existing charger, or configuring one before it is created. */
+// Editing an existing charger, or configuring one before it is created.
 export type ChargerEditing =
   | { mode: "add"; typeId: string }
   | { mode: "edit"; typeId: string; chargerId: string };
@@ -26,9 +26,9 @@ export type ChargerEditing =
 export const hasSettingsPanel = (typeId: string): boolean =>
   `${typeId}-settings` in pluginSettingsComponents;
 
-/** Nothing to fill in before the row exists, so adding skips the form. Not the
- *  same as having no settings panel: the simulated charger declares this yet
- *  still has one, for the dev knobs its row exposes once it is created. */
+// Nothing to fill in before the row exists, so adding skips the form. Not
+// the same as having no settings panel: the simulated charger declares this
+// yet still has one, for the dev knobs its row exposes once created.
 const addsDirectly = (typeId: string): boolean =>
   chargerPluginOptions.find((o) => o.id === typeId)?.directAdd === true;
 

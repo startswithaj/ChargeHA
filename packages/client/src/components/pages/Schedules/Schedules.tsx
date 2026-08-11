@@ -336,8 +336,8 @@ type Chargers = ReturnType<typeof useChargers>["chargers"];
 const chargerOption = (adapterType: string) =>
   chargerPluginOptions.find((o) => o.id === adapterType);
 
-/** Everything the notice builders need about one charging point, including
- *  the server's live vehicle resolution. */
+// Everything the notice builders need about one charging point, including
+// the server's live vehicle resolution.
 function toNoticePoints(chargers: Chargers, vehicles: Vehicles): NoticePoint[] {
   return chargers.map((c) => ({
     id: c.id,
@@ -351,12 +351,9 @@ function toNoticePoints(chargers: Chargers, vehicles: Vehicles): NoticePoint[] {
   }));
 }
 
-/** Charger groups: every smart point, always — including one with a vehicle
- *  assigned, whose own charger-keyed schedules would otherwise have no group
- *  to appear in and would silently vanish from this page. A vehicle_api point
- *  is the vehicle by construction (resolveConstructionLinked), so it is only
- *  ever a vehicle group; giving it both would list one charging point twice
- *  under two names. */
+// Every smart point, always — including one with a vehicle assigned, whose
+// own charger-keyed schedules would otherwise vanish from the page. A
+// vehicle_api point is the vehicle by construction, so it's excluded here.
 function chargerTargets(chargers: Chargers): ScheduleTarget[] {
   return chargers
     .filter((c) => c.kind !== "vehicle_api")
@@ -370,12 +367,9 @@ function chargerTargets(chargers: Chargers): ScheduleTarget[] {
     }));
 }
 
-/** One group per distinct car a charging point is tied to — by assignment or
- *  construction (`vehicleId`), or by the resolution in force right now
- *  (`resolvedVehicleId`). Resolution counts because otherwise an unassigned
- *  smart charger's vehicle-keyed schedules would have no group and vanish from
- *  the page while still running in the engine. Deduped, so two points on one
- *  car give one group; a car no point is tied to gets none. */
+// One group per distinct car a point is tied to — by assignment/construction
+// (`vehicleId`) or current resolution (`resolvedVehicleId`); resolution
+// counts so an unassigned smart charger's schedules don't vanish. Deduped.
 function vehicleTargets(
   chargers: Chargers,
   vehicles: Vehicles,
@@ -413,8 +407,8 @@ function buildScheduleTargets(
   return [...chargerTargets(chargers), ...vehicleTargets(chargers, vehicles)];
 }
 
-/** Notices only make sense against schedules that exist — an empty group
- *  already says "nothing here" with its empty state. */
+// Notices only make sense against schedules that exist — an empty group
+// already says "nothing here" with its empty state.
 function noticesForTarget(
   target: ScheduleTarget,
   targetSchedules: ChargeSchedule[],

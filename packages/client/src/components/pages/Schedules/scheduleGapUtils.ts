@@ -1,6 +1,6 @@
 import type { Schedule, ScheduleType } from "@chargeha/shared";
 
-/** 96 quarter-hour slots per day (00:00 = slot 0, 23:45 = slot 95) */
+// Quarter-hour slots: 00:00 = slot 0, 23:45 = slot 95.
 export const SLOTS = 96;
 export const MAX_GAP_SLOTS = 24; // 6 hours cap
 
@@ -16,11 +16,8 @@ export function slotToTime(slot: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-/**
- * Find the largest free time window among existing schedules of the same type
- * and target (vehicle- or charger-keyed).
- * Returns suggested start/end times for a new schedule, capped at 6 hours.
- */
+// The largest free window among existing schedules of the same type and
+// target, capped at 6 hours (MAX_GAP_SLOTS).
 export function findNextGap(
   schedules: Schedule[],
   scheduleType: ScheduleType,

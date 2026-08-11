@@ -16,7 +16,6 @@ import { Spinner } from "../ui/Spinner.tsx";
 import layout from "../ui/CardLayout.module.css";
 import styles from "./VehicleCard.module.css";
 
-/** Which controller reasons warrant a visible status row. */
 const VISIBLE_REASONS = new Set([
   "schedule",
   "blockout",
@@ -41,7 +40,6 @@ const REASON_COLORS: Record<string, "blue" | "orange"> = {
   battery_priority: "orange",
 };
 
-/** User-friendly label formatters per reason. */
 const REASON_LABELS: Record<string, (detail: string) => string> = {
   schedule: (detail) => {
     const match = detail.match(/schedule (\d{2}:\d{2}-\d{2}:\d{2})/);
@@ -127,13 +125,13 @@ function ChargeButton(
   );
 }
 
-/** True when a controller reason is worth its own formatted row. Callers that
- *  also have a fallback for unformatted reasons need to know which they got. */
+// Callers that also have a fallback for unformatted reasons need to know
+// which they got.
 export const isVisibleReason = (reason: string | null): boolean =>
   reason !== null && VISIBLE_REASONS.has(reason);
 
-/** Renders nothing for a reason with no user-facing phrasing, so callers can
- *  hand it whatever the controller reported without filtering first. */
+// Renders nothing for a reason with no user-facing phrasing, so callers can
+// hand it whatever the controller reported without filtering first.
 export function ControllerReasonRow(
   { reason, detail }: { reason: string | null; detail: string | null },
 ) {
@@ -151,9 +149,8 @@ export function ControllerReasonRow(
   );
 }
 
-/** How long until the car reaches its own charge limit. The only charging row
- *  a charger cannot produce: `minutesToFull` and the limit are the vehicle's
- *  own numbers, not anything the charger measures. */
+// The only charging row a charger cannot produce: `minutesToFull` and the
+// limit are the vehicle's own numbers, not anything the charger measures.
 function TimeToFullRow(
   { state, chargeLimitPercent }: {
     state: VehicleChargeState;
@@ -176,15 +173,9 @@ function TimeToFullRow(
   );
 }
 
-/** The detail block for a car whose charging a smart charger owns.
- *
- * `readOnly` used to drop this block whole, which cost the user real
- * information rather than just the controls. Every other row — amps,
- * solar/grid, energy added, allocation status, controller reason — is measured
- * by the charger and already shown on the charger card sitting directly above
- * this one, so repeating them here would be the same fact twice, six inches
- * apart. Time to full is the one row that card cannot produce, so it is the
- * one row that stays. */
+// `readOnly` used to drop this block whole, costing real information rather
+// than just the controls. Every other row is already shown on the charger
+// card above; time to full is the one row that card cannot produce.
 export function PairedChargeDetails(
   { state, chargeLimitPercent }: {
     state: VehicleChargeState;

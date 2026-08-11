@@ -13,11 +13,9 @@ import {
 import { demoNow } from "./demoClock.ts";
 import { buildVehicleState } from "./handlers/vehicleState.ts";
 
-/**
- * The events emitted on each tick: the current energy snapshot plus a
- * vehicle_update per vehicle (the live controller advances charging first), so
- * the dashboard's energy tile and car cards both animate.
- */
+// The current energy snapshot plus a vehicle_update per vehicle (the live
+// controller advances charging first), so the dashboard's energy tile and
+// car cards both animate.
 const tickEvents = (now: Date): SSEEvent[] => {
   const vehicles = runLiveController(now);
   const iso = now.toISOString();
@@ -31,11 +29,9 @@ const tickEvents = (now: Date): SSEEvent[] => {
   ];
 };
 
-/**
- * Terminating tRPC link for demo mode. Queries/mutations resolve synchronously
- * from demo state; the single subscription (subscription.onEvents) emits an
- * energy snapshot now and on every demo tick — the in-browser stand-in for SSE.
- */
+// Queries/mutations resolve synchronously from demo state; the single
+// subscription (subscription.onEvents) emits an energy snapshot now and on
+// every demo tick — the in-browser stand-in for SSE.
 export const demoLink =
   <TRouter extends AnyRouter>(): TRPCLink<TRouter> => () => ({ op }) =>
     observable((observer) => {

@@ -76,7 +76,6 @@ const FLOW_KEYS = [
   "gridToCar",
 ] as const;
 
-/** Build a time-range header label for the tooltip. */
 function buildHeaderLabel(
   label: string,
   period: StatsPeriod,
@@ -375,11 +374,9 @@ function ChartLegend() {
   );
 }
 
-/** Returns the recharts Bar/Line elements for ComposedChart. Called as a
- *  function (not JSX) so the fragment lands directly in ComposedChart's
- *  children — recharts walks `Children.map` to find Bar/Line by displayName,
- *  and a wrapper component (e.g. `<ChartBars />`) hides them and the chart
- *  renders blank. */
+// Called as a function (not JSX) so the fragment lands directly in
+// ComposedChart's children — recharts walks `Children.map` to find Bar/Line
+// by displayName, and a wrapper component would hide them, rendering blank.
 function chartBars() {
   return (
     <>

@@ -16,9 +16,8 @@ export interface ScheduleTarget {
   id: string;
   name: string;
   badge: string;
-  /** The charge point's own id (e.g. an OCPP charge point id), when its
-   *  plugin advertises one. Two chargers of the same type are otherwise
-   *  indistinguishable in this heading. */
+  // Two chargers of the same type are otherwise indistinguishable in this
+  // heading.
   identifier: string | null;
 }
 

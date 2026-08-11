@@ -28,7 +28,6 @@ const MODE_LABELS: Record<AuthMode, string> = {
   oidc: "OpenID Connect (OIDC)",
 };
 
-/** Map OIDC error codes to user-friendly messages. */
 const OIDC_ERROR_MESSAGES: Record<string, string> = {
   provider_denied: "The identity provider denied the request.",
   state_mismatch: "Session expired or state mismatch. Please try again.",

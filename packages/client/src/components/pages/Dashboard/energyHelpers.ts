@@ -10,7 +10,6 @@ export interface ChargingEntry {
   chargePowerKw: number;
 }
 
-/** Format minutes until a future time as a human-readable string (e.g., "2h 15m", "45m"). */
 export function formatTimeUntil(isoString: string): string {
   const diffMs = new Date(isoString).getTime() - Date.now();
   const diffMin = Math.max(0, Math.round(diffMs / 60_000));

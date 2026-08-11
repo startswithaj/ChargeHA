@@ -34,10 +34,8 @@ type SetSolarField = <K extends keyof SolarFields>(
   v: SolarFields[K],
 ) => void;
 
-/** Assemble the ControllerConfig the real engine needs from the Solar,
- *  Battery, and Charging config sections — the same shape ChargeController
- *  builds from the database, so the preview runs the exact engine the
- *  live controller runs. */
+// The same shape ChargeController builds from the database, so the preview
+// runs the exact engine the live controller runs.
 function buildControllerConfig(
   fields: SolarFields,
   batteryConfig: {

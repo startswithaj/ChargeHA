@@ -50,7 +50,6 @@ type QueryPathsOf<TRecord> = {
     : never;
 }[keyof TRecord & string];
 
-/** Union of every QUERY path on the fully-merged router (core + all plugins). */
 export type QueryPath = QueryPathsOf<FullAppRouter["_def"]["record"]>;
 
 // Walk the router's nested procedure record, emitting the dotted path of every
@@ -62,7 +61,6 @@ type MutationPathsOf<TRecord> = {
     : never;
 }[keyof TRecord & string];
 
-/** Union of every MUTATION path on the fully-merged router (core + all plugins). */
 export type MutationPath = MutationPathsOf<FullAppRouter["_def"]["record"]>;
 
 // Resolve a dotted path to its procedure by walking the nested record (the type
@@ -76,11 +74,9 @@ type ProcedureAt<TRecord, P extends string> = P extends
 
 type Record_ = FullAppRouter["_def"]["record"];
 
-/** The real input type of the mutation at path `P`. */
 export type MutationInput<P extends MutationPath> = inferProcedureInput<
   ProcedureAt<Record_, P>
 >;
-/** The real (awaited) result type of the mutation at path `P`. */
 export type MutationOutput<P extends MutationPath> = inferProcedureOutput<
   ProcedureAt<Record_, P>
 >;

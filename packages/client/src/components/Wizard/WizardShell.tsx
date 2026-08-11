@@ -20,14 +20,13 @@ import styles from "./WizardShell.module.css";
 interface WizardShellProps {
   flow: StepDef[];
   store: WizardStore;
-  /** Steps are addressed as `${basePath}/${stepId}`. */
+  // Steps are addressed as `${basePath}/${stepId}`.
   basePath: string;
   onComplete?: () => void;
-  /** When set, an "Exit setup" button is shown that abandons the wizard —
-   *  provided only when the wizard was previously completed. */
+  // Shown only when the wizard was previously completed.
   onExit?: () => void;
-  /** Called when Back is pressed on the first step. Without it, Back is
-   *  disabled there. */
+  // Called when Back is pressed on the first step. Without it, Back is
+  // disabled there.
   onBackOut?: () => void;
 }
 

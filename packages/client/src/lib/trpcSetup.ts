@@ -16,7 +16,6 @@ import { demoLink } from "./demo/demoLink.ts";
 // real production build. A `demoMode.isActive()` call can't be tree-shaken.
 const isDemoBuild = import.meta.env.VITE_DEMO_MODE === "1";
 
-/** Check whether a tRPC error indicates an UNAUTHORIZED response. */
 export function isUnauthorizedError(error: unknown): boolean {
   if (!(error instanceof TRPCClientError)) return false;
   // tRPC procedure-level UNAUTHORIZED
@@ -27,32 +26,21 @@ export function isUnauthorizedError(error: unknown): boolean {
   return false;
 }
 
-/** Retry predicate for tanstack-query — never retry UNAUTHORIZED, retry once otherwise. */
 export function shouldRetry(failureCount: number, error: unknown): boolean {
   // Never retry UNAUTHORIZED — redirect to login instead
   if (isUnauthorizedError(error)) return false;
   return failureCount < 1;
 }
 
-/** Clears the query client when the given error is an auth error. */
 export function handleAuthError(error: unknown): void {
   if (isUnauthorizedError(error)) {
     queryClient.clear();
   }
 }
 
-/** Invalidate the entire query cache after any mutation succeeds.
- *
- * WHY blanket: mutations previously relied on the server echoing a
- * `*_changed` SSE event to refresh caches. That makes the mutating client's
- * own correctness depend on a network round-trip — if the SSE connection is
- * dropped or reconnecting, the UI stays stale indefinitely. Invalidating
- * locally makes the mutating client self-correcting; the SSE events remain
- * for syncing *other* connected clients.
- *
- * Cost is low: only active queries refetch, and httpBatchLink coalesces them
- * into a single request. Structural sharing keeps object identity stable when
- * refetched data is unchanged, so forms seeded from query data don't reset. */
+// Blanket invalidation because relying on the server's `*_changed` SSE
+// event left the mutating client's own correctness dependent on a network
+// round-trip — a dropped/reconnecting SSE connection left the UI stale.
 export function invalidateAllOnMutation(): void {
   queryClient.invalidateQueries();
 }

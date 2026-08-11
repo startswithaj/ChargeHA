@@ -44,8 +44,7 @@ const solarDayFor = (config: SolarConfig): SolarMinute[] => {
   return day;
 };
 
-/** The simulated-energy config from demo state (drives the live solar model).
- *  Section values deserialize as strings, so coerce to the numeric SolarConfig. */
+// Section values deserialize as strings, so coerce to the numeric SolarConfig.
 const solarConfigOf = (state: DemoState): SolarConfig => {
   const c = deserializeSection(simulatedEnergyConfigDef, state.config);
   return {
@@ -64,8 +63,8 @@ const solarConfigOf = (state: DemoState): SolarConfig => {
 const noise = (now: Date, amp: number, salt: number): number =>
   (hash01(Math.floor(now.getTime() / 1000) + salt) - 0.5) * 2 * amp;
 
-/** Live solar + base household load simulated from the simulated-energy config,
- *  with small per-second sensor jitter. Editing the settings changes this. */
+// Small per-second sensor jitter layered on top; editing the settings
+// changes this.
 const liveBasePoint = (state: DemoState, now: Date): BasePoint => {
   const day = solarDayFor(solarConfigOf(state));
   const idx = Math.min(
@@ -85,7 +84,6 @@ const liveBasePoint = (state: DemoState, now: Date): BasePoint => {
   };
 };
 
-/** Today's cumulative energy totals up to `minute`. */
 const cumulativeToday = (
   readings: DemoReading[],
   minute: number,
@@ -135,8 +133,6 @@ const charge = (amps: number): Decision =>
     ? { isCharging: true, amps, drawW: amps * GRID_VOLTAGE_V }
     : { isCharging: false, amps: 0, drawW: 0 };
 
-/** Decide one vehicle's draw given an active charge schedule (if any), whether a
- *  blockout is active, and the solar excess still available. */
 const decideCharge = (
   v: DemoVehicle,
   schedule: DemoSchedule | undefined,
@@ -156,9 +152,8 @@ const decideCharge = (
   return charge(clampAmps(remainingExcessW / GRID_VOLTAGE_V));
 };
 
-/** Decide every vehicle's charging for this instant, honouring schedules (active
- *  blockout suppresses; an active charge window forces charging) and otherwise
- *  sharing solar excess by priority. Pure — does not advance SoC. */
+// Honours schedules (blockout suppresses, an active charge window forces)
+// and otherwise shares solar excess by priority. Pure — does not advance SoC.
 const chargeVehicles = (
   vehicles: DemoVehicle[],
   excessW: number,
@@ -196,8 +191,8 @@ const chargeVehicles = (
   };
 };
 
-/** Current energy snapshot: base household load + the live car(s) on top, so
- *  solar / home / grid and the per-car split all reconcile. Pure (no SoC change). */
+// Base household load + live car(s) on top, so solar/home/grid and the
+// per-car split all reconcile. Pure (no SoC change).
 export const currentSnapshot = (
   state: DemoState,
   now: Date = new Date(),
@@ -233,7 +228,6 @@ export const currentSnapshot = (
 // fill — so the dashboard car visibly charges when the sun is out and idles
 // otherwise. In-memory only (updateDemoStateLive — never persisted).
 
-/** Add one tick's worth of charge to a vehicle's SoC (capped at its limit). */
 const advanceSoc = (v: DemoVehicle): DemoVehicle => {
   if (!v.isCharging) return v;
   const deltaPct = (v.chargeAmps * GRID_VOLTAGE_V * TICK_HOURS) /
@@ -244,8 +238,6 @@ const advanceSoc = (v: DemoVehicle): DemoVehicle => {
   };
 };
 
-/** Advance live charging one tick: set amps from current solar excess and
- *  accumulate SoC. Returns the updated vehicles. */
 export const runLiveController = (now: Date = new Date()): DemoVehicle[] => {
   const state = getDemoState();
   const { solarW, baseHomeW } = liveBasePoint(state, now);
@@ -266,7 +258,7 @@ const emitter = new EventTarget();
 // deno-lint-ignore custom-no-let/no-let
 let timer: ReturnType<typeof setInterval> | null = null;
 
-/** Start emitting ticks (idempotent). */
+// Idempotent.
 export const startDemoTick = (): void => {
   if (timer === null) {
     timer = setInterval(
@@ -276,7 +268,6 @@ export const startDemoTick = (): void => {
   }
 };
 
-/** Subscribe to ticks; returns an unsubscribe function. */
 export const onDemoTick = (cb: () => void): () => void => {
   emitter.addEventListener("tick", cb);
   return () => emitter.removeEventListener("tick", cb);

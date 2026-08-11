@@ -13,7 +13,7 @@ interface ChargeSettingsProps {
   ) => void;
 }
 
-/** Charge amps + charge limit steppers (charge schedules only) */
+// Charge schedules only.
 export function ChargeSettings({
   chargeAmps,
   chargeLimitPct,

@@ -21,20 +21,17 @@ export interface PluginConfigField {
   secret?: boolean;
   width?: number;
   placeholder?: string;
-  /** Flagged red while empty — the form cannot do its job without it. */
+  // Flagged red while empty — the form cannot do its job without it.
   required?: boolean;
-  /** Renders a select rather than a free-text box. */
   options?: Array<{ value: string; label: string }>;
-  /** Tagged "Advanced" in the row label. Still always shown — the tag marks
-   *  it as tuning you can usually leave alone. */
+  // Tagged "Advanced" in the row label. Still always shown — the tag marks
+  // it as tuning you can usually leave alone.
   advanced?: boolean;
-  /** Rendered directly beneath this field's row, so a control that fills the
-   *  field in (network discovery, say) sits with it rather than orphaned at
-   *  the end of the form. Receives a setter for this field's draft value. */
+  // Rendered beneath this field's row, so a control that fills it in
+  // (network discovery, say) sits with it rather than orphaned at the end.
   after?: (setValue: (value: string) => void) => ReactNode;
-  /** Replaces the default input entirely. For a value the user should not
-   *  normally type — one discovered from the device, say — where the plugin
-   *  wants to show it as text plus its own escape hatch. */
+  // Replaces the default input entirely, for a value the user shouldn't
+  // normally type (discovered from the device), shown as text plus escape.
   render?: (value: string, setValue: (value: string) => void) => ReactNode;
 }
 
@@ -95,20 +92,16 @@ function FieldLabel({ field }: { field: PluginConfigField }) {
   );
 }
 
-/**
- * The one renderer for a plugin's config fields. Both the settings panel and
- * the plugin's wizard step render through this off the same field list, so
- * labels, help, widgets and grouping cannot drift between them.
- */
+// Both the settings panel and the plugin's wizard step render through this
+// off the same field list, so labels, help, widgets and grouping cannot
+// drift between them.
 export function PluginFieldInputs(
   { fields, values, onChange, onCommit, autoFocus }: {
     fields: PluginConfigField[];
     values: Record<string, string>;
     onChange: (key: string, value: string) => void;
-    /** Fired when a field is done being edited (blur, or a select choice) —
-     *  for hosts that persist per-field rather than on an explicit Save. */
+    // For hosts that persist per-field rather than on an explicit Save.
     onCommit?: (key: string) => void;
-    /** Focus the first field on mount — for a freshly opened add form. */
     autoFocus?: boolean;
   },
 ) {
@@ -134,13 +127,9 @@ export function PluginFieldInputs(
   return <>{fields.map(row)}</>;
 }
 
-/**
- * Drop-in settings form for a plugin's config. Renders `fields` as editable
- * rows, buffers edits, and reports its dirty/save/status to the host panel — so
- * the panel's standard header Save + dirty highlight + Saved badge cover the
- * plugin's fields with no per-plugin wiring. Values edit as strings (the
- * mutation coerces); pass the mutation's `mutate` straight through as `onSave`.
- */
+// Reports its dirty/save/status to the host panel, so the panel's standard
+// header Save + dirty highlight + Saved badge cover the plugin's fields
+// with no per-plugin wiring. Values edit as strings; pass `mutate` as `onSave`.
 export function PluginConfigForm({
   data,
   fields,
@@ -152,12 +141,11 @@ export function PluginConfigForm({
   data: Record<string, unknown> | undefined;
   fields: PluginConfigField[];
   onSave: (draft: Record<string, string>, opts: SaveOpts) => void;
-  /** Trailing content that needs the live edited values rather than the saved
-   *  ones — a connection test, for instance. */
+  // Trailing content that needs the live edited values, not the saved ones
+  // — a connection test, for instance.
   renderFooter?: (values: Record<string, string>) => ReactNode;
-  /** Leading content, above the field rows. For setup a user must do *before*
-   *  the fields make sense — and which may itself fill one in, hence the
-   *  setter. */
+  // Leading content, above the field rows, for setup a user must do
+  // *before* the fields make sense — may itself fill one in, hence setter.
   renderHeader?: (
     values: Record<string, string>,
     setValue: (key: string, value: string) => void,
@@ -223,7 +211,6 @@ export function PluginConfigForm({
   );
 }
 
-/** The "check it actually works" action every device plugin ends with. */
 export function PluginTestRow(
   {
     label = "Test Connection",

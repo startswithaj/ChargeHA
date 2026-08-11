@@ -2,7 +2,6 @@ import { Text } from "@radix-ui/themes";
 import styles from "./steps.module.css";
 import type { ReactNode } from "react";
 
-/** A selectable card on a wizard selection step. */
 export function OptionCard(
   { icon, title, description, selected, disabled, onSelect }: {
     icon: ReactNode;

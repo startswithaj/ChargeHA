@@ -23,7 +23,7 @@ import styles from "./Logs.module.css";
 interface LogFilterBarProps {
   vehicleFilter: string;
   onVehicleFilterChange: (v: string) => void;
-  /** Charging points — controller logs key by charging-point id. */
+  // Charging points — controller logs key by charging-point id.
   vehicles: Array<{ id: string; name: string }>;
   timeRange: TimeRangePreset;
   onTimeRangeChange: (v: TimeRangePreset) => void;
@@ -229,8 +229,8 @@ export function LogFilterBar({
   );
 }
 
-/** Holds `active` true for at least `minMs` after it goes true, so brief
- *  truthy windows (fast react-query fetches) remain visible. */
+// Holds `active` true for at least `minMs` after it goes true, so brief
+// truthy windows (fast react-query fetches) remain visible.
 function useMinDuration(active: boolean, minMs: number): boolean {
   const [visible, setVisible] = useState(active);
   useEffect(() => {

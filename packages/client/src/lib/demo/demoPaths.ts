@@ -16,7 +16,7 @@
 
 import type { MutationPath, QueryPath } from "./queryPaths.ts";
 
-/** Queries deliberately unreachable in demo (disabled plugins / features). */
+// Queries deliberately unreachable in demo (disabled plugins / features).
 export const GATED_QUERIES: readonly string[] = [
   // Tesla — disabled in the wizard, no tesla vehicle ever exists.
   "plugin.vehicle.tesla.encryptionStatus",
@@ -42,11 +42,11 @@ export const GATED_QUERIES: readonly string[] = [
   "plugin.energy.fronius_local.lanSubnets",
 ] as const satisfies readonly QueryPath[];
 
-/** Queries known to exist but not yet implemented. Empty — all are handled. */
+// Queries known to exist but not yet implemented. Empty — all are handled.
 export const PENDING_QUERIES: readonly string[] =
   [] as const satisfies readonly QueryPath[];
 
-/** Mutations deliberately unreachable in demo (disabled plugins / features). */
+// Mutations deliberately unreachable in demo (disabled plugins / features).
 export const GATED_MUTATIONS = [
   // Tesla — disabled in the wizard, no tesla vehicle ever exists.
   "plugin.vehicle.tesla.checkKeyPairing",
@@ -83,13 +83,9 @@ export const GATED_MUTATIONS = [
   "plugin.charger.ocpp.cancelPairing",
 ] as const satisfies readonly MutationPath[];
 
-/** The gated mutation paths as a literal union. */
 export type GatedMutationPath = typeof GATED_MUTATIONS[number];
 
-/**
- * Mutations the demo MUST handle: every router mutation except the gated ones.
- * The handler map (handlers/mutations) is typed total over this, so a missing
- * handler — or a new router mutation that is neither gated nor handled — is a
- * compile error. There is deliberately no "pending" escape hatch.
- */
+// The handler map (handlers/mutations) is typed total over this, so a
+// missing handler — or a new mutation neither gated nor handled — is a
+// compile error. Deliberately no "pending" escape hatch.
 export type RequiredMutationPath = Exclude<MutationPath, GatedMutationPath>;

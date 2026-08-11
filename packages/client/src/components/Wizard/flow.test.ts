@@ -17,7 +17,7 @@ describe("flow", () => {
     ...extra,
   });
 
-  /** A flow shaped like the real one: core steps with a gated plugin group. */
+  // Core steps with a gated plugin group.
   const FLOW: StepDef[] = [
     step("welcome"),
     step("vehicle-type"),

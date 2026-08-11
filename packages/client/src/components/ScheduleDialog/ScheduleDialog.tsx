@@ -23,8 +23,8 @@ interface ScheduleFormProps {
   onCancel: () => void;
 }
 
-/** 100% never stops a charge, so it is the neutral starting point for a
- *  charger-keyed schedule, whose linked car may not report battery level. */
+// 100% never stops a charge, so it is the neutral starting point for a
+// charger-keyed schedule, whose linked car may not report battery level.
 const NO_LIMIT_PCT = 100;
 
 const DEFAULT_FORM: ScheduleFormData = {

@@ -48,14 +48,11 @@ interface VehicleCardProps {
   controllerReason?: string | null;
   controllerDetail?: string | null;
   chargerStatus?: { status: string; statusDetail: string | null } | null;
-  /** Data-only vehicle: charging is owned by a smart charger, so no
-   *  mode/start/stop/amps controls render. */
+  // Data-only vehicle: charging is owned by a smart charger, so no
+  // mode/start/stop/amps controls render.
   readOnly?: boolean;
-  /** The charging point this car is plugged into, when a smart charger owns
-   *  it — the pair renders as two cards and this badge is what ties them
-   *  together. One object rather than two props so the name and its id cannot
-   *  disagree, and so the absent case is a single null: a car with no charger
-   *  of its own renders nothing here. */
+  // One object rather than two props so the name and its id cannot
+  // disagree, and so the absent case (no charger of its own) is one null.
   chargingPoint?: { name: string; identifier: string | null } | null;
 }
 
@@ -122,10 +119,9 @@ const MODE_BUTTONS: {
   { value: "charge_now", label: "CHARGE NOW", color: "green" },
 ];
 
-/** Which charger this car is on, in the badge language the charger card and
- *  the Schedules headings already use. The name alone is not enough — a
- *  charging point is named after its adapter by default, so two OCPP chargers
- *  read identically until the charge point id separates them. */
+// The name alone is not enough — a charging point is named after its
+// adapter by default, so two OCPP chargers read identically until the
+// charge point id separates them.
 function ChargingPointBadge(
   { chargingPoint }: {
     chargingPoint: { name: string; identifier: string | null };
@@ -140,9 +136,9 @@ function ChargingPointBadge(
   );
 }
 
-/** A paired card keeps the information and loses only the controls: the
- *  charger card above it owns every row it measures itself, so repeating those
- *  here would be the same fact twice. */
+// A paired card keeps the information and loses only the controls: the
+// charger card above it owns every row it measures, so repeating it here
+// would be the same fact twice.
 function ChargeDetailsSection(
   { readOnly, ...props }:
     & { readOnly: boolean }
