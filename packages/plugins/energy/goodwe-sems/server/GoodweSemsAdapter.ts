@@ -174,6 +174,7 @@ export class GoodweSemsAdapter implements EnergySourceAdapter {
         );
       }
       const data = this.remember(toEnergyData(detail.powerflow));
+      void this.client.probeGatewayFlow?.(this.stationId, detail.powerflow);
       this.logger.info(
         `SEMS poll: solar=${data.solarProductionW}W grid=${data.gridPowerW}W home=${data.homeConsumptionW}W battery=${data.batteryPowerW}W soc=${data.batterySoc} (raw pv=${detail.powerflow.pv} grid=${detail.powerflow.grid} load=${detail.powerflow.load} bettery=${detail.powerflow.bettery} gridStatus=${detail.powerflow.gridStatus})`,
       );
