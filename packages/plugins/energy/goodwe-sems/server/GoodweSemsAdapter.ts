@@ -64,7 +64,11 @@ export function applyStatus(
 export function toGridPowerW(flow: SemsPowerflow): number {
   const magnitude = parseSemsValue(flow.grid);
   if (magnitude === null) return 0;
-  const direction = Number(flow.loadStatus) === LOAD_STATUS_IMPORTING ? 1 : -1;
+  const status = Number(flow.loadStatus);
+  // Unknown direction must never read as export: phantom export starts a
+  // charge that draws real grid power. Zero is the safe answer.
+  if (!Number.isFinite(status) || status === 0) return 0;
+  const direction = status === LOAD_STATUS_IMPORTING ? 1 : -1;
   return Math.abs(magnitude) * direction;
 }
 
@@ -96,6 +100,7 @@ export class GoodweSemsAdapter implements EnergySourceAdapter {
   private lastGoodAtMs = 0;
   /** Epoch ms before which no request may be issued. Set on a rate limit. */
   private backoffUntilMs = 0;
+  private gridDirectionUnknown = false;
 
   /** Takes an assembled client rather than credentials — everything is known
    *  at construction time and tests inject a fake without an optional param. */
@@ -103,6 +108,7 @@ export class GoodweSemsAdapter implements EnergySourceAdapter {
     private readonly client: GoodweSemsStationReader,
     private readonly stationId: string,
     private readonly logger: Logger,
+    private readonly dbLog: PluginDbLogger,
   ) {}
 
   static create(
@@ -116,6 +122,7 @@ export class GoodweSemsAdapter implements EnergySourceAdapter {
       new GoodweSemsClient(account, password, logger, dbLog),
       stationId,
       logger,
+      dbLog,
     );
   }
 
@@ -148,6 +155,26 @@ export class GoodweSemsAdapter implements EnergySourceAdapter {
     }
   }
 
+  /** Logged on state change, not per poll — an inverter can sit in this state
+   *  for hours and one row marks the whole span. */
+  private trackGridDirection(flow: SemsPowerflow): void {
+    const status = Number(flow.loadStatus);
+    const gridMagnitude = parseSemsValue(flow.grid);
+    const unknown = gridMagnitude !== null && gridMagnitude !== 0 &&
+      (!Number.isFinite(status) || status === 0);
+    if (unknown && !this.gridDirectionUnknown) {
+      const message =
+        `SEMS payload carries grid=${flow.grid} but no usable loadStatus (${flow.loadStatus}) — grid direction unknown, reporting 0W`;
+      this.logger.warn(message);
+      this.dbLog.warn(message, { payload: { powerflow: flow } });
+    } else if (!unknown && this.gridDirectionUnknown) {
+      this.logger.info(
+        "SEMS loadStatus usable again — grid direction restored",
+      );
+    }
+    this.gridDirectionUnknown = unknown;
+  }
+
   disconnect(): Promise<void> {
     this.client.clearSession();
     this.lastGood = null;
@@ -174,6 +201,7 @@ export class GoodweSemsAdapter implements EnergySourceAdapter {
         );
       }
       const data = this.remember(toEnergyData(detail.powerflow));
+      this.trackGridDirection(detail.powerflow);
       void this.client.probeGatewayFlow?.(this.stationId, detail.powerflow);
       this.logger.info(
         `SEMS poll: solar=${data.solarProductionW}W grid=${data.gridPowerW}W home=${data.homeConsumptionW}W battery=${data.batteryPowerW}W soc=${data.batterySoc} (raw pv=${detail.powerflow.pv} grid=${detail.powerflow.grid} load=${detail.powerflow.load} bettery=${detail.powerflow.bettery} gridStatus=${detail.powerflow.gridStatus})`,

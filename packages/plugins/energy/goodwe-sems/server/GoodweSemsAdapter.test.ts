@@ -110,6 +110,18 @@ describe("toGridPowerW", () => {
     ).toBe(1800);
   });
 
+  it("is 0 when loadStatus is absent — unknown direction must not read as export", () => {
+    expect(
+      toGridPowerW(buildPowerflow({ grid: "2337(W)", loadStatus: undefined })),
+    ).toBe(0);
+  });
+
+  it("is 0 when loadStatus is 0", () => {
+    expect(
+      toGridPowerW(buildPowerflow({ grid: "2337(W)", loadStatus: "0" })),
+    ).toBe(0);
+  });
+
   it("is 0 when the grid field is absent", () => {
     expect(toGridPowerW(buildPowerflow({ grid: undefined }))).toBe(0);
   });

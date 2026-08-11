@@ -229,4 +229,5 @@ export const makeAdapter = (
     client,
     overrides.stationId ?? "station-1",
     overrides.logger ?? testLogger,
+    testDbLogger,
   );
