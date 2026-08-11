@@ -298,6 +298,36 @@ describe("GoodweSemsClient", () => {
       expect(detailCalls.length).toBe(2);
     });
 
+    it("does not re-login on a failure code that is not a stale token", async () => {
+      mock.setPathResponse(NEW_LOGIN_PATH, loginOk("tok", GATEWAY_API));
+      mock.setPathResponse(STATION_DETAIL_PATH, semsCode("100005"));
+
+      await expect(makeClient().getStationDetail("station-1")).rejects
+        .toBeInstanceOf(GoodweSemsConnectionError);
+      const loginCalls = mock.fetchCalls.filter((c) =>
+        c.url.includes(NEW_LOGIN_PATH)
+      );
+      expect(loginCalls.length).toBe(1);
+    });
+
+    it("retries an empty response only once per cooldown window", async () => {
+      mock.setPathResponse(NEW_LOGIN_PATH, loginOk("tok", GATEWAY_API));
+      mock.setPathResponse(STATION_DETAIL_PATH, semsOk({}));
+
+      const client = makeClient();
+      await client.getStationDetail("station-1");
+      const callsAfterFirst =
+        mock.fetchCalls.filter((c) => c.url.includes(STATION_DETAIL_PATH))
+          .length;
+      await client.getStationDetail("station-1");
+      const callsAfterSecond =
+        mock.fetchCalls.filter((c) => c.url.includes(STATION_DETAIL_PATH))
+          .length;
+
+      expect(callsAfterFirst).toBe(2);
+      expect(callsAfterSecond).toBe(3);
+    });
+
     it("treats an empty data block as a failure and retries once", async () => {
       mock.setPathResponse(NEW_LOGIN_PATH, loginOk("tok", GATEWAY_API));
       mock.queuePathResponses(STATION_DETAIL_PATH, [

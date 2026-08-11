@@ -43,6 +43,10 @@ const STATION_LIST_PATH = "/PowerStation/GetPowerStationIdByOwner";
 const BOOTSTRAP_TOKEN = '{"version":"3.1.1","client":"ios","language":"en"}';
 
 const SUCCESS_CODES: ReadonlySet<string> = new Set(["0", "00000"]);
+// 100002: legacy/gateway "authorization expired"; C0602: SEMS+ session
+// expired/abnormal.
+const STALE_TOKEN_CODES: ReadonlySet<string> = new Set(["100002", "C0602"]);
+const EMPTY_RETRY_COOLDOWN_MS = 10 * 60 * 1000;
 const RATE_LIMIT_CODE = "GY0429";
 const REQUEST_TIMEOUT_MS = 15_000;
 
@@ -217,6 +221,7 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
   private preferredMode: LoginMode | null = null;
   private readonly gatewayProbe: SemsGatewayProbe;
   private loginPromise: Promise<void> | null = null;
+  private lastEmptyRetryAtMs = 0;
 
   constructor(
     private readonly account: string,
@@ -347,15 +352,10 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
       throw new GoodweSemsRateLimitError(RATE_LIMIT_BACKOFF_MS);
     }
 
-    // An empty data block counts as failure, matching the reference client —
-    // a stale token surfaces that way and must trigger the re-login retry
-    // rather than reading as "you have no power stations".
     const data = json.data;
-    if (SUCCESS_CODES.has(code) && !isEmptyData(data)) return data;
+    if (SUCCESS_CODES.has(code) && !dataEmpty) return data;
 
-    // A stale token reads as an ordinary failure code, so one re-login retry
-    // separates "expired" from "genuinely broken".
-    if (!isRetry) {
+    if (!isRetry && this.shouldRetryWithFreshLogin(code, dataEmpty)) {
       this.logger.debug("SEMS call failed, re-authenticating and retrying");
       this.token = null;
       return await this.call(path, body, true);
@@ -369,6 +369,20 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     throw new GoodweSemsConnectionError(
       `SEMS ${path} failed with code ${code || "(none)"}`,
     );
+  }
+
+  // Stale-token codes always retry; empty-success retries on a cooldown
+  // (legacy stale tokens surface as empty, but a genuinely empty account must
+  // not cost two logins per poll). Other codes are real errors.
+  private shouldRetryWithFreshLogin(code: string, dataEmpty: boolean): boolean {
+    if (STALE_TOKEN_CODES.has(code)) return true;
+    if (SUCCESS_CODES.has(code) && dataEmpty) {
+      const now = Date.now();
+      if (now - this.lastEmptyRetryAtMs < EMPTY_RETRY_COOLDOWN_MS) return false;
+      this.lastEmptyRetryAtMs = now;
+      return true;
+    }
+    return false;
   }
 
   /** One login attempt. Returns null for "this mode did not work" — including
