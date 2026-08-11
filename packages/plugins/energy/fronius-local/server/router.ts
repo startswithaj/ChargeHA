@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { Logger } from "@chargeha/server/lib/Logger";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
 import { discoverFronius } from "./FroniusDiscovery.ts";
 import { FroniusLocalAdapter } from "./FroniusLocalAdapter.ts";
@@ -41,7 +40,7 @@ export function createFroniusLocalRouter(deps: PluginDependencies) {
         const adapter = new FroniusLocalAdapter(
           input.host,
           input.meterDeviceId ?? 0,
-          new Logger("Fronius", "error"),
+          deps.log,
         );
         try {
           await adapter.connect();

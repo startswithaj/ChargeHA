@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { Logger } from "@chargeha/server/lib/Logger";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
 import { SigenergyLocalAdapter } from "./SigenergyLocalAdapter.ts";
 import { JsmodbusReader } from "./SigenergyModbusClient.ts";
@@ -41,7 +40,7 @@ export function createSigenergyLocalRouter(deps: PluginDependencies) {
     testConnection: publicProcedure
       .input(testConnectionInput)
       .mutation(async ({ input }) => {
-        const logger = new Logger("Sigenergy", "error");
+        const logger = deps.log;
         const plantUnitId = input.plantUnitId ?? 247;
         const deviceUnitId = input.deviceUnitId ?? 1;
         const reader = new JsmodbusReader(

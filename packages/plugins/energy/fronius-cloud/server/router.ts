@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { Logger } from "@chargeha/server/lib/Logger";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
 import { FroniusCloudAdapter } from "./FroniusCloudAdapter.ts";
 import { FRONIUS_CLOUD_SECRET_KEYS, froniusCloudConfigDef } from "./config.ts";
@@ -31,7 +30,7 @@ export function createFroniusCloudRouter(deps: PluginDependencies) {
           input.email,
           input.password,
           input.pvSystemId,
-          new Logger("FroniusCloud", "error"),
+          deps.log,
         );
         try {
           await adapter.connect();

@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { Logger } from "@chargeha/server/lib/Logger";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
 import { EnphaseClient, makeNodeHttpsEnvoyHttp } from "./EnphaseClient.ts";
 import { INFO_PATH, isEnvoyInfo, tagValue } from "./envoyInfo.ts";
@@ -44,7 +43,7 @@ export function createEnphaseLocalRouter(deps: PluginDependencies) {
     testConnection: publicProcedure
       .input(testConnectionInput)
       .mutation(async ({ input }) => {
-        const logger = new Logger("Enphase", "error");
+        const logger = deps.log;
         try {
           const info = await makeNodeHttpsEnvoyHttp().get(
             input.host,

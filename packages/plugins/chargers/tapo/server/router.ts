@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { Logger } from "@chargeha/server/lib/Logger";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import {
@@ -49,7 +48,7 @@ async function savedClient(
     host,
     email,
     password,
-    new Logger("Tapo", "error"),
+    deps.log,
     deps.dbLog,
     chargerRowId,
   );
@@ -88,7 +87,7 @@ export function createTapoRouter(deps: PluginDependencies) {
           input.host,
           input.email,
           input.password,
-          new Logger("Tapo", "error"),
+          deps.log,
           deps.dbLog,
           // No charger row exists yet during wizard setup — a stable label
           // instead of an id keeps this call distinguishable in the log.
