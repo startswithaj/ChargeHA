@@ -32,8 +32,8 @@ function legacyLoginUrl(): string {
     : "https://www.semsportal.com/api/v3/Common/CrossLogin";
 }
 
-const NEW_LOGIN_FALLBACK_API = "https://eu-gateway.semsportal.com/web/sems";
-const LEGACY_API_FALLBACK = "https://eu.semsportal.com/api";
+const NEW_LOGIN_FALLBACK_API = "https://au-gateway.semsportal.com/web/sems";
+const LEGACY_API_FALLBACK = "https://au.semsportal.com/api";
 
 const STATION_DETAIL_PATH = "/v3/PowerStation/GetMonitorDetailByPowerstationId";
 const STATION_LIST_PATH = "/PowerStation/GetPowerStationIdByOwner";
