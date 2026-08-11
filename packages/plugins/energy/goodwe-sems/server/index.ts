@@ -32,6 +32,7 @@ export class GoodweSemsPlugin implements EnergyPlugin {
       password,
       stationId,
       this.deps.log,
+      this.deps.dbLog,
     );
   }
 

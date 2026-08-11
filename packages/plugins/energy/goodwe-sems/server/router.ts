@@ -36,6 +36,7 @@ export function createGoodweSemsRouter(deps: PluginDependencies) {
           input.account,
           input.password,
           deps.log,
+          deps.dbLog,
         );
         try {
           await client.login();
@@ -59,6 +60,7 @@ export function createGoodweSemsRouter(deps: PluginDependencies) {
           input.password,
           input.stationId,
           deps.log,
+          deps.dbLog,
         );
         try {
           await adapter.connect();

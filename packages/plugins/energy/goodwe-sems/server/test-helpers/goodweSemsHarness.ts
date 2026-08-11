@@ -1,4 +1,5 @@
 import { Logger } from "@chargeha/server/lib/Logger";
+import { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import {
   GoodweSemsClient,
   GoodweSemsRateLimitError,
@@ -9,6 +10,10 @@ import {
 import { GoodweSemsAdapter } from "../GoodweSemsAdapter.ts";
 
 export const testLogger = new Logger("GoodweSems", "error");
+export const testDbLogger = new PluginDbLogger(
+  () => Promise.resolve(),
+  testLogger,
+);
 
 /** Mirrors the client's RATE_LIMIT_BACKOFF_MS and the adapter's MAX_STALE_MS.
  *  Both are internal to their modules; the tests need the same numbers to
@@ -153,6 +158,7 @@ export const makeClient = (
     overrides.account ?? "user@example.com",
     overrides.password ?? "secret123",
     overrides.logger ?? testLogger,
+    testDbLogger,
   );
 
 // ── Fake station reader (GoodweSemsAdapter behaviour tests) ──────────────────

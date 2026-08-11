@@ -6,6 +6,7 @@ import { crypto as stdCrypto } from "@std/crypto";
 import { encodeHex } from "@std/encoding/hex";
 import { z } from "zod";
 import type { Logger } from "@chargeha/server/lib/Logger";
+import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 
 // SEMS has two login endpoints. The newer SEMS+ one is tried first; accounts
 // not migrated to it still work on the legacy portal endpoint.
@@ -214,6 +215,7 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     private readonly account: string,
     private readonly password: string,
     private readonly logger: Logger,
+    private readonly dbLog: PluginDbLogger,
   ) {}
 
   clearSession(): void {
@@ -288,18 +290,29 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     if (!token) throw new GoodweSemsAuthError("SEMS login produced no token");
 
     const url = this.resolveApiBase(token, path) + path;
+    const startedAt = performance.now();
     const json = await this.post(url, body, {
       "Content-Type": "application/json",
       "Accept": "application/json",
       "token": JSON.stringify(token),
     });
+    const durationMs = Math.round(performance.now() - startedAt);
 
     const code = String(json.code ?? "");
+    const dataEmpty = isEmptyData(json.data);
     this.logger.debug(
-      `SEMS ${path} → code ${code || "(none)"}, dataEmpty=${
-        isEmptyData(json.data)
-      }${isRetry ? " (retry)" : ""}`,
+      `SEMS ${path} → code ${code || "(none)"}, dataEmpty=${dataEmpty}${
+        isRetry ? " (retry)" : ""
+      }`,
     );
+    const dbEntry = {
+      payload: { path, code: code || null, dataEmpty, durationMs, isRetry },
+    };
+    if (SUCCESS_CODES.has(code) && !dataEmpty) {
+      this.dbLog.info(`POST ${path}`, dbEntry);
+    } else {
+      this.dbLog.warn(`POST ${path}`, dbEntry);
+    }
     if (code === RATE_LIMIT_CODE) {
       this.logger.warn(
         `SEMS ${path} rate limited (${RATE_LIMIT_CODE}) — backing off ${
@@ -350,6 +363,9 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
       }
       if (!SUCCESS_CODES.has(String(json.code ?? ""))) {
         this.logger.warn(`SEMS ${mode} login rejected (code ${json.code})`);
+        this.dbLog.warn(`SEMS ${mode} login rejected`, {
+          payload: { mode, code: String(json.code ?? "") },
+        });
         return null;
       }
 
@@ -366,6 +382,9 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
         return null;
       }
       this.logger.info(`SEMS ${mode} login succeeded — api base ${api}`);
+      this.dbLog.info(`SEMS ${mode} login succeeded`, {
+        payload: { mode, api },
+      });
       return { ...payload, api };
     } catch (error) {
       if (error instanceof GoodweSemsRateLimitError) throw error;

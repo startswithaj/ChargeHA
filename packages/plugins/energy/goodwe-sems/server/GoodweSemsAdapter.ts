@@ -4,6 +4,7 @@ import type {
   EnergySourceAdapter,
 } from "@chargeha/shared";
 import type { Logger } from "@chargeha/server/lib/Logger";
+import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import {
   GoodweSemsClient,
   GoodweSemsConnectionError,
@@ -109,9 +110,10 @@ export class GoodweSemsAdapter implements EnergySourceAdapter {
     password: string,
     stationId: string,
     logger: Logger,
+    dbLog: PluginDbLogger,
   ): GoodweSemsAdapter {
     return new GoodweSemsAdapter(
-      new GoodweSemsClient(account, password, logger),
+      new GoodweSemsClient(account, password, logger, dbLog),
       stationId,
       logger,
     );
