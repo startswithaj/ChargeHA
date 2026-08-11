@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { Logger } from "@chargeha/server/lib/Logger";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
 import { GoodweSemsClient } from "./GoodweSemsClient.ts";
 import { GoodweSemsAdapter } from "./GoodweSemsAdapter.ts";
@@ -36,7 +35,7 @@ export function createGoodweSemsRouter(deps: PluginDependencies) {
         const client = new GoodweSemsClient(
           input.account,
           input.password,
-          new Logger("GoodweSems", "error"),
+          deps.log,
         );
         try {
           await client.login();
@@ -59,7 +58,7 @@ export function createGoodweSemsRouter(deps: PluginDependencies) {
           input.account,
           input.password,
           input.stationId,
-          new Logger("GoodweSems", "error"),
+          deps.log,
         );
         try {
           await adapter.connect();
