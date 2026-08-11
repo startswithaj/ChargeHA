@@ -1,8 +1,12 @@
 import type { AnyRouter } from "@trpc/server";
-import type { EnergySourceAdapter } from "@chargeha/shared";
+import type {
+  DeviceInfo,
+  EnergyData,
+  EnergySourceAdapter,
+} from "@chargeha/shared";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import type { EnergyPlugin, PluginHealthCheck } from "@chargeha/shared/plugins";
-import { sigenergyLocalConfigDef } from "./config.ts";
+import { SIGENERGY_DEFAULTS, sigenergyLocalConfigDef } from "./config.ts";
 import { SigenergyLocalAdapter } from "./SigenergyLocalAdapter.ts";
 import { JsmodbusReader } from "./SigenergyModbusClient.ts";
 import { createSigenergyLocalRouter } from "./router.ts";
@@ -26,16 +30,30 @@ export class SigenergyLocalPlugin implements EnergyPlugin {
     if (!host) {
       throw new Error("Sigenergy host not configured");
     }
-    const port = parseInt((await this.deps.getConfig("port")) ?? "502", 10);
+    const port = parseInt(
+      (await this.deps.getConfig("port")) ?? String(SIGENERGY_DEFAULTS.port),
+      10,
+    );
     const plantUnitId = parseInt(
-      (await this.deps.getConfig("plant_unit_id")) ?? "247",
+      (await this.deps.getConfig("plant_unit_id")) ??
+        String(SIGENERGY_DEFAULTS.plantUnitId),
       10,
     );
     const deviceUnitId = parseInt(
-      (await this.deps.getConfig("device_unit_id")) ?? "1",
+      (await this.deps.getConfig("device_unit_id")) ??
+        String(SIGENERGY_DEFAULTS.deviceUnitId),
       10,
     );
 
+    return this.buildAdapter(host, port, plantUnitId, deviceUnitId);
+  }
+
+  private buildAdapter(
+    host: string,
+    port: number,
+    plantUnitId: number,
+    deviceUnitId: number,
+  ): SigenergyLocalAdapter {
     const reader = new JsmodbusReader(
       host,
       port,
@@ -50,12 +68,46 @@ export class SigenergyLocalPlugin implements EnergyPlugin {
     );
   }
 
+  async testConnection(
+    config: {
+      host: string;
+      port: number;
+      plantUnitId: number;
+      deviceUnitId: number;
+    },
+  ): Promise<
+    | { success: true; device: DeviceInfo; realtime: EnergyData }
+    | { success: false; error: string }
+  > {
+    const adapter = this.buildAdapter(
+      config.host,
+      config.port,
+      config.plantUnitId,
+      config.deviceUnitId,
+    );
+    try {
+      await adapter.connect();
+      const [device, realtime] = await Promise.all([
+        adapter.getDeviceInfo(),
+        adapter.getRealtimeData(),
+      ]);
+      return { success: true, device, realtime };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Connection failed",
+      };
+    } finally {
+      await adapter.disconnect();
+    }
+  }
+
   shutdown(): Promise<void> {
     return Promise.resolve();
   }
 
   getRouter(): AnyRouter {
-    return createSigenergyLocalRouter(this.deps);
+    return createSigenergyLocalRouter(this.deps, this);
   }
 
   getHealthChecks(): PluginHealthCheck[] {

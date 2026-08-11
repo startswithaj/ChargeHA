@@ -5,6 +5,7 @@ import { detectLanAddresses } from "@chargeha/server/lib/LanInterfaces";
 import { createChargerConfigProcedures } from "../../../createPluginConfigProcedures.ts";
 import { OCPP_SECRET_KEYS, ocppConfigDef } from "./config.ts";
 import type { OcppCentralSystem } from "./OcppCentralSystem.ts";
+import type { OcppChargerPlugin } from "./OcppChargerPlugin.ts";
 
 // Long enough to walk to the charger and paste a URL into its app, short
 // enough that an unattended window closes on its own.
@@ -28,17 +29,6 @@ const testConnectionInput = z.union([
   chargerInput,
   z.object({ chargePointId: z.string().min(1) }),
 ]);
-
-// The OCPP charge point id configured on one charger row, or null when that
-// row has not been given one yet. The only place a row id becomes a charge
-// point id in the router.
-async function chargePointIdFor(
-  deps: PluginDependencies,
-  chargerRowId: string,
-): Promise<string | null> {
-  const { config } = await deps.resolveChargerConfig(chargerRowId);
-  return config.charger_id ?? null;
-}
 
 // LAN addresses a charger could plausibly dial. Interface filtering lives in
 // the shared `detectLanAddresses` — this just turns those addresses into
@@ -102,6 +92,7 @@ function pairingProcedures(centralSystem: OcppCentralSystem) {
 export function createOcppRouter(
   deps: PluginDependencies,
   centralSystem: OcppCentralSystem,
+  plugin: Pick<OcppChargerPlugin, "chargePointIdFor" | "testConnection">,
 ) {
   return router({
     ...createChargerConfigProcedures(deps, ocppConfigDef, OCPP_SECRET_KEYS),
@@ -111,7 +102,7 @@ export function createOcppRouter(
     status: publicProcedure
       .input(chargerInput)
       .query(async ({ input }) => {
-        const chargePointId = await chargePointIdFor(deps, input.chargerRowId);
+        const chargePointId = await plugin.chargePointIdFor(input.chargerRowId);
         // No id yet means nothing can have connected — report absence rather
         // than probing the central system with an empty-string key.
         const data = chargePointId === null
@@ -134,29 +125,12 @@ export function createOcppRouter(
 
     testConnection: publicProcedure
       .input(testConnectionInput)
-      .mutation(async ({ input }) => {
-        const chargePointId = "chargePointId" in input
-          ? input.chargePointId
-          : await chargePointIdFor(deps, input.chargerRowId);
-        if (
-          chargePointId === null ||
-          !centralSystem.getData(chargePointId).connected
-        ) {
-          return {
-            success: false as const,
-            error: "Charger not connected — check the charger URL in its " +
-              "OCPP settings and your network",
-          };
-        }
-        try {
-          const { latencyMs } = await centralSystem.ping(chargePointId);
-          return { success: true as const, latencyMs };
-        } catch (error) {
-          return {
-            success: false as const,
-            error: error instanceof Error ? error.message : "Round trip failed",
-          };
-        }
-      }),
+      .mutation(async ({ input }) =>
+        plugin.testConnection(
+          "chargePointId" in input
+            ? input.chargePointId
+            : await plugin.chargePointIdFor(input.chargerRowId),
+        )
+      ),
   });
 }

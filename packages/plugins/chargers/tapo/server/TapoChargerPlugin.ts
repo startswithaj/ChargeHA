@@ -12,9 +12,11 @@ import type {
 import { PollingChargerMiddleware } from "../../PollingChargerMiddleware.ts";
 import { TAPO_SECRET_KEYS, tapoConfigDef } from "./config.ts";
 import { KlapClient } from "./KlapClient.ts";
-import { TapoAuthError, TapoLockedError } from "./errors.ts";
+import { TapoApiError, TapoAuthError, TapoLockedError } from "./errors.ts";
 import {
+  decodeNickname,
   TapoChargerAdapter,
+  type TapoDeviceInfo,
   type TapoEnergyUsage,
 } from "./TapoChargerAdapter.ts";
 import { createTapoRouter } from "./router.ts";
@@ -26,7 +28,7 @@ const numberConfig = (raw: string | undefined, fallback: number): number => {
 
 const describeTapoError = (error: unknown): string => {
   if (error instanceof TapoAuthError) {
-    return "Tapo credentials rejected — check email and password";
+    return "Wrong Tapo email or password";
   }
   // A firmware update can re-lock a plug that was working, so this reaches the
   // health check, not just first-time setup.
@@ -36,7 +38,7 @@ const describeTapoError = (error: unknown): string => {
   if (error instanceof Error) {
     return error.message;
   }
-  return String(error);
+  return "Connection failed";
 };
 
 interface TapoCredentials {
@@ -105,8 +107,62 @@ export class TapoChargerPlugin implements ChargerPlugin {
     return new PollingChargerMiddleware(adapter, this.deps.log);
   }
 
+  async testConnection(
+    credentials: TapoCredentials,
+  ): Promise<
+    | {
+      success: true;
+      model: string;
+      firmwareVersion: string;
+      nickname: string;
+      powerW: number;
+    }
+    | { success: false; error: string }
+  > {
+    const logger = this.deps.log;
+    const client = new KlapClient(
+      credentials.host,
+      credentials.email,
+      credentials.password,
+      logger,
+      this.deps.dbLog,
+      // No charger row exists yet during wizard setup — a stable label
+      // instead of an id keeps this call distinguishable in the log.
+      "wizard-test-connection",
+    );
+    try {
+      await client.handshake();
+      const info = await client.request<TapoDeviceInfo>("get_device_info");
+      const energy = await client
+        .request<TapoEnergyUsage>("get_energy_usage")
+        .catch((error: unknown) => {
+          // Only a device-level rejection means meterless; connection
+          // errors fall through to the outer catch.
+          if (error instanceof TapoApiError) return null;
+          throw error;
+        });
+      if (!energy) {
+        return {
+          success: false,
+          error: `This model (${info.model}) has no energy meter — an ` +
+            "energy-monitoring model (P110/P115) is required",
+        };
+      }
+      return {
+        success: true,
+        model: info.model,
+        firmwareVersion: info.fw_ver,
+        // The name set in the Tapo app — what the user calls this plug.
+        nickname: decodeNickname(info.nickname, logger),
+        powerW: energy.current_power / 1000,
+      };
+    } catch (err) {
+      return { success: false, error: describeTapoError(err) };
+    }
+  }
+
   getRouter(): AnyRouter {
-    return createTapoRouter(this.deps);
+    return createTapoRouter(this.deps, this);
   }
 
   getChargerHttpRoutes(): PluginHttpRoutes | null {

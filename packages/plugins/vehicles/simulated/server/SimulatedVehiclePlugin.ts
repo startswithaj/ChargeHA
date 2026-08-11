@@ -1,6 +1,11 @@
 import type { AnyRouter } from "@trpc/server";
 import { defineSection } from "@chargeha/shared/configSections";
-import type { ChargerRow, VehicleRow } from "@chargeha/shared";
+import { createTraceId } from "@chargeha/shared";
+import type {
+  ChargerRow,
+  VehicleChargeState,
+  VehicleRow,
+} from "@chargeha/shared";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import type {
   ChargerMiddleware,
@@ -32,6 +37,15 @@ function parseVehicleConfig(
 }
 
 export const simulatedConfigDef = defineSection({});
+
+interface SimulatedStateUpdate {
+  vehicleId: string;
+  isPluggedIn?: boolean;
+  latitude?: number;
+  longitude?: number;
+  chargeLimit?: number;
+  socPercent?: number;
+}
 
 // Simulated vehicle plugin — creates SimulatedVehicleAdapter instances for
 // testing/demo use. Charging draw reaches the energy figures by being read
@@ -117,6 +131,48 @@ export class SimulatedVehiclePlugin implements VehiclePlugin, ChargerPlugin {
   // Look up a simulated adapter by vehicle id. Router helper.
   getAdapter(vehicleId: string): SimulatedVehicleAdapter | undefined {
     return this.adapters.get(vehicleId);
+  }
+
+  // null when no adapter owns that vehicle id.
+  async updateState(
+    update: SimulatedStateUpdate,
+  ): Promise<{ state: VehicleChargeState | null } | null> {
+    const adapter = this.getAdapter(update.vehicleId);
+    if (!adapter) return null;
+
+    if (typeof update.isPluggedIn === "boolean") {
+      adapter.setPluggedIn(update.isPluggedIn);
+    }
+
+    if (
+      typeof update.latitude === "number" &&
+      typeof update.longitude === "number"
+    ) {
+      adapter.setLocation(update.latitude, update.longitude);
+    }
+
+    if (typeof update.chargeLimit === "number") {
+      await adapter.setChargeLimit(
+        update.chargeLimit,
+        { origin: "user:sim-set-charge-limit", traceId: createTraceId() },
+      );
+    }
+
+    if (typeof update.socPercent === "number") {
+      adapter.setSocPercent(Math.max(0, Math.min(100, update.socPercent)));
+    }
+
+    // Force a middleware cache refresh — the dashboard reads getCachedState(), not the adapter.
+    return {
+      state: await this.deps.requestVehicleState(update.vehicleId, {
+        origin: "user:sim-update",
+        traceId: createTraceId(),
+        hasSolar: false,
+        hasSchedule: false,
+        hasBlockout: false,
+        forceRefresh: true,
+      }),
+    };
   }
 
   getRouter(): AnyRouter {

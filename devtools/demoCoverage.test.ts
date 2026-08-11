@@ -16,8 +16,10 @@ import { createFroniusCloudRouter } from "../packages/plugins/energy/fronius-clo
 import type { FroniusCloudPlugin } from "../packages/plugins/energy/fronius-cloud/server/FroniusCloudPlugin.ts";
 import { createSimulatedEnergyRouter } from "../packages/plugins/energy/simulated/server/router.ts";
 import { createTapoRouter } from "../packages/plugins/chargers/tapo/server/router.ts";
+import type { TapoChargerPlugin } from "../packages/plugins/chargers/tapo/server/TapoChargerPlugin.ts";
 import { createOcppRouter } from "../packages/plugins/chargers/ocpp/server/router.ts";
 import type { OcppCentralSystem } from "../packages/plugins/chargers/ocpp/server/OcppCentralSystem.ts";
+import type { OcppChargerPlugin } from "../packages/plugins/chargers/ocpp/server/OcppChargerPlugin.ts";
 import { createSimulatedChargerRouter } from "../packages/plugins/chargers/simulated/server/router.ts";
 import type { PluginDependencies } from "../packages/server/src/bootstrap/PluginDependencies.ts";
 import { throwingMock } from "../packages/server/src/test-helpers/throwingMock.ts";
@@ -45,7 +47,7 @@ const realPaths = (type: "query" | "mutation"): string[] => {
         stubDeps("tesla"),
       ),
       simulated: createSimulatedRouter(
-        {} as unknown as SimulatedVehiclePlugin,
+        throwingMock<SimulatedVehiclePlugin>("SimulatedVehiclePlugin"),
         stubDeps("simulated"),
       ),
     },
@@ -63,10 +65,14 @@ const realPaths = (type: "query" | "mutation"): string[] => {
       ),
     },
     charger: {
-      tapo: createTapoRouter(stubDeps("tapo")),
+      tapo: createTapoRouter(
+        stubDeps("tapo"),
+        throwingMock<TapoChargerPlugin>("TapoChargerPlugin"),
+      ),
       ocpp: createOcppRouter(
         stubDeps("ocpp"),
         {} as unknown as OcppCentralSystem,
+        throwingMock<OcppChargerPlugin>("OcppChargerPlugin"),
       ),
       simulated_charger: createSimulatedChargerRouter(() => []),
     },

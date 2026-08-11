@@ -1,19 +1,11 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createTraceId } from "@chargeha/shared";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
-import type { SimulatedVehicleAdapter } from "./SimulatedVehicleAdapter.ts";
-
-// The slice of the plugin this router calls. Declared here rather than
-// imported from index.ts, which imports this module — the class satisfies it
-// structurally.
-interface SimulatedRouterPlugin {
-  getAdapter(vehicleId: string): SimulatedVehicleAdapter | undefined;
-}
+import type { SimulatedVehiclePlugin } from "./SimulatedVehiclePlugin.ts";
 
 export function createSimulatedRouter(
-  plugin: SimulatedRouterPlugin,
+  plugin: Pick<SimulatedVehiclePlugin, "updateState">,
   deps: PluginDependencies,
 ) {
   return router({
@@ -37,47 +29,14 @@ export function createSimulatedRouter(
         }),
       )
       .mutation(async ({ input }) => {
-        const adapter = plugin.getAdapter(input.vehicleId);
-        if (!adapter) {
+        const result = await plugin.updateState(input);
+        if (!result) {
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "Simulated vehicle not found",
           });
         }
-
-        if (typeof input.isPluggedIn === "boolean") {
-          adapter.setPluggedIn(input.isPluggedIn);
-        }
-
-        if (
-          typeof input.latitude === "number" &&
-          typeof input.longitude === "number"
-        ) {
-          adapter.setLocation(input.latitude, input.longitude);
-        }
-
-        if (typeof input.chargeLimit === "number") {
-          await adapter.setChargeLimit(
-            input.chargeLimit,
-            { origin: "user:sim-set-charge-limit", traceId: createTraceId() },
-          );
-        }
-
-        if (typeof input.socPercent === "number") {
-          const clamped = Math.max(0, Math.min(100, input.socPercent));
-          adapter.setSocPercent(clamped);
-        }
-
-        // Force a middleware cache refresh — the dashboard reads getCachedState(), not the adapter.
-        const state = await deps.requestVehicleState(input.vehicleId, {
-          origin: "user:sim-update",
-          traceId: createTraceId(),
-          hasSolar: false,
-          hasSchedule: false,
-          hasBlockout: false,
-          forceRefresh: true,
-        });
-        return { success: true, state };
+        return { success: true, state: result.state };
       }),
   });
 }

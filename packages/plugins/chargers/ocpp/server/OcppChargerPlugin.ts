@@ -49,6 +49,39 @@ export class OcppChargerPlugin implements ChargerPlugin {
     return entries.find((e) => e.config.charger_id === chargePointId) ?? null;
   }
 
+  // The OCPP charge point id configured on one charger row, or null when that
+  // row has not been given one yet.
+  async chargePointIdFor(chargerRowId: string): Promise<string | null> {
+    const { config } = await this.deps.resolveChargerConfig(chargerRowId);
+    return config.charger_id ?? null;
+  }
+
+  async testConnection(
+    chargePointId: string | null,
+  ): Promise<
+    { success: true; latencyMs: number } | { success: false; error: string }
+  > {
+    if (
+      chargePointId === null ||
+      !this.centralSystem.getData(chargePointId).connected
+    ) {
+      return {
+        success: false,
+        error: "Charger not connected — check the charger URL in its " +
+          "OCPP settings and your network",
+      };
+    }
+    try {
+      const { latencyMs } = await this.centralSystem.ping(chargePointId);
+      return { success: true, latencyMs };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Round trip failed",
+      };
+    }
+  }
+
   // Nothing is awaited: every value this needs arrives as an argument.
   // deno-lint-ignore require-await
   async createChargerMiddleware(
@@ -79,7 +112,7 @@ export class OcppChargerPlugin implements ChargerPlugin {
   }
 
   getRouter(): AnyRouter {
-    return createOcppRouter(this.deps, this.centralSystem);
+    return createOcppRouter(this.deps, this.centralSystem, this);
   }
 
   getChargerHttpRoutes(): PluginHttpRoutes | null {

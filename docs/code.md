@@ -277,9 +277,9 @@ A demo shortcut creates a simulated vehicle and skips plugin-specific config.
   instantiated in `main.ts` and available on `TrpcContext`.
 - When a service covers multiple concerns, split into a facade + sub-services
   (e.g. `AuthService` delegates to `AuthLocalService` and `AuthOIDCService`).
-- tRPC routers are thin — validate input, call a service, return the result. No
-  data-layer or crypto imports, no `index.ts` imports, 180-line cap. Enforced by
-  `no-router-logic`.
+- tRPC routers are thin — validate input, call a service, return the result.
+  Procedure handlers are capped at 15 lines and may not import `index.ts`.
+  Enforced by `no-router-logic`.
 - Core code should not reference specific plugin IDs. Use plugin registry
   interfaces. Plugins access the DB through `PluginDependencies`, not
   `AppDatabase` directly.
