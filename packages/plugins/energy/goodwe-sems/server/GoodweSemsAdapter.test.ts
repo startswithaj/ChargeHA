@@ -310,7 +310,7 @@ describe("GoodweSemsAdapter", () => {
       }
     });
 
-    it("restamps lastUpdated on a cached reading", async () => {
+    it("keeps the original lastUpdated on a cached reading", async () => {
       const time = new FakeTime(new Date("2026-01-01T00:00:00.000Z"));
       try {
         const client = makeFakeClient();
@@ -324,7 +324,8 @@ describe("GoodweSemsAdapter", () => {
         const cached = await adapter.getRealtimeData();
 
         expect(live.lastUpdated).toBe("2026-01-01T00:00:00.000Z");
-        expect(cached.lastUpdated).toBe("2026-01-01T00:02:00.000Z");
+        // Restamping would record a backoff window as fresh readings.
+        expect(cached.lastUpdated).toBe("2026-01-01T00:00:00.000Z");
       } finally {
         time.restore();
       }

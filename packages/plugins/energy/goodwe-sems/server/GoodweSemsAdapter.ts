@@ -257,8 +257,9 @@ export class GoodweSemsAdapter implements EnergySourceAdapter {
     return data;
   }
 
-  /** Last good reading, restamped, while it is still within the staleness
-   *  budget. Beyond that the outage is real and must surface. */
+  /** Last good reading, with its original timestamp — restamping would record
+   *  a backoff window as a run of fresh readings. Beyond the staleness budget
+   *  the outage is real and must surface. */
   private serveCached(): EnergyData {
     const age = Date.now() - this.lastGoodAtMs;
     if (!this.lastGood || age > MAX_STALE_MS) {
@@ -266,6 +267,6 @@ export class GoodweSemsAdapter implements EnergySourceAdapter {
         "SEMS is rate limiting and no recent reading is available",
       );
     }
-    return { ...this.lastGood, lastUpdated: new Date().toISOString() };
+    return { ...this.lastGood };
   }
 }
