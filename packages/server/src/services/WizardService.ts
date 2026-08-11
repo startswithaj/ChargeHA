@@ -23,8 +23,8 @@ const NAV_CONFIG_KEYS: Record<keyof WizardNavState, CoreConfigKey> = {
   controlPath: "wizard_control_path",
 };
 
-/** Narrow the stored string to the union; anything else reads as
- *  unanswered rather than guessing. */
+// Narrow the stored string to the union; anything else reads as
+// unanswered rather than guessing.
 function parseControlPath(raw: string | null): "charger" | "vehicle" | null {
   if (raw === "charger" || raw === "vehicle") return raw;
   return null;
@@ -156,11 +156,8 @@ export class WizardService {
     return { newMode: "none" };
   }
 
-  /**
-   * Save OIDC config during wizard without activating auth mode.
-   * Tests discovery, saves config to DB, refreshes OidcService cache.
-   * The actual mode switch happens on successful OIDC callback.
-   */
+  // Save OIDC config during wizard without activating auth mode. Tests
+  // discovery, saves config to DB, refreshes OidcService cache. The actual mode switch happens on successful OIDC callback.
   async saveOidcConfig(
     input: WizardSaveOidcConfigInput,
   ): Promise<{ success: true }> {

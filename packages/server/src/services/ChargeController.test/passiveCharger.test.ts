@@ -1,9 +1,5 @@
-/** A car driven by its own API owns its charging session. The smart charger
- *  it is plugged into must stop deciding — no mode, no schedules, no solar
- *  tracking, no amp adjustment — while still physically allowing current,
- *  because an OCPP charger left at a stale ChargingProfile caps the car at
- *  whatever solar tracking last asked for, and one that was never sent
- *  RemoteStart never closes its contactor at all. */
+// A car driven by its own API owns its charging session. The smart charger it is plugged into must stop deciding — no mode, no schedules, no solar
+// tracking, no amp adjustment — while still physically allowing current, because an OCPP charger left at a stale ChargingProfile caps the car at whatever solar tracking last asked for, and one that was never sent RemoteStart never closes its contactor at all.
 import { afterEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { assertExists } from "@std/assert";
@@ -151,9 +147,8 @@ describe("ChargeController — passive smart charger", () => {
     },
   };
 
-  /** A vehicle plugin that also has a charger role, so
-   *  ensureVehicleChargingPoint gives the car its own vehicle_api point —
-   *  the thing the API-control toggle switches. */
+  // A vehicle plugin that also has a charger role, so
+  // ensureVehicleChargingPoint gives the car its own vehicle_api point — the thing the API-control toggle switches.
   const registerApiVehicle = (
     id: string,
     vehicles: VehiclePluginRegistry,
@@ -189,8 +184,8 @@ describe("ChargeController — passive smart charger", () => {
     db?.close();
   });
 
-  /** One smart charger, plus `cars` vehicles that each have an API control
-   *  path of their own. Returns everything a test needs to drive a loop. */
+  // One smart charger, plus `cars` vehicles that each have an API control
+  // path of their own. Returns everything a test needs to drive a loop.
   const setup = async (cars: string[]) => {
     db = new AppDatabase(":memory:");
     await db.init();

@@ -8,9 +8,8 @@ import { sortLanAddresses } from "@chargeha/shared/lanAddresses";
 // in the discovery plugins (Fronius/Enphase/Sigenergy/Tapo) — one filter,
 // not one copy per caller.
 
-/** Virtual interfaces nothing on the LAN can route to: container bridges,
- *  VPN tunnels, virtual-machine adapters. Offering these as scan/connect
- *  candidates sends the user down a dead end. */
+// Virtual interfaces nothing on the LAN can route to: container bridges,
+// VPN tunnels, virtual-machine adapters. Offering these as scan/connect candidates sends the user down a dead end.
 const VIRTUAL_IFACE = /^(docker|br-|veth|utun|tun|tap|vmnet|vboxnet|zt|wg)/i;
 
 function isRealLanAddress(iface: Deno.NetworkInterfaceInfo): boolean {
@@ -22,10 +21,8 @@ function isRealLanAddress(iface: Deno.NetworkInterfaceInfo): boolean {
     !iface.address.endsWith(".0");
 }
 
-/** This machine's real LAN IPv4 addresses, filtered of loopback, link-local,
- *  virtual/container/VPN interfaces, and bare network addresses. Empty when
- *  interface reads are unavailable (no `--allow-sys`) rather than throwing —
- *  callers on a settings page must degrade, not fail. */
+// This machine's real LAN IPv4 addresses, filtered of loopback, link-local,
+// virtual/container/VPN interfaces, and bare network addresses. Empty when interface reads are unavailable (no `--allow-sys`) rather than throwing — callers on a settings page must degrade, not fail.
 export function detectLanAddresses(
   networkInterfaces: typeof Deno.networkInterfaces = Deno.networkInterfaces,
 ): string[] {
@@ -41,9 +38,8 @@ export function detectLanAddresses(
   }
 }
 
-/** The distinct /24 subnet prefixes (e.g. "192.168.1") this machine is
- *  reachable on. A machine can sit on more than one LAN, so every plausible
- *  candidate is returned rather than just the first. */
+// The distinct /24 subnet prefixes (e.g. "192.168.1") this machine is
+// reachable on. A machine can sit on more than one LAN, so every plausible candidate is returned rather than just the first.
 export function detectLanSubnets(
   networkInterfaces: typeof Deno.networkInterfaces = Deno.networkInterfaces,
 ): string[] {

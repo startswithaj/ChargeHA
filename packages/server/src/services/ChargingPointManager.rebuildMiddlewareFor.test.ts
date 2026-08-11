@@ -18,9 +18,8 @@ import { Logger } from "../lib/Logger.ts";
 import { MockEventEmitter } from "../test-helpers/MockEventEmitter.ts";
 import { throwingMock } from "../test-helpers/throwingMock.ts";
 
-/** Controllable ChargerMiddleware stub — same shape as the sibling test
- *  file's; kept local rather than shared so each test file is self-contained
- *  and can be read on its own. */
+// Controllable ChargerMiddleware stub — same shape as the sibling test
+// file's; kept local rather than shared so each test file is self-contained and can be read on its own.
 class StubChargerMiddleware implements ChargerMiddleware {
   setAmpsCalls: Array<{ amps: number; origin: string }> = [];
   shutdownCalls = 0;

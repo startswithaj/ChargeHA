@@ -546,9 +546,8 @@ function setupTrpcEndpoint(
   });
 }
 
-/** Supplied by the entrypoint rather than imported here: naming the plugin set
- *  is the composition root's job, and the host must not depend on the package
- *  that depends on it. */
+// Supplied by the entrypoint rather than imported here: naming the plugin set
+// is the composition root's job, and the host must not depend on the package that depends on it.
 export type RegisterPlugins = (
   host: Omit<PluginDependenciesInit, "pluginId">,
   vehicleRegistry: VehiclePluginRegistry,
@@ -556,11 +555,8 @@ export type RegisterPlugins = (
   chargerRegistry: ChargerPluginRegistry,
 ) => void;
 
-/**
- * Construct the entire app: infrastructure, services, plugins, HTTP router.
- * Returns a `shutdown` function that stops the server, shuts down plugins,
- * closes the tunnel, and closes the DB.
- */
+// Construct the entire app: infrastructure, services, plugins, HTTP router.
+// Returns a `shutdown` function that stops the server, shuts down plugins, closes the tunnel, and closes the DB.
 export async function bootstrap(
   registerPlugins: RegisterPlugins,
 ): Promise<

@@ -1,9 +1,7 @@
 import type { VehicleChargeState } from "@chargeha/shared";
 
-/**
- * Used by DataRecorder tests. Distinct from MockVehicleManager (subscriptions
- * router) which exposes a richer API with errors and per-vehicle lookups.
- */
+// Used by DataRecorder tests. Distinct from MockVehicleManager (subscriptions
+// router) which exposes a richer API with errors and per-vehicle lookups.
 export class MockRecorderVehicleManager {
   private states = new Map<string, VehicleChargeState>();
 

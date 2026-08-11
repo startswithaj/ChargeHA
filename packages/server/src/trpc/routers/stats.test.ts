@@ -350,7 +350,6 @@ describe("Stats tRPC Router", () => {
   });
 
   describe("Vehicle SoC in day stats", () => {
-    /** Insert a vehicle poll log at a specific UTC timestamp. */
     async function insertPollLog(
       db: AppDatabase,
       opts: {

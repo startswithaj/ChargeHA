@@ -5,12 +5,8 @@ import type {
 } from "@chargeha/shared/plugins";
 import { resolveHttpRoutes } from "@chargeha/shared/plugins";
 
-/**
- * Thin container for vehicle plugins. Starts empty; plugins are constructed
- * and passed in via `register()`. Plugins initialize themselves in their own
- * constructors (kicked off by `PluginDependencies`), so the registry does
- * not own lifecycle concerns beyond collection + shutdown aggregation.
- */
+// Thin container for vehicle plugins. Starts empty; plugins are constructed
+// and passed in via `register()`. Plugins initialize themselves in their own constructors (kicked off by `PluginDependencies`), so the registry does not own lifecycle concerns beyond collection + shutdown aggregation.
 export class VehiclePluginRegistry {
   private readonly plugins = new Map<string, VehiclePlugin>();
 
@@ -29,7 +25,6 @@ export class VehiclePluginRegistry {
     return [...this.plugins.values()];
   }
 
-  /** Collects non-null tRPC routers from all registered plugins, keyed by plugin id. */
   getPluginRouters(): Record<string, AnyRouter> {
     return Object.fromEntries(
       [...this.plugins]
@@ -45,12 +40,10 @@ export class VehiclePluginRegistry {
     );
   }
 
-  /** Aggregates health checks from all registered plugins. */
   getHealthChecks(): PluginHealthCheck[] {
     return [...this.plugins.values()].flatMap((p) => p.getHealthChecks());
   }
 
-  /** Shuts down every registered plugin. */
   async shutdownAll(): Promise<void> {
     // allSettled, not all: one plugin failing must not skip the others.
     const results = await Promise.allSettled(

@@ -23,8 +23,8 @@ import { Logger } from "../lib/Logger.ts";
 import { MockEventEmitter } from "../test-helpers/MockEventEmitter.ts";
 import { throwingMock } from "../test-helpers/throwingMock.ts";
 
-/** Controllable ChargerMiddleware stub. Mirrors MockMiddleware's shape for
- *  vehicles — tracks calls, lets tests drive responses via mutable fields. */
+// Controllable ChargerMiddleware stub. Mirrors MockMiddleware's shape for
+// vehicles — tracks calls, lets tests drive responses via mutable fields.
 class StubChargerMiddleware implements ChargerMiddleware {
   requestStateCalls: CallContext[] = [];
   startCalls: string[] = [];
@@ -53,8 +53,8 @@ class StubChargerMiddleware implements ChargerMiddleware {
     return this.cached;
   }
 
-  /** Seed the cache directly, bypassing requestState — used to test that
-   *  getState never triggers a device call. */
+  // Seed the cache directly, bypassing requestState — used to test that
+  // getState never triggers a device call.
   seedCache(state: ChargerState): void {
     this.cached = { ...state };
   }

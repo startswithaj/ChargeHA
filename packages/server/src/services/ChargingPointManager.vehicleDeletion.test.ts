@@ -23,15 +23,9 @@ import { Logger } from "../lib/Logger.ts";
 import { MockEventEmitter } from "../test-helpers/MockEventEmitter.ts";
 import { throwingMock } from "../test-helpers/throwingMock.ts";
 
-/** What happens to charging points and their schedules when the vehicle a
- *  point is attached to is deleted.
- *
- *  Uses a real in-memory database rather than a stubbed one, because the
- *  question is partly about what `AppDatabase.deleteCharger` cascades — a
- *  stub would answer with whatever the stub was written to do. */
-/** Inert middleware — these tests are about row lifecycle, not charging.
- *  Its ChargerInfo lives on the class because the lint rules put classes at
- *  module scope but keep consts inside describe(). */
+// What happens to charging points and their schedules when the vehicle a point is attached to is deleted. Uses a real in-memory database rather
+// than a stubbed one, because the question is partly about what `AppDatabase.deleteCharger` cascades — a stub would answer with whatever the stub
+// was written to do. Inert middleware — these tests are about row lifecycle, not charging. Its ChargerInfo lives on the class because the lint rules put classes at module scope but keep consts inside describe().
 class StubChargerMiddleware implements ChargerMiddleware {
   private readonly info: ChargerInfo = {
     id: "sim",
@@ -170,9 +164,8 @@ describe("ChargingPointManager vehicle deletion", () => {
     (await db.getSchedules()).map((s) => s.id).toSorted();
 
   describe("a smart charger the deleted vehicle was assigned to", () => {
-    /** Sets up what a user actually has: a wallbox they own, a car assigned
-     *  to it through the real assignment path, and a schedule they set on the
-     *  wallbox itself. */
+    // Sets up what a user actually has: a wallbox they own, a car assigned
+    // to it through the real assignment path, and a schedule they set on the wallbox itself.
     const setUpAssignedWallbox = async (): Promise<void> => {
       await seedVehicle("VIN1");
       await db.upsertCharger({

@@ -21,48 +21,37 @@ import { createLogger, Logger } from "../lib/Logger.ts";
 import { PluginDbLogger } from "../lib/PluginDbLogger.ts";
 import { detectLanSubnets } from "../lib/LanInterfaces.ts";
 
-/** Tunnel lifecycle exposed to plugins. URLs are live state, never persisted
- *  — quick-tunnel URLs change on every start. */
+// Tunnel lifecycle exposed to plugins. URLs are live state, never persisted
+// — quick-tunnel URLs change on every start.
 export interface PluginTunnelApi {
   getUrl(): string | null;
   start(): Promise<{ url: string }>;
   stop(): Promise<void>;
-  /** Free-tier session limit of the tunnel provider, if any. */
+  // Free-tier session limit of the tunnel provider, if any.
   getExpiryMinutes(): number | null;
 }
 
-/** Everything a PluginDependencies instance is built from. */
 export interface PluginDependenciesInit {
   db: AppDatabase;
   vehicleManager: VehicleManager;
   chargingPoints: ChargingPointManager;
   tunnel: PluginTunnelApi;
   geocode: (query: string) => Promise<GeocodeResult>;
-  /** Whether ENCRYPTION_KEY is configured — secrets are stored encrypted. */
+  // Whether ENCRYPTION_KEY is configured — secrets are stored encrypted.
   encryptionConfigured: () => boolean;
   pluginId: string;
 }
 
-/**
- * Scoped dependencies injected into a plugin at construction time.
- *
- * One instance per plugin. Built via the static `create` factory so the
- * constructor stays private — callers can't forget to wire the plugin id.
- *
- * All config/secret keys are auto-prefixed with `{pluginId}.`, and
- * `getVehicleRows()` returns only vehicles matching the plugin's adapter type.
- * Logs and dbLog entries are tagged with the plugin id.
- *
- * Encryption is a storage concern — `AppDatabase` owns the key and the
- * encrypt/decrypt pathway. Plugins just call `setSecret` / `getSecret` here.
- */
+// Scoped dependencies injected into a plugin at construction time, one per
+// plugin, built via the private static `create` factory (constructor stays
+// private). Config/secret keys are auto-prefixed with `{pluginId}.`; encryption is a storage concern owned by `AppDatabase`.
 export class PluginDependencies<K extends string = string> {
   readonly pluginId: string;
   readonly log: Logger;
   readonly dbLog: PluginDbLogger;
   readonly tunnel: PluginTunnelApi;
   readonly geocode: (query: string) => Promise<GeocodeResult>;
-  /** Whether ENCRYPTION_KEY is configured — secrets are stored encrypted. */
+  // Whether ENCRYPTION_KEY is configured — secrets are stored encrypted.
   readonly encryptionConfigured: () => boolean;
   private readonly db: AppDatabase;
   private readonly vehicleManager: VehicleManager;
@@ -121,16 +110,16 @@ export class PluginDependencies<K extends string = string> {
   // host, credentials, charge point id, amp limits — belongs to one charger
   // row, so two chargers of one adapter type control two different devices.
 
-  /** This plugin's charger rows. Filtered by adapter type for the same reason
-   *  vehicles are: a plugin must never see another plugin's hardware. */
+  // This plugin's charger rows. Filtered by adapter type for the same reason
+  // vehicles are: a plugin must never see another plugin's hardware.
   async getChargerRows(): Promise<ChargerRow[]> {
     const all = await this.db.getChargers();
     return all.filter((c) => c.chargerAdapterType === this.pluginId);
   }
 
-  /** One of this plugin's charger rows, or throws. Same ownership check as
-   *  `requestVehicleState` and `deleteVehicle`: a plugin must not be able to
-   *  read or write another plugin's credentials by guessing a row id. */
+  // One of this plugin's charger rows, or throws. Same ownership check as
+  // `requestVehicleState` and `deleteVehicle`: a plugin must not be able to
+  // read or write another plugin's credentials by guessing a row id.
   private async ownedChargerRow(chargerRowId: string): Promise<ChargerRow> {
     const row = await this.db.getCharger(chargerRowId);
     if (!row || row.chargerAdapterType !== this.pluginId) {
@@ -141,13 +130,9 @@ export class PluginDependencies<K extends string = string> {
     return row;
   }
 
-  /** Row-scoped config plus decrypted secrets for one of this plugin's
-   *  chargers. The only route a plugin has to per-charger credentials.
-   *
-   *  Throws when the row is missing, belongs to another plugin, or its
-   *  secrets are encrypted with no ENCRYPTION_KEY set — callers on the
-   *  middleware-construction path have that turned into an "unconfigured"
-   *  charger by ChargingPointManager. */
+  // Row-scoped config plus decrypted secrets for one of this plugin's
+  // chargers, the only route to per-charger credentials. Throws when the row
+  // is missing, belongs to another plugin, or its secrets are encrypted with no ENCRYPTION_KEY set — callers on the middleware-construction path turn that into an "unconfigured" charger via ChargingPointManager.
   async resolveChargerConfig(chargerRowId: string): Promise<ChargerRowConfig> {
     await this.ownedChargerRow(chargerRowId);
     const [config, secrets] = await Promise.all([
@@ -157,12 +142,9 @@ export class PluginDependencies<K extends string = string> {
     return { config, secrets };
   }
 
-  /** Every charger row of this plugin with its config and secrets resolved.
-   *
-   *  Health checks, OCPP pairing and the OCPP websocket route all have to work
-   *  across every charger of the type rather than one privileged instance;
-   *  this is the shape that question needs. Ownership is guaranteed by
-   *  `getChargerRows`, so no per-row re-check is done. */
+  // Every charger row of this plugin with its config and secrets resolved.
+  // Health checks, OCPP pairing and the OCPP websocket route all have to work
+  // across every charger of the type rather than one privileged instance; this is the shape that question needs. Ownership is guaranteed by `getChargerRows`, so no per-row re-check is done.
   async resolveChargerConfigs(): Promise<ResolvedChargerRow[]> {
     const rows = await this.getChargerRows();
     return await Promise.all(rows.map(async (row) => {
@@ -174,9 +156,9 @@ export class PluginDependencies<K extends string = string> {
     }));
   }
 
-  /** Set or remove non-secret keys on one of this plugin's charger rows.
-   *  `null` deletes the key rather than storing "" (code.md). Untouched keys
-   *  are preserved. */
+  // Set or remove non-secret keys on one of this plugin's charger rows.
+  // `null` deletes the key rather than storing "" (code.md). Untouched keys
+  // are preserved.
   async patchChargerConfig(
     chargerRowId: string,
     patch: ChargerConfigPatch,
@@ -185,10 +167,9 @@ export class PluginDependencies<K extends string = string> {
     await this.db.patchChargerConfig(chargerRowId, patch);
   }
 
-  /** Set or remove secret keys on one of this plugin's charger rows.
-   *  Encryption is a storage concern — AppDatabase owns the key and this
-   *  method takes and returns plaintext, exactly like `setSecret` does for
-   *  plugin-wide values. */
+  // Set or remove secret keys on one of this plugin's charger rows.
+  // Encryption is a storage concern — AppDatabase owns the key and this
+  // method takes and returns plaintext, exactly like `setSecret` does for plugin-wide values.
   async patchChargerSecrets(
     chargerRowId: string,
     patch: ChargerConfigPatch,
@@ -197,20 +178,16 @@ export class PluginDependencies<K extends string = string> {
     await this.db.patchChargerSecrets(chargerRowId, patch);
   }
 
-  /** Rebuild the running middleware for one of this plugin's chargers, after
-   *  a row-scoped config write. Ownership-guarded like every other charger
-   *  method — a plugin cannot rebuild another plugin's charger. */
+  // Rebuild the running middleware for one of this plugin's chargers, after
+  // a row-scoped config write. Ownership-guarded like every other charger
+  // method — a plugin cannot rebuild another plugin's charger.
   async rebuildCharger(chargerRowId: string): Promise<void> {
     await this.ownedChargerRow(chargerRowId);
     await this.chargingPoints.rebuildMiddlewareFor(chargerRowId);
   }
 
-  /** Create a new charger row for this plugin. The adapter type is stamped
-   *  with the plugin's own id — a plugin cannot create another plugin's
-   *  charger. Used by the row-scoped config path's add-mode: `setConfig`
-   *  creates the row on first save, not before. Always creates — a second
-   *  Tapo (or any other type) saved through its own add-mode form must be a
-   *  second row, not a reuse of the first. */
+  // Create a new charger row for this plugin. The adapter type is stamped
+  // with the plugin's own id — a plugin cannot create another plugin's charger. Used by the row-scoped config path's add-mode: `setConfig` creates the row on first save, not before. Always creates — a second Tapo (or any other type) saved through its own add-mode form must be a second row, not a reuse of the first.
   createChargerRow(): Promise<ChargerRow> {
     return this.chargingPoints.createChargerForType(this.pluginId);
   }
@@ -222,8 +199,8 @@ export class PluginDependencies<K extends string = string> {
     return all.filter((v) => v.adapterType === this.pluginId);
   }
 
-  /** This plugin's vehicles enriched with live state, location, and last
-   *  error — the same shape the main app's vehicle list uses. */
+  // This plugin's vehicles enriched with live state, location, and last
+  // error — the same shape the main app's vehicle list uses.
   async getVehiclesWithState(): Promise<VehicleWithLiveState[]> {
     return await enrichVehicleRows(
       await this.getVehicleRows(),
@@ -231,8 +208,8 @@ export class PluginDependencies<K extends string = string> {
     );
   }
 
-  /** Request fresh state for one of this plugin's vehicles. Rejects ids
-   *  belonging to other plugins. */
+  // Request fresh state for one of this plugin's vehicles. Rejects ids
+  // belonging to other plugins.
   async requestVehicleState(
     vehicleId: string,
     context: VehicleRequestContext,
@@ -246,16 +223,16 @@ export class PluginDependencies<K extends string = string> {
     return await this.vehicleManager.requestState(vehicleId, context);
   }
 
-  /** One of this plugin's vehicle rows, or null when the id doesn't exist
-   *  or belongs to another plugin. */
+  // One of this plugin's vehicle rows, or null when the id doesn't exist
+  // or belongs to another plugin.
   async getVehicleRow(id: string): Promise<VehicleRow | null> {
     const row = await this.db.getVehicle(id);
     return row?.adapterType === this.pluginId ? row : null;
   }
 
-  /** Upsert a vehicle for this plugin. The adapter type is stamped with the
-   *  plugin's own id — a plugin cannot write another plugin's vehicles.
-   *  Routed through the host so a new vehicle gets its charging point. */
+  // Upsert a vehicle for this plugin. The adapter type is stamped with the
+  // plugin's own id — a plugin cannot write another plugin's vehicles.
+  // Routed through the host so a new vehicle gets its charging point.
   async upsertVehicleRow(
     input: Omit<UpsertVehicleInput, "adapterType">,
   ): Promise<void> {
@@ -266,9 +243,9 @@ export class PluginDependencies<K extends string = string> {
 
   // ── Vehicle lifecycle (notify VehicleManager) ────────────────────────
 
-  /** Register one of this plugin's vehicles with VehicleManager. The adapter
-   *  type is stamped with the plugin's own id — a plugin cannot register
-   *  another plugin's vehicles. */
+  // Register one of this plugin's vehicles with VehicleManager. The adapter
+  // type is stamped with the plugin's own id — a plugin cannot register
+  // another plugin's vehicles.
   addVehicle(row: Omit<VehicleRow, "adapterType">): Promise<void> {
     return this.vehicleManager.addVehicle({
       ...row,
@@ -276,9 +253,9 @@ export class PluginDependencies<K extends string = string> {
     });
   }
 
-  /** Permanently delete one of this plugin's vehicles: drops live state,
-   *  deletes the row (cascading its schedules), and renumbers remaining
-   *  priorities. Rejects ids belonging to other plugins. */
+  // Permanently delete one of this plugin's vehicles: drops live state,
+  // deletes the row (cascading its schedules), and renumbers remaining
+  // priorities. Rejects ids belonging to other plugins.
   async deleteVehicle(id: string): Promise<void> {
     const row = await this.db.getVehicle(id);
     if (!row || row.adapterType !== this.pluginId) {
@@ -291,11 +268,9 @@ export class PluginDependencies<K extends string = string> {
 
   // ── LAN detection (discovery plugins) ─────────────────────────────────
 
-  /** The /24 subnet(s) ChargeHA itself is reachable on, so a discovery
-   *  plugin's "Search Network" field can default to where the hardware
-   *  almost always is instead of an empty text box. Empty when interface
-   *  reads are unavailable (no `--allow-sys`) — the caller falls back to
-   *  its own guess, same as today. */
+  // The /24 subnet(s) ChargeHA itself is reachable on, so a discovery
+  // plugin's "Search Network" field can default to where the hardware
+  // almost always is instead of an empty text box. Empty when interface reads are unavailable (no `--allow-sys`) — the caller falls back to its own guess, same as today.
   lanSubnets(): string[] {
     return detectLanSubnets();
   }

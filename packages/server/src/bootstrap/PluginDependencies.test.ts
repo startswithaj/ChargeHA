@@ -23,7 +23,7 @@ describe("PluginDependencies charger scoping", () => {
     updatedAt: "2026-01-01T00:00:00.000Z",
   });
 
-  /** Minimal stand-in for the slice of AppDatabase these methods touch. */
+  // Minimal stand-in for the slice of AppDatabase these methods touch.
   const fakeDb = (
     { chargers = [] }: {
       chargers?: ChargerRow[];

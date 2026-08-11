@@ -16,8 +16,8 @@ export type VehicleWithLiveState = Awaited<
   ReturnType<typeof enrichVehicleRows>
 >[number];
 
-/** Enrich vehicle rows with live state, location, and last error — shared by
- *  the main vehicle list and plugin-scoped lists so the shapes never drift. */
+// Enrich vehicle rows with live state, location, and last error — shared by
+// the main vehicle list and plugin-scoped lists so the shapes never drift.
 export async function enrichVehicleRows(
   rows: VehicleRow[],
   vehicleManager: VehicleManager,
@@ -38,11 +38,8 @@ export async function enrichVehicleRows(
   }));
 }
 
-/**
- * tRPC-facing API layer for the dashboard. Each method maps to a tRPC
- * procedure — it validates input, calls VehicleManager, and wraps errors
- * for the client.
- */
+// tRPC-facing API layer for the dashboard. Each method maps to a tRPC
+// procedure — it validates input, calls VehicleManager, and wraps errors for the client.
 export class VehicleService {
   private readonly db: AppDatabase;
   private readonly vehicleManager: VehicleManager;
@@ -67,7 +64,6 @@ export class VehicleService {
     this.logger = logger;
   }
 
-  /** Returns registered vehicle plugins with configuration status. */
   async getPluginSummaries(): Promise<
     Array<{
       id: string;
@@ -88,7 +84,7 @@ export class VehicleService {
     });
   }
 
-  /** Check command readiness for a specific vehicle, delegating to its plugin. */
+  // Check command readiness for a specific vehicle, delegating to its plugin.
   async getCommandStatus(
     vehicleId: string,
   ): Promise<{ commandsDisabled: boolean; reason: string | null }> {
@@ -100,7 +96,6 @@ export class VehicleService {
     return await plugin.getCommandStatus();
   }
 
-  /** Get a vehicle row or throw NOT_FOUND. */
   async getVehicleOrThrow(vehicleId: string): Promise<VehicleRow> {
     const vehicle = await this.db.getVehicle(vehicleId);
     if (!vehicle) {
@@ -109,7 +104,7 @@ export class VehicleService {
     return vehicle;
   }
 
-  /** List all configured vehicles with latest state and location. */
+  // List all configured vehicles with latest state and location.
   async listVehicles() {
     return await enrichVehicleRows(
       await this.db.getVehicles(),
@@ -117,7 +112,6 @@ export class VehicleService {
     );
   }
 
-  /** Create a new vehicle and register it with the manager. */
   async createVehicle(input: {
     id: string;
     name: string;
@@ -162,21 +156,19 @@ export class VehicleService {
     return { success: true, vehicle: row };
   }
 
-  /** Delete a vehicle from DB and manager. */
   async deleteVehicle(vehicleId: string) {
     await this.getVehicleOrThrow(vehicleId);
     await this.vehicleManager.deleteVehicle(vehicleId);
     return { success: true };
   }
 
-  /** Set vehicle priority. */
   async setPriority(vehicleId: string, priority: number) {
     await this.getVehicleOrThrow(vehicleId);
     await this.db.updateVehiclePriority(vehicleId, priority);
     return { success: true, priority };
   }
 
-  /** Wake the vehicle for fresh data (charge commands live on chargers). */
+  // Wake the vehicle for fresh data (charge commands live on chargers).
   async executeCommand(vehicleId: string, command: "wake") {
     await this.getVehicleOrThrow(vehicleId);
 
@@ -206,7 +198,7 @@ export class VehicleService {
     }
   }
 
-  /** Force-poll a vehicle for fresh state. Wakes the vehicle if asleep. */
+  // Force-poll a vehicle for fresh state. Wakes the vehicle if asleep.
   async refreshState(vehicleId: string) {
     await this.getVehicleOrThrow(vehicleId);
     const state = await this.vehicleManager.requestState(

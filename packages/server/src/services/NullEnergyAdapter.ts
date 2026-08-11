@@ -5,7 +5,6 @@ import type {
 } from "@chargeha/shared";
 import type { Logger } from "../lib/Logger.ts";
 
-/** No-op adapter used when no energy source is configured yet. */
 export class NullEnergyAdapter implements EnergySourceAdapter {
   private logger: Logger;
   private hasLogged = false;

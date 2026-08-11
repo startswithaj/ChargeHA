@@ -13,7 +13,7 @@ import { notificationsRouter } from "./routers/notifications.ts";
 import { wizardRouter } from "./routers/wizard.ts";
 import { authRouter } from "./routers/auth.ts";
 import { chargersRouter } from "./routers/chargers.ts";
-/** Plugin router records collected from registries at startup. */
+// Plugin router records collected from registries at startup.
 export interface PluginRouters<
   TVehicle extends Record<string, AnyRouter> = Record<string, AnyRouter>,
   TEnergy extends Record<string, AnyRouter> = Record<string, AnyRouter>,
@@ -24,7 +24,6 @@ export interface PluginRouters<
   charger: TCharger;
 }
 
-/** Builds the app router with dynamically-mounted plugin routers. */
 export function createAppRouter<
   TVehicle extends Record<string, AnyRouter>,
   TEnergy extends Record<string, AnyRouter>,

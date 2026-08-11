@@ -15,7 +15,7 @@ export class EnergyPoller {
   private readonly db: AppDatabase;
   private readonly logger: Logger;
   private timer: Promise<ReturnType<typeof setInterval>> | null = null;
-  /** In-flight poll, tracked so stop() can await it before shutdown. */
+  // In-flight poll, tracked so stop() can await it before shutdown.
   private polling: Promise<void> | null = null;
   private latestRealtime: EnergyData | null = null;
   private latestCumulative: CumulativeEnergyData | null = null;
@@ -72,7 +72,7 @@ export class EnergyPoller {
     this.latestCumulative = null;
   }
 
-  /** Stop and restart polling (picks up new adapter poll interval). */
+  // Stop and restart polling (picks up new adapter poll interval).
   async restart(): Promise<void> {
     await this.stop();
     this.timer = this.start();
@@ -104,7 +104,7 @@ export class EnergyPoller {
     };
   }
 
-  /** Returns an Observable that emits the initial snapshot (if any) then live energy updates. */
+  // Returns an Observable that emits the initial snapshot (if any) then live energy updates.
   subscribeToUpdates(): Observable<EnergyData & CumulativeEnergyData, unknown> {
     return observable<EnergyData & CumulativeEnergyData>((emit) => {
       // Initial snapshot (replaces WS onopen behavior)
@@ -193,8 +193,8 @@ export class EnergyPoller {
     }
   }
 
-  /** Build cumulative-from-DB block; on DB error, return zeros so a poll
-   *  failure path still produces a usable event. */
+  // Build cumulative-from-DB block; on DB error, return zeros so a poll
+  // failure path still produces a usable event.
   private async buildCumulativeFromDb(): Promise<CumulativeEnergyData> {
     try {
       const timezone = (await this.db.getConfig("timezone")) ?? "";

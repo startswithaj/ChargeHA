@@ -4,11 +4,8 @@ import type {
   VehicleRequestContext,
 } from "@chargeha/shared/plugins";
 
-/**
- * Controllable middleware stub used by VehicleManager tests. Tracks calls and
- * lets tests drive responses by mutating fields on the instance
- * (`nextState`, `startResult`, etc.) before calling through.
- */
+// Controllable middleware stub used by VehicleManager tests. Tracks calls and
+// lets tests drive responses by mutating fields on the instance (`nextState`, `startResult`, etc.) before calling through.
 export class MockMiddleware implements VehicleMiddleware {
   requestStateCalls: VehicleRequestContext[] = [];
   startCalls: string[] = [];

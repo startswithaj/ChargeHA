@@ -15,8 +15,8 @@ export interface EventMap {
   charger_update: ChargerState & { chargerName: string };
   chargers_changed: Record<string, never>;
   vehicle_update: VehicleChargeState;
-  /** Vehicle membership changed (added/removed) — an invalidation signal so
-   *  clients refetch their vehicle lists. */
+  // Vehicle membership changed (added/removed) — an invalidation signal so
+  // clients refetch their vehicle lists.
   vehicles_changed: Record<string, never>;
   vehicle_plug_changed: {
     vehicleId: string;
@@ -102,9 +102,8 @@ type Listener<T extends EventType> = (data: EventMap[T]) => void;
 
 export class TypedEventEmitter {
   private listeners = new Map<EventType, Set<Listener<EventType>>>();
-  /** Last emitted value per (event, key). Used to seed SSE connections
-   *  with the latest state on connect. Written by emit() when a retainKey
-   *  is provided. */
+  // Last emitted value per (event, key). Used to seed SSE connections
+  // with the latest state on connect. Written by emit() when a retainKey is provided.
   private retained = new Map<EventType, Map<string, EventMap[EventType]>>();
 
   subscribe<T extends EventType>(

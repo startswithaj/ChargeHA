@@ -34,8 +34,8 @@ describe("EnergyAdapterManager", () => {
   };
 
   const NO_LOAD = { unmeteredW: 0, meteredW: 0 };
-  /** An adapter that invents its figures instead of measuring, so metered
-   *  load has to be added to it too. Declared by the plugin, not its id. */
+  // An adapter that invents its figures instead of measuring, so metered
+  // load has to be added to it too. Declared by the plugin, not its id.
   const MEASURES_NOTHING = false;
 
   function makeMockPlugin(
@@ -58,11 +58,8 @@ describe("EnergyAdapterManager", () => {
     };
   }
 
-  /**
-   * Create an EnergyAdapterManager wired to a mock plugin that produces a
-   * MockAdapter. Awaits initialization so the adapter is in place before the
-   * caller exercises it.
-   */
+  // Create an EnergyAdapterManager wired to a mock plugin that produces a
+  // MockAdapter. Awaits initialization so the adapter is in place before the caller exercises it.
   async function createManagerWithMock(
     measuresLoad = true,
   ): Promise<{

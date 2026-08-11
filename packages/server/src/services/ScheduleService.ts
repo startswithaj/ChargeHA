@@ -55,7 +55,6 @@ export class ScheduleService {
     return { schedules: rows.map(rowToSchedule) };
   }
 
-  /** Return schedules that are currently active based on the configured timezone. */
   async getActiveSchedules() {
     const timezone = await this.getTimezone();
     const rows = await this.db.getSchedules();
@@ -65,8 +64,8 @@ export class ScheduleService {
       .map(rowToSchedule);
   }
 
-  /** Active charge schedule for a specific vehicle right now, or null.
-   *  Blockouts are excluded — they're not vehicle charge targets. */
+  // Active charge schedule for a specific vehicle right now, or null.
+  // Blockouts are excluded — they're not vehicle charge targets.
   async getActiveChargeForVehicle(vehicleId: string) {
     const active = await this.getActiveSchedules();
     const found = active.find(

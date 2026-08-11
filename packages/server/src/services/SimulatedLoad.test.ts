@@ -34,8 +34,8 @@ import { throwingMock } from "../test-helpers/throwingMock.ts";
 describe("simulated load — the four inverter/vehicle combinations", () => {
   const testLogger = new Logger("SimulatedLoad", "error");
 
-  /** Exporting 2kW with nothing charging. A 3kW car swings that to 1kW of
-   *  import — but only if the car reaches the figures at all. */
+  // Exporting 2kW with nothing charging. A 3kW car swings that to 1kW of
+  // import — but only if the car reaches the figures at all.
   const BASE_REALTIME: EnergyData = {
     solarProductionW: 5000,
     gridPowerW: -2000,
@@ -54,7 +54,7 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
   };
 
   const CAR_KW = 3;
-  /** A plugin id the classifier must never special-case — the flag decides. */
+  // A plugin id the classifier must never special-case — the flag decides.
   const SIMULATED_VEHICLE = "pretend-cars";
   const REAL_VEHICLE = "actual-cars";
 
@@ -75,8 +75,8 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
     emitter = new MockEventEmitter();
   });
 
-  /** Wire the real pair: CPM classifies, EAM decides. Nothing here is a
-   *  stand-in for the code under test — only its surroundings. */
+  // Wire the real pair: CPM classifies, EAM decides. Nothing here is a
+  // stand-in for the code under test — only its surroundings.
   function build(
     { vehicleType, measuresLoad, pointKind = "vehicle_api" }: {
       vehicleType: string;
@@ -194,9 +194,8 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
     };
   }
 
-  /** Run with the car's charging point registered, as the app always does.
-   *  The same four expectations must hold either way: one physical session is
-   *  one load, whichever interface reports it. */
+  // Run with the car's charging point registered, as the app always does.
+  // The same four expectations must hold either way: one physical session is one load, whichever interface reports it.
   const readingFor = async (opts: {
     vehicleType: string;
     measuresLoad: boolean;

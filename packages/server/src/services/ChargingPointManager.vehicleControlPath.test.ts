@@ -24,9 +24,8 @@ import { Logger } from "../lib/Logger.ts";
 import { MockEventEmitter } from "../test-helpers/MockEventEmitter.ts";
 import { throwingMock } from "../test-helpers/throwingMock.ts";
 
-/** Controllable ChargerMiddleware stub — same shape as the sibling test
- *  file's; kept local rather than shared so each test file is self-contained
- *  and can be read on its own. */
+// Controllable ChargerMiddleware stub — same shape as the sibling test
+// file's; kept local rather than shared so each test file is self-contained and can be read on its own.
 class StubChargerMiddleware implements ChargerMiddleware {
   startCalls: string[] = [];
   ampCalls: number[] = [];
@@ -433,10 +432,8 @@ describe("ChargingPointManager vehicle control path", () => {
     });
   });
 
-  /** With API control on, the car's own API owns the session and the smart
-   *  charger it is plugged into must stop deciding — but must NOT be
-   *  unregistered, or it stops passing current and stops reporting the meter
-   *  reading everything else depends on. */
+  // With API control on, the car's own API owns the session and the smart charger it is plugged into must stop deciding — but must NOT be
+  // unregistered, or it stops passing current and stops reporting the meter reading everything else depends on.
   describe("passive smart charger", () => {
     const apiPoint = (vehicleId: string, active = true): ChargerRow => ({
       ...ROW,
@@ -455,8 +452,8 @@ describe("ChargingPointManager vehicle control path", () => {
         ...overrides,
       });
 
-    /** Registers both plugins, boots, and polls the smart charger once so it
-     *  has cached state to reason about. */
+    // Registers both plugins, boots, and polls the smart charger once so it
+    // has cached state to reason about.
     const boot = async (): Promise<void> => {
       registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
       await manager.init();

@@ -1,9 +1,5 @@
-/** Two cars plugged into one smart charger, neither explicitly assigned:
- *  resolution is ambiguous, and mergeChargingPointState falls back to
- *  batteryLevel: 0 / chargeLimit: 100. Left unguarded, the engine would
- *  never see "battery full" and would charge forever. This suite proves the
- *  controller refuses to start/adjust amps while ambiguous, and that an
- *  explicit assignment (Settings) clears it. */
+// Two cars plugged into one smart charger, neither explicitly assigned: resolution is ambiguous, and mergeChargingPointState falls back to
+// batteryLevel: 0 / chargeLimit: 100. Left unguarded, the engine would never see "battery full" and would charge forever. This suite proves the controller refuses to start/adjust amps while ambiguous, and that an explicit assignment (Settings) clears it.
 import { afterEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { assertExists } from "@std/assert";
