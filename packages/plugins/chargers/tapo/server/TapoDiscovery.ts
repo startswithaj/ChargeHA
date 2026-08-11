@@ -50,7 +50,6 @@ class TapoDiscovery extends NetworkDiscovery<TapoDevice> {
   }
 }
 
-// Scan the local network for KLAP-speaking Tapo devices.
 export function discoverTapo(
   logger: Logger,
   subnet?: string,

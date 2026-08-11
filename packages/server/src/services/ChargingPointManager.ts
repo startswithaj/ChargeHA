@@ -78,8 +78,6 @@ export class ChargingPointManager {
     private readonly logger: Logger,
   ) {}
 
-  // ── Lifecycle ────────────────────────────────────────────────────────
-
   async addCharger(row: ChargerRow): Promise<void> {
     if (this.chargers.has(row.id) || !row.active) return;
     const plugin = this.chargerPlugins.get(row.chargerAdapterType);
@@ -184,8 +182,6 @@ export class ChargingPointManager {
     await entry.middleware.shutdown();
     this.chargers.delete(id);
   }
-
-  // ── State ────────────────────────────────────────────────────────────
 
   async requestState(
     id: string,
@@ -382,8 +378,6 @@ export class ChargingPointManager {
     this.eventEmitter.emit("chargers_changed", {});
   }
 
-  // ── Commands ─────────────────────────────────────────────────────────
-
   async startChargingAt(
     id: string,
     amps: number,
@@ -462,8 +456,6 @@ export class ChargingPointManager {
       };
     }
   }
-
-  // ── Vehicle resolution ───────────────────────────────────────────────
 
   async resolveVehicleId(id: string): Promise<string | null> {
     return (await this.resolveVehicle(id)).vehicleId;
@@ -545,8 +537,6 @@ export class ChargingPointManager {
       ? { kind: "inferred", vehicleId: pluggedIn[0][0] }
       : { kind: pluggedIn.length > 1 ? "ambiguous" : "none", vehicleId: null };
   }
-
-  // ── Control path ─────────────────────────────────────────────────────
 
   // Vehicles driven by their own API that could be on a charger right now: an active vehicle_api point, plugged in, and not known to be away.
   // isHome is null when unknown, so only an explicit false rules one out — the same test inferVehicle uses. Public because it is the per-pass
@@ -638,8 +628,6 @@ export class ChargingPointManager {
     entry.row = { ...entry.row, vehicleId };
     this.eventEmitter.emit("chargers_changed", {});
   }
-
-  // ── Mode / priority / CRUD (called from chargersRouter) ──────────────
 
   async setMode(
     id: string,
@@ -835,8 +823,6 @@ export class ChargingPointManager {
       };
     }));
   }
-
-  // ── Backoff ──────────────────────────────────────────────────────────
 
   isBackedOff(id: string): { backedOff: boolean; remainingMs: number } {
     const bs = this.commandBackoff.get(id);

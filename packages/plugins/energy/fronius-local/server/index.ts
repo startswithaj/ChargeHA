@@ -6,8 +6,6 @@ import { froniusLocalConfigDef } from "./config.ts";
 import { FroniusLocalAdapter } from "./FroniusLocalAdapter.ts";
 import { createFroniusLocalRouter } from "./router.ts";
 
-// Fronius Local energy plugin — manages local network inverter communication
-// behind the EnergyPlugin interface.
 export class FroniusLocalPlugin implements EnergyPlugin {
   readonly id = "fronius_local";
   readonly displayName = "Fronius (Local)";

@@ -65,7 +65,6 @@ const patchVehicle = (
     vehicles: m.vehicles.map((v) => (v.id === vehicleId ? fn(v) : v)),
   }));
 
-// Whether a vehicle should be charging given a newly-set mode.
 const chargingForMode = (mode: DemoVehicleMode, current: boolean): boolean => {
   if (mode === "charge_now") return true;
   if (mode === "stop") return false;

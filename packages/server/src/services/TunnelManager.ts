@@ -190,7 +190,6 @@ export class TunnelManager {
     }
   }
 
-  // Clear tunnel state when the process exits, expectedly or otherwise.
   private monitorExit(process: Deno.ChildProcess): void {
     process.status.then((status: Deno.CommandStatus) => {
       this.logger.warn(
@@ -265,7 +264,6 @@ export class TunnelManager {
     });
   }
 
-  // Pipe the rest of the URL stream to the logger after parsing.
   private async pipeUrlStream(process: Deno.ChildProcess): Promise<void> {
     const decoder = new TextDecoder();
     const reader = process[this.provider.urlStream].getReader();

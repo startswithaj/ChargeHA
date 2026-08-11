@@ -72,7 +72,6 @@ export class EnergyPoller {
     this.latestCumulative = null;
   }
 
-  // Stop and restart polling (picks up new adapter poll interval).
   async restart(): Promise<void> {
     await this.stop();
     this.timer = this.start();
@@ -104,7 +103,6 @@ export class EnergyPoller {
     };
   }
 
-  // Returns an Observable that emits the initial snapshot (if any) then live energy updates.
   subscribeToUpdates(): Observable<EnergyData & CumulativeEnergyData, unknown> {
     return observable<EnergyData & CumulativeEnergyData>((emit) => {
       // Initial snapshot (replaces WS onopen behavior)

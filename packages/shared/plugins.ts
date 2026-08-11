@@ -12,8 +12,6 @@ import type {
   VehicleRow,
 } from "./types.ts";
 
-// ── Health Check Types ──────────────────────────────────────────────────────
-
 export interface HealthCheckResult {
   // "warning" is degraded-but-working: the plugin works but with reduced
   // capability. Reserve "error" for conditions the user must act on.
@@ -31,17 +29,12 @@ export interface PluginHealthCheck {
   run(): Promise<HealthCheckResult>;
 }
 
-// ── Tunnel Route Types ──────────────────────────────────────────────────────
-
-// A route registered by a plugin on the tunnel middleware server.
 export interface PluginTunnelRoute {
   path: string;
   handler?: (req: Request) => Response | Promise<Response>;
   // If true, proxy the request to the main ChargeHA server at the same path.
   proxy?: boolean;
 }
-
-// ── HTTP Route Types ────────────────────────────────────────────────────────
 
 // HTTP routes a plugin contributes. Core owns the URL; public marks
 // device-facing endpoints that apply their own device-appropriate auth.
@@ -63,8 +56,6 @@ export const resolveHttpRoutes = (
       public: httpRoutes.public ?? false,
     }));
 
-// ── Base Plugin Interface ───────────────────────────────────────────────────
-
 // Static identity + config + lifecycle shared by all plugin types.
 export interface BasePlugin {
   readonly id: string;
@@ -79,8 +70,6 @@ export interface BasePlugin {
   getHealthChecks(): PluginHealthCheck[];
   shutdown(): Promise<void>;
 }
-
-// ── Vehicle Plugin ──────────────────────────────────────────────────────────
 
 // A vehicle plugin (e.g. Tesla, Simulated). Takes `PluginDependencies` in
 // its constructor and kicks off async startup internally, no wrapper.
@@ -101,8 +90,6 @@ export interface VehiclePlugin extends BasePlugin {
   // user-facing reason when they can't.
   getCommandStatus(): Promise<CommandStatus>;
 }
-
-// ── Vehicle Middleware ──────────────────────────────────────────────────────
 
 // Context for cost-aware caching/online/wake decisions. Extends
 // CallContext so logs inherit the caller's origin + traceId.
@@ -136,8 +123,6 @@ export interface VehicleMiddleware {
   readonly online: boolean;
 }
 
-// ── Energy Plugin ───────────────────────────────────────────────────────────
-
 // An energy plugin (e.g. Fronius Local, Fronius Cloud). `createAdapter()`
 // returns the active adapter after reading current config.
 export interface EnergyPlugin extends BasePlugin {
@@ -150,8 +135,6 @@ export interface EnergyPlugin extends BasePlugin {
   // EnergyAdapterManager during initial setup and on reconfigure.
   createAdapter(): Promise<EnergySourceAdapter>;
 }
-
-// ── Charger Middleware ──────────────────────────────────────────────────────
 
 // Same layering as vehicles: the manager never touches an adapter
 // directly, everything flows through the middleware.
@@ -169,8 +152,6 @@ export interface ChargerMiddleware {
   // Release device connections/timers on shutdown or rebuild.
   shutdown(): Promise<void>;
 }
-
-// ── Charger Plugin ──────────────────────────────────────────────────────────
 
 // `config`/`secrets` are the row's plain/decrypted halves — the plugin
 // never sees ciphertext. Absence is `undefined`, never `""`.

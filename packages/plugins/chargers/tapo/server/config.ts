@@ -5,8 +5,6 @@ import {
   type SectionType,
 } from "@chargeha/shared/configSections";
 
-// Only the password is a secret (matching fronius-cloud); email is plain.
-
 export const tapoConfigDef = defineSection({
   tapoHost: {
     key: "host",

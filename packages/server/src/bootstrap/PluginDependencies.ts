@@ -110,7 +110,6 @@ export class PluginDependencies<K extends string = string> {
   }
 
   // ── Charger rows + row-scoped config ─────────────────────────────────
-  //
   // There is no plugin-wide charger config any more. Every charger value —
   // host, credentials, charge point id, amp limits — belongs to one charger
   // row, so two chargers of one adapter type control two different devices.

@@ -54,7 +54,6 @@ describe("useWizardState", () => {
   const setup = () =>
     renderHook(() => useWizardState(), { wrapper: createWrapper() });
 
-  // Run the updater the hook handed to setData against a starting state.
   const applyOptimisticWrite = (prev: WizardNavState | undefined) => {
     const updater = hoisted.setData.mock.calls.at(-1)?.[1] as (
       p: WizardNavState | undefined,

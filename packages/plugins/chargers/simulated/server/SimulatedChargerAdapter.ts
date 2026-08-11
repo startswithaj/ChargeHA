@@ -100,7 +100,6 @@ export class SimulatedChargerAdapter implements ChargerAdapter {
     });
   }
 
-  // Dev controls (router): plug/unplug the fake car, set its appetite.
   updateState(patch: { pluggedIn?: boolean; carMaxAmps?: number }): void {
     this.tick();
     this.state = {
@@ -111,7 +110,6 @@ export class SimulatedChargerAdapter implements ChargerAdapter {
     };
   }
 
-  // Dev-panel view of current state — no ChargerState ceremony.
   devStatus(): {
     chargerRowId: string;
     pluggedIn: boolean;
