@@ -27,6 +27,8 @@ export interface DemoVehicle {
 
 export interface DemoSchedule {
   id: string;
+  /** Set for one-off charges: the calendar date the window starts on. */
+  oneOffDate?: string | null;
   vehicleId: string | null;
   scheduleType: string;
   startTime: string;

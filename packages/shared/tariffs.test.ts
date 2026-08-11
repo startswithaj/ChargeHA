@@ -1,24 +1,24 @@
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { assertExists } from "@std/assert";
-import { getApplicablePeriodForTime } from "./Tariffs.ts";
-import type { TariffPeriodRow } from "../db/types.ts";
+import { getApplicablePeriodForTime } from "./tariffs.ts";
+import type { TariffPeriodLike } from "./tariffs.ts";
+
+type TestPeriod = TariffPeriodLike & { id: number };
 
 describe("getApplicablePeriodForTime", () => {
-  /** Helper to create a minimal TariffPeriodRow for testing. */
+  /** Helper to create a minimal tariff period for testing. */
   const makePeriod = (
-    overrides: Partial<TariffPeriodRow> & {
+    overrides: Partial<TestPeriod> & {
       startTime: string;
       endTime: string;
       ratePerKwh: number;
       days: string[];
     },
-  ): TariffPeriodRow => ({
+  ): TestPeriod => ({
     id: 1,
     label: "Test",
     enabled: true,
-    createdAt: "2026-01-01T00:00:00Z",
-    updatedAt: "2026-01-01T00:00:00Z",
     ...overrides,
   });
 

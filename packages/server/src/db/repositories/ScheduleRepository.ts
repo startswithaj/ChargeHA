@@ -44,6 +44,7 @@ export class ScheduleRepository {
       daysJson: JSON.stringify(input.days),
       chargeAmps: input.chargeAmps,
       chargeLimitPct: input.chargeLimitPct,
+      oneOffDate: input.oneOffDate ?? null,
       enabled: input.enabled !== false ? 1 : 0,
     });
   }
@@ -63,6 +64,7 @@ export class ScheduleRepository {
     if (input.chargeLimitPct !== undefined) {
       set.chargeLimitPct = input.chargeLimitPct;
     }
+    if (input.oneOffDate !== undefined) set.oneOffDate = input.oneOffDate;
     if (input.enabled !== undefined) set.enabled = input.enabled ? 1 : 0;
 
     if (Object.keys(set).length === 0) return;

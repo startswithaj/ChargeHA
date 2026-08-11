@@ -1,5 +1,6 @@
 import { publicProcedure, router } from "../trpc.ts";
 import {
+  oneOffChargeCreateInput,
   scheduleCreateInput,
   scheduleDeleteInput,
   scheduleUpdateInput,
@@ -35,5 +36,12 @@ export const schedulesRouter = router({
     .input(scheduleDeleteInput)
     .mutation(async ({ ctx, input }) => {
       return await ctx.scheduleService.delete(input.id);
+    }),
+
+  // Schedule a one-off charge on the next occurrence of a start time
+  createOneOff: publicProcedure
+    .input(oneOffChargeCreateInput)
+    .mutation(async ({ ctx, input }) => {
+      return await ctx.scheduleService.createOneOff(input);
     }),
 });

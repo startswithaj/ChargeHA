@@ -4,6 +4,11 @@ import {
   CORE_CONFIG_KEYS,
   type CoreConfigKey,
 } from "./configSections.ts";
+import {
+  ONE_OFF_MAX_MINUTES,
+  ONE_OFF_MIN_MINUTES,
+  ONE_OFF_STEP_MINUTES,
+} from "./oneOffCharge.ts";
 
 // Re-export config types from configSections (single source of truth)
 export { type ConfigKey, type CoreConfigKey };
@@ -333,6 +338,29 @@ export const scheduleDeleteInput: z.ZodType<{
   id: z.string(),
 });
 export type ScheduleDeleteInput = z.infer<typeof scheduleDeleteInput>;
+
+/** Create a one-off charge. The server resolves the start time's next
+ *  occurrence and derives the end time, so callers send a duration. */
+export const oneOffChargeCreateInput: z.ZodType<{
+  vehicleId: string;
+  startTime: string;
+  durationMinutes: number;
+  chargeAmps: number;
+  chargeLimitPct: number;
+}> = z.object({
+  vehicleId: z.string().min(1),
+  startTime: timeStringSchema,
+  durationMinutes: z.number().int()
+    .min(ONE_OFF_MIN_MINUTES)
+    .max(ONE_OFF_MAX_MINUTES)
+    .refine(
+      (m) => m % ONE_OFF_STEP_MINUTES === 0,
+      `Must be a multiple of ${ONE_OFF_STEP_MINUTES} minutes`,
+    ),
+  chargeAmps: z.number().int().min(1),
+  chargeLimitPct: z.number().int().min(1).max(100),
+});
+export type OneOffChargeCreateInput = z.infer<typeof oneOffChargeCreateInput>;
 
 // ---- Wizard inputs ----
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   BatteryCharging,
+  CalendarClock,
   Car,
   Key,
   Plug,
@@ -10,7 +11,7 @@ import {
 } from "lucide-react";
 import { Badge, Button, Callout, Card, Skeleton, Text } from "@radix-ui/themes";
 import type { VehicleChargeState, VehicleMode } from "@chargeha/shared";
-import { formatRelativeTime } from "../../utils/Format.ts";
+import { formatRelativeTime, formatTime12h } from "../../utils/Format.ts";
 import { StaticMap } from "../StaticMap/StaticMap.tsx";
 import { Spinner } from "../ui/Spinner.tsx";
 import { ErrorBanner } from "../ui/ErrorBanner.tsx";
@@ -27,6 +28,10 @@ interface VehicleCardProps {
   onStopCharging: () => void;
   onSetAmps: (amps: number) => void;
   onChangeMode: (mode: VehicleMode) => void;
+  /** Opens the one-off charge dialog. Omitted hides the ADHOC CHARGE button. */
+  onScheduleCharge?: () => void;
+  /** The vehicle's pending one-off charge, if any. */
+  scheduledCharge?: { startTime: string; endTime: string } | null;
   onNavigateSettings?: () => void;
   solarPowerW?: number;
   gridPowerW?: number;
@@ -204,12 +209,22 @@ function VehicleCardBanners(
 }
 
 function VehicleModeToggle(
-  { mode, disabled, isPluggedIn, pending, onChangeMode }: {
+  {
+    mode,
+    disabled,
+    isPluggedIn,
+    pending,
+    onChangeMode,
+    onScheduleCharge,
+    hasScheduledCharge,
+  }: {
     mode: VehicleMode;
     disabled: boolean;
     isPluggedIn: boolean;
     pending: string;
     onChangeMode: (mode: VehicleMode) => void;
+    onScheduleCharge?: () => void;
+    hasScheduledCharge?: boolean;
   },
 ) {
   return (
@@ -228,6 +243,23 @@ function VehicleModeToggle(
             {btn.label}
           </Button>
         ))}
+        {
+          /* Not a mode — opens the one-off charge dialog. Sits alongside the
+            mode buttons because it's the same kind of "what should this car do"
+            decision. */
+        }
+        {onScheduleCharge && (
+          <Button
+            variant={hasScheduledCharge ? "solid" : "outline"}
+            color={hasScheduledCharge ? "blue" : "gray"}
+            size="1"
+            disabled={disabled || !isPluggedIn}
+            onClick={onScheduleCharge}
+          >
+            <CalendarClock size={12} />
+            ADHOC
+          </Button>
+        )}
       </div>
       {mode === "charge_now" && (
         <Callout.Root size="1" color="orange" style={{ marginBottom: 8 }}>
@@ -240,6 +272,26 @@ function VehicleModeToggle(
         </Callout.Root>
       )}
     </>
+  );
+}
+
+/** The pending one-off charge window, shown under the mode toggle. */
+function ScheduledChargeRow(
+  { scheduledCharge }: {
+    scheduledCharge?: { startTime: string; endTime: string } | null;
+  },
+) {
+  if (!scheduledCharge) return null;
+  return (
+    <div className={styles.detailRow} style={{ marginBottom: 8 }}>
+      <CalendarClock size={14} />
+      <Text size="1" color="blue">
+        Charge scheduled{" "}
+        {formatTime12h(scheduledCharge.startTime)}–{formatTime12h(
+          scheduledCharge.endTime,
+        )}
+      </Text>
+    </div>
   );
 }
 
@@ -285,6 +337,8 @@ export function VehicleCard({
   onStopCharging,
   onSetAmps,
   onChangeMode,
+  onScheduleCharge,
+  scheduledCharge,
   onNavigateSettings,
   solarPowerW = 0,
   gridPowerW = 0,
@@ -350,7 +404,10 @@ export function VehicleCard({
         isPluggedIn={state.isPluggedIn}
         pending={pending}
         onChangeMode={onChangeMode}
+        onScheduleCharge={onScheduleCharge}
+        hasScheduledCharge={!!scheduledCharge}
       />
+      <ScheduledChargeRow scheduledCharge={scheduledCharge} />
       <VehicleBatterySection
         batteryPercent={batteryPercent}
         chargeLimitPercent={chargeLimitPercent}

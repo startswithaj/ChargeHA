@@ -105,6 +105,9 @@ export const schedules = sqliteTable("schedules", {
   chargeAmps: integer("charge_amps"),
   chargeLimitPct: integer("charge_limit_pct"),
   enabled: integer("enabled").notNull().default(1),
+  // Set for one-off charges: the calendar date (user's timezone) the window
+  // starts on. Null for recurring schedules.
+  oneOffDate: text("one_off_date"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
 });

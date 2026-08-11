@@ -126,25 +126,27 @@ In excess mode two adjustments are applied to `-gridPowerW`:
 
 - **Battery discharge is subtracted.** Power leaving the home battery
   (`batteryPowerW > 0`) is not solar. Without this, a battery that is operating
-  in self-consumption mode and not drawing from the grid makes the vehicle's own 
-  draw reappear as available solar through the add-back below, and the car charges 
-  off the house battery - probably not what you want!. Battery _charging_ is not 
-  added back — we'll try to charge a home battery first from any solar surplus 
-  (see battery priority for SoC-based control).
+  in self-consumption mode and not drawing from the grid makes the vehicle's own
+  draw reappear as available solar through the add-back below, and the car
+  charges off the house battery - probably not what you want!. Battery
+  _charging_ is not added back — we'll try to charge a home battery first from
+  any solar surplus (see battery priority for SoC-based control).
 - **The vehicle's charge power is added back** when the energy meter includes EV
-  charging in its consumption reading (that's the most common setup), since the car's own
-  draw suppresses export. Skipped if `consumptionExcludesCharging` is enabled.
+  charging in its consumption reading (that's the most common setup), since the
+  car's own draw suppresses export. Skipped if `consumptionExcludesCharging` is
+  enabled.
 
-The result is capped at current solar production — obviously a solar surplus can never 
-exceed what the panels are making. Gross mode takes production directly and applies no
-add-back, since panel output never had the vehicle's draw subtracted from it.
+The result is capped at current solar production — obviously a solar surplus can
+never exceed what the panels are making. Gross mode takes production directly
+and applies no add-back, since panel output never had the vehicle's draw
+subtracted from it.
 
 A configurable safety margin (`solarMarginKw`) is subtracted from the result.
 
 > Note: the simulator replays recorded `solarW` / `gridW` but passes
-> `batteryPowerW: null`, so it does not simulate a home battery in self consumption mode. 
-> Simulated results with a battery are a little optimistic relative to how a real home
-> setup would behave.
+> `batteryPowerW: null`, so it does not simulate a home battery in self
+> consumption mode. Simulated results with a battery are a little optimistic
+> relative to how a real home setup would behave.
 
 ### Amps conversion
 

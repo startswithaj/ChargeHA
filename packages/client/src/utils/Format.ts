@@ -74,6 +74,21 @@ export function formatDays(days: string[]): string {
 }
 
 /**
+ * Format a "YYYY-MM-DD" calendar date for display.
+ * e.g. "2026-08-12" → "Wed 12 Aug"
+ */
+export function formatCalendarDate(date: string): string {
+  const [y, m, d] = date.split("-").map(Number);
+  // Built as UTC so the calendar date is never shifted by the host's offset
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-GB", {
+    timeZone: "UTC",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+}
+
+/**
  * Format cents to a currency string.
  * e.g. formatCost(1250, '$') → '$12.50'
  */

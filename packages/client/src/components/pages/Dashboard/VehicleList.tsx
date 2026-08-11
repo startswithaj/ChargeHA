@@ -1,7 +1,7 @@
-import { type ComponentProps, useMemo } from "react";
+import { type ComponentProps, useMemo, useState } from "react";
 import { Car, Settings, Zap } from "lucide-react";
 import { Button, Card, Text } from "@radix-ui/themes";
-import type { VehicleMode } from "@chargeha/shared";
+import type { VehicleChargeState, VehicleMode } from "@chargeha/shared";
 import { isHome } from "@chargeha/shared/geo";
 import {
   useChargingConfig,
@@ -11,7 +11,9 @@ import { useEnergyData } from "../../../hooks/useEnergyData.ts";
 import { useVehicles } from "../../../hooks/useVehicles.ts";
 import { useToast } from "../../../hooks/useToast.tsx";
 import { useControllerStatuses } from "../../../hooks/controllerStatusStore.ts";
+import { useOneOffCharges } from "../../../hooks/useOneOffCharge.ts";
 import { VehicleCard } from "../../VehicleCard/VehicleCard.tsx";
+import { OneOffChargeDialog } from "../../OneOffChargeDialog/OneOffChargeDialog.tsx";
 import { trpc } from "../../../trpc.ts";
 import { useVehicleSolarGrid } from "./energyHelpers.ts";
 
@@ -174,6 +176,8 @@ function VehicleCards(
     stopCharging,
     setAmps,
     changeMode,
+    oneOffByVehicle,
+    onScheduleCharge,
     onNavigateSettings,
   }: {
     vehicles: ReturnType<typeof useVehicles>["vehicles"];
@@ -190,6 +194,8 @@ function VehicleCards(
     stopCharging: (id: string) => void;
     setAmps: (id: string, amps: number) => void;
     changeMode: (id: string, mode: VehicleMode) => void;
+    oneOffByVehicle: ReturnType<typeof useOneOffCharges>["oneOffByVehicle"];
+    onScheduleCharge: (id: string) => void;
     onNavigateSettings?: () => void;
   },
 ) {
@@ -210,6 +216,8 @@ function VehicleCards(
               onStopCharging={() => stopCharging(v.id)}
               onSetAmps={(amps) => setAmps(v.id, amps)}
               onChangeMode={(mode) => changeMode(v.id, mode)}
+              onScheduleCharge={() => onScheduleCharge(v.id)}
+              scheduledCharge={oneOffByVehicle[v.id] ?? null}
               solarPowerW={vehicleSolarGrid[v.id]?.solarW ?? 0}
               gridPowerW={vehicleSolarGrid[v.id]?.gridW ?? 0}
               loading={vehiclesLoading}
@@ -239,6 +247,44 @@ function VehicleCards(
         );
       })}
     </>
+  );
+}
+
+/** The one-off charge dialog, wired to the schedule mutations and toasts. */
+function ConnectedOneOffDialog(
+  { vehicle, state, onClose, changeMode }: {
+    vehicle: { id: string; name: string; mode: string };
+    state: VehicleChargeState;
+    onClose: () => void;
+    changeMode: (id: string, mode: VehicleMode) => void;
+  },
+) {
+  const { addToast } = useToast();
+  const { schedules, scheduleOneOff, cancelOneOff } = useOneOffCharges();
+
+  return (
+    <OneOffChargeDialog
+      open
+      onOpenChange={(open) => !open && onClose()}
+      vehicleId={vehicle.id}
+      vehicleName={vehicle.name || state.vehicleName}
+      state={state}
+      mode={vehicle.mode as VehicleMode}
+      schedules={schedules}
+      onSchedule={async (form) => {
+        const err = await scheduleOneOff(vehicle.id, form);
+        if (err) return err;
+        if (form.switchToAuto && vehicle.mode !== "auto") {
+          changeMode(vehicle.id, "auto");
+        }
+        addToast("Charge scheduled", "success");
+        return null;
+      }}
+      onCancelPending={async (id) => {
+        await cancelOneOff(id);
+        addToast("Scheduled charge cancelled", "success");
+      }}
+    />
   );
 }
 
@@ -288,6 +334,11 @@ export function VehicleList(
     controllerStatuses,
   );
 
+  // Which vehicle's one-off charge dialog is open, if any
+  const [scheduleFor, setScheduleFor] = useState<string | null>(null);
+  const { oneOffByVehicle } = useOneOffCharges();
+  const scheduleVehicle = vehicles.find((v) => v.id === scheduleFor);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {/* Vehicle section — one card per configured vehicle */}
@@ -314,8 +365,19 @@ export function VehicleList(
         stopCharging={stopCharging}
         setAmps={setAmps}
         changeMode={changeMode}
+        oneOffByVehicle={oneOffByVehicle}
+        onScheduleCharge={setScheduleFor}
         onNavigateSettings={onNavigateSettings}
       />
+
+      {scheduleVehicle?.state && (
+        <ConnectedOneOffDialog
+          vehicle={scheduleVehicle}
+          state={scheduleVehicle.state}
+          onClose={() => setScheduleFor(null)}
+          changeMode={changeMode}
+        />
+      )}
 
       {!vehiclesLoading && vehicles.length === 0 && vehiclesError && (
         <VehicleListErrorCard

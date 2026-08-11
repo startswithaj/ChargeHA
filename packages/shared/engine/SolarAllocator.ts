@@ -1,4 +1,8 @@
 import type { EnergyData, VehicleChargeState } from "../types.ts";
+import {
+  resolveChargePhases,
+  resolveChargeVoltage,
+} from "../chargeCostEstimate.ts";
 import type { ControllerConfig, EngineVehicleInput } from "./types.ts";
 
 /** Eligible vehicle enriched with resolved electrical parameters. */
@@ -26,8 +30,11 @@ export class SolarAllocator {
     energy: EnergyData | null,
     config: ControllerConfig,
   ): number {
-    if (state.chargerVoltage >= 100) return state.chargerVoltage;
-    return energy?.gridVoltageV ?? config.gridVoltage;
+    return resolveChargeVoltage(
+      state,
+      config.gridVoltage,
+      energy?.gridVoltageV,
+    );
   }
 
   /** Resolve charger phases: a live single-phase reading while charging
@@ -38,8 +45,7 @@ export class SolarAllocator {
     state: VehicleChargeState,
     config: ControllerConfig,
   ): number {
-    if (state.isCharging && state.chargerPhases === 1) return 1;
-    return config.threePhaseCharger ? 3 : state.chargerPhases;
+    return resolveChargePhases(state, config.threePhaseCharger);
   }
 
   /** Surplus solar in watts, before the safety margin.
@@ -47,7 +53,7 @@ export class SolarAllocator {
    *  Starts from grid export, then:
    *  - Subtracts home battery discharge. Power leaving the battery is not
    *    solar. Without this, a battery operating in self-consumption won't be
-   *    drawing from the grid, and would makes the EV's own draw reappear as 
+   *    drawing from the grid, and would makes the EV's own draw reappear as
    *    "available solar" through the add-back below, and the car would charge
    *    off the home battery.
    *  - Adds back the EV's charge power when the meter includes EV load in

@@ -64,6 +64,7 @@ export function buildChargeSchedule(
     days: ["mon", "tue", "wed", "thu", "fri"],
     chargeAmps: 16,
     chargeLimitPct: 80,
+    oneOffDate: null,
     enabled: true,
     ...overrides,
   };
