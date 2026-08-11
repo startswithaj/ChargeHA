@@ -65,6 +65,27 @@ describe("GoodweSemsClient", () => {
       expect(mock.fetchCalls[0].method).toBe("POST");
     });
 
+    it("tries the regional SEMS+ host before the global one", async () => {
+      mock.setPathResponse(NEW_LOGIN_PATH, loginOk("tok", GATEWAY_API));
+
+      await makeClient().login();
+
+      expect(mock.fetchCalls[0].url).toContain("au-semsplus.goodwe.com");
+    });
+
+    it("falls back to the global SEMS+ host when the regional one rejects", async () => {
+      mock.setPathResponse("au-semsplus.goodwe.com", semsCode("C0602"));
+      mock.setPathResponse(
+        "//semsplus.goodwe.com",
+        loginOk("tok", GATEWAY_API),
+      );
+
+      await makeClient().login();
+
+      expect(mock.fetchCalls.length).toBe(2);
+      expect(mock.fetchCalls[1].url).toContain("//semsplus.goodwe.com");
+    });
+
     it("sends the SEMS+ password base64-encoded rather than in the clear", async () => {
       mock.setPathResponse(NEW_LOGIN_PATH, loginOk("tok", GATEWAY_API));
 
@@ -83,8 +104,9 @@ describe("GoodweSemsClient", () => {
 
       await makeClient().login();
 
-      expect(mock.fetchCalls.length).toBe(2);
-      expect(mock.fetchCalls[1].url).toContain(LEGACY_LOGIN_PATH);
+      // Two SEMS+ attempts (regional then global), then legacy.
+      expect(mock.fetchCalls.length).toBe(3);
+      expect(mock.fetchCalls[2].url).toContain(LEGACY_LOGIN_PATH);
     });
 
     it("sends the plain password and bootstrap token on the legacy endpoint", async () => {
@@ -93,19 +115,19 @@ describe("GoodweSemsClient", () => {
 
       await makeClient({ password: "secret123" }).login();
 
-      const legacy = mock.fetchCalls[1];
+      const legacy = mock.fetchCalls[2];
       expect(legacy.body).toContain("secret123");
       expect(legacy.headers.token).toContain("ios");
     });
 
     it("falls back to legacy when the SEMS+ endpoint is unreachable", async () => {
-      // No override registered for the SEMS+ host, so it answers 404.
+      // No override registered for the SEMS+ hosts, so both answer 404.
       mock.setPathResponse(LEGACY_LOGIN_PATH, loginOk("tok", REGION_API));
 
       await makeClient().login();
 
-      expect(mock.fetchCalls.length).toBe(2);
-      expect(mock.fetchCalls[1].url).toContain(LEGACY_LOGIN_PATH);
+      expect(mock.fetchCalls.length).toBe(3);
+      expect(mock.fetchCalls[2].url).toContain(LEGACY_LOGIN_PATH);
     });
 
     it("prefers the mode that last worked on the next login", async () => {
@@ -116,8 +138,8 @@ describe("GoodweSemsClient", () => {
       await client.login();
       await client.login();
 
-      expect(mock.fetchCalls.length).toBe(3);
-      expect(mock.fetchCalls[2].url).toContain(LEGACY_LOGIN_PATH);
+      expect(mock.fetchCalls.length).toBe(4);
+      expect(mock.fetchCalls[3].url).toContain(LEGACY_LOGIN_PATH);
     });
 
     it("throws GoodweSemsAuthError when both modes reject", async () => {

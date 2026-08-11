@@ -19,11 +19,15 @@ function baseOverride(): string | undefined {
   return Deno.env.get("GOODWE_SEMS_BASE_URL")?.replace(/\/$/, "");
 }
 
-function newLoginUrl(): string {
+// Regional host first: the global one returns C0602 for some accounts.
+function newLoginUrls(): string[] {
   const base = baseOverride();
-  return base
-    ? `${base}/web/sems/sems-user/api/v1/auth/cross-login`
-    : "https://semsplus.goodwe.com/web/sems/sems-user/api/v1/auth/cross-login";
+  const path = "/web/sems/sems-user/api/v1/auth/cross-login";
+  if (base) return [`${base}${path}`];
+  return [
+    `https://au-semsplus.goodwe.com${path}`,
+    `https://semsplus.goodwe.com${path}`,
+  ];
 }
 
 function legacyLoginUrl(): string {
@@ -413,9 +417,20 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
   }
 
   private async attemptLogin(mode: LoginMode): Promise<SemsToken | null> {
+    const urls = mode === "new" ? newLoginUrls() : [legacyLoginUrl()];
+    return await urls.reduce<Promise<SemsToken | null>>(
+      async (carry, url) => (await carry) ?? this.attemptLoginAt(mode, url),
+      Promise.resolve(null),
+    );
+  }
+
+  private async attemptLoginAt(
+    mode: LoginMode,
+    url: string,
+  ): Promise<SemsToken | null> {
     try {
       const json = await this.post(
-        mode === "new" ? newLoginUrl() : legacyLoginUrl(),
+        url,
         await this.loginBody(mode),
         loginHeaders(mode),
       );
