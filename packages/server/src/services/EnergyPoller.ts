@@ -21,6 +21,7 @@ export class EnergyPoller {
   private latestCumulative: CumulativeEnergyData | null = null;
   private consecutivePollFailures = 0;
   private lastFailureLoggedAtMs = 0;
+  private reconfigurePending = false;
 
   constructor(
     em: EnergyAdapterManager,
@@ -36,10 +37,17 @@ export class EnergyPoller {
     this.logger = logger;
     // When a config key relevant to the active adapter changes, rebuild
     // the adapter and restart the timer so the new poll interval takes
-    // effect immediately.
+    // effect immediately. Coalesced per tick: a multi-key save emits one
+    // config_changed per key, and rebuilding per event would tear down and
+    // re-login the adapter once per key.
     this.eventEmitter.subscribe("config_changed", ({ key }) => {
       if (!this.em.isRelevantConfigKey(key)) return;
-      void this.em.reconfigure().then(() => this.restart());
+      if (this.reconfigurePending) return;
+      this.reconfigurePending = true;
+      queueMicrotask(() => {
+        this.reconfigurePending = false;
+        void this.em.reconfigure().then(() => this.restart());
+      });
     });
     this.timer = this.start();
   }

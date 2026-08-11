@@ -109,6 +109,21 @@ export class PluginDependencies<K extends string = string> {
     return this.db.storeSecret(`${this.prefix}${key}`, value);
   }
 
+  // One atomic save for a multi-key config write: all keys land before any
+  // config_changed fires, so adapter rebuilds never see a partial save.
+  setConfigValues(
+    plain: Partial<Record<K, string | null>>,
+    secrets: Partial<Record<K, string | null>>,
+  ): Promise<void> {
+    const prefix = (values: Partial<Record<K, string | null>>) =>
+      Object.fromEntries(
+        Object.entries(values).map((
+          [key, value],
+        ) => [`${this.prefix}${key}`, value as string | null]),
+      );
+    return this.db.setPluginConfigValues(prefix(plain), prefix(secrets));
+  }
+
   // ── Charger rows + row-scoped config ─────────────────────────────────
   // There is no plugin-wide charger config any more. Every charger value —
   // host, credentials, charge point id, amp limits — belongs to one charger
