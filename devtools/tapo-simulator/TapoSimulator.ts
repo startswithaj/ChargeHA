@@ -213,7 +213,6 @@ export class TapoSimulator {
     }
   }
 
-  // Advance the accumulating meter by elapsed wall-clock time.
   private tickEnergy(): void {
     const now = Date.now();
     const hours = (now - this.lastEnergyTickMs) / 3_600_000;

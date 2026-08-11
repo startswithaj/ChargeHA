@@ -8,7 +8,7 @@ jobs:
     name: deno task check:all
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Deno
         uses: denoland/setup-deno@v2
@@ -16,7 +16,7 @@ jobs:
           deno-version: v2.9.4
 
       - name: Cache Deno deps
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cache/deno

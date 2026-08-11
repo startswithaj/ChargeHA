@@ -129,7 +129,6 @@ class SigenergyDiscovery extends NetworkDiscovery<SigenergyDevice> {
   }
 }
 
-// Scan the local network for Sigenergy inverters/batteries over Modbus TCP.
 export function discoverSigenergy(
   logger: Logger,
   subnet?: string,

@@ -120,8 +120,6 @@ export class ChargerRepository {
     );
   }
 
-  // ---- Row-scoped config / secrets (raw column access) ----
-  //
   // These move the column value only. Encryption and JSON parsing are
   // AppDatabase's job — this class has no encryption key, like every other
   // repository.

@@ -17,7 +17,6 @@ interface AllocationContext {
   availableW: number;
 }
 
-// Solar calculation and multi-vehicle amp allocation.
 export class SolarAllocator {
   // Resolve charger voltage: trust the reading if present and >= 100V,
   // otherwise fall back to the inverter grid reading, then the user's configured value.
@@ -97,7 +96,6 @@ export class SolarAllocator {
     );
   }
 
-  // Top-level allocation dispatcher: waterfall or equal based on config.
   static allocate(
     vehicles: EngineVehicleInput[],
     config: ControllerConfig,

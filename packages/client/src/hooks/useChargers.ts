@@ -32,8 +32,6 @@ type ChargerCommandPending =
   | `mode:${ChargingPointMode}`
   | false;
 
-// The dashboard's replacement for the removed
-// vehicle.setMode/setAmps/command mutations.
 export function useChargerCommands(chargerId: string | null) {
   const utils = trpc.useUtils();
   const { addToast } = useToast();

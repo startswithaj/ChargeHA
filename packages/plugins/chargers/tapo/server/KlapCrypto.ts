@@ -11,7 +11,6 @@ export interface KlapSessionKeys {
   initialSeq: number; // signed int32 BE from the iv derivation's last 4 bytes
 }
 
-// Stateless crypto primitives, grouped like SolarAllocator.
 export class KlapCrypto {
   static concatBytes(
     ...parts: Uint8Array<ArrayBuffer>[]

@@ -78,8 +78,6 @@ export class ChargingPointManager {
     private readonly logger: Logger,
   ) {}
 
-  // ── Lifecycle ────────────────────────────────────────────────────────
-
   async addCharger(row: ChargerRow): Promise<void> {
     if (this.chargers.has(row.id) || !row.active) return;
     const plugin = this.chargerPlugins.get(row.chargerAdapterType);
@@ -184,8 +182,6 @@ export class ChargingPointManager {
     await entry.middleware.shutdown();
     this.chargers.delete(id);
   }
-
-  // ── State ────────────────────────────────────────────────────────────
 
   async requestState(
     id: string,
@@ -382,8 +378,6 @@ export class ChargingPointManager {
     this.eventEmitter.emit("chargers_changed", {});
   }
 
-  // ── Commands ─────────────────────────────────────────────────────────
-
   async startChargingAt(
     id: string,
     amps: number,
@@ -462,8 +456,6 @@ export class ChargingPointManager {
       };
     }
   }
-
-  // ── Vehicle resolution ───────────────────────────────────────────────
 
   async resolveVehicleId(id: string): Promise<string | null> {
     return (await this.resolveVehicle(id)).vehicleId;
@@ -545,8 +537,6 @@ export class ChargingPointManager {
       ? { kind: "inferred", vehicleId: pluggedIn[0][0] }
       : { kind: pluggedIn.length > 1 ? "ambiguous" : "none", vehicleId: null };
   }
-
-  // ── Control path ─────────────────────────────────────────────────────
 
   // Vehicles driven by their own API that could be on a charger right now: an active vehicle_api point, plugged in, and not known to be away.
   // isHome is null when unknown, so only an explicit false rules one out — the same test inferVehicle uses. Public because it is the per-pass
@@ -639,8 +629,6 @@ export class ChargingPointManager {
     this.eventEmitter.emit("chargers_changed", {});
   }
 
-  // ── Mode / priority / CRUD (called from chargersRouter) ──────────────
-
   async setMode(
     id: string,
     mode: ChargingPointMode,
@@ -682,15 +670,9 @@ export class ChargingPointManager {
     },
   ): Promise<ChargerRow> {
     const rows = await this.db.getChargers();
-    const sameType = rows.filter((row) =>
-      row.chargerAdapterType === input.chargerAdapterType
-    );
-    const name = sameType.length === 0
-      ? input.name
-      : `${input.name} ${sameType.length + 1}`;
     const row: ChargerRow = {
       id: crypto.randomUUID(),
-      name,
+      name: input.name,
       chargerAdapterType: input.chargerAdapterType,
       chargerConfig: JSON.stringify(input.config ?? {}),
       mode: "auto",
@@ -714,9 +696,6 @@ export class ChargingPointManager {
     return row;
   }
 
-  // Always creates, resolving the row's name from the plugin's own
-  // `displayName` — used by every "add a charger of this type" path that doesn't already have a name to give (Settings' no-panel add, a plugin's
-  // own add-mode save). `createCharger` does the actual insert and picks a distinguishing name if one of this type already exists.
   async createChargerForType(
     chargerAdapterType: string,
     seed: {
@@ -725,13 +704,27 @@ export class ChargingPointManager {
       secrets?: ChargerSecretsMap;
     } = {},
   ): Promise<ChargerRow> {
-    const plugin = this.chargerPlugins.get(chargerAdapterType);
     return await this.createCharger({
-      name: seed.name ?? plugin?.displayName ?? chargerAdapterType,
+      name: seed.name ??
+        await this.defaultChargerName(chargerAdapterType),
       chargerAdapterType,
       config: seed.config,
       secrets: seed.secrets,
     });
+  }
+
+  // The counter only disambiguates repeats of a plugin's own label — a
+  // device-reported name is already unique to its hardware.
+  private async defaultChargerName(
+    chargerAdapterType: string,
+  ): Promise<string> {
+    const label = this.chargerPlugins.get(chargerAdapterType)?.displayName ??
+      chargerAdapterType;
+    const rows = await this.db.getChargers();
+    const sameType = rows.filter((row) =>
+      row.chargerAdapterType === chargerAdapterType
+    );
+    return sameType.length === 0 ? label : `${label} ${sameType.length + 1}`;
   }
 
   // Find-or-create, by adapter type. Only the first-run wizard needs this:
@@ -835,8 +828,6 @@ export class ChargingPointManager {
       };
     }));
   }
-
-  // ── Backoff ──────────────────────────────────────────────────────────
 
   isBackedOff(id: string): { backedOff: boolean; remainingMs: number } {
     const bs = this.commandBackoff.get(id);

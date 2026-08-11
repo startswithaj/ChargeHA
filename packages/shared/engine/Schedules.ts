@@ -42,7 +42,6 @@ function parseTimezone(
   };
 }
 
-// Parse an "HH:MM" schedule time into minutes since midnight.
 function toMinutes(time: string): number {
   const [hours, minutes] = time.split(":").map(Number);
   return hours * 60 + minutes;

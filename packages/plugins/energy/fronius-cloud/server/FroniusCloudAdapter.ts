@@ -167,7 +167,6 @@ export class FroniusCloudAdapter implements EnergySourceAdapter {
     };
   }
 
-  // Authenticate with Solar.web via email/password to obtain JWT tokens.
   async login(): Promise<void> {
     try {
       const response = await fetch(`${BASE_URL}/iam/jwt`, {
@@ -257,7 +256,6 @@ export class FroniusCloudAdapter implements EnergySourceAdapter {
     }
   }
 
-  // Ensure a valid access token is available — refresh or re-login as needed.
   async ensureToken(): Promise<void> {
     if (!this.accessToken) {
       await this.login();

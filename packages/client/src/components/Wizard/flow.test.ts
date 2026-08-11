@@ -17,7 +17,6 @@ describe("flow", () => {
     ...extra,
   });
 
-  // Core steps with a gated plugin group.
   const FLOW: StepDef[] = [
     step("welcome"),
     step("vehicle-type"),

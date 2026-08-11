@@ -48,6 +48,7 @@ describe("OCPP e2e", () => {
     await ocppTrpc.plugin.charger.ocpp.setConfig.mutate({
       chargerRowId: null,
       values: { ocppChargerId: CP_ID },
+      name: CP_ID,
     });
     // The app 404s the station's pre-row connect; it retries on a ~30s
     // backoff. Poll past that backoff — a one-shot check races the station's
@@ -323,6 +324,7 @@ describe("OCPP measurand negotiation e2e", () => {
     await ocppTrpc.plugin.charger.ocpp.setConfig.mutate({
       chargerRowId: null,
       values: { ocppChargerId: SAP_BASIC_STATION_ID },
+      name: SAP_BASIC_STATION_ID,
     });
     // Same as the sap-test suite: poll past the station's own ~30s backoff;
     // an unconditional forced reconnect can duplicate a live socket and start

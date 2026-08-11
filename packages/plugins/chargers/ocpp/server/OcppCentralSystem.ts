@@ -160,8 +160,6 @@ export class OcppCentralSystem {
     return this.connections.get(chargePointId)?.data ?? freshData();
   }
 
-  // ── Pairing ──────────────────────────────────────────────────────────
-
   // Open a time-boxed window: lets the panel prove reachability before the
   // user commits a charger id (otherwise unverifiable until a socket arrives).
   armPairing(ttlMs: number): void {
@@ -293,8 +291,6 @@ export class OcppCentralSystem {
     this.connections.clear();
   }
 
-  // ── Outgoing commands ────────────────────────────────────────────────
-
   async remoteStart(chargePointId: string): Promise<boolean> {
     const res = await this.send(chargePointId, "RemoteStartTransaction", {
       connectorId: 1,
@@ -372,8 +368,6 @@ export class OcppCentralSystem {
     });
     return { latencyMs };
   }
-
-  // ── Incoming ─────────────────────────────────────────────────────────
 
   private onMessage(chargePointId: string, raw: string): void {
     const connection = this.connections.get(chargePointId);
@@ -707,7 +701,6 @@ export class OcppCentralSystem {
   }
 }
 
-// ── Measurand aggregation ──────────────────────────────────────────────
 // A 3-phase charger reports one sample per phase. Flattening those and
 // taking the first match reads power at a third of actual, and can take a
 // line-to-line voltage for a line-to-neutral one. Rules follow the HA OCPP
