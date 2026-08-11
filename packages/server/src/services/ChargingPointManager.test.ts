@@ -679,6 +679,16 @@ describe("ChargingPointManager", () => {
       ]);
     });
 
+    it("keeps a device-reported name verbatim, even as the second of its type", async () => {
+      await manager.createChargerForType(CHARGER_TYPE);
+      await manager.createChargerForType(CHARGER_TYPE, { name: "sap-basic" });
+
+      expect(chargerRows.map((r) => r.name)).toEqual([
+        "Simulated Charger",
+        "sap-basic",
+      ]);
+    });
+
     it("does not touch rows of a different type when numbering", async () => {
       await manager.createCharger({
         name: "My OCPP",

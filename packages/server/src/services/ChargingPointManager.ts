@@ -670,15 +670,9 @@ export class ChargingPointManager {
     },
   ): Promise<ChargerRow> {
     const rows = await this.db.getChargers();
-    const sameType = rows.filter((row) =>
-      row.chargerAdapterType === input.chargerAdapterType
-    );
-    const name = sameType.length === 0
-      ? input.name
-      : `${input.name} ${sameType.length + 1}`;
     const row: ChargerRow = {
       id: crypto.randomUUID(),
-      name,
+      name: input.name,
       chargerAdapterType: input.chargerAdapterType,
       chargerConfig: JSON.stringify(input.config ?? {}),
       mode: "auto",
@@ -702,9 +696,6 @@ export class ChargingPointManager {
     return row;
   }
 
-  // Always creates, resolving the row's name from the plugin's own
-  // `displayName` — used by every "add a charger of this type" path that doesn't already have a name to give (Settings' no-panel add, a plugin's
-  // own add-mode save). `createCharger` does the actual insert and picks a distinguishing name if one of this type already exists.
   async createChargerForType(
     chargerAdapterType: string,
     seed: {
@@ -713,13 +704,27 @@ export class ChargingPointManager {
       secrets?: ChargerSecretsMap;
     } = {},
   ): Promise<ChargerRow> {
-    const plugin = this.chargerPlugins.get(chargerAdapterType);
     return await this.createCharger({
-      name: seed.name ?? plugin?.displayName ?? chargerAdapterType,
+      name: seed.name ??
+        await this.defaultChargerName(chargerAdapterType),
       chargerAdapterType,
       config: seed.config,
       secrets: seed.secrets,
     });
+  }
+
+  // The counter only disambiguates repeats of a plugin's own label — a
+  // device-reported name is already unique to its hardware.
+  private async defaultChargerName(
+    chargerAdapterType: string,
+  ): Promise<string> {
+    const label = this.chargerPlugins.get(chargerAdapterType)?.displayName ??
+      chargerAdapterType;
+    const rows = await this.db.getChargers();
+    const sameType = rows.filter((row) =>
+      row.chargerAdapterType === chargerAdapterType
+    );
+    return sameType.length === 0 ? label : `${label} ${sameType.length + 1}`;
   }
 
   // Find-or-create, by adapter type. Only the first-run wizard needs this:
