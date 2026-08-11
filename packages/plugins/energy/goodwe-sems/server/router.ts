@@ -38,13 +38,16 @@ export function createGoodweSemsRouter(deps: PluginDependencies) {
           deps.log,
           deps.dbLog,
         );
+        deps.log.info("SEMS (ui) listStations requested");
         try {
           await client.login();
-          return {
-            success: true as const,
-            stations: await client.getStations(),
-          };
+          const stations = await client.getStations();
+          deps.log.info(
+            `SEMS (ui) listStations → ${stations.length} station(s)`,
+          );
+          return { success: true as const, stations };
         } catch (err) {
+          deps.log.warn(`SEMS (ui) listStations failed: ${err}`);
           return {
             success: false as const,
             error: err instanceof Error ? err.message : "Login failed",
@@ -62,12 +65,17 @@ export function createGoodweSemsRouter(deps: PluginDependencies) {
           deps.log,
           deps.dbLog,
         );
+        deps.log.info(
+          `SEMS (ui) testConnection requested for station ${input.stationId}`,
+        );
         try {
           await adapter.connect();
           const deviceInfo = await adapter.getDeviceInfo();
           await adapter.disconnect();
+          deps.log.info(`SEMS (ui) testConnection ok — ${deviceInfo.name}`);
           return { success: true as const, systemName: deviceInfo.name };
         } catch (err) {
+          deps.log.warn(`SEMS (ui) testConnection failed: ${err}`);
           return {
             success: false as const,
             error: err instanceof Error ? err.message : "Connection failed",

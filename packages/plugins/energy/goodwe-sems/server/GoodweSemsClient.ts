@@ -252,7 +252,12 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     const parsed = stationListSchema.safeParse(
       await this.call(STATION_LIST_PATH, null),
     );
-    if (!parsed.success) return [];
+    if (!parsed.success) {
+      this.logger.warn(
+        `SEMS station list arrived in an unrecognised shape: ${parsed.error.message}`,
+      );
+      return [];
+    }
     return parsed.data.flatMap((entry) => {
       const id = entry.id ?? entry.powerstation_id;
       if (!id) return [];
@@ -394,7 +399,7 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
       return { ...payload, api };
     } catch (error) {
       if (error instanceof GoodweSemsRateLimitError) throw error;
-      this.logger.debug(`SEMS ${mode} login unreachable: ${error}`);
+      this.logger.warn(`SEMS ${mode} login unreachable: ${error}`);
       return null;
     }
   }
