@@ -9,7 +9,6 @@ import type {
 } from "@chargeha/shared";
 import type { ControllerConfig } from "@chargeha/shared/engine";
 
-// Structure of the JSON stored in the system_alert config key.
 export interface SystemAlert {
   message: string;
   timestamp: string;
@@ -17,9 +16,6 @@ export interface SystemAlert {
   vehicleName: string;
 }
 
-// The row shapes themselves live in shared: plugins receive them through the
-// plugin contract, and the host must not import the plugin package to describe
-// its own data.
 export type { ChargerRow, VehicleRow } from "@chargeha/shared";
 
 export interface UpsertVehicleInput {
@@ -31,14 +27,10 @@ export interface UpsertVehicleInput {
   mode: VehicleMode;
 }
 
-// Upsert payload for a charger row. Deliberately carries NO secrets field. Secrets live in the encrypted `charger_secrets` column and are written
-// only through `AppDatabase.setChargerSecrets` / `patchChargerSecrets`, so a plain upsert (rename, reorder, mode change) can never clobber them and no caller can accidentally log a payload containing credentials.
 export interface UpsertChargerInput {
   id: string;
   name: string;
   chargerAdapterType: string;
-  // Serialized `ChargerConfigMap`. Omitted leaves the stored value alone on
-  // update, and defaults to `"{}"` on insert.
   chargerConfig?: string;
   mode?: ChargingPointMode;
   priority?: number;
@@ -257,8 +249,6 @@ export interface RecentStateChange {
   timestamp: string;
 }
 
-// Session row. createdAt/expiresAt are epoch seconds (not ms) to avoid
-// @db/sqlite's 32-bit integer truncation for values > 2^31.
 export interface SessionRow {
   id: string;
   authType: string;
@@ -268,7 +258,6 @@ export interface SessionRow {
   expiresAt: number;
 }
 
-// Create session input. createdAt/expiresAt are epoch seconds (not ms).
 export interface CreateSessionInput {
   id: string;
   authType: string;
@@ -278,16 +267,12 @@ export interface CreateSessionInput {
   expiresAt: number;
 }
 
-// Structured inputs snapshot captured each decision cycle. Persisted as
-// controller_logs.inputs_json, so it belongs with the row types rather than with the service that produces it — db must never import from services.
 export interface DecisionInputs {
   energy: {
     solarProductionW: number;
     gridPowerW: number;
     homeConsumptionW: number;
     batterySoc: number | null;
-    // Absent (undefined) on rows written before this field was added — treat
-    // missing the same as null, not as "no battery power right now".
     batteryPowerW?: number | null;
   } | null;
   vehicleState: {

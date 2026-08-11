@@ -15,8 +15,18 @@ import { NullEnergyAdapter } from "./NullEnergyAdapter.ts";
 
 const ADAPTER_TYPE_KEY = equipmentConfigDef.energyAdapterType.key;
 
-// Owns the energy adapter lifecycle: resolves config from DB, constructs the correct adapter via plugin registry, and handles hot-swap on config
-// change. Initialization kicks off in the constructor and is protected by `initializationPromise` so a concurrent `reconfigure()` can't clobber the in-flight initial adapter assignment. EM does not know about the poller — the poller subscribes to `config_changed` itself and calls `reconfigure()` + its own `restart()` when a key relevant to the active adapter is written.
+// ── EnergyAdapterManager ────────────────────────────────────────────────
+
+// Owns the energy adapter lifecycle: resolves config from DB, constructs
+// the correct adapter via plugin registry, and handles hot-swap on config
+// change. Initialization kicks off in the constructor and is protected by
+// `initializationPromise` so a concurrent `reconfigure()` can't clobber
+// the in-flight initial adapter assignment.
+//
+// EM does not know about the poller. The poller subscribes to
+// `config_changed` itself and calls `reconfigure()` + its own `restart()`
+// when a key relevant to the active adapter is written.
+//
 // Not typed as EnergySourceAdapter: getRealtimeData takes the charging load
 // as a parameter, which diverges from the adapter signature.
 export class EnergyAdapterManager {
