@@ -13,19 +13,10 @@ import type {
   EngineVehicleInput,
 } from "./engine/mod.ts";
 
-/** Run the real ControllerEngine for a single simulated moment and derive the
- *  kW breakdown the Settings-page "Solar Charging Simulation" preview needs.
- *
- *  Every decision (start/stop, target amps, waterfall vs equal split, grace
- *  periods, thresholds, schedules, blockouts) comes straight from
- *  ControllerEngine/SolarAllocator. This file only turns the resulting amps
- *  into kilowatts and attributes them to solar vs grid for display — that is
- *  arithmetic, not a re-implementation of any decision. */
+// Runs the real ControllerEngine and derives the kW breakdown the Settings-page preview needs; every decision comes from ControllerEngine/SolarAllocator, this file only converts amps to kW and attributes solar vs grid.
 
-/** One vehicle's inputs for the preview. Mirrors the fields the real engine
- *  needs, plus its current charging draw — carried over so the engine's own
- *  add-back logic (SolarAllocator.addBackW) sees an already-charging vehicle
- *  the same way the live controller would. */
+// Mirrors the fields the real engine needs, plus current charging draw —
+// carried over so the engine's own add-back logic treats an already-charging vehicle the same way the live controller would.
 export interface PreviewVehicle {
   id: string;
   name: string;
@@ -44,9 +35,8 @@ export interface PreviewVehicle {
 export interface PreviewInputs {
   solarProductionKw: number;
   homeConsumptionKw: number;
-  /** Positive = discharging (supplies power), negative = charging (draws
-   *  power). Matches EnergyData.batteryPowerW. Null when there's no home
-   *  battery to model. */
+  // Positive = discharging (supplies power), negative = charging (draws
+  // power). Matches EnergyData.batteryPowerW. Null when there's no home battery to model.
   batteryPowerKw: number | null;
   batterySoc: number | null;
   schedules: Schedule[];
@@ -58,9 +48,9 @@ export interface PreviewVehicleResult {
   id: string;
   name: string;
   action: "charging" | "skipped";
-  /** The engine's own human-readable explanation for this decision. */
+  // The engine's own human-readable explanation for this decision.
   reason: string;
-  /** The engine's coded reason — for callers that need to branch on it. */
+  // The engine's coded reason — for callers that need to branch on it.
   reasonCode: DecisionReason;
   scheduleName?: string;
   allocatedAmps: number;
@@ -158,8 +148,8 @@ function toEnergyData(inputs: PreviewInputs, nowIso: string): EnergyData {
   };
 }
 
-/** Display budget for the solar/grid split — built exactly the way the
- *  engine budgets (resolveAvailableW: EV add-back, margin, gross mode). */
+// Display budget for the solar/grid split — built exactly the way the
+// engine budgets (resolveAvailableW: EV add-back, margin, gross mode).
 function attributionBudgetKw(
   config: ControllerConfig,
   energy: EnergyData,
