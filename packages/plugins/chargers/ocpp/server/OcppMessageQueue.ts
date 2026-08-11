@@ -78,11 +78,6 @@ export class OcppMessageQueue {
         }),
       ]);
     } catch (error) {
-      // A timed-out job keeps running in the background — JS has no way to
-      // cancel an in-flight async function — but the queue moves on rather
-      // than waiting for it, which is the whole point of a bound. If it
-      // eventually finishes, whatever it does (send a reply, patch state)
-      // still happens, just later and out of the queue's view.
       this.logger.warn(
         `OCPP handler for ${this.chargePointId} failed or timed out: ${error}`,
       );

@@ -45,9 +45,7 @@ interface TapoCredentials {
   password: string;
 }
 
-// One charger row's plug credentials, or a message naming what is missing.
-// Row-scoped: `host`/`email` come from the row's plain config and `password`
-// from its encrypted secrets, so two Tapo rows address two different plugs.
+// Per-row plug credentials (config host/email + encrypted password), or a message naming what is missing.
 export function tapoCredentials(
   { config, secrets }: ChargerRowConfig,
 ): TapoCredentials | { error: string } {

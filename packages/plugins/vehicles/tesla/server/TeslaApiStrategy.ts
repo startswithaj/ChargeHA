@@ -40,9 +40,16 @@ export class TeslaApiStrategy {
     return elapsed < this.staleness(context, cachedState);
   }
 
-  // Whether a wake call ($0.02) is justified: always for forceRefresh,
-  // allowed for schedules/solar (not blockouts), skipped when cached state
-  // shows unplugged or already at/over the charge limit, rate-limited to 1/hr.
+  // Whether a wake call ($0.02) is justified given the current context.
+  //  - Always wakes for user-initiated forceRefresh
+  //  - Allowed for schedules or solar (not blockouts)
+  //  - Skipped when cached state shows the car isn't plugged in
+  //    (Tesla wakes itself on plug-in, so the free /vehicles online check will
+  //    catch it — no reason to spend $0.02 waking an unplugged car)
+  //  - Skipped when cached battery is already at/over the charge limit
+  //    (battery only drops while asleep, so a cached "full" reading stays valid;
+  //    if the user drives the car it will come online naturally and refresh)
+  //  - Rate-limited to once per hour
   shouldWake(
     context: VehicleRequestContext,
     cachedState: AdapterVehicleChargeState | null,

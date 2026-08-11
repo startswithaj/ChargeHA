@@ -1,17 +1,3 @@
-// Pairing exists to break a deadlock in first-time setup: a charge point id
-// with no charger row is refused, but the user cannot know the URL and id are
-// right until a charger actually connects. A pairing window accepts an
-// unknown id for a few minutes so the panel can prove reachability before
-// anything is committed.
-//
-// The load-bearing property is that a connection with no charger row is
-// inert. It may say what it is (BootNotification, for vendor/model display);
-// it may not open a transaction or push meter readings, because no charger
-// row exists for it yet. Once Save creates the row, the same open socket's
-// very next message is handled normally — no promote, no reconnect. These
-// tests drive the real message handler over a fake socket and a fake row
-// lookup rather than asserting on internal flags, so a regression that lets
-// StartTransaction through fails here rather than in production.
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { Logger } from "@chargeha/server/lib/Logger";

@@ -3,17 +3,10 @@ import { z } from "zod";
 import { createTraceId } from "@chargeha/shared";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
-import type { SimulatedVehicleAdapter } from "./SimulatedVehicleAdapter.ts";
-
-// The slice of the plugin this router calls. Declared here rather than
-// imported from index.ts, which imports this module — the class satisfies it
-// structurally.
-interface SimulatedRouterPlugin {
-  getAdapter(vehicleId: string): SimulatedVehicleAdapter | undefined;
-}
+import type { SimulatedVehiclePlugin } from "./index.ts";
 
 export function createSimulatedRouter(
-  plugin: SimulatedRouterPlugin,
+  plugin: Pick<SimulatedVehiclePlugin, "getAdapter">,
   deps: PluginDependencies,
 ) {
   return router({

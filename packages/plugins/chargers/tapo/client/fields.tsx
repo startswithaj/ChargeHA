@@ -1,8 +1,7 @@
 import type { PluginConfigField } from "../../../hostUi.ts";
 import { TapoDiscoverySection } from "./TapoControls.tsx";
 
-// The one definition of Tapo's config. Rendered by both the wizard step and
-// the settings panel, so labels, help and grouping cannot drift apart.
+// Single config definition shared by the wizard step and the settings panel.
 export const TAPO_FIELDS: PluginConfigField[] = [
   {
     key: "tapoHost",

@@ -15,10 +15,7 @@ const PROBE_TIMEOUT_MS = 1500;
 // 32-byte hash) — detectable without credentials. A 403 is equally
 // identifying: only a Tapo device serves that path at all.
 class TapoDiscovery extends NetworkDiscovery<TapoDevice> {
-  // Full sweep rather than stopping early: a locked plug would otherwise mask
-  // a usable one later in the subnet, and a household can have several plugs.
-  // Absent hosts refuse the TCP connection immediately, so the added cost is
-  // small next to the timeout budget an empty subnet already spends.
+  // Sweep the whole subnet so a locked plug cannot mask a usable one further along.
   protected readonly stopAtFirstHit = false;
 
   constructor(

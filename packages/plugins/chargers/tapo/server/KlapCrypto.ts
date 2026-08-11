@@ -144,10 +144,6 @@ export class KlapCrypto {
   ): Promise<Uint8Array<ArrayBuffer>> {
     const signature = body.slice(0, 32);
     const ciphertext = body.slice(32);
-    // Same formula as the request signature. Assumption to confirm on real
-    // hardware: reference clients (python-kasa) skip these 32 bytes without
-    // verifying; tapo-simulator signs responses this way. A mismatch here
-    // fails loud instead of surfacing as an opaque decrypt/JSON error.
     const expected = await KlapCrypto.sha256(
       KlapCrypto.concatBytes(
         keys.sigKey,
