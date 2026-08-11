@@ -341,12 +341,17 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     durationMs: number,
     isRetry: boolean,
   ): void {
-    this.logger.debug(
-      `SEMS ${path} → code ${
-        code || "(none)"
-      }, dataEmpty=${dataEmpty} in ${durationMs}ms${isRetry ? " (retry)" : ""}`,
-    );
-    if (SUCCESS_CODES.has(code) && !dataEmpty) return;
+    const summary = `SEMS ${path} → code ${
+      code || "(none)"
+    }, dataEmpty=${dataEmpty} in ${durationMs}ms${isRetry ? " (retry)" : ""}`;
+    if (SUCCESS_CODES.has(code) && !dataEmpty) {
+      this.logger.debug(summary);
+      return;
+    }
+    // Failures are loud — warn on stdout at the default log level plus a
+    // plugin_logs row — because failing calls are exactly what a user's log
+    // excerpt has to show.
+    this.logger.warn(summary);
     this.dbLog.warn(`POST ${path}`, {
       payload: { path, code: code || null, dataEmpty, durationMs, isRetry },
     });
@@ -457,7 +462,7 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
       return await response.json() as Record<string, unknown>;
     } catch (error) {
       const elapsedMs = Math.round(performance.now() - startedAt);
-      this.logger.debug(
+      this.logger.warn(
         `SEMS POST ${url} failed after ${elapsedMs}ms: ${error}`,
       );
       if (
