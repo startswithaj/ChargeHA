@@ -15,12 +15,12 @@ import {
 export interface NoticePoint extends ConflictPoint {
   kind: ChargerKind;
   vehicleResolution: VehicleResolutionKind;
-  /** The charger row's assigned vehicle — not the resolved one. */
+  // The charger row's assigned vehicle — not the resolved one.
   vehicleId: string | null;
 }
 
-/** Either schedule can carry a chargeLimitPct, and the engine stops at the
- *  strictest of the two — see selectActiveChargeSchedule. */
+// Either schedule can carry a chargeLimitPct, and the engine stops at the
+// strictest of the two — see selectActiveChargeSchedule.
 const limitClause = (c: ScheduleConflict): string => {
   if (c.chargerLimitPct === null && c.vehicleLimitPct === null) {
     return "neither schedule sets a charge limit";
@@ -38,8 +38,8 @@ const limitClause = (c: ScheduleConflict): string => {
 const pointNames = (points: NoticePoint[]): string =>
   points.map((p) => p.name).join(", ");
 
-/** Charger-keyed group: the car plugged in here may have its own schedule, and
- *  then both drive this one charger. */
+// Charger-keyed group: the car plugged in here may have its own schedule,
+// and then both drive this one charger.
 export function chargerNotices(
   point: NoticePoint,
   chargeSchedules: ChargeSchedule[],
@@ -113,17 +113,9 @@ function idleNotice(vehicleName: string): ScheduleNotice {
   };
 }
 
-/** Vehicle-keyed group: a vehicle schedule only drives a charger while some
- *  charging point resolves to that vehicle (ChargingPointManager.resolveVehicle
- *  — an assignment wins while that car is plugged in, otherwise exactly one
- *  plugged-in car is inferred, and several is ambiguous and resolves to
- *  nothing).
- *
- *  Callers gate this on the vehicle being tied to a smart charger; a
- *  vehicle_api point is linked by construction and has nothing to report.
- *
- *  Every notice is about this instant, because resolution is: the wording has
- *  to stay in the present tense so it cannot read as a permanent claim. */
+// A vehicle schedule only drives a charger while some point resolves to
+// that vehicle. Callers gate this on the vehicle being tied to a smart
+// charger. Every notice stays in the present tense — resolution is instant.
 export function vehicleNotices(
   vehicleId: string,
   vehicleName: string,

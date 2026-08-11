@@ -45,13 +45,9 @@ interface TapoCredentials {
   password: string;
 }
 
-/**
- * One charger row's plug credentials, or a message naming what is missing.
- *
- * Row-scoped: `host`/`email` come from the row's plain config and `password`
- * from its encrypted secrets, so two Tapo rows address two different plugs.
- * The plugin-wide `tapo.host` / `tapo.email` / `tapo.password` keys are gone.
- */
+// One charger row's plug credentials, or a message naming what is missing.
+// Row-scoped: `host`/`email` come from the row's plain config and `password`
+// from its encrypted secrets, so two Tapo rows address two different plugs.
 export function tapoCredentials(
   { config, secrets }: ChargerRowConfig,
 ): TapoCredentials | { error: string } {
@@ -64,8 +60,8 @@ export function tapoCredentials(
   return { host, email, password };
 }
 
-/** Tapo smart plug charger plugin — switch-only control of a dumb EVSE via
- *  the local KLAP protocol. */
+// Tapo smart plug charger plugin — switch-only control of a dumb EVSE via
+// the local KLAP protocol.
 export class TapoChargerPlugin implements ChargerPlugin {
   readonly id = "tapo";
   readonly displayName = "Tapo P110/115 Smart Plug";
@@ -78,7 +74,7 @@ export class TapoChargerPlugin implements ChargerPlugin {
     deps.log.info("Tapo plugin initialized");
   }
 
-  /** Nothing is awaited: every value this needs arrives as an argument. */
+  // Nothing is awaited: every value this needs arrives as an argument.
   // deno-lint-ignore require-await
   async createChargerMiddleware(
     row: ChargerRow,
@@ -117,7 +113,7 @@ export class TapoChargerPlugin implements ChargerPlugin {
     return null;
   }
 
-  /** null = healthy, or unconfigured and therefore deliberately silent. */
+  // null = healthy, or unconfigured and therefore deliberately silent.
   private async checkRow(entry: ResolvedChargerRow): Promise<string | null> {
     const credentials = tapoCredentials(entry);
     if ("error" in credentials) {

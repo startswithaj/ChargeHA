@@ -64,14 +64,8 @@ const t = initTRPC.context<TrpcContext>().create({
   },
 });
 
-/**
- * Middleware that maps domain errors to TRPCErrors so routers don't
- * need try/catch blocks and services stay transport-agnostic.
- *
- * In tRPC v11, next() returns a result object instead of throwing.
- * When result.ok is false, the original domain error is in
- * result.error.cause — we inspect it and throw the mapped TRPCError.
- */
+// Middleware that maps domain errors to TRPCErrors so routers don't need
+// try/catch blocks and services stay transport-agnostic. In tRPC v11, next() returns a result object instead of throwing. When result.ok is false, the original domain error is in result.error.cause — we inspect it and throw the mapped TRPCError.
 const errorMiddleware = t.middleware(async ({ next }) => {
   const result = await next();
   if (!result.ok) {

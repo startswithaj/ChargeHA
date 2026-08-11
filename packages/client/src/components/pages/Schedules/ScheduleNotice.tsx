@@ -9,9 +9,9 @@ export interface ScheduleNotice {
   message: string;
 }
 
-/** Amber + Info is the dashboard's warning convention (WARNING_ACCENTS in
- *  EnergyOverview.tsx); the gray variant reuses this page's existing info-note
- *  border rather than inventing a third style. */
+// Amber + Info is the dashboard's warning convention (WARNING_ACCENTS in
+// EnergyOverview.tsx); gray reuses this page's existing info-note border
+// rather than inventing a third style.
 const ACCENTS = {
   warning: { border: "var(--amber-9)", icon: "var(--amber-9)" },
   info: { border: "var(--gray-a6)", icon: "var(--gray-9)" },

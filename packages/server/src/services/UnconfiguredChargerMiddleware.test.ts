@@ -50,10 +50,8 @@ describe("UnconfiguredChargerMiddleware", () => {
       expect(await middleware.setChargeAmps(16, ctx)).toBe(false);
     });
 
-    it("rejects getChargerInfo with the reason rather than inventing specs", async () => {
-      await expect(build().getChargerInfo(ctx)).rejects.toThrow(
-        "Charger not configured: Tapo host not configured",
-      );
+    it("reports switch control mode — it commands nothing either way", () => {
+      expect(build().getCachedState()?.controlMode).toBe("switch");
     });
   });
 });

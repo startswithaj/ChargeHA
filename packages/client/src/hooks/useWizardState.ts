@@ -11,11 +11,8 @@ const EMPTY_STATE: WizardNavState = {
   controlPath: null,
 };
 
-/**
- * The setup wizard's store, persisted to the database via tRPC.
- * Steps are identified by string IDs (not numeric indices) so the wizard
- * can resume correctly even when the step list changes dynamically.
- */
+// Steps are identified by string IDs (not numeric indices) so the wizard
+// can resume correctly even when the step list changes dynamically.
 export function useWizardState(): WizardStore {
   const utils = trpc.useUtils();
 

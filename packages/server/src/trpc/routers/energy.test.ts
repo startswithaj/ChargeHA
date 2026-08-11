@@ -49,7 +49,6 @@ describe("Energy tRPC Router", () => {
       db,
       emptyRegistry,
       testLogger,
-      () => Promise.resolve({ unmeteredW: 0, meteredW: 0 }),
     );
     caller = createCaller(throwingMock<TrpcContext>("TrpcContext", {
       energyManager,

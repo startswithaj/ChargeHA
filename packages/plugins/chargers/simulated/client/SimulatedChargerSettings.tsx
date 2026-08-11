@@ -7,8 +7,8 @@ import { trpc } from "./trpc.ts";
 const clampAmps = (value: string): number =>
   Math.min(48, Math.max(0, Number(value) || 0));
 
-/** Dev controls for the simulated charger: plugged-in state and the fake
- *  car's appetite, plus a live readout of the adapter's reported state. */
+// Dev controls for the simulated charger: plugged-in state and the fake
+// car's appetite, plus a live readout of the adapter's reported state.
 export function SimulatedChargerSettings(
   { chargerId }: PluginSettingsProps,
 ): JSX.Element | null {

@@ -43,7 +43,7 @@ const DEFAULT_LOOP_MS = 30_000;
 // Prune old log entries every N loops
 const PRUNE_EVERY_N_LOOPS = 100;
 
-/** Decision log entry built per vehicle per loop iteration. */
+// Decision log entry built per vehicle per loop iteration.
 interface DecisionLogEntry {
   vehicleId: string;
   vehicleName: string;
@@ -54,16 +54,15 @@ interface DecisionLogEntry {
   reason: DecisionReason;
   actionDetail: string;
   targetAmps: number | null;
-  /** When true, polling can be suspended for this vehicle. */
   suspendable?: boolean;
-  /** Set when a charge schedule's limit was reached and the decision fell through. */
+  // Set when a charge schedule's limit was reached and the decision fell through.
   scheduleLimitContext?: { scheduleLimitPct: number; batteryLevel: number };
 }
 
-/** One controllable unit for the loop: a charging point. */
+// One controllable unit for the loop: a charging point.
 interface ControlTarget {
   id: string;
-  /** Vehicle linked to this charging point — schedules are keyed by it. */
+  // Vehicle linked to this charging point — schedules are keyed by it.
   vehicleId: string | null;
   name: string;
   mode: VehicleMode;
@@ -128,10 +127,9 @@ export class ChargeController {
     }, delayMs);
   }
 
-  /** Run a single iteration of the control loop without scheduling the next.
-   *  Used by the simulator to step the controller one tick at a time.
-   *  Returns the loaded config so the loop scheduler can read controllerLoopSeconds
-   *  without a redundant DB round-trip. */
+  // Run a single iteration of the control loop without scheduling the next.
+  // Used by the simulator to step the controller one tick at a time. Returns
+  // the loaded config so the loop scheduler can read controllerLoopSeconds without a redundant DB round-trip.
   async runOnce(): Promise<ControllerConfig> {
     const traceId = createTraceId();
     const config = await this.loadConfig();
@@ -229,7 +227,6 @@ export class ChargeController {
     return config;
   }
 
-  /** Execute a decision by issuing the appropriate target command. */
   private async executeDecision(
     target: ControlTarget,
     decision: VehicleDecision,
@@ -288,14 +285,9 @@ export class ChargeController {
     );
   }
 
-  /** Split active, controllable charging points into the ones this loop
-   *  decides for and the ones a vehicle's own API owns. A passive point is
-   *  not a decision target: no mode, no schedules, no solar allocation, no
-   *  commands. Its draw is not lost — the same physical session appears in
-   *  the allocator through that car's own, active, charging point.
-   *
-   *  The self-driven set is computed once for the whole pass; deriving it
-   *  per charger would cost two DB reads per charger per loop. */
+  // Split active, controllable charging points into the ones this loop decides for and the ones a vehicle's own API owns. A passive point is
+  // not a decision target: no mode, no schedules, no solar allocation, no commands. Its draw is not lost — the same physical session appears in
+  // the allocator through that car's own, active, charging point. The self-driven set is computed once for the whole pass; deriving it per charger would cost two DB reads per charger per loop.
   private async splitByControlPath(): Promise<
     { self: ChargerRow[]; passive: ChargerRow[] }
   > {
@@ -320,15 +312,9 @@ export class ChargeController {
     };
   }
 
-  /** Passive chargers are still polled — the dashboard card and the energy
-   *  adapter's charging-load figure both read their cached state — and still
-   *  held open, or the car's own API has no path to draw current through.
-   *  They get no decision, no mode, no schedule and no allocation.
-   *
-   *  No solar/schedule hints are passed: those exist so a cost-aware VEHICLE
-   *  middleware can decide whether a paid wake is worth it, and a passive
-   *  point acts on neither. The car itself is refreshed through its own
-   *  vehicle_api target, which is active by definition here. */
+  // Passive chargers are still polled — the dashboard card and the energy adapter's charging-load figure both read their cached state — and still
+  // held open, or the car's own API has no path to draw current through. They get no decision, no mode, no schedule and no allocation. No
+  // solar/schedule hints are passed: those exist so a cost-aware VEHICLE middleware can decide whether a paid wake is worth it, and a passive point acts on neither. The car itself is refreshed through its own vehicle_api target, which is active by definition here.
   private async refreshPassiveChargers(
     rows: ChargerRow[],
     traceId: string,
@@ -430,9 +416,8 @@ export class ChargeController {
     };
   }
 
-  /** Execute a single target's decision and produce its log entry.
-   *  Handles: commands, polling suspension, event emission, transition
-   *  tracking. */
+  // Execute a single target's decision and produce its log entry. Handles:
+  // commands, polling suspension, event emission, transition tracking.
   private async processTargetDecision(
     target: ControlTarget,
     decision: VehicleDecision,
@@ -538,7 +523,7 @@ export class ChargeController {
     this.scheduleNext(nextIntervalMs);
   }
 
-  /** Push the latest controller decision to the frontend via SSE. */
+  // Push the latest controller decision to the frontend via SSE.
   private emitControllerStatus(
     vehicleId: string,
     entry: DecisionLogEntry,
@@ -553,9 +538,9 @@ export class ChargeController {
     }, vehicleId);
   }
 
-  /** Detect state transitions and emit controller events.
-   *  @param preState   — polled state at the start of this loop (before commands)
-   *  @param postState  — state after commands (may differ from preState) */
+  // Detect state transitions and emit controller events.
+  // preState — polled state at the start of this loop (before commands)
+  // postState — state after commands (may differ from preState)
   private emitControllerEvents(
     target: ControlTarget,
     preState: VehicleChargeState | null,
@@ -710,9 +695,8 @@ export class ChargeController {
     };
   }
 
-  /** Blockouts are always global. Charge schedules match the charging
-   *  point directly (chargerId), via its linked vehicle (vehicleId), or
-   *  everywhere when untargeted. */
+  // Blockouts are always global. Charge schedules match the charging point
+  // directly (chargerId), via its linked vehicle (vehicleId), or everywhere when untargeted.
   private isScheduleApplicable(
     s: ScheduleRow,
     target: { id: string; vehicleId: string | null },

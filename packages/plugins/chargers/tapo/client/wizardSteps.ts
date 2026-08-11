@@ -3,10 +3,8 @@ import type { ChargerPluginOption } from "../../../pluginOptions.ts";
 import { tapoSetupStep } from "./TapoSetupStep.tsx";
 import { tapoVerifyStep } from "./TapoVerifyStep.tsx";
 
-/** Tapo wizard steps, in order. */
 export const tapoWizardSteps: PluginStepDef[] = [tapoSetupStep, tapoVerifyStep];
 
-/** Tapo option metadata for the charger type selection step. */
 export const tapoChargerOption: ChargerPluginOption = {
   id: "tapo",
   label: "Tapo P110/115 Smart Plug",

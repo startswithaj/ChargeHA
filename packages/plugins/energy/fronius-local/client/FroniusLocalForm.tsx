@@ -87,8 +87,8 @@ function SearchSection(
   );
 }
 
-/** Search state + the subnet default, split out to keep FroniusLocalForm
- *  under the function-length limit. */
+// Search state + the subnet default, split out to keep FroniusLocalForm
+// under the function-length limit.
 function useFroniusSearch() {
   const [subnet, setSubnet] = useState("");
   const [searchResults, setSearchResults] = useState<FroniusDevice[]>([]);

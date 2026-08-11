@@ -1,7 +1,10 @@
 import type {
   CallContext,
+  ChargerConfigMap,
+  ChargerSecretsMap,
   ChargerState,
   ChargingPointMode,
+  EnergyData,
   VehicleChargeState,
   VehicleResolutionKind,
 } from "@chargeha/shared";
@@ -11,7 +14,6 @@ import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { ChargerRow, VehicleRow } from "../db/types.ts";
 import type { TypedEventEmitter } from "./TypedEventEmitter.ts";
 import type { VehicleManager } from "./VehicleManager.ts";
-import type { EnergyPoller } from "./EnergyPoller.ts";
 import type { ConfigService } from "./ConfigService.ts";
 import type { Logger } from "../lib/Logger.ts";
 import type {
@@ -44,18 +46,12 @@ export interface VehicleResolution {
   vehicleId: string | null;
 }
 
-/** Which side is deciding for this charging point right now.
- *
- *  `"self"` — this point makes its own decisions: mode, schedules, solar
- *  tracking, amp adjustment.
- *
- *  `"vehicle_api"` — the car on it is driven by its own API, so this point
- *  decides nothing. It is NOT unregistered: it still reports state, and it
- *  must still physically allow current or the car's API has no path to
- *  charge through. See `holdOpen`. */
+// Which side is deciding for this charging point right now. `"self"` — this point makes its own decisions: mode, schedules, solar tracking, amp adjustment.
+// `"vehicle_api"` — the car on it is driven by its own API, so this point decides nothing. It is NOT unregistered: it still reports state, and it
+// must still physically allow current or the car's API has no path to charge through. See `holdOpen`.
 export interface ControlPath {
   owner: "self" | "vehicle_api";
-  /** The self-driven vehicle this point is passing current to. */
+  // The self-driven vehicle this point is passing current to.
   passiveForVehicleId: string | null;
 }
 
@@ -69,12 +65,14 @@ export class ChargingPointManager {
   private commandBackoff = new Map<string, CommandBackoffState>();
   // Cached at init; enrich() runs on hot paths and must not hit the DB.
   private cachedGridVoltage: number | null = null;
+  // Last good energy reading, cached from energy_update; cleared on a failed
+  // poll so enrich() never resolves voltage from a zeroed breadcrumb.
+  private latestEnergy: EnergyData | null = null;
 
   constructor(
     private readonly db: AppDatabase,
     private readonly chargerPlugins: ChargerPluginRegistry,
     private readonly vehicleManager: VehicleManager,
-    private readonly poller: EnergyPoller,
     private readonly configService: ConfigService,
     private readonly eventEmitter: TypedEventEmitter,
     private readonly logger: Logger,
@@ -103,13 +101,9 @@ export class ChargingPointManager {
     this.eventEmitter.emit("chargers_changed", {});
   }
 
-  /** Never throws: a charger whose adapter cannot be built still registers
-   *  and reports "unconfigured", so the dashboard can say what is wrong.
-   *
-   *  Reading the row's config and secrets happens INSIDE the try. A row whose
-   *  secrets were encrypted under an ENCRYPTION_KEY that is no longer set
-   *  makes `getChargerSecrets` throw; that must show up as one unconfigured
-   *  charger on the dashboard, not as a failed boot. */
+  // Never throws: a charger whose adapter cannot be built still registers and reports "unconfigured", so the dashboard can say what is wrong.
+  // Reading the row's config and secrets happens INSIDE the try. A row whose secrets were encrypted under an ENCRYPTION_KEY that is no longer set
+  // makes `getChargerSecrets` throw; that must show up as one unconfigured charger on the dashboard, not as a failed boot.
   private async tryCreateMiddleware(
     plugin: ChargerPlugin,
     row: ChargerRow,
@@ -149,8 +143,8 @@ export class ChargingPointManager {
     this.eventEmitter.emit("chargers_changed", {});
   }
 
-  /** Vehicle-API points are deactivated rather than deleted so that their
-   *  schedules, logs and stats survive a control-path switch. */
+  // Vehicle-API points are deactivated rather than deleted so that their
+  // schedules, logs and stats survive a control-path switch.
   private async setVehicleApiActive(active: boolean): Promise<void> {
     const rows = await this.db.getChargers();
     const targets = rows.filter((r) =>
@@ -241,8 +235,8 @@ export class ChargingPointManager {
     await this.setMode(entry.row.id, "auto", ctx);
   }
 
-  /** A point with no adapter still has a row and a card, but nothing to
-   *  drive. Reads the cache directly — enrich() derives amps we never use. */
+  // A point with no adapter still has a row and a card, but nothing to
+  // drive. Reads the cache directly — enrich() derives amps we never use.
   isControllable(id: string): boolean {
     const entry = this.chargers.get(id);
     return entry !== undefined &&
@@ -259,7 +253,7 @@ export class ChargingPointManager {
     if (state.chargeAmps !== null || state.chargePowerKw === null) return state;
     if (this.cachedGridVoltage === null) return state;
 
-    const energy = this.poller.tryGetRealtimeSnapshot()?.realtime ?? null;
+    const energy = this.latestEnergy;
     const voltage = SolarAllocator.resolveVoltage(
       state.chargerVoltage,
       energy,
@@ -286,6 +280,9 @@ export class ChargingPointManager {
     this.eventEmitter.subscribe("vehicles_changed", async () => {
       await this.syncVehicleChargingPoints();
     });
+    this.eventEmitter.subscribe("energy_update", (data) => {
+      this.latestEnergy = data.pollFailed ? null : data;
+    });
     const rows = await this.db.getChargers();
     await rows.reduce(
       (chain, row) => chain.then(() => this.addCharger(row)),
@@ -293,15 +290,9 @@ export class ChargingPointManager {
     );
   }
 
-  /** Cleans up after a deleted vehicle. Creating points for new vehicles is
-   *  the vehicle-creation path's job, not an event's.
-   *
-   *  Only the vehicle's own API point is deleted — it exists solely to drive
-   *  that one car, so it has nothing left to do. Any other point merely had
-   *  the car assigned to it: that is hardware the user still owns, so the
-   *  assignment is cleared and the row stays. Deleting it instead would take
-   *  the charger-keyed schedules set on it too, since deleteCharger cascades
-   *  them (AppDatabase.deleteCharger). */
+  // Cleans up after a deleted vehicle. Creating points for new vehicles is the vehicle-creation path's job, not an event's.
+  // Only the vehicle's own API point is deleted — it exists solely to drive that one car, so it has nothing left to do. Any other point merely had
+  // the car assigned to it: that is hardware the user still owns, so the assignment is cleared and the row stays. Deleting it instead would take the charger-keyed schedules set on it too, since deleteCharger cascades them (AppDatabase.deleteCharger).
   async syncVehicleChargingPoints(): Promise<void> {
     const [vehicles, rows] = await Promise.all([
       this.db.getVehicles(),
@@ -322,10 +313,9 @@ export class ChargingPointManager {
     );
   }
 
-  /** Gives a newly added vehicle its own charging point, unless its plugin
-   *  has no charger role. Created inactive when a smart charger already owns
-   *  control, so the vehicle still has something for the API-control toggle
-   *  to show and switch, in either setup order. */
+  // Gives a newly added vehicle its own charging point, unless its plugin
+  // has no charger role. Created inactive when a smart charger already owns control, so the vehicle still has something for the API-control toggle
+  // to show and switch, in either setup order.
   async ensureVehicleChargingPoint(vehicle: VehicleRow): Promise<void> {
     if (!this.chargerPlugins.get(vehicle.adapterType)) return;
     const rows = await this.db.getChargers();
@@ -355,8 +345,8 @@ export class ChargingPointManager {
     );
   }
 
-  /** Per-vehicle control-path switch: whether this car is driven by its own
-   *  API or by whichever smart charger it is plugged into. */
+  // Per-vehicle control-path switch: whether this car is driven by its own
+  // API or by whichever smart charger it is plugged into.
   async setVehicleApiControl(
     vehicleId: string,
     active: boolean,
@@ -372,12 +362,9 @@ export class ChargingPointManager {
     this.eventEmitter.emit("chargers_changed", {});
   }
 
-  /** Rebuild the running middleware for ONE charger row after a row-scoped
-   *  config write. Never throws: a still-wrong config becomes an
-   *  UnconfiguredChargerMiddleware, so a bad Save still resolves. Registers
-   *  the row if it is not yet in the map — the first save on a fresh
-   *  charger — and clears `lastCommandedAmps`, since amps commanded against
-   *  the old adapter mean nothing against the new one. */
+  // Rebuild the running middleware for ONE charger row after a row-scoped config write. Never throws: a still-wrong config becomes an
+  // UnconfiguredChargerMiddleware, so a bad Save still resolves. Registers the row if it is not yet in the map — the first save on a fresh
+  // charger — and clears `lastCommandedAmps`, since amps commanded against the old adapter mean nothing against the new one.
   async rebuildMiddlewareFor(chargerRowId: string): Promise<void> {
     const entry = this.chargers.get(chargerRowId);
     if (entry === undefined) {
@@ -410,7 +397,6 @@ export class ChargingPointManager {
       return { success: false, error: "Command backoff active" };
     }
     try {
-      const info = await entry.middleware.getChargerInfo(ctx);
       const clamped = Math.max(
         state.chargeAmpsMin,
         Math.min(state.chargeAmpsMax, Math.round(amps)),
@@ -419,7 +405,7 @@ export class ChargingPointManager {
       const alreadyCommanded = entry.lastCommandedAmps === clamped &&
         state.isCharging;
       if (
-        info.controlMode === "amps" && !alreadyCommanded &&
+        state.controlMode === "amps" && !alreadyCommanded &&
         state.chargeAmps !== clamped
       ) {
         const ok = await entry.middleware.setChargeAmps(
@@ -562,14 +548,9 @@ export class ChargingPointManager {
 
   // ── Control path ─────────────────────────────────────────────────────
 
-  /** Vehicles driven by their own API that could be on a charger right now:
-   *  an active vehicle_api point, plugged in, and not known to be away.
-   *  isHome is null when unknown, so only an explicit false rules one out —
-   *  the same test inferVehicle uses.
-   *
-   *  Public because it is the per-pass cache for `getControlPath`: a caller
-   *  looking at every charger computes this once and threads it in, rather
-   *  than paying two DB reads per charger per controller loop. */
+  // Vehicles driven by their own API that could be on a charger right now: an active vehicle_api point, plugged in, and not known to be away.
+  // isHome is null when unknown, so only an explicit false rules one out — the same test inferVehicle uses. Public because it is the per-pass
+  // cache for `getControlPath`: a caller looking at every charger computes this once and threads it in, rather than paying two DB reads per charger per controller loop.
   async getSelfDrivenVehicles(): Promise<Set<string>> {
     const [rows, states] = await Promise.all([
       this.db.getChargers(),
@@ -586,21 +567,9 @@ export class ChargingPointManager {
     );
   }
 
-  /** Derived, never stored: a smart charger goes passive only while a
-   *  self-driven car is the one on it. A second, dumb car on the same
-   *  charger resolves normally and the charger keeps full control for it.
-   *
-   *  Deriving this rather than storing a second flag is deliberate — a
-   *  stored "passive" bit and the row's `active` bit could disagree, and
-   *  `active` is per-row so it could not vary by which car is plugged in
-   *  anyway.
-   *
-   *  `selfDriven` is the optional per-pass cache from
-   *  `getSelfDrivenVehicles`; omit it and one is computed for this call.
-   *
-   *  Clears a stale hold as a side effect when control comes back: the next
-   *  controlled loop must re-decide amps from scratch, not inherit the
-   *  standing maximum that passive left behind. */
+  // Derived, never stored: a smart charger goes passive only while a self-driven car is the one on it. A second, dumb car on the same charger
+  // resolves normally and the charger keeps full control for it. Deriving this rather than storing a second flag is deliberate — a stored "passive"
+  // bit and the row's `active` bit could disagree, and `active` is per-row so it could not vary by which car is plugged in anyway. `selfDriven` is the optional per-pass cache from `getSelfDrivenVehicles`; omit it and one is computed for this call. Clears a stale hold as a side effect when control comes back: the next controlled loop must re-decide amps from scratch, not inherit the standing maximum that passive left behind.
   async getControlPath(
     id: string,
     selfDriven?: ReadonlySet<string>,
@@ -620,8 +589,8 @@ export class ChargingPointManager {
     return { owner: "vehicle_api", passiveForVehicleId: vehicleId };
   }
 
-  /** The self-driven vehicle this smart charger is passing current to, or
-   *  null when it is deciding for itself. */
+  // The self-driven vehicle this smart charger is passing current to, or
+  // null when it is deciding for itself.
   private async passiveVehicleFor(
     id: string,
     selfDriven: ReadonlySet<string>,
@@ -643,23 +612,9 @@ export class ChargingPointManager {
     entry.lastCommandedAmps = null;
   }
 
-  /** Passive hold for a smart charger whose car is driven by its own API.
-   *
-   *  Doing nothing is not passive enough to work. An OCPP charger keeps the
-   *  last ChargingProfile it was sent, so a charger left at 6A by solar
-   *  tracking caps the car at 6A however much its own API asks for; and a
-   *  charger that never received RemoteStart never closes its contactor at
-   *  all. Passive therefore means a standing permission — the connector's
-   *  own maximum, and one start — after which the point issues nothing: no
-   *  stop, no amp adjustment, no schedules, no solar tracking.
-   *
-   *  Once per plug-in, NOT once per loop. Do not "fix" this into a per-loop
-   *  re-start. If the car's own API ends the charge the transaction ends
-   *  with it, and re-issuing RemoteStart every loop would fight the car for
-   *  as long as it stayed plugged in. The accepted cost is the other side of
-   *  that trade: a car that finishes mid-session leaves the charger armed
-   *  but idle until the cable is pulled, which draws nothing and is
-   *  cleared by resetModeOnUnplug's unplug edge. */
+  // Passive hold for a smart charger whose car is driven by its own API. Doing nothing is not passive enough to work. An OCPP charger keeps the
+  // last ChargingProfile it was sent, so a charger left at 6A by solar tracking caps the car at 6A however much its own API asks for; and a charger
+  // that never received RemoteStart never closes its contactor at all. Passive therefore means a standing permission — the connector's own maximum, and one start — after which the point issues nothing: no stop, no amp adjustment, no schedules, no solar tracking. Once per plug-in, NOT once per loop. Do not "fix" this into a per-loop re-start. If the car's own API ends the charge the transaction ends with it, and re-issuing RemoteStart every loop would fight the car for as long as it stayed plugged in. The accepted cost is the other side of that trade: a car that finishes mid-session leaves the charger armed but idle until the cable is pulled, which draws nothing and is cleared by resetModeOnUnplug's unplug edge.
   async holdOpen(id: string, ctx: CallContext): Promise<void> {
     const entry = this.chargers.get(id);
     if (!entry || entry.heldOpen) return;
@@ -670,12 +625,9 @@ export class ChargingPointManager {
     await this.startChargingAt(id, state.chargeAmpsMax, ctx, state);
   }
 
-  /** Explicit vehicle assignment for a smart charger — resolveVehicle prefers
-   *  this over inference. `null` clears it, returning to inference. Updates
-   *  the in-memory row so the next controller loop or resolveVehicle call
-   *  sees it immediately; no rebuild/restart needed since the adapter itself
-   *  is unaffected. Only meaningful for `kind: "smart"` rows — vehicle_api
-   *  rows are already tied to their vehicle by construction. */
+  // Explicit vehicle assignment for a smart charger — resolveVehicle prefers this over inference. `null` clears it, returning to inference. Updates
+  // the in-memory row so the next controller loop or resolveVehicle call sees it immediately; no rebuild/restart needed since the adapter itself
+  // is unaffected. Only meaningful for `kind: "smart"` rows — vehicle_api rows are already tied to their vehicle by construction.
   async setChargerVehicleId(
     id: string,
     vehicleId: string | null,
@@ -718,12 +670,16 @@ export class ChargingPointManager {
     this.eventEmitter.emit("chargers_changed", {});
   }
 
-  /** Always creates a new row, even if one of this adapter type already
-   *  exists — a second Tapo or a second OCPP charger is a new row, not a
-   *  reuse of the first. Two rows of the same type would be indistinguishable
-   *  in the UI, so the second (and later) gets a count appended to its name. */
+  // Always creates a new row, even if one of this adapter type already
+  // exists — a second Tapo or a second OCPP charger is a new row, not a reuse of the first. Two rows of the same type would be indistinguishable
+  // in the UI, so the second (and later) gets a count appended to its name.
   async createCharger(
-    input: { name: string; chargerAdapterType: string },
+    input: {
+      name: string;
+      chargerAdapterType: string;
+      config?: ChargerConfigMap;
+      secrets?: ChargerSecretsMap;
+    },
   ): Promise<ChargerRow> {
     const rows = await this.db.getChargers();
     const sameType = rows.filter((row) =>
@@ -736,7 +692,7 @@ export class ChargingPointManager {
       id: crypto.randomUUID(),
       name,
       chargerAdapterType: input.chargerAdapterType,
-      chargerConfig: "{}",
+      chargerConfig: JSON.stringify(input.config ?? {}),
       mode: "auto",
       priority: rows.length + 1,
       vehicleId: null,
@@ -745,7 +701,11 @@ export class ChargingPointManager {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    await this.db.upsertCharger(row);
+    await this.db.createChargerWithConfig(
+      row,
+      input.config ?? {},
+      input.secrets ?? {},
+    );
     await this.addCharger(row);
     // One control path per car: the first smart charger takes over.
     if (!rows.some((r) => r.kind === "smart")) {
@@ -754,24 +714,29 @@ export class ChargingPointManager {
     return row;
   }
 
-  /** Always creates, resolving the row's name from the plugin's own
-   *  `displayName` — used by every "add a charger of this type" path that
-   *  doesn't already have a name to give (Settings' no-panel add, a plugin's
-   *  own add-mode save). `createCharger` does the actual insert and picks a
-   *  distinguishing name if one of this type already exists. */
-  async createChargerForType(chargerAdapterType: string): Promise<ChargerRow> {
+  // Always creates, resolving the row's name from the plugin's own
+  // `displayName` — used by every "add a charger of this type" path that doesn't already have a name to give (Settings' no-panel add, a plugin's
+  // own add-mode save). `createCharger` does the actual insert and picks a distinguishing name if one of this type already exists.
+  async createChargerForType(
+    chargerAdapterType: string,
+    seed: {
+      name?: string;
+      config?: ChargerConfigMap;
+      secrets?: ChargerSecretsMap;
+    } = {},
+  ): Promise<ChargerRow> {
     const plugin = this.chargerPlugins.get(chargerAdapterType);
     return await this.createCharger({
-      name: plugin?.displayName ?? chargerAdapterType,
+      name: seed.name ?? plugin?.displayName ?? chargerAdapterType,
       chargerAdapterType,
+      config: seed.config,
+      secrets: seed.secrets,
     });
   }
 
-  /** Find-or-create, by adapter type. Only the first-run wizard needs this:
-   *  re-running it after the charger step already ran must not create a
-   *  second row. Every other creation path (Settings "Add charger", a
-   *  plugin's own add-mode save) must always create — see
-   *  `createChargerForType` / `createCharger`. */
+  // Find-or-create, by adapter type. Only the first-run wizard needs this:
+  // re-running it after the charger step already ran must not create a second row. Every other creation path (Settings "Add charger", a
+  // plugin's own add-mode save) must always create — see `createChargerForType` / `createCharger`.
   async ensureCharger(chargerAdapterType: string): Promise<ChargerRow> {
     const rows = await this.db.getChargers();
     const existing = rows.find((row) =>
@@ -781,12 +746,9 @@ export class ChargingPointManager {
     return await this.createChargerForType(chargerAdapterType);
   }
 
-  /** Live charging load, split by whether a physical meter would already have
-   *  counted it. `unmeteredW` applies to any energy reading; `meteredW` only
-   *  to an adapter that measures nothing itself. See docs/simulated-load.md.
-   *
-   *  Counted once: a vehicle charging through a charger is one physical load,
-   *  so the charger's reading wins and that vehicle is skipped. */
+  // Live charging load, split by whether a physical meter would already have
+  // counted it. `unmeteredW` applies to any energy reading; `meteredW` only to an adapter that measures nothing itself. See docs/simulated-load.md.
+  // Counted once: a vehicle charging through a charger is one physical load, so the charger's reading wins and that vehicle is skipped.
   async getChargingLoadW(): Promise<
     { unmeteredW: number; meteredW: number }
   > {
@@ -861,8 +823,10 @@ export class ChargingPointManager {
         this.resolveVehicle(row.id),
         this.getControlPath(row.id, selfDriven),
       ]);
+      // Withheld: carries plug host addresses and account emails.
+      const { chargerConfig: _chargerConfig, ...wireRow } = row;
       return {
-        ...row,
+        ...wireRow,
         state: this.getState(row.id),
         resolvedVehicleId: resolution.vehicleId,
         vehicleResolution: resolution.kind,

@@ -25,8 +25,8 @@ interface SentFrame {
 }
 
 describe("OCPP pairing", () => {
-  /** Minimal stand-in for the upgraded socket: records what we send back and
-   *  lets a test push charger-initiated CALLs in. */
+  // Minimal stand-in for the upgraded socket: records what we send back and
+  // lets a test push charger-initiated CALLs in.
   const fakeSocket = () => {
     const sent: SentFrame[] = [];
     const socket = {
@@ -44,9 +44,9 @@ describe("OCPP pairing", () => {
     return socket;
   };
 
-  /** A fake row lookup: which charge point ids currently have a charger row.
-   *  A test can add to it mid-flow to simulate Save creating a row on an
-   *  already-open socket. */
+  // A fake row lookup: which charge point ids currently have a charger row.
+  // A test can add to it mid-flow to simulate Save creating a row on an
+  // already-open socket.
   const build = (rowsFor: Set<string> = new Set()) => {
     const logger = new Logger("OcppTest", "error");
     const cs = new OcppCentralSystem(
@@ -57,8 +57,8 @@ describe("OCPP pairing", () => {
     return { cs, rowsFor };
   };
 
-  /** Deliver a charger-initiated CALL and return what we replied. Message
-   *  handling is async now (the row lookup is), so tests await a tick. */
+  // Deliver a charger-initiated CALL and return what we replied. Message
+  // handling is async now (the row lookup is), so tests await a tick.
   const call = async (
     socket: ReturnType<typeof fakeSocket>,
     action: string,

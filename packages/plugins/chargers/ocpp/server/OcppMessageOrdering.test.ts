@@ -44,12 +44,9 @@ describe("OCPP message ordering", () => {
   const heartbeatFrame = (id: string) =>
     JSON.stringify([2, id, "Heartbeat", {}]);
 
-  /** A hasChargerRow stub whose FIRST call hangs until `release()` is
-   *  called; every call after that resolves immediately. Reproduces the
-   *  DB-latency asymmetry from the bug report deterministically, instead of
-   *  depending on real timing. A holder object rather than a reassigned
-   *  `let`, so the resolver is always a real function by the time anything
-   *  can read it — the executor above runs synchronously. */
+  // A hasChargerRow stub whose FIRST call hangs until `release()` is called;
+  // every call after resolves immediately. Reproduces the DB-latency
+  // asymmetry from the bug report deterministically rather than by timing.
   const blockingFirstLookup = () => {
     const resolver = { release: () => {} };
     const first = new Promise<boolean>((resolve) => {

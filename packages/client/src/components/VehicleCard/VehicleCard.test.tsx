@@ -374,23 +374,13 @@ describe("VehicleCard", () => {
     expect(screen.getByText("Not Charging")).toBeInTheDocument();
   });
 
-  it("badges the charger it is plugged into, with the charge point id", () => {
+  it("badges the charger it is plugged into", () => {
     renderVC({
       readOnly: true,
-      chargingPoint: { name: "OCPP Smart Charger", identifier: "vcp-dev-2" },
-    });
-    const badge = screen.getByTitle("Charging on this charger");
-    expect(badge).toHaveTextContent("OCPP Smart Charger");
-    expect(badge).toHaveTextContent("vcp-dev-2");
-  });
-
-  it("badges the charger name alone when the adapter has no id", () => {
-    renderVC({
-      readOnly: true,
-      chargingPoint: { name: "Garage Plug", identifier: null },
+      chargingPoint: { name: "OCPP Smart Charger" },
     });
     expect(screen.getByTitle("Charging on this charger")).toHaveTextContent(
-      "Garage Plug",
+      "OCPP Smart Charger",
     );
   });
 

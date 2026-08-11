@@ -5,11 +5,9 @@ import type {
 } from "@chargeha/shared/plugins";
 import type { SimulatedVehicleAdapter } from "./SimulatedVehicleAdapter.ts";
 
-/**
- * Middleware for simulated vehicles. Simulator calls are free and instant,
- * so there is no cost model — every request fetches fresh state and the
- * cache only exists to serve `getCachedState()`.
- */
+// Middleware for simulated vehicles. Simulator calls are free and instant,
+// so there is no cost model — every request fetches fresh state and the
+// cache only exists to serve `getCachedState()`.
 export class SimulatedVehicleMiddleware implements VehicleMiddleware {
   private cachedState: AdapterVehicleChargeState | null = null;
 

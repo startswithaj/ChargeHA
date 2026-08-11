@@ -3,6 +3,10 @@ import type {
   EnergyData,
   EnergySourceAdapter,
 } from "@chargeha/shared";
+
+// Live charging load, already split by whether a physical meter would have
+// counted it.
+export type ChargingLoad = { unmeteredW: number; meteredW: number };
 import { equipmentConfigDef } from "@chargeha/shared/configSections";
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { EnergyPluginRegistry } from "@chargeha/server/bootstrap/EnergyPluginRegistry";
@@ -11,57 +15,35 @@ import { NullEnergyAdapter } from "./NullEnergyAdapter.ts";
 
 const ADAPTER_TYPE_KEY = equipmentConfigDef.energyAdapterType.key;
 
-/** Live charging load, already split by whether a physical meter would have
- *  counted it. A plain function rather than the ChargingPointManager itself:
- *  that manager depends on the poller that owns this one, so holding it
- *  directly would be a construction cycle. */
-type ChargingLoadProvider = () => Promise<
-  { unmeteredW: number; meteredW: number }
->;
-
-/**
- * Owns the energy adapter lifecycle: resolves config from DB, constructs
- * the correct adapter via plugin registry, and handles hot-swap on config
- * change. Initialization kicks off in the constructor and is protected by
- * `initializationPromise` so a concurrent `reconfigure()` can't clobber
- * the in-flight initial adapter assignment.
- *
- * EM does not know about the poller. The poller subscribes to
- * `config_changed` itself and calls `reconfigure()` + its own `restart()`
- * when a key relevant to the active adapter is written.
- */
-export class EnergyAdapterManager implements EnergySourceAdapter {
+// Owns the energy adapter lifecycle: resolves config from DB, constructs the correct adapter via plugin registry, and handles hot-swap on config
+// change. Initialization kicks off in the constructor and is protected by `initializationPromise` so a concurrent `reconfigure()` can't clobber the in-flight initial adapter assignment. EM does not know about the poller — the poller subscribes to `config_changed` itself and calls `reconfigure()` + its own `restart()` when a key relevant to the active adapter is written.
+// Not typed as EnergySourceAdapter: getRealtimeData takes the charging load
+// as a parameter, which diverges from the adapter signature.
+export class EnergyAdapterManager {
   private readonly db: AppDatabase;
   private readonly energyPlugins: EnergyPluginRegistry;
   private readonly logger: Logger;
   private adapter: EnergySourceAdapter | null = null;
   private activeType: string | null = null;
-  private readonly chargingLoad: ChargingLoadProvider;
   private readonly initializationPromise: Promise<void>;
 
   constructor(
     db: AppDatabase,
     energyPlugins: EnergyPluginRegistry,
     logger: Logger,
-    /** Resolved lazily at poll time: ChargingPointManager is constructed
-     *  after this manager (it reaches the poller that owns it), so bootstrap
-     *  passes an accessor rather than the manager. A function, not the
-     *  manager itself — this class needs the load figures and nothing else. */
-    chargingLoad: ChargingLoadProvider,
   ) {
     this.db = db;
     this.energyPlugins = energyPlugins;
     this.logger = logger;
-    this.chargingLoad = chargingLoad;
     this.initializationPromise = this.initialize();
   }
 
-  /** Plugin id of the currently selected energy adapter, null when none. */
+  // Plugin id of the currently selected energy adapter, null when none.
   get activePluginId(): string | null {
     return this.activeType;
   }
 
-  /** True if writing this config key should trigger a reconfigure. */
+  // True if writing this config key should trigger a reconfigure.
   isRelevantConfigKey(key: string): boolean {
     if (key === ADAPTER_TYPE_KEY) return true;
     return this.activeType !== null && key.startsWith(`${this.activeType}.`);
@@ -73,9 +55,8 @@ export class EnergyAdapterManager implements EnergySourceAdapter {
     return this.adapter?.pollIntervalSeconds() ?? 5;
   }
 
-  /** Resolves once the initial adapter has been constructed and (attempted
-   *  to) connect. Callers that depend on `pollIntervalSeconds()` or the
-   *  active adapter should await this before reading. */
+  // Resolves once the initial adapter has been constructed and (attempted
+  // to) connect. Callers that depend on `pollIntervalSeconds()` or the active adapter should await this before reading.
   ready(): Promise<void> {
     return this.initializationPromise;
   }
@@ -90,14 +71,14 @@ export class EnergyAdapterManager implements EnergySourceAdapter {
     return this.adapter.disconnect();
   }
 
-  async getRealtimeData(): Promise<EnergyData> {
+  async getRealtimeData(load: ChargingLoad): Promise<EnergyData> {
     await this.initializationPromise;
     if (!this.adapter) {
       throw new Error("EnergyAdapterManager not initialized");
     }
     const data = await this.adapter.getRealtimeData();
 
-    const addW = await this.unseenLoadW();
+    const addW = this.unseenLoadW(load);
     if (addW > 0) {
       return {
         ...data,
@@ -109,10 +90,9 @@ export class EnergyAdapterManager implements EnergySourceAdapter {
     return data;
   }
 
-  /** Watts the active adapter could not have measured, so they are missing
-   *  from its reading. See docs/simulated-load.md. */
-  private async unseenLoadW(): Promise<number> {
-    const { unmeteredW, meteredW } = await this.chargingLoad();
+  // Watts the active adapter could not have measured, so they are missing
+  // from its reading. See docs/simulated-load.md.
+  private unseenLoadW({ unmeteredW, meteredW }: ChargingLoad): number {
     // Unmetered load moves no electricity, so no adapter can see it and it
     // always applies. Metered load is already inside a measuring adapter's
     // reading — adding it there would count the charger twice.
@@ -144,11 +124,8 @@ export class EnergyAdapterManager implements EnergySourceAdapter {
     }
   }
 
-  /**
-   * Hot-swap: await in-flight initialization, build a new adapter, connect,
-   * and swap. The poller calls this itself in response to `config_changed`
-   * and restarts its own timer afterwards.
-   */
+  // Hot-swap: await in-flight initialization, build a new adapter, connect,
+  // and swap. The poller calls this itself in response to `config_changed` and restarts its own timer afterwards.
   async reconfigure(): Promise<void> {
     await this.initializationPromise;
     const newAdapter = await this.buildAdapter();
@@ -167,7 +144,6 @@ export class EnergyAdapterManager implements EnergySourceAdapter {
 
   // ── Router service methods ──────────────────────────────────────────
 
-  /** Returns registered energy plugins with configuration status. */
   getPluginSummaries(): Array<{
     id: string;
     displayName: string;
@@ -184,7 +160,6 @@ export class EnergyAdapterManager implements EnergySourceAdapter {
     }));
   }
 
-  /** Returns recent energy readings from DB. */
   async getRecentReadings(
     limit?: number,
   ): Promise<{ readings: Array<EnergyData & { timestamp: string }> }> {
@@ -192,11 +167,8 @@ export class EnergyAdapterManager implements EnergySourceAdapter {
     return { readings };
   }
 
-  /**
-   * Read the active energy adapter type from the DB and ask the matching
-   * plugin to build the adapter. Falls back to NullEnergyAdapter on any
-   * failure so the app keeps running.
-   */
+  // Read the active energy adapter type from the DB and ask the matching
+  // plugin to build the adapter. Falls back to NullEnergyAdapter on any failure so the app keeps running.
   private async buildAdapter(): Promise<EnergySourceAdapter> {
     const adapterType = await this.db.getConfig(ADAPTER_TYPE_KEY);
 

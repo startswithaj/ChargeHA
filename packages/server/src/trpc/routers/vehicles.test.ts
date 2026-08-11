@@ -110,10 +110,9 @@ describe("Vehicles tRPC Router", () => {
       throwingMock("ConfigService"),
       emitter,
       testLogger,
-      () =>
-        throwingMock<ChargingPointManager>("ChargingPointManager", {
-          ensureVehicleChargingPoint: () => Promise.resolve(),
-        }),
+      throwingMock<ChargingPointManager>("ChargingPointManager", {
+        ensureVehicleChargingPoint: () => Promise.resolve(),
+      }),
     );
 
     caller = createCaller(throwingMock<TrpcContext>("TrpcContext", {

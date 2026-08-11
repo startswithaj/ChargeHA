@@ -23,8 +23,8 @@ const NAV_CONFIG_KEYS: Record<keyof WizardNavState, CoreConfigKey> = {
   controlPath: "wizard_control_path",
 };
 
-/** Narrow the stored string to the union; anything else reads as
- *  unanswered rather than guessing. */
+// Narrow the stored string to the union; anything else reads as
+// unanswered rather than guessing.
 function parseControlPath(raw: string | null): "charger" | "vehicle" | null {
   if (raw === "charger" || raw === "vehicle") return raw;
   return null;
@@ -39,8 +39,7 @@ export class WizardService {
     private vehicleManager: VehicleManager,
     private authService: AuthService,
     private oidcService: OidcService,
-    // Resolved lazily: ChargingPointManager is built after this service.
-    private chargingPoints: () => ChargingPointManager,
+    private chargingPoints: ChargingPointManager,
   ) {}
 
   async getStatus() {
@@ -157,11 +156,8 @@ export class WizardService {
     return { newMode: "none" };
   }
 
-  /**
-   * Save OIDC config during wizard without activating auth mode.
-   * Tests discovery, saves config to DB, refreshes OidcService cache.
-   * The actual mode switch happens on successful OIDC callback.
-   */
+  // Save OIDC config during wizard without activating auth mode. Tests
+  // discovery, saves config to DB, refreshes OidcService cache. The actual mode switch happens on successful OIDC callback.
   async saveOidcConfig(
     input: WizardSaveOidcConfigInput,
   ): Promise<{ success: true }> {
@@ -219,7 +215,7 @@ export class WizardService {
       const row = await this.db.getVehicle("DEMO-001");
       if (row) {
         await this.vehicleManager.addVehicle(row);
-        await this.chargingPoints().ensureVehicleChargingPoint(row);
+        await this.chargingPoints.ensureVehicleChargingPoint(row);
       }
 
       this.logger.info("Demo setup completed");

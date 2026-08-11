@@ -123,7 +123,6 @@ describe("Logs", () => {
     };
   };
 
-  /** Full log entry with all input sections populated. */
   const fullLogEntry = makeLogEntry({
     checks: [
       { check: "solar_available", result: "pass" },
@@ -175,7 +174,6 @@ describe("Logs", () => {
     };
   };
 
-  /** Sets the next return value of the mocked useControllerLogs hook. */
   const setLogs = (overrides: Record<string, unknown> = {}): void => {
     vi.mocked(useControllerLogs).mockReturnValue(
       makeLogsReturn(overrides) as never,

@@ -9,13 +9,9 @@ export const trpc = createTRPCClient<TapoAppRouter>({
   links: [httpBatchLink({ url: `${APP_URL}/trpc` })],
 });
 
-/** Restart the app container and wait for it to serve again.
- *
- *  A real restart, not a mocked one: OCPP is charger-initiated, so nothing
- *  in the app can re-establish a socket by itself — only the charger dialling
- *  back in restores control. The container's filesystem survives `restart`,
- *  so the database and its charger rows do too, exactly as a service restart
- *  on a user's box would behave. */
+// Restart the app container and wait for it to serve again. A real restart, not mocked:
+// OCPP is charger-initiated, so only the charger dialling back in restores the socket —
+// the container's filesystem survives, so the database and charger rows persist too.
 export async function restartApp(): Promise<void> {
   const restart = await new Deno.Command("docker", {
     args: [
@@ -43,10 +39,8 @@ export async function restartApp(): Promise<void> {
   );
 }
 
-/** Poll until the predicate resolves truthy. The only place a retry loop
- *  lives — assertions in tests stay deterministic. Default timeout is 90 s:
- *  the controller loop defaults to 30 s (systemConfigDef), and chained
- *  effects (command → device → next poll) can span two ticks. */
+// The only retry loop — assertions in tests stay deterministic. Default 90s: controller
+// loop defaults to 30s (systemConfigDef), and chained effects (command → device → poll) can span two ticks.
 export async function waitFor<T>(
   fn: () => Promise<T | null | false | undefined>,
   { timeoutMs = 90_000, intervalMs = 1_000, label = "condition" } = {},

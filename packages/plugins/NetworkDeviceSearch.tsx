@@ -9,13 +9,11 @@
 import { useEffect, useRef } from "react";
 import { Badge, Button, Spinner, Text, TextField } from "@radix-ui/themes";
 import { Search } from "lucide-react";
+import { isLikelyDockerNetwork } from "@chargeha/shared/lanAddresses";
 
-/** Defaults `subnet` to the first server-detected LAN subnet, once, the
- *  first time detection results arrive with the field still untouched. Every
- *  discovery form calls this instead of guessing from the browser's own
- *  hostname — `lanSubnets` reads ChargeHA's actual network interfaces, which
- *  is where the hardware almost always is. Still fully editable afterwards:
- *  this only ever fires once. */
+// Defaults `subnet` to the first server-detected LAN subnet, once, the first
+// time results arrive with the field still untouched — reads ChargeHA's own
+// network interfaces rather than guessing from the browser's hostname.
 export function useDefaultSubnet(
   detectedSubnets: string[] | undefined,
   subnet: string,
@@ -43,12 +41,11 @@ export interface DiscoveryResult {
 
 export interface NetworkSearchResult {
   host: string;
-  /** Primary line. Falls back to the host when discovery cannot name the
-   *  device — Tapo's handshake probe yields no name without credentials. */
+  // Primary line. Falls back to the host when discovery cannot name the
+  // device — Tapo's handshake probe yields no name without credentials.
   name?: string;
-  /** When set, the row is informational: this badge replaces the Use button.
-   *  Lets a protocol surface a device it found but cannot drive, instead of
-   *  dropping it and leaving the user staring at an empty result. */
+  // When set, the row is informational: this badge replaces the Use button,
+  // so a protocol can surface a device it found but cannot drive.
   unavailable?: string;
 }
 
@@ -141,10 +138,9 @@ export function DiscoveryResultList<T extends DiscoveryResult>(
   );
 }
 
-/** Scan button, optional subnet scope, scanning line, result rows and empty
- *  state. Every discovery-capable plugin renders this rather than keeping its
- *  own copy — five near-identical copies had already drifted apart in wording
- *  and layout. */
+// Scan button, optional subnet scope, scanning line, result rows and empty
+// state. Every discovery-capable plugin renders this rather than keeping its
+// own copy — five near-identical copies had already drifted apart.
 export function NetworkDeviceSearch<T extends NetworkSearchResult>(
   {
     deviceNoun,
@@ -159,24 +155,23 @@ export function NetworkDeviceSearch<T extends NetworkSearchResult>(
     footer,
     detectedSubnets,
   }: {
-    /** Plural, e.g. "Fronius inverters" — reads as "...for Fronius inverters". */
+    // Plural, e.g. "Fronius inverters" — reads as "...for Fronius inverters".
     deviceNoun: string;
     subnet: string;
     onSubnetChange: (value: string) => void;
     onSearch: () => void;
     isPending: boolean;
-    /** True once a scan has finished, so the empty state stays hidden until the
-     *  user has actually searched. */
+    // True once a scan has finished, so the empty state stays hidden until
+    // the user has actually searched.
     searched: boolean;
     results: T[];
     onUse: (device: T) => void;
     emptyMessage: JSX.Element | string;
-    /** Extra guidance below the results, e.g. Tapo's locked-plug fix. */
+    // Extra guidance below the results, e.g. Tapo's locked-plug fix.
     footer?: JSX.Element | false;
-    /** Subnets ChargeHA itself was detected on. The caller already defaults
-     *  `subnet` to the first candidate — this only offers the rest when a
-     *  machine sits on more than one LAN, so the user can pick instead of
-     *  being stuck with a silent guess. */
+    // Subnets ChargeHA itself was detected on. The caller already defaults
+    // `subnet` to the first candidate — this offers the rest only when a
+    // machine sits on more than one LAN, so the user can pick instead of guessing.
     detectedSubnets?: string[];
   },
 ) {
@@ -219,6 +214,15 @@ export function NetworkDeviceSearch<T extends NetworkSearchResult>(
             </Button>
           ))}
         </div>
+      )}
+
+      {isLikelyDockerNetwork(subnet) && (
+        <Text size="1" color="orange">
+          {subnet}.* looks like a Docker internal network, not your real one —
+          scanning it will find nothing. Enter the network your {deviceNoun}
+          {" "}
+          are on, usually starting with 192.168.
+        </Text>
       )}
 
       {isPending && (

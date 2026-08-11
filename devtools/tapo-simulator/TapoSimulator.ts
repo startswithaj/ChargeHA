@@ -9,15 +9,15 @@ export interface SimulatedDevice {
   email: string;
   password: string;
   deviceOn: boolean;
-  /** Watts drawn while on (the "car"). 0 simulates an absent/full car. */
+  // Watts drawn while on (the "car"). 0 simulates an absent/full car.
   drawWhenOnW: number;
   overheated: boolean;
-  /** When true, all device endpoints time out (connection refused-like). */
+  // When true, all device endpoints time out (connection refused-like).
   unreachable: boolean;
-  /** Simulate a P100/P105: get_energy_usage returns an error. */
+  // Simulate a P100/P105: get_energy_usage returns an error.
   meterless: boolean;
-  /** Simulate firmware 1.4.x with Third-Party Compatibility off: handshake1
-   *  is refused with a 403 before any credential is exchanged. */
+  // Simulate firmware 1.4.x with Third-Party Compatibility off: handshake1
+  // is refused with a 403 before any credential is exchanged.
   locked: boolean;
   todayEnergyWh: number;
   model: string;
@@ -51,7 +51,7 @@ export class TapoSimulator {
     remoteSeed: Uint8Array<ArrayBuffer>;
   } | null = null;
 
-  /** Device-facing handler: /app/handshake1, /app/handshake2, /app/request. */
+  // Device-facing handler: /app/handshake1, /app/handshake2, /app/request.
   async handle(req: Request): Promise<Response> {
     if (this.device.unreachable) {
       // Hang forever: the client's own AbortSignal.timeout (5 s) is the only
@@ -71,8 +71,8 @@ export class TapoSimulator {
     this.session = null;
   }
 
-  /** Control-API mutator — route() must not assign into the simulator
-   *  directly (no-param-mutation lint rule). */
+  // Control-API mutator — route() must not assign into the simulator
+  // directly (no-param-mutation lint rule).
   applyPatch(patch: Partial<SimulatedDevice>): void {
     this.device = { ...this.device, ...patch };
   }
@@ -213,7 +213,7 @@ export class TapoSimulator {
     }
   }
 
-  /** Advance the accumulating meter by elapsed wall-clock time. */
+  // Advance the accumulating meter by elapsed wall-clock time.
   private tickEnergy(): void {
     const now = Date.now();
     const hours = (now - this.lastEnergyTickMs) / 3_600_000;

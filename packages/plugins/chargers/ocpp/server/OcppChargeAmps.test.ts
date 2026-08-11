@@ -36,8 +36,8 @@ describe("OCPP adapter — setChargeAmps profiles", () => {
     phases: 3,
   };
 
-  /** Adapter plus the profiles it pushed, so the assertions read what a
-   *  charger would actually receive. */
+  // Adapter plus the profiles it pushed, so the assertions read what a
+  // charger would actually receive.
   const harness = (transactionId: number | null, accept = true) => {
     const sent: unknown[] = [];
     const handle: OcppChargerHandle = {
@@ -59,7 +59,7 @@ describe("OCPP adapter — setChargeAmps profiles", () => {
     return { adapter, sent };
   };
 
-  /** Flattens each profile to the parts the charger acts on. */
+  // Flattens each profile to the parts the charger acts on.
   const summarise = (sent: unknown[]) =>
     sent.map((entry) => {
       const p = entry as {

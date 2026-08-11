@@ -22,18 +22,12 @@ import type {
 } from "./types.ts";
 import { createControlState } from "./types.ts";
 
-/** Pure decision engine for the charge controller.
- *
- *  Owns per-vehicle runtime state (grace periods, cooldowns, amp debouncing)
- *  and exposes a single `decide()` method that takes the current state of the
- *  world and returns per-vehicle decisions.
- *
- *  No I/O, no database, no adapters. The caller (ChargeController or the
- *  simulator) executes the returned decisions. */
+// Pure decision engine for the charge controller. Owns per-vehicle runtime
+// state (grace periods, cooldowns, amp debouncing) and exposes a single
+// `decide()` method. No I/O, no database, no adapters — the caller (ChargeController or the simulator) executes the returned decisions.
 export class ControllerEngine {
   private controlStates = new Map<string, VehicleControlState>();
 
-  /** Make decisions for all vehicles in a single loop iteration. */
   decide(input: EngineInput): EngineOutput {
     const { config, vehicles, schedules, energy, now, timestamp } = input;
     if (!config.chargingEnabled) {
@@ -66,7 +60,7 @@ export class ControllerEngine {
     return { decisions, controlStates: this.controlStates };
   }
 
-  /** Read a vehicle's control state (for the orchestrator's event emission). */
+  // Read a vehicle's control state (for the orchestrator's event emission).
   getControlState(vehicleId: string): VehicleControlState {
     const existing = this.controlStates.get(vehicleId);
     if (existing) return existing;
@@ -939,9 +933,8 @@ export class ControllerEngine {
   }
 }
 
-/** Suffix appended to a schedule decision's detail when two or more
- *  overlapping schedules were merged. Empty for the ordinary single-schedule
- *  case so existing log text is unchanged. */
+// Suffix appended to a schedule decision's detail when two or more
+// overlapping schedules were merged. Empty for the ordinary single-schedule case so existing log text is unchanged.
 function mergedSuffix(active: ActiveChargeSchedule): string {
   if (!active.merged) return "";
   const pct = active.effective.chargeLimitPct;
@@ -949,14 +942,12 @@ function mergedSuffix(active: ActiveChargeSchedule): string {
   return ` merged, limit ${pct}%`;
 }
 
-/** Reason text when solar production is under the configured minimum. */
 function belowMinGenerationReason(solarKw: number, minKw: number): string {
   return `solar generation below minimum (${
     solarKw.toFixed(2)
   } kW < ${minKw} kW)`;
 }
 
-/** Reason text when available solar can't sustain the vehicle's minimum amps. */
 function insufficientSolarReason(
   availableW: number,
   targetAmps: number,

@@ -54,7 +54,6 @@ describe("VehicleManager", () => {
   let middlewares: Map<string, MockMiddleware>;
   let manager: VehicleManager;
 
-  /** Build a plugin registry that returns a MockMiddleware per vehicle row. */
   function makeRegistry(): VehiclePluginRegistry {
     return {
       get: () => ({

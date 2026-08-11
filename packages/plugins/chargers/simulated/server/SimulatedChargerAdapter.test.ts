@@ -2,15 +2,21 @@ import { beforeEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { FakeTime } from "@std/testing/time";
 import type { CallContext } from "@chargeha/shared";
+import { Logger } from "@chargeha/server/lib/Logger";
+import { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import { SimulatedChargerAdapter } from "./SimulatedChargerAdapter.ts";
 
 describe("SimulatedChargerAdapter", () => {
   const c = (origin: string): CallContext => ({ origin, traceId: "test" });
+  const dbLog = new PluginDbLogger(
+    () => Promise.resolve(),
+    new Logger("SimTest", "error"),
+  );
 
   let adapter: SimulatedChargerAdapter;
 
   beforeEach(() => {
-    adapter = new SimulatedChargerAdapter("charger-1");
+    adapter = new SimulatedChargerAdapter("charger-1", dbLog);
   });
 
   describe("draw amps", () => {
@@ -65,7 +71,7 @@ describe("SimulatedChargerAdapter", () => {
   describe("stopCharging", () => {
     it("zeroes session energy", async () => {
       using fakeTime = new FakeTime();
-      const sim = new SimulatedChargerAdapter("charger-1");
+      const sim = new SimulatedChargerAdapter("charger-1", dbLog);
       await sim.startCharging(c("test:start"));
       await fakeTime.tickAsync(3_600_000); // 1 hour at the default 6A draw
 
@@ -82,7 +88,7 @@ describe("SimulatedChargerAdapter", () => {
   describe("unplug", () => {
     it("ends the session and forces amps to 0", async () => {
       using fakeTime = new FakeTime();
-      const sim = new SimulatedChargerAdapter("charger-1");
+      const sim = new SimulatedChargerAdapter("charger-1", dbLog);
       await sim.startCharging(c("test:start"));
       await fakeTime.tickAsync(3_600_000); // 1 hour at the default 6A draw
 
@@ -98,7 +104,7 @@ describe("SimulatedChargerAdapter", () => {
   describe("energy accrual", () => {
     it("accrues energy proportional to wall-clock time while charging", async () => {
       using fakeTime = new FakeTime();
-      const sim = new SimulatedChargerAdapter("charger-1");
+      const sim = new SimulatedChargerAdapter("charger-1", dbLog);
       // Default commandedAmps 6A, carMaxAmps 16A -> draw 6A = 1.38kW.
       await sim.startCharging(c("test:start"));
       await fakeTime.tickAsync(3_600_000); // 1 hour

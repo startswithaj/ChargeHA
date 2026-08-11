@@ -1,17 +1,9 @@
-/** A car driven by its own API owns its charging session. The smart charger
- *  it is plugged into must stop deciding — no mode, no schedules, no solar
- *  tracking, no amp adjustment — while still physically allowing current,
- *  because an OCPP charger left at a stale ChargingProfile caps the car at
- *  whatever solar tracking last asked for, and one that was never sent
- *  RemoteStart never closes its contactor at all. */
+// A car driven by its own API owns its charging session. The smart charger it is plugged into must stop deciding — no mode, no schedules, no solar
+// tracking, no amp adjustment — while still physically allowing current, because an OCPP charger left at a stale ChargingProfile caps the car at whatever solar tracking last asked for, and one that was never sent RemoteStart never closes its contactor at all.
 import { afterEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { assertExists } from "@std/assert";
-import type {
-  ChargerInfo,
-  ChargerState,
-  VehicleChargeState,
-} from "@chargeha/shared";
+import type { ChargerState, VehicleChargeState } from "@chargeha/shared";
 import type {
   ChargerMiddleware,
   ChargerPlugin,
@@ -37,19 +29,6 @@ import {
 import { testable } from "../../test-helpers/Testable.ts";
 
 class StubChargerMiddleware implements ChargerMiddleware {
-  static readonly INFO: ChargerInfo = {
-    id: "sim-charger",
-    name: "Simulated",
-    vendor: "sim",
-    model: "sim-1",
-    firmwareVersion: "1.0",
-    maxAmps: 32,
-    minAmps: 6,
-    phases: 1,
-    connectorCount: 1,
-    controlMode: "amps",
-  };
-
   startCalls = 0;
   stopCalls = 0;
   ampCalls: number[] = [];
@@ -66,9 +45,6 @@ class StubChargerMiddleware implements ChargerMiddleware {
   }
   getCachedState(): ChargerState | null {
     return this.cached;
-  }
-  getChargerInfo(): Promise<ChargerInfo> {
-    return Promise.resolve(StubChargerMiddleware.INFO);
   }
   startCharging(): Promise<boolean> {
     this.startCalls++;
@@ -128,6 +104,7 @@ describe("ChargeController — passive smart charger", () => {
     energyAddedKwh: 0,
     status: "available",
     statusDetail: null,
+    controlMode: "amps",
     lastUpdated: "2024-01-01T00:00:00.000Z",
   };
 
@@ -151,9 +128,8 @@ describe("ChargeController — passive smart charger", () => {
     },
   };
 
-  /** A vehicle plugin that also has a charger role, so
-   *  ensureVehicleChargingPoint gives the car its own vehicle_api point —
-   *  the thing the API-control toggle switches. */
+  // A vehicle plugin that also has a charger role, so
+  // ensureVehicleChargingPoint gives the car its own vehicle_api point — the thing the API-control toggle switches.
   const registerApiVehicle = (
     id: string,
     vehicles: VehiclePluginRegistry,
@@ -189,8 +165,8 @@ describe("ChargeController — passive smart charger", () => {
     db?.close();
   });
 
-  /** One smart charger, plus `cars` vehicles that each have an API control
-   *  path of their own. Returns everything a test needs to drive a loop. */
+  // One smart charger, plus `cars` vehicles that each have an API control
+  // path of their own. Returns everything a test needs to drive a loop.
   const setup = async (cars: string[]) => {
     db = new AppDatabase(":memory:");
     await db.init();
@@ -222,7 +198,6 @@ describe("ChargeController — passive smart charger", () => {
       db,
       chargers,
       manager,
-      poller as unknown as EnergyPoller,
       configService,
       emitter,
       testLogger,

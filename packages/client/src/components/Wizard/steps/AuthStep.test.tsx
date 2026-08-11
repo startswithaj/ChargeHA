@@ -72,8 +72,8 @@ describe("AuthStep", () => {
     ...overrides,
   });
 
-  /** Render the step through the real StepHost — the step's gate and its save
-   *  both come back from useStep, so the harness drives them together. */
+  // The step's gate and its save both come back from useStep, so the
+  // harness drives them together.
   const renderAuthStep = (props: StepProps) =>
     renderWithProviders(
       <StepNextHarness

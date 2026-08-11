@@ -7,8 +7,8 @@ import {
 } from "../../../hostUi.ts";
 import { trpc } from "./trpc.ts";
 
-/** Guidance shown only when a locked plug turned up. Listing it with an
- *  explanation beats hiding it, which reads as "wrong subnet". */
+// Guidance shown only when a locked plug turned up. Listing it with an
+// explanation beats hiding it, which reads as "wrong subnet".
 function LockedPlugHint() {
   return (
     <Text size="1" color="orange">
@@ -60,12 +60,13 @@ export function TapoTestButton(
     host: string;
     email: string;
     password: string;
-    onValidated?: () => void;
+    // Carries the plug's own name so the row can be created with it.
+    onValidated?: (nickname: string) => void;
   },
 ) {
   const test = trpc.plugin.charger.tapo.testConnection.useMutation({
     onSuccess: (data) => {
-      if (data.success) onValidated?.();
+      if (data.success) onValidated?.(data.nickname);
     },
   });
   const result = test.data;

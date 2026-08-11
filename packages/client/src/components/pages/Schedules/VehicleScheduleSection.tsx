@@ -16,10 +16,6 @@ export interface ScheduleTarget {
   id: string;
   name: string;
   badge: string;
-  /** The charge point's own id (e.g. an OCPP charge point id), when its
-   *  plugin advertises one. Two chargers of the same type are otherwise
-   *  indistinguishable in this heading. */
-  identifier: string | null;
 }
 
 interface TargetScheduleSectionProps {
@@ -46,11 +42,6 @@ function TargetHeading({ target }: { target: ScheduleTarget }) {
         ? <Car size={16} style={{ color: "var(--color-vehicle)" }} />
         : <Zap size={16} style={{ color: "var(--color-charging)" }} />}
       <Text size="3" weight="medium">{target.name}</Text>
-      {target.identifier !== null && (
-        <Badge variant="soft" size="1" title="Charge point id">
-          {target.identifier}
-        </Badge>
-      )}
       {
         /* A row named after its adapter already says its type; repeating it in
           the badge tells the user nothing about which charger this is. */

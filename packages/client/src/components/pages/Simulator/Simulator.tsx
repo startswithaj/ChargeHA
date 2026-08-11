@@ -95,7 +95,6 @@ const DEFAULTS: SimConfig = {
 
 const VOLTAGE = 230;
 
-/** Distinct colors per charging point, cycling if there are more points than colors. */
 const VEHICLE_COLORS = [
   "#8b5cf6",
   "#06b6d4",
@@ -248,7 +247,6 @@ async function runAndCollect(
   }
 }
 
-/** Add/remove/edit charging points within the simulator config. */
 function useChargingPoints(
   setConfig: React.Dispatch<React.SetStateAction<SimConfig>>,
 ) {
@@ -296,8 +294,6 @@ function useChargingPoints(
   return { addChargingPoint, removeChargingPoint, updateChargingPoint };
 }
 
-/** Runs the simulation and drives the charts off the result: run/random-seed
- *  handlers, in-flight state, and the chart-render effect. */
 function useSimRun(config: SimConfig, setConfig: (c: SimConfig) => void) {
   const [running, setRunning] = useState(false);
   const [output, setOutput] = useState<SimulationOutput | null>(null);

@@ -224,7 +224,7 @@ vi.mock("../../VehicleCard/VehicleCard.tsx", () => ({
       solarPowerW?: number;
       gridPowerW?: number;
       readOnly?: boolean;
-      chargingPoint?: { name: string; identifier: string | null } | null;
+      chargingPoint?: { name: string } | null;
     },
   ) => (
     <div
@@ -234,7 +234,6 @@ vi.mock("../../VehicleCard/VehicleCard.tsx", () => ({
       data-grid-w={gridPowerW ?? ""}
       data-read-only={readOnly ? "true" : "false"}
       data-charging-point={chargingPoint?.name ?? ""}
-      data-charging-point-id={chargingPoint?.identifier ?? ""}
     >
       {name}
       {onNavigateSettings && (
@@ -593,35 +592,14 @@ describe("Dashboard", () => {
       .toBe("true");
   });
 
-  it("ties the two cards together by name and charge point id", () => {
-    h.setVehicles([
-      smartPoint({
-        adapterType: "ocpp",
-        chargerConfig: '{"charger_id":"vcp-dev-2"}',
-      }),
-    ]);
+  it("ties the two cards together by name", () => {
+    h.setVehicles([smartPoint({ adapterType: "ocpp" })]);
     h.render();
 
     expect(screen.getByText("Demo EV detected automatically"))
       .toBeInTheDocument();
     const card = screen.getByTestId("vehicle-card");
     expect(card.getAttribute("data-charging-point")).toBe("Demo EV");
-    // The name alone cannot tell two chargers of one type apart.
-    expect(card.getAttribute("data-charging-point-id")).toBe("vcp-dev-2");
-  });
-
-  it("shows the charge point id on the charger card", () => {
-    h.setVehicles([
-      smartPoint({
-        adapterType: "ocpp",
-        chargerConfig: '{"charger_id":"vcp-dev-2"}',
-      }),
-    ]);
-    h.render();
-
-    expect(screen.getByTitle("Charge point id")).toHaveTextContent(
-      "vcp-dev-2",
-    );
   });
 
   it("keeps controls on a vehicle-API point", () => {

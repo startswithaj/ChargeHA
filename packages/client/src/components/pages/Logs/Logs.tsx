@@ -52,7 +52,6 @@ export const ACTION_LABELS: Record<ActionType, string> = {
 
 export const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
 
-/** Convert ISO UTC string to `YYYY-MM-DDTHH:mm` in local time for <input type="datetime-local"> display. */
 export function isoToLocalInput(iso: string): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -63,7 +62,6 @@ export function isoToLocalInput(iso: string): string {
   }:${pad(d.getMinutes())}`;
 }
 
-/** Convert `YYYY-MM-DDTHH:mm` local-time input value to an ISO UTC string. */
 export function localInputToIso(local: string): string {
   if (!local) return "";
   const d = new Date(local);
@@ -117,7 +115,6 @@ function getPresetRange(
   }
 }
 
-/** Read filter state from current URL search params */
 function readFiltersFromUrl(): {
   tab?: LogTab;
   vehicle?: string;
@@ -160,7 +157,6 @@ function readFiltersFromUrl(): {
   return result;
 }
 
-/** Write current filters to URL search params using replaceState */
 function writeFiltersToUrl(filters: {
   tab: LogTab;
   vehicle: string;

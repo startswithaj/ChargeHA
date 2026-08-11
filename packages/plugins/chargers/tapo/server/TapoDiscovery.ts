@@ -3,17 +3,17 @@ import type { Logger } from "@chargeha/server/lib/Logger";
 import { NetworkDiscovery } from "../../../discovery/NetworkDiscovery.ts";
 import { KlapHttp } from "./KlapHttp.ts";
 
-/** `locked` is a Tapo device that answered but has local control switched off
- *  — reported rather than dropped, so the UI can explain the fix. */
+// `locked` is a Tapo device that answered but has local control switched off
+// — reported rather than dropped, so the UI can explain the fix.
 export type TapoDeviceStatus = "usable" | "locked";
 
 type TapoDevice = { host: string; status: TapoDeviceStatus };
 
 const PROBE_TIMEOUT_MS = 1500;
 
-/** A KLAP device answers handshake1 with exactly 48 bytes (16-byte seed +
- *  32-byte hash) — detectable without credentials. A 403 is equally
- *  identifying: only a Tapo device serves that path at all. */
+// A KLAP device answers handshake1 with exactly 48 bytes (16-byte seed +
+// 32-byte hash) — detectable without credentials. A 403 is equally
+// identifying: only a Tapo device serves that path at all.
 class TapoDiscovery extends NetworkDiscovery<TapoDevice> {
   // Full sweep rather than stopping early: a locked plug would otherwise mask
   // a usable one later in the subnet, and a household can have several plugs.
@@ -50,7 +50,7 @@ class TapoDiscovery extends NetworkDiscovery<TapoDevice> {
   }
 }
 
-/** Scan the local network for KLAP-speaking Tapo devices. */
+// Scan the local network for KLAP-speaking Tapo devices.
 export function discoverTapo(
   logger: Logger,
   subnet?: string,

@@ -24,6 +24,14 @@ describe("detectLanAddresses", () => {
     expect(result).toEqual(["192.168.1.50"]);
   });
 
+  it("ranks a real LAN address above a docker-range one", () => {
+    const result = detectLanAddresses(() => [
+      iface({ name: "eth0", address: "172.28.0.3" }),
+      iface({ name: "eth1", address: "192.168.1.50" }),
+    ]);
+    expect(result).toEqual(["192.168.1.50", "172.28.0.3"]);
+  });
+
   it("excludes loopback", () => {
     const result = detectLanAddresses(() => [
       iface({ name: "lo0", address: "127.0.0.1" }),

@@ -57,9 +57,9 @@ import type {
   VehicleRow,
 } from "./types.ts";
 
-/** Parse a stored config/secrets object. A row written by a previous version,
- *  or hand-edited, must not take the process down — treat unparseable content
- *  as "no keys" and let the caller's missing-config path handle it. */
+// Parse a stored config/secrets object. A row written by a previous version,
+// or hand-edited, must not take the process down — treat unparseable content
+// as "no keys" and let the caller's missing-config path handle it.
 function parseChargerMap(json: string): Record<string, string> {
   try {
     const parsed = chargerConfigMapSchema.safeParse(JSON.parse(json));
@@ -69,7 +69,7 @@ function parseChargerMap(json: string): Record<string, string> {
   }
 }
 
-/** Apply a patch: `null` removes the key, a string sets it. Never stores "". */
+// Apply a patch: `null` removes the key, a string sets it. Never stores "".
 function applyPatch(
   current: Record<string, string>,
   patch: ChargerConfigPatch,
@@ -99,8 +99,8 @@ export class AppDatabase {
   tariffs: TariffRepository;
   vehicles: VehicleRepository;
 
-  /** Low-level driver access for seed scripts and migrations.
-   *  Not for runtime use — services should go through the repositories. */
+  // Low-level driver access for seed scripts and migrations. Not for
+  // runtime use — services should go through the repositories.
   getDriver(): DatabaseDriver {
     return this.sqlite;
   }
@@ -197,11 +197,8 @@ export class AppDatabase {
   async hasEncryptedRows(): Promise<boolean> {
     return await this.config.hasEncryptedRows();
   }
-  /**
-   * Store a secret, encrypting it with the configured encryption key if one
-   * is set. Wraps the low-level `setSecret` so callers don't need to know
-   * about encryption.
-   */
+  // Store a secret, encrypting it with the configured encryption key if one
+  // is set. Wraps the low-level `setSecret` so callers don't need to know about encryption.
   async storeSecret(key: string, plaintext: string | null): Promise<void> {
     // null deletes the row
     if (plaintext === null) {
@@ -211,10 +208,8 @@ export class AppDatabase {
     }
     this.eventEmitter?.emit("config_changed", { key });
   }
-  /**
-   * Read a secret, decrypting it with the configured encryption key if the
-   * stored row is marked encrypted. Wraps the low-level `getSecret`.
-   */
+  // Read a secret, decrypting it with the configured encryption key if the
+  // stored row is marked encrypted. Wraps the low-level `getSecret`.
   async readSecret(key: string): Promise<string | null> {
     return await readSecret(this, key, this.encryptionKey);
   }
@@ -289,23 +284,20 @@ export class AppDatabase {
 
   // ---- Charger row-scoped config ----
 
-  /**
-   * Non-secret config for one charger row. Returns `{}` for a row with
-   * nothing stored; throws when the row does not exist, because a caller
-   * asking for a missing charger's config has a bug it should hear about.
-   */
+  // Non-secret config for one charger row. Returns `{}` for a row with
+  // nothing stored; throws when the row does not exist, because a caller asking for a missing charger's config has a bug it should hear about.
   async getChargerConfig(id: string): Promise<ChargerConfigMap> {
     const json = await this.chargers.getChargerConfigJson(id);
     if (json === null) throw new Error(`Charger not found: ${id}`);
     return parseChargerMap(json);
   }
 
-  /** Replace a row's non-secret config wholesale. */
+  // Replace a row's non-secret config wholesale.
   async setChargerConfig(id: string, config: ChargerConfigMap): Promise<void> {
     await this.chargers.setChargerConfigJson(id, JSON.stringify(config));
   }
 
-  /** Set/remove individual non-secret keys, leaving the rest intact. */
+  // Set/remove individual non-secret keys, leaving the rest intact.
   async patchChargerConfig(
     id: string,
     patch: ChargerConfigPatch,
@@ -316,14 +308,8 @@ export class AppDatabase {
 
   // ---- Charger row-scoped secrets ----
 
-  /**
-   * Secrets for one charger row, decrypted.
-   *
-   * Throws when the stored value is marked encrypted but ENCRYPTION_KEY is
-   * not set — the same contract as `Encryption.readSecret`. Returning the
-   * ciphertext would hand a plugin a "password" that silently fails against
-   * the device.
-   */
+  // Secrets for one charger row, decrypted. Throws when the stored value is
+  // marked encrypted but ENCRYPTION_KEY is not set — the same contract as `Encryption.readSecret`. Returning the ciphertext would hand a plugin a "password" that silently fails against the device.
   async getChargerSecrets(id: string): Promise<ChargerSecretsMap> {
     const record = await this.chargers.getChargerSecretsRecord(id);
     if (record === null) throw new Error(`Charger not found: ${id}`);
@@ -336,12 +322,8 @@ export class AppDatabase {
     return parseChargerMap(await decrypt(record.value, this.encryptionKey));
   }
 
-  /**
-   * Replace a row's secrets wholesale. Encrypts when a key is configured,
-   * stores plaintext with the flag at 0 when it is not — the same
-   * degradation as `Encryption.storeSecret`, so the app still runs without
-   * ENCRYPTION_KEY.
-   */
+  // Replace a row's secrets wholesale. Encrypts when a key is configured,
+  // stores plaintext with the flag at 0 when it is not — the same degradation as `Encryption.storeSecret`, so the app still runs without ENCRYPTION_KEY.
   async setChargerSecrets(
     id: string,
     secrets: ChargerSecretsMap,
@@ -351,7 +333,24 @@ export class AppDatabase {
     await this.chargers.setChargerSecretsRecord(id, value, isEncrypted);
   }
 
-  /** Set/remove individual secret keys, leaving the rest intact. */
+  async createChargerWithConfig(
+    input: UpsertChargerInput,
+    config: ChargerConfigMap,
+    secrets: ChargerSecretsMap,
+  ): Promise<void> {
+    const { value, isEncrypted } = await maybeEncrypt(
+      JSON.stringify(secrets),
+      this.encryptionKey,
+    );
+    await this.chargers.insertCharger({
+      ...input,
+      chargerConfig: JSON.stringify(config),
+      chargerSecrets: value,
+      chargerSecretsEncrypted: isEncrypted,
+    });
+  }
+
+  // Set/remove individual secret keys, leaving the rest intact.
   async patchChargerSecrets(
     id: string,
     patch: ChargerConfigPatch,

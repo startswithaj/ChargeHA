@@ -10,19 +10,15 @@ type FieldDef<T extends z.ZodTypeAny = z.ZodTypeAny> = {
 
 export type SectionDef = Record<string, FieldDef>;
 
-/**
- * Infer the typed config object from a section definition.
- * E.g. { solarTrackingEnabled: boolean; solarMarginKw: number; ... }
- */
+// Infer the typed config object from a section definition.
+// E.g. { solarTrackingEnabled: boolean; solarMarginKw: number; ... }
 export type SectionType<T extends SectionDef> = {
   [K in keyof T]: z.infer<T[K]["schema"]>;
 };
 
-/**
- * Identity function that preserves the exact type of the section definition.
- * The `const` type parameter keeps string literal `key` values from being
- * widened to `string`, so `SectionKeys<typeof def>` resolves to a real union.
- */
+// Identity function that preserves the exact type of the section definition.
+// The `const` type parameter keeps string literal `key` values from being
+// widened to `string`, so `SectionKeys<typeof def>` resolves to a real union.
 export function defineSection<const T extends SectionDef>(def: T): T {
   return def;
 }
@@ -290,10 +286,8 @@ export type InternalConfig = SectionType<typeof internalConfigDef>;
 
 // ── Derive CoreConfigKey union from core sections ───────────────────────────
 
-/** Collect all DB key strings from a section definition. */
 export type SectionKeys<T extends SectionDef> = T[keyof T]["key"];
 
-/** Union of every DB key across core sections. */
 export type CoreConfigKey =
   | SectionKeys<typeof chargingConfigDef>
   | SectionKeys<typeof solarConfigDef>
@@ -304,8 +298,8 @@ export type CoreConfigKey =
   | SectionKeys<typeof notificationConfigDef>
   | SectionKeys<typeof internalConfigDef>;
 
-/** Runtime list of every core DB key — used by validators that need a
- *  closed set (e.g. tRPC input enums). Kept in sync with CoreConfigKey. */
+// Runtime list of every core DB key — used by validators that need a
+// closed set (e.g. tRPC input enums). Kept in sync with CoreConfigKey.
 export const CORE_CONFIG_KEYS: readonly CoreConfigKey[] = [
   ...sectionDbKeys(chargingConfigDef),
   ...sectionDbKeys(solarConfigDef),
@@ -319,20 +313,12 @@ export const CORE_CONFIG_KEYS: readonly CoreConfigKey[] = [
 
 // ── ConfigKey ───────────────────────────────────────────────────────────────
 
-/**
- * `ConfigKey` aliases `CoreConfigKey` — every core key is typed as a literal
- * union. Plugin config goes through `PluginDependencies` (with its own
- * per-plugin key union) and `AppDatabase.{get,set}PluginConfig`, which take
- * already-namespaced strings.
- */
+// `ConfigKey` aliases `CoreConfigKey` — every core key is a literal union.
+// Plugin config goes through `PluginDependencies`/`AppDatabase.{get,set}PluginConfig` instead, which take already-namespaced strings.
 export type ConfigKey = CoreConfigKey;
 
 // ── Serialization / Deserialization ─────────────────────────────────────────
 
-/**
- * Deserialize a string value from the KV store into its typed form,
- * based on the Zod schema for that field.
- */
 function deserializeValue<T extends z.ZodTypeAny>(
   raw: string | null,
   schema: T,
@@ -365,9 +351,6 @@ function deserializeValue<T extends z.ZodTypeAny>(
   return raw;
 }
 
-/**
- * Serialize a typed value to a string for KV store storage.
- */
 function serializeValue<T extends z.ZodTypeAny>(
   value: z.infer<T>,
   // deno-lint-ignore custom-trailing-underscore-param/no-trailing-underscore-param -- carries the generic so T is inferred at call sites
@@ -379,7 +362,6 @@ function serializeValue<T extends z.ZodTypeAny>(
   return String(value);
 }
 
-/** Unwrap z.nullable() to get the inner schema, or return the schema itself. */
 function unwrapNullable(schema: z.ZodTypeAny): z.ZodTypeAny {
   if (schema instanceof z.ZodNullable) {
     return schema.unwrap();
@@ -389,10 +371,7 @@ function unwrapNullable(schema: z.ZodTypeAny): z.ZodTypeAny {
 
 // ── Public serde API ────────────────────────────────────────────────────────
 
-/**
- * Deserialize a full section from string KV pairs into a typed object.
- * `rawValues` maps DB key → string value (or null if not in DB).
- */
+// `rawValues` maps DB key → string value (or null if not in DB).
 export function deserializeSection<T extends SectionDef>(
   sectionDef: T,
   rawValues: Record<string, string | null>,
@@ -406,9 +385,6 @@ export function deserializeSection<T extends SectionDef>(
   return result as SectionType<T>;
 }
 
-/**
- * Serialize a partial typed config object into DB key → string pairs.
- */
 export function serializeSection<T extends SectionDef>(
   sectionDef: T,
   values: Partial<SectionType<T>>,
@@ -424,11 +400,8 @@ export function serializeSection<T extends SectionDef>(
   return result as Record<SectionKeys<T>, string>;
 }
 
-/**
- * Serialize a partial typed config object into DB key → string|null pairs,
- * for the row-scoped charger write path. `null` means "delete this key" —
- * a cleared field is unsetting it, not storing "".
- */
+// For the row-scoped charger write path. `null` means "delete this key" —
+// a cleared field is unsetting it, not storing "".
 export function serializeSectionPatch<T extends SectionDef>(
   sectionDef: T,
   values: Partial<SectionType<T>>,
@@ -447,18 +420,12 @@ export function serializeSectionPatch<T extends SectionDef>(
   return result as Record<SectionKeys<T>, string | null>;
 }
 
-/**
- * Get the DB keys for a section definition, typed as the literal union.
- */
 export function sectionDbKeys<T extends SectionDef>(
   sectionDef: T,
 ): SectionKeys<T>[] {
   return Object.values(sectionDef).map((f) => f.key) as SectionKeys<T>[];
 }
 
-/**
- * Get the defaults for a section as DB key → string pairs.
- */
 export function sectionDefaults<T extends SectionDef>(
   sectionDef: T,
 ): Record<string, string> {
@@ -473,10 +440,6 @@ export function sectionDefaults<T extends SectionDef>(
 
 // ── Build a Zod input schema for per-section mutations ──────────────────────
 
-/**
- * Build a Zod schema for validating partial section input (for mutations).
- * Every field is optional, matching Partial<SectionType<T>>.
- */
 export function buildSectionInputSchema<T extends SectionDef>(
   sectionDef: T,
 ): z.ZodType<Partial<SectionType<T>>> {

@@ -1,7 +1,7 @@
 import type { EnergyData, VehicleChargeState } from "../types.ts";
 import type { ControllerConfig, EngineVehicleInput } from "./types.ts";
 
-/** Eligible vehicle enriched with resolved electrical parameters. */
+// Eligible vehicle enriched with resolved electrical parameters.
 export interface AllocationEntry {
   id: string;
   name: string;
@@ -17,11 +17,10 @@ interface AllocationContext {
   availableW: number;
 }
 
-/** Solar calculation and multi-vehicle amp allocation. */
+// Solar calculation and multi-vehicle amp allocation.
 export class SolarAllocator {
-  /** Resolve charger voltage: trust the reading if present and >= 100V,
-   *  otherwise fall back to the inverter grid reading, then the user's
-   *  configured value. */
+  // Resolve charger voltage: trust the reading if present and >= 100V,
+  // otherwise fall back to the inverter grid reading, then the user's configured value.
   static resolveVoltage(
     chargerVoltage: number | null,
     energy: EnergyData | null,
@@ -31,10 +30,8 @@ export class SolarAllocator {
     return energy?.gridVoltageV ?? gridVoltage;
   }
 
-  /** Resolve charger phases: a live single-phase reading while charging
-   *  overrides the threePhaseCharger flag (e.g. a three-phase install
-   *  charging from a regular wall socket). Vehicles only report phases while
-   *  charging, so the flag stands until a real reading arrives. */
+  // A live single-phase reading while charging overrides the threePhaseCharger
+  // flag (e.g. a three-phase install on a regular wall socket); vehicles only report phases while charging, so the flag stands until a real reading arrives.
   static resolvePhases(
     state: VehicleChargeState,
     config: ControllerConfig,
@@ -43,21 +40,9 @@ export class SolarAllocator {
     return config.threePhaseCharger ? 3 : state.chargerPhases;
   }
 
-  /** Surplus solar in watts, before the safety margin.
-   *
-   *  Starts from grid export, then:
-   *  - Subtracts home battery discharge. Power leaving the battery is not
-   *    solar. Without this, a battery operating in self-consumption won't be
-   *    drawing from the grid, and would makes the EV's own draw reappear as
-   *    "available solar" through the add-back below, and the car would charge
-   *    off the home battery.
-   *  - Adds back the EV's charge power when the meter includes EV load in
-   *    consumption (the default), since the car's own draw suppresses export.
-   *  - Caps at solar production: surplus can never exceed what the panels are
-   *    making right now.
-   *
-   *  `addBackW` is the charge power to add back — 0 when the meter excludes EV
-   *  load or nothing is charging. */
+  // Surplus solar before the safety margin: grid export, minus battery
+  // discharge (else the EV's own draw reappears as "available solar" and the
+  // car charges off the battery), plus `addBackW` (EV draw the meter already counted), capped at solar production.
   static surplusW(
     energy: EnergyData,
     addBackW: number,
@@ -67,12 +52,9 @@ export class SolarAllocator {
     return Math.min(exportW + addBackW, energy.solarProductionW);
   }
 
-  /** Charge power to add back for one vehicle — zero when the meter already
-   *  excludes EV load, or the vehicle isn't drawing anything.
-   *
-   *  Uses state.chargeAmps (kept current by VehicleManager.startChargingAt
-   *  after confirmed commands) rather than the vehicle-reported chargePowerKw,
-   *  which can lag. */
+  // Charge power to add back for one vehicle — zero when the meter already
+  // excludes EV load, or the vehicle isn't drawing anything. Uses
+  // state.chargeAmps (kept current by VehicleManager after confirmed commands), not the vehicle-reported chargePowerKw, which can lag.
   static addBackW(
     config: ControllerConfig,
     state: VehicleChargeState,
@@ -83,9 +65,8 @@ export class SolarAllocator {
     return state.chargeAmps * voltage * phases;
   }
 
-  /** Available watts after the reference mode and safety margin are applied.
-   *  `addBackW` is the total charge power to add back across all vehicles
-   *  being considered. */
+  // Available watts after the reference mode and safety margin are applied.
+  // `addBackW` is the total charge power to add back across all vehicles being considered.
   static resolveAvailableW(
     config: ControllerConfig,
     energy: EnergyData,
@@ -102,7 +83,6 @@ export class SolarAllocator {
     return Math.max(0, SolarAllocator.surplusW(energy, addBackW) - marginW);
   }
 
-  /** Calculate available solar power in watts for a single vehicle's charging. */
   static calculateAvailableSolar(
     config: ControllerConfig,
     energy: EnergyData,
@@ -117,7 +97,7 @@ export class SolarAllocator {
     );
   }
 
-  /** Top-level allocation dispatcher: waterfall or equal based on config. */
+  // Top-level allocation dispatcher: waterfall or equal based on config.
   static allocate(
     vehicles: EngineVehicleInput[],
     config: ControllerConfig,
@@ -128,9 +108,8 @@ export class SolarAllocator {
       : SolarAllocator.equal(vehicles, config, energy);
   }
 
-  /** Equal allocation: split amps evenly, remainder to highest priority.
-   *  When the split gives any vehicle less than its chargeAmpsMin, progressively
-   *  drops lowest-priority vehicles until the split is viable. */
+  // Equal allocation: split amps evenly, remainder to highest priority.
+  // When the split gives any vehicle less than its chargeAmpsMin, progressively drops lowest-priority vehicles until the split is viable.
   static equal(
     vehicles: EngineVehicleInput[],
     config: ControllerConfig,
@@ -176,8 +155,8 @@ export class SolarAllocator {
     return allocated;
   }
 
-  /** Waterfall allocation: priority 1 gets min(totalAmps, chargeAmpsMax),
-   *  overflow goes to priority 2, then priority 3, etc. */
+  // Waterfall allocation: priority 1 gets min(totalAmps, chargeAmpsMax),
+  // overflow goes to priority 2, then priority 3, etc.
   static waterfall(
     vehicles: EngineVehicleInput[],
     config: ControllerConfig,
@@ -202,9 +181,8 @@ export class SolarAllocator {
     return allocations;
   }
 
-  /** Build the allocation context: filter eligible vehicles, compute total
-   *  available amps. Returns null when allocation doesn't apply (< 2 eligible
-   *  vehicles, no energy data, or solar tracking disabled). */
+  // Filter eligible vehicles, compute total available amps. Returns null
+  // when allocation doesn't apply (< 2 eligible vehicles, no energy data, or solar tracking disabled).
   private static getContext(
     vehicles: EngineVehicleInput[],
     config: ControllerConfig,

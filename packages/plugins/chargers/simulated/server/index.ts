@@ -12,12 +12,12 @@ import { PollingChargerMiddleware } from "../../PollingChargerMiddleware.ts";
 import { SimulatedChargerAdapter } from "./SimulatedChargerAdapter.ts";
 import { createSimulatedChargerRouter } from "./router.ts";
 
-/** Empty config section — the simulated charger has no configurable
- *  settings; dev state lives in the adapter, driven via the router. */
+// Empty config section — the simulated charger has no configurable
+// settings; dev state lives in the adapter, driven via the router.
 export const simulatedChargerConfigDef = defineSection({});
 
-/** Simulated charger plugin — an in-memory EVSE twin for the charger side
- *  of the wizard "Yes" flow, with no hardware and no docker stack. */
+// Simulated charger plugin — an in-memory EVSE twin for the charger side
+// of the wizard "Yes" flow, with no hardware and no docker stack.
 export class SimulatedChargerPlugin implements ChargerPlugin {
   readonly id = "simulated_charger";
   readonly displayName = "Simulated Charger";
@@ -25,9 +25,9 @@ export class SimulatedChargerPlugin implements ChargerPlugin {
   readonly settingsComponentKey = "simulated_charger-settings";
   readonly configDef = simulatedChargerConfigDef;
   readonly secretKeys: readonly string[] = [];
-  /** An in-memory EVSE draws nothing, so nothing can meter it. Unlike the
-   *  OCPP simulator, this one is only ever reached in-process — there is no
-   *  real charger it could be mistaken for. */
+  // An in-memory EVSE draws nothing, so nothing can meter it. Unlike the
+  // OCPP simulator, this one is only ever reached in-process — no real
+  // charger it could be mistaken for.
   readonly loadIsUnmetered = true;
 
   private readonly adapters = new Map<string, SimulatedChargerAdapter>();
@@ -36,7 +36,7 @@ export class SimulatedChargerPlugin implements ChargerPlugin {
 
   // deno-lint-ignore require-await
   async createChargerMiddleware(row: ChargerRow): Promise<ChargerMiddleware> {
-    const adapter = new SimulatedChargerAdapter(row.id);
+    const adapter = new SimulatedChargerAdapter(row.id, this.deps.dbLog);
     this.adapters.set(row.id, adapter);
     return new PollingChargerMiddleware(adapter, this.deps.log);
   }
@@ -45,7 +45,7 @@ export class SimulatedChargerPlugin implements ChargerPlugin {
     this.adapters.delete(rowId);
   }
 
-  /** All live adapters, keyed by charger row id. Router helper. */
+  // All live adapters, keyed by charger row id. Router helper.
   getAdapters(): SimulatedChargerAdapter[] {
     return [...this.adapters.values()];
   }

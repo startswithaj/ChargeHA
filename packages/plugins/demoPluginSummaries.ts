@@ -53,7 +53,7 @@ export const demoEnergyPluginSummaries: DemoEnergyPluginSummary[] = [
   },
 ];
 
-/** Vehicle adapters whose plugin also has the charger role. */
+// Vehicle adapters whose plugin also has the charger role.
 export const chargerCapableVehicleAdapters: readonly string[] = [
   "tesla",
   "simulated",

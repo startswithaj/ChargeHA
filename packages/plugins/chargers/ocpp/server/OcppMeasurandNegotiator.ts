@@ -17,13 +17,13 @@ import {
   selectMeasurands,
 } from "./OcppMeasurands.ts";
 
-/** How long before a charge point that did not settle is asked again. A
- *  charger stuck in a two-second reconnect loop boots constantly; without
- *  this it would be interrogated on every one of those boots. */
+// How long before a charge point that did not settle is asked again. A
+// charger stuck in a two-second reconnect loop boots constantly; without
+// this it would be interrogated on every one of those boots.
 const RETRY_AFTER_MS = 10 * 60_000;
 
-/** Outcomes no retry can improve. "satisfied" is the charger already doing
- *  what we want; "not-supported" means the key itself is unknown to it. */
+// Outcomes no retry can improve. "satisfied" is the charger already doing
+// what we want; "not-supported" means the key itself is unknown to it.
 const TERMINAL: ReadonlySet<NegotiationStatus> = new Set([
   "satisfied",
   "not-supported",
@@ -36,12 +36,12 @@ const STATUS_MAP: Record<string, NegotiationStatus> = {
   Rejected: "rejected",
 };
 
-/** An unrecognised vendor status is treated as a refusal: that is the
- *  outcome with the safest handling, and it is certainly not an acceptance. */
+// An unrecognised vendor status is treated as a refusal: that is the
+// outcome with the safest handling, and it is certainly not an acceptance.
 const mapStatus = (status: string): NegotiationStatus =>
   STATUS_MAP[status] ?? "rejected";
 
-/** What the charger said about one configuration key. */
+// What the charger said about one configuration key.
 interface ConfigEntry {
   value: string | null;
   readonly: boolean;
@@ -54,20 +54,18 @@ const readNumber = (value: string | null | undefined): number | null => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
 
-/** Set equality: the charger's own list arrives in its order, not ours. */
+// Set equality: the charger's own list arrives in its order, not ours.
 const sameSet = (a: string[], b: string[]): boolean =>
   a.length === b.length && a.every((item) => b.includes(item));
 
-/** Negotiates what a charger reports. State is in memory and keyed by charge
- *  point id, held here rather than on the connection — the very reconnect
- *  this has to survive destroys the connection object. Nothing is persisted:
- *  the charger is the durable store for its own configuration, and a cached
- *  copy goes stale the moment someone edits it in the charger's portal. */
+// Negotiates what a charger reports. State is in memory, held here rather
+// than on the connection — the very reconnect this has to survive destroys
+// the connection object. Nothing is persisted: the charger is the durable store.
 export class OcppMeasurandNegotiator {
   private readonly results = new Map<string, MeasurandNegotiation>();
-  /** Charge points with a round trip in flight. Separate from `results` so a
-   *  second BootNotification arriving mid-negotiation is dropped instead of
-   *  starting a duplicate conversation on the same socket. */
+  // Charge points with a round trip in flight. Separate from `results` so a
+  // second BootNotification arriving mid-negotiation is dropped instead of
+  // starting a duplicate conversation on the same socket.
   private readonly inFlight = new Set<string>();
 
   constructor(
@@ -84,10 +82,9 @@ export class OcppMeasurandNegotiator {
     return this.results.get(chargePointId);
   }
 
-  /** Runs at most once per charge point per process for a settled outcome,
-   *  and at most once per RETRY_AFTER_MS otherwise. Never throws: a charger
-   *  that vanishes mid-negotiation is a recorded outcome, not an error for
-   *  the message handler that kicked this off. */
+  // Runs at most once per charge point per process for a settled outcome,
+  // and at most once per RETRY_AFTER_MS otherwise. Never throws: a vanished
+  // charger is a recorded outcome, not an error for the caller.
   async negotiate(chargePointId: string): Promise<void> {
     if (!this.shouldRun(chargePointId)) return;
     this.inFlight.add(chargePointId);
@@ -128,9 +125,8 @@ export class OcppMeasurandNegotiator {
     this.dbLog.warn(text, { payload });
   }
 
-  /** Read first. A charger already reporting what the controller needs is
-   *  never written to, and the same read tells us the max list length, the
-   *  sample interval, and whether the key is read-only. */
+  // Read first. A charger already reporting what the controller needs is
+  // never written to, and the same read tells us max length, sample interval, and read-only.
   private async run(chargePointId: string): Promise<Outcome> {
     const config = await this.readConfig(chargePointId);
     await this.alignInterval(chargePointId, config);
@@ -160,11 +156,9 @@ export class OcppMeasurandNegotiator {
     return await this.narrow(chargePointId, maxLength);
   }
 
-  /** Rejected: the charger would not take our list, and 1.6 gives no key
-   *  listing what it does support. Its own MeterValuesSampledData value is
-   *  the only list it will ever hand us, so re-read it and offer the
-   *  intersection — once. A second refusal is final; retrying the same list
-   *  forever is how a charger gets hammered. */
+  // Rejected: the charger would not take our list, and 1.6 gives no key
+  // listing what it does support. Its own MeterValuesSampledData is the only
+  // list it will hand us, so re-read and offer the intersection — once.
   private async narrow(
     chargePointId: string,
     maxLength: number | null,
@@ -181,11 +175,9 @@ export class OcppMeasurandNegotiator {
     return { status, requested };
   }
 
-  /** Best effort, and never a user-facing warning: the measurands are the
-   *  point, and a charger sampling too slowly already surfaces as a faulted
-   *  charger via the meter-staleness timeout. Only ever speeds a charger up
-   *  — one already sampling every 10 s is left alone rather than slowed to
-   *  our 30. */
+  // Best effort, never a user-facing warning: a slow-sampling charger already
+  // surfaces via the meter-staleness timeout. Only ever speeds a charger up —
+  // one already sampling every 10 s is left alone rather than slowed to our 30.
   private async alignInterval(
     chargePointId: string,
     config: Map<string, ConfigEntry>,

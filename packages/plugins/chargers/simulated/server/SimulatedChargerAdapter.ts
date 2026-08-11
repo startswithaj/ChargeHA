@@ -1,26 +1,25 @@
 import type {
   CallContext,
   ChargerAdapter,
-  ChargerInfo,
   ChargerState,
   ChargerStatus,
 } from "@chargeha/shared";
+import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 
 const VOLTAGE = 230;
 
 interface SimState {
   on: boolean;
   pluggedIn: boolean;
-  /** The fake car's appetite; 0 = absent or full. */
+  // The fake car's appetite; 0 = absent or full.
   carMaxAmps: number;
   commandedAmps: number;
   energyAddedKwh: number;
   lastTickMs: number;
 }
 
-/** In-memory EVSE: honours start/stop/setChargeAmps like real hardware,
- *  draws min(commanded, car appetite), accumulates session energy on a
- *  wall-clock tick. */
+// In-memory EVSE: honours start/stop/setChargeAmps like real hardware, draws
+// min(commanded, car appetite), accumulates session energy on a wall-clock tick.
 export class SimulatedChargerAdapter implements ChargerAdapter {
   private state: SimState = {
     on: false,
@@ -31,7 +30,10 @@ export class SimulatedChargerAdapter implements ChargerAdapter {
     lastTickMs: Date.now(),
   };
 
-  constructor(readonly chargerId: string) {}
+  constructor(
+    readonly chargerId: string,
+    private readonly dbLog: PluginDbLogger,
+  ) {}
 
   pollIntervalSeconds(): number {
     return 2;
@@ -41,21 +43,37 @@ export class SimulatedChargerAdapter implements ChargerAdapter {
     return Promise.resolve();
   }
 
-  startCharging(_ctx: CallContext): Promise<boolean> {
+  startCharging(ctx: CallContext): Promise<boolean> {
     this.state = { ...this.state, on: true, lastTickMs: Date.now() };
+    this.command("info", "startCharging", {}, ctx);
     return Promise.resolve(true);
   }
 
-  stopCharging(_ctx: CallContext): Promise<boolean> {
+  stopCharging(ctx: CallContext): Promise<boolean> {
     this.tick();
     this.state = { ...this.state, on: false, energyAddedKwh: 0 };
+    this.command("info", "stopCharging", {}, ctx);
     return Promise.resolve(true);
   }
 
-  setChargeAmps(amps: number, _ctx: CallContext): Promise<boolean> {
+  setChargeAmps(amps: number, ctx: CallContext): Promise<boolean> {
     this.tick();
     this.state = { ...this.state, commandedAmps: amps };
+    this.command("debug", "setChargeAmps", { amps }, ctx);
     return Promise.resolve(true);
+  }
+
+  private command(
+    level: "info" | "debug",
+    name: string,
+    payload: Record<string, unknown>,
+    ctx: CallContext,
+  ): void {
+    this.dbLog.log(level, `${name} (${this.chargerId})`, {
+      payload: { chargerId: this.chargerId, ...payload },
+      origin: ctx.origin,
+      traceId: ctx.traceId,
+    });
   }
 
   getChargerState(_ctx: CallContext): Promise<ChargerState> {
@@ -77,26 +95,12 @@ export class SimulatedChargerAdapter implements ChargerAdapter {
       statusDetail: `simulated: ${
         s.pluggedIn ? `car appetite ${s.carMaxAmps}A` : "no cable"
       }, ${s.on ? `energized at ${s.commandedAmps}A` : "off"}`,
+      controlMode: "amps",
       lastUpdated: new Date().toISOString(),
     });
   }
 
-  getChargerInfo(_ctx: CallContext): Promise<ChargerInfo> {
-    return Promise.resolve({
-      id: this.chargerId,
-      name: "Simulated Charger",
-      vendor: "ChargeHA",
-      model: "SimEVSE",
-      firmwareVersion: "sim",
-      maxAmps: 32,
-      minAmps: 6,
-      phases: 1,
-      connectorCount: 1,
-      controlMode: "amps",
-    });
-  }
-
-  /** Dev controls (router): plug/unplug the fake car, set its appetite. */
+  // Dev controls (router): plug/unplug the fake car, set its appetite.
   updateState(patch: { pluggedIn?: boolean; carMaxAmps?: number }): void {
     this.tick();
     this.state = {
@@ -107,7 +111,7 @@ export class SimulatedChargerAdapter implements ChargerAdapter {
     };
   }
 
-  /** Dev-panel view of current state — no ChargerState ceremony. */
+  // Dev-panel view of current state — no ChargerState ceremony.
   devStatus(): {
     chargerRowId: string;
     pluggedIn: boolean;

@@ -1,8 +1,6 @@
 import type { MutationHandlers } from "../types.ts";
-import type { DemoCharger } from "../../demoState.ts";
 import { ALL_DAYS, updateDemoState } from "../../demoState.ts";
 import { emitDemoEvent } from "../../demoTick.ts";
-import { demoChargerDisplayNames } from "@chargeha/plugins/demoPluginSummaries";
 
 type WizardMutations = Pick<
   MutationHandlers,
@@ -12,29 +10,13 @@ type WizardMutations = Pick<
   | "wizard.patchState"
 >;
 
-function wizardCharger(
-  m: { config: Record<string, string>; chargers: DemoCharger[] },
-): DemoCharger[] {
-  const chargerType = m.config.wizard_charger_type;
-  if (!chargerType) return [];
-  if (m.chargers.some((c) => c.chargerAdapterType === chargerType)) return [];
-  return [{
-    id: crypto.randomUUID(),
-    name: demoChargerDisplayNames[chargerType] ?? chargerType,
-    chargerAdapterType: chargerType,
-    mode: "auto",
-    priority: m.chargers.length + 1,
-    vehicleId: null,
-  }];
-}
-
 export const wizardMutations: WizardMutations = {
   "wizard.complete": () => {
     updateDemoState((m) => ({
       ...m,
-      // The host creates the charger row on completion (mirrors the real
-      // server's ensureCharger call).
-      chargers: [...m.chargers, ...wizardCharger(m)],
+      // Charger rows are created by the wizard's charger.ensure call when the
+      // type is selected (ensureOnSelect), not on completion — mirrors the
+      // real server.
       config: {
         ...m.config,
         wizard_completed: "true",

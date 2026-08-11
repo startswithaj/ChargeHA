@@ -51,10 +51,8 @@ interface DayProfile {
 const rand = (offset: number, salt: number): number =>
   hash01(offset * 131 + salt);
 
-/**
- * Per-day weather + vehicle presence so no two days look alike: clear days,
- * overcast days, the occasional storm, and days a car is away (no charging).
- */
+// Per-day weather + vehicle presence so no two days look alike: clear
+// days, overcast days, the occasional storm, and days a car is away.
 const dayProfile = (offset: number): DayProfile => {
   const stormy = rand(offset, 2) < 0.12;
   return {
@@ -109,7 +107,6 @@ interface ChargingVehicle {
   soc: number;
 }
 
-/** Split available solar excess across charging vehicles, in priority order. */
 const allocateSolar = (
   charging: ChargingVehicle[],
   excessW: number,
@@ -177,10 +174,8 @@ const buildDay = (offset: number): DemoDay => {
   return { offset, readings, logs };
 };
 
-/**
- * Build the full demo series. Today (offset 0) is truncated to the current
- * time-of-day so it reads as a day in progress rather than a finished day.
- */
+// Today (offset 0) is truncated to the current time-of-day so it reads as
+// a day in progress rather than a finished day.
 export const buildDemoSeries = (now: Date = new Date()): DemoSeries => {
   const nowMinutes = minuteOfDay(now);
   const days = Array.from({ length: DEMO_DAYS }, (_, offset) => {

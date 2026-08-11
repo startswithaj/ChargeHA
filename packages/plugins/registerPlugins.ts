@@ -18,14 +18,9 @@ import { TapoChargerPlugin } from "./chargers/tapo/server/index.ts";
 import { OcppChargerPlugin } from "./chargers/ocpp/server/index.ts";
 import { SimulatedChargerPlugin } from "./chargers/simulated/server/index.ts";
 
-/**
- * Instantiate every plugin the app supports and register each with its
- * registry. Plugins self-initialize in their constructors via the
- * `PluginDependencies` handed to them here.
- *
- * The encryption key does not appear in this signature on purpose — secret
- * storage is encapsulated inside `AppDatabase`.
- */
+// Instantiate every plugin the app supports and register each with its
+// registry. Plugins self-initialize in their constructors. The encryption
+// key does not appear in this signature on purpose — encapsulated in AppDatabase.
 export function registerPlugins(
   host: Omit<PluginDependenciesInit, "pluginId">,
   vehicleRegistry: VehiclePluginRegistry,

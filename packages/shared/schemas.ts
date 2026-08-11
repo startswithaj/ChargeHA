@@ -326,12 +326,12 @@ export type ScheduleDeleteInput = z.infer<typeof scheduleDeleteInput>;
 
 // ---- Charger row config/secrets ----
 
-/** A charger row's config or secrets object, as persisted in
- *  `chargers.charger_config` / `chargers.charger_secrets`. */
+// A charger row's config or secrets object, as persisted in
+// `chargers.charger_config` / `chargers.charger_secrets`.
 export const chargerConfigMapSchema: z.ZodType<Record<string, string>> = z
   .record(z.string(), z.string());
 
-/** Patch shape — `null` deletes the key. */
+// Patch shape — `null` deletes the key.
 export const chargerConfigPatchSchema: z.ZodType<
   Record<string, string | null>
 > = z.record(z.string(), z.string().nullable());

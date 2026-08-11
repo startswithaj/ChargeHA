@@ -164,9 +164,9 @@ interface BatteryTick {
   soc: number;
 }
 
-/** Self-consumption home battery: covers a deficit by discharging, absorbs a
- *  surplus by charging — capped by max rate and remaining capacity/headroom.
- *  `netW` is home + EV load minus solar production (positive = deficit). */
+// Self-consumption home battery: covers a deficit by discharging, absorbs a
+// surplus by charging — capped by max rate and remaining capacity/headroom.
+// `netW` is home + EV load minus solar production (positive = deficit).
 function stepBattery(
   netW: number,
   soc: number,
@@ -195,9 +195,8 @@ function stepBattery(
   };
 }
 
-/** Run a full-day charge controller simulation using the pure decision engine.
- *  No database, no adapters, no service classes — just plain objects and the
- *  engine's decide() method. */
+// Run a full-day charge controller simulation using the pure decision
+// engine. No database, no adapters, no service classes — just plain objects and the engine's decide() method.
 export function runSimulation(
   opts: SimulationOptions,
 ): SimulationOutput {

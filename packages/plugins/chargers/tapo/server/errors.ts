@@ -5,7 +5,7 @@ export class TapoConnectionError extends Error {
   }
 }
 
-/** Handshake hash mismatch — wrong Tapo account email/password. */
+// Handshake hash mismatch — wrong Tapo account email/password.
 export class TapoAuthError extends Error {
   constructor() {
     super("Tapo rejected the credentials (handshake hash mismatch)");
@@ -13,23 +13,16 @@ export class TapoAuthError extends Error {
   }
 }
 
-/** Guidance shared by every surface that reports a locked plug. The setting
- *  takes effect immediately — the plug switches back to KLAP without a
- *  restart, confirmed against a P110(AU) on firmware 1.4.x. */
+// Guidance shared by every surface that reports a locked plug. The setting
+// takes effect immediately — the plug switches back to KLAP without a
+// restart, confirmed against a P110(AU) on firmware 1.4.x.
 export const TAPO_THIRD_PARTY_HINT =
   "In the Tapo app open Me → Third-Party Services → Third-Party " +
   "Compatibility and turn it on.";
 
-/**
- * The device answered but refused handshake1 outright (HTTP 403), so no
- * credentials were ever involved.
- *
- * Firmware 1.4.x ships with TP-Link's newer TPAP scheme preferred and KLAP —
- * the only protocol ChargeHA speaks — switched off until "Third-Party
- * Compatibility" is enabled in the Tapo app. Reported separately from a
- * credential failure because the fix is entirely different, and the raw 403
- * otherwise reads as "wrong password".
- */
+// The device refused handshake1 outright (HTTP 403), no credentials involved.
+// Firmware 1.4.x ships with TPAP preferred and KLAP switched off until
+// "Third-Party Compatibility" is enabled — the raw 403 otherwise reads as "wrong password".
 export class TapoLockedError extends Error {
   constructor(readonly host: string) {
     super(

@@ -625,8 +625,8 @@ describe("Schedules", () => {
   });
 
   describe("group heading", () => {
-    it("shows the OCPP charge point id so two chargers can be told apart", () => {
-      setChargers([makeChargerRow()]);
+    it("names the group after the charge point, so two chargers can be told apart", () => {
+      setChargers([makeChargerRow({ name: "vcp-dev-2" })]);
 
       renderWithProviders(<Schedules />);
 
@@ -649,14 +649,6 @@ describe("Schedules", () => {
 
       expect(screen.getByText("Garage")).toBeInTheDocument();
       expect(screen.getByText("OCPP Smart Charger")).toBeInTheDocument();
-    });
-
-    it("shows no id badge when the charger config has none", () => {
-      setChargers([makeChargerRow({ chargerConfig: "{}" })]);
-
-      renderWithProviders(<Schedules />);
-
-      expect(screen.queryByText("vcp-dev-2")).not.toBeInTheDocument();
     });
   });
 
@@ -884,7 +876,7 @@ describe("Schedules", () => {
       renderWithProviders(<Schedules />);
 
       // Charger group, keyed by the point, listing its charger-keyed schedule.
-      expect(screen.getByText("vcp-dev-2")).toBeInTheDocument();
+      expect(screen.getByText("OCPP Smart Charger")).toBeInTheDocument();
       expect(screen.getByTestId("delete-sched-charger-1")).toBeInTheDocument();
       // Vehicle group, keyed by the car, listing its vehicle-keyed schedule.
       expect(screen.getByText("Test Car")).toBeInTheDocument();

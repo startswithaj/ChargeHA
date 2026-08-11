@@ -37,8 +37,8 @@ function FormFields(
   );
 }
 
-/** The plugin's own fields plus Cancel/Save, rendered inside the charger's
- *  row band so the two read as one block. */
+// Rendered inside the charger's row band so the plugin's fields and
+// Cancel/Save read as one block.
 export function ChargerEditForm(
   {
     typeId,
@@ -52,19 +52,19 @@ export function ChargerEditForm(
     onCancel,
   }: {
     typeId: string;
-    /** null in add mode — the panel's own save creates the row. */
+    // null in add mode — the panel's own save creates the row.
     chargerId: string | null;
     submitLabel: string;
     error: string | null;
     busy: boolean;
-    /** Put the cursor in the first field — for a freshly opened add form. */
+    // Put the cursor in the first field — for a freshly opened add form.
     autoFocus?: boolean;
-    /** Hands the host the panel's commit rather than running it here — a
-     *  control-path confirm dialog must be answered before it runs, so
-     *  declining creates nothing. */
+    // Hands the host the panel's commit rather than running it here — a
+    // control-path confirm dialog must be answered before it runs, so
+    // declining creates nothing.
     onSubmit: (commit: () => void) => void;
-    /** Called once the panel reports its save landed — the host closes the
-     *  form here, not in onSubmit, so a failed save stays visible. */
+    // Called once the panel reports its save landed — the host closes the
+    // form here, not in onSubmit, so a failed save stays visible.
     onSaved: () => void;
     onCancel: () => void;
   },

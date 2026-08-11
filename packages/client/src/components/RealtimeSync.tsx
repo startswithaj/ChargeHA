@@ -3,12 +3,8 @@ import { useRealtimeEvents } from "../hooks/useRealtimeEvents.ts";
 import { vehicleErrorStore } from "../hooks/vehicleErrorStore.ts";
 import { controllerStatusStore } from "../hooks/controllerStatusStore.ts";
 
-/**
- * Renderless component that manages the single SSE subscription for all
- * real-time events (energy, vehicle, errors) and updates the tRPC cache.
- *
- * Call this once inside the authenticated area of the app.
- */
+// Renderless; manages the single SSE subscription for all real-time events.
+// Call this once inside the authenticated area of the app.
 export function RealtimeSync() {
   const utils = trpc.useUtils();
 

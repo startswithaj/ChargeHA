@@ -27,7 +27,7 @@ describe("EnphaseLocalAdapter", () => {
     return new EnphaseLocalAdapter(client, logger, dbLog, () => clock);
   };
 
-  /** CT-metered system: 5 kW solar, 2 kW import. */
+  // CT-metered system: 5 kW solar, 2 kW import.
   const seedMetered = (h: FakeEnvoyHttp): FakeEnvoyHttp =>
     h
       .setJson("/ivp/meters", [

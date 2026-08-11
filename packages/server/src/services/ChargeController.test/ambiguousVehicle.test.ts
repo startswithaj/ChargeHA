@@ -1,14 +1,10 @@
-/** Two cars plugged into one smart charger, neither explicitly assigned:
- *  resolution is ambiguous, and mergeChargingPointState falls back to
- *  batteryLevel: 0 / chargeLimit: 100. Left unguarded, the engine would
- *  never see "battery full" and would charge forever. This suite proves the
- *  controller refuses to start/adjust amps while ambiguous, and that an
- *  explicit assignment (Settings) clears it. */
+// Two cars plugged into one smart charger, neither explicitly assigned: resolution is ambiguous, and mergeChargingPointState falls back to
+// batteryLevel: 0 / chargeLimit: 100. Left unguarded, the engine would never see "battery full" and would charge forever. This suite proves the controller refuses to start/adjust amps while ambiguous, and that an explicit assignment (Settings) clears it.
 import { afterEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { assertExists } from "@std/assert";
 import type { VehicleChargeState } from "@chargeha/shared";
-import type { ChargerInfo, ChargerState } from "@chargeha/shared";
+import type { ChargerState } from "@chargeha/shared";
 import type {
   ChargerMiddleware,
   ChargerPlugin,
@@ -34,19 +30,6 @@ import {
 import { testable } from "../../test-helpers/Testable.ts";
 
 class StubChargerMiddleware implements ChargerMiddleware {
-  static readonly INFO: ChargerInfo = {
-    id: "sim-charger",
-    name: "Simulated",
-    vendor: "sim",
-    model: "sim-1",
-    firmwareVersion: "1.0",
-    maxAmps: 32,
-    minAmps: 6,
-    phases: 1,
-    connectorCount: 1,
-    controlMode: "amps",
-  };
-
   startCalls = 0;
   setAmpsCalls = 0;
   private cached: ChargerState;
@@ -60,9 +43,6 @@ class StubChargerMiddleware implements ChargerMiddleware {
   }
   getCachedState(): ChargerState | null {
     return this.cached;
-  }
-  getChargerInfo(): Promise<ChargerInfo> {
-    return Promise.resolve(StubChargerMiddleware.INFO);
   }
   startCharging(): Promise<boolean> {
     this.startCalls++;
@@ -121,6 +101,7 @@ describe("ChargeController — ambiguous vehicle resolution", () => {
     energyAddedKwh: 0,
     status: "available",
     statusDetail: null,
+    controlMode: "amps",
     lastUpdated: "2024-01-01T00:00:00.000Z",
   };
 
@@ -212,7 +193,6 @@ describe("ChargeController — ambiguous vehicle resolution", () => {
       db,
       chargers,
       manager,
-      poller as unknown as EnergyPoller,
       configService,
       emitter,
       testLogger,

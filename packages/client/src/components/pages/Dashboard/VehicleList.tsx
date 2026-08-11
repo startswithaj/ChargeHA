@@ -12,7 +12,6 @@ import { useVehicles } from "../../../hooks/useVehicles.ts";
 import { useToast } from "../../../hooks/useToast.tsx";
 import { useControllerStatuses } from "../../../hooks/controllerStatusStore.ts";
 import { useChargerCommands, useChargers } from "../../../hooks/useChargers.ts";
-import { chargePointIdentifier } from "../../../lib/chargePointIdentity.ts";
 import { VehicleCard } from "../../VehicleCard/VehicleCard.tsx";
 import { ChargerCard } from "./ChargerCard.tsx";
 import { trpc } from "../../../trpc.ts";
@@ -27,26 +26,15 @@ type ChargingPoint = ReturnType<typeof useChargers>["chargers"][number];
 
 type DashboardVehicle = ReturnType<typeof useVehicles>["vehicles"][number];
 
-/** The car a point puts on screen. Resolution first — an assignment that fell
- *  through resolves to the car actually plugged in — then the car a passive
- *  charger is passing current to. That second case is not a fallback for
- *  tidiness: `inferVehicle` deliberately skips self-driven cars, so a smart
- *  charger holding current for one resolves to nobody while
- *  `passiveForVehicleId` names it. */
+// Resolution first, then the car a passive charger is passing current to —
+// `inferVehicle` skips self-driven cars, so only `passiveForVehicleId`
+// names that one.
 const cardVehicleId = (point: ChargingPoint): string | null =>
   point.resolvedVehicleId ?? point.passiveForVehicleId;
 
-/** Which point owns each car's card, so no car renders twice.
- *
- *  A vehicle_api point outranks a smart one for the same car. When a smart
- *  charger has gone passive, both points name that car, and the vehicle_api
- *  point is the one whose card carries working controls — letting list order
- *  decide would sometimes hand the car to the passive charger and leave the
- *  controls nowhere.
- *
- *  Within a rank the first point in list order wins: two smart chargers infer
- *  the same car when only one is plugged in. Entries are reversed because a
- *  Map keeps the LAST value for a duplicate key. */
+// A vehicle_api point outranks a smart one for the same car, since its card
+// carries working controls. Within a rank the first point in list order
+// wins; entries reversed since Map keeps the LAST value for a duplicate key.
 function ownerByVehicleId(points: ChargingPoint[]): Map<string, string> {
   const rank = (p: ChargingPoint) => p.kind === "vehicle_api" ? 0 : 1;
   return new Map(
@@ -320,7 +308,6 @@ function SmartPointCards(
         controllerDetail={ctx.controllerStatuses[point.id]?.detail ?? null}
         controllerReason={ctx.controllerStatuses[point.id]?.reason ?? null}
         allocationStatus={ctx.allocationStatus[point.id] ?? null}
-        identifier={chargePointIdentifier(point)}
         onNavigateSettings={ctx.onNavigateSettings}
         vehicleResolution={point.vehicleResolution}
         resolvedVehicleName={vehicle?.name || null}
@@ -336,10 +323,7 @@ function SmartPointCards(
       {point.controlOwner === "self" && vehicle?.state && (
         <VehicleCard
           readOnly
-          chargingPoint={{
-            name: point.name,
-            identifier: chargePointIdentifier(point),
-          }}
+          chargingPoint={{ name: point.name }}
           name={vehicle.name || vehicle.state.vehicleName}
           state={vehicle.state}
           priority={point.priority}

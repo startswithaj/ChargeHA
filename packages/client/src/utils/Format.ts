@@ -1,7 +1,3 @@
-/**
- * Format watts to a human-readable kW string.
- * e.g. 5234 → "5.2 kW", 342 → "342 W"
- */
 export function kwValue(watts: number): string {
   const abs = Math.abs(watts);
   if (abs >= 1000) {
@@ -10,10 +6,6 @@ export function kwValue(watts: number): string {
   return `${Math.round(watts)} W`;
 }
 
-/**
- * Format watt-hours to a human-readable kWh string.
- * e.g. 12345 → "12.3 kWh"
- */
 export function kwhValue(wh: number): string {
   if (Math.abs(wh) >= 1000) {
     return `${(wh / 1000).toFixed(1)} kWh`;
@@ -21,23 +13,13 @@ export function kwhValue(wh: number): string {
   return `${Math.round(wh)} Wh`;
 }
 
-/**
- * Format a current reading as whole amps.
- * e.g. 16.13 → "16A"
- *
- * A charger that reports no current measurand has its amps derived from
- * power ÷ voltage ÷ phases, so the decimals are an artefact of that division
- * rather than anything the hardware measured. Nothing else on a card carries
- * decimals in amps, and no charger is commanded in fractions of one.
- */
+// A charger with no current measurand derives amps from power ÷ voltage ÷
+// phases, so decimals are a division artefact, not a real reading — nothing
+// is commanded in fractional amps.
 export function ampsValue(amps: number): string {
   return `${Math.round(amps)}A`;
 }
 
-/**
- * Format a current reading against its ceiling.
- * e.g. (16.13, 32) → "16A / 32A max"
- */
 export function ampsRange(amps: number, maxAmps: number): string {
   return `${ampsValue(amps)} / ${ampsValue(maxAmps)} max`;
 }
@@ -48,10 +30,6 @@ function toHour12(h: number): number {
   return h;
 }
 
-/**
- * Format 24h time string (HH:MM) to 12h format.
- * e.g. "13:00" → "1:00 PM", "00:30" → "12:30 AM"
- */
 export function formatTime12h(time: string): string {
   const [h, m] = time.split(":").map(Number);
   const period = h >= 12 ? "PM" : "AM";
@@ -72,10 +50,6 @@ const ALL_DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri"];
 const WEEKENDS = ["sat", "sun"];
 
-/**
- * Format an array of day codes to a human-readable string.
- * e.g. all 7 → "Every Day", mon-fri → "Weekdays", sat+sun → "Weekends"
- */
 export function formatDays(days: string[]): string {
   const sorted = ALL_DAYS.filter((d) => days.includes(d));
   if (sorted.length === 7) return "Every Day";
@@ -94,20 +68,12 @@ export function formatDays(days: string[]): string {
   return sorted.map((d) => DAY_LABELS[d]).join(", ");
 }
 
-/**
- * Format cents to a currency string.
- * e.g. formatCost(1250, '$') → '$12.50'
- */
 export function formatCost(cents: number, currencySymbol: string): string {
   const dollars = cents / 100;
   return `${currencySymbol}${dollars.toFixed(2)}`;
 }
 
-/**
- * Format a rate (stored in currency unit per kWh) for display.
- * Uses 2 decimal places when sufficient, 4 when sub-cent precision exists.
- * e.g. formatRate(0.35, '$') → '$0.35', formatRate(0.3553, '$') → '$0.3553'
- */
+// Uses 2 decimal places when sufficient, 4 when sub-cent precision exists.
 export function formatRate(
   ratePerKwh: number,
   currencySymbol: string,
@@ -119,10 +85,6 @@ export function formatRate(
   return `${currencySymbol}${ratePerKwh.toFixed(4)}`;
 }
 
-/**
- * Format a date to a relative time string.
- * e.g. "just now", "5s ago", "2m ago"
- */
 export function formatRelativeTime(date: Date): string {
   const seconds = Math.max(0, Math.round((Date.now() - date.getTime()) / 1000));
   if (seconds < 60) return `${seconds}s ago`;

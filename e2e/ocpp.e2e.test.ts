@@ -26,14 +26,12 @@ describe("OCPP e2e", () => {
   // chargerRowId: null — the same shape the client uses. Every test shares
   // it: `charger.create` would make a second row with no charge point id,
   // which could never connect.
-  /** Rows are matched by charge point id, not by adapter type: the stack
-   *  runs two OCPP stations now, so "the OCPP row" is ambiguous. */
+  // Rows are matched by charge point id, not by adapter type: the stack
+  // runs two OCPP stations now, so "the OCPP row" is ambiguous.
   async function ocppRow(chargePointId: string = CP_ID) {
     const list = await trpc.charger.list.query();
     return list.find((c) =>
-      c.chargerAdapterType === "ocpp" &&
-      (JSON.parse(c.chargerConfig) as { charger_id?: string }).charger_id ===
-        chargePointId
+      c.chargerAdapterType === "ocpp" && c.name === chargePointId
     );
   }
 
@@ -308,9 +306,7 @@ describe("OCPP measurand negotiation e2e", () => {
   async function ocppRow(chargePointId: string) {
     const list = await trpc.charger.list.query();
     return list.find((c) =>
-      c.chargerAdapterType === "ocpp" &&
-      (JSON.parse(c.chargerConfig) as { charger_id?: string }).charger_id ===
-        chargePointId
+      c.chargerAdapterType === "ocpp" && c.name === chargePointId
     );
   }
 
@@ -396,9 +392,7 @@ describe("OCPP reconnect after an app restart", () => {
   it("the charger dials back in and control is restored", async () => {
     const rowId = await waitFor(async () => {
       const row = (await trpc.charger.list.query()).find((c) =>
-        c.chargerAdapterType === "ocpp" &&
-        (JSON.parse(c.chargerConfig) as { charger_id?: string }).charger_id ===
-          SAP_STATION_ID
+        c.chargerAdapterType === "ocpp" && c.name === SAP_STATION_ID
       );
       return row?.id ?? null;
     }, { label: "sap-test row" });

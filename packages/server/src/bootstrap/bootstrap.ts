@@ -65,24 +65,22 @@ function parseLogLevel(raw: string | undefined): LogLevel {
 function buildAuxServices(
   {
     db,
-    energyManager,
     encryptionKey,
     logLevel,
     port,
     vehicleRegistry,
     vehicleManager,
-    eventEmitter,
-    chargingPoints,
+    configService,
+    chargingPointManager,
   }: {
     db: AppDatabase;
-    energyManager: EnergyAdapterManager;
     encryptionKey: string | null;
     logLevel: "debug" | "info" | "warn" | "error";
     port: number;
     vehicleRegistry: VehiclePluginRegistry;
     vehicleManager: VehicleManager;
-    eventEmitter: TypedEventEmitter;
-    chargingPoints: () => ChargingPointManager;
+    configService: ConfigService;
+    chargingPointManager: ChargingPointManager;
   },
 ) {
   const tariffService = new TariffService(
@@ -90,12 +88,6 @@ function buildAuxServices(
     new Logger("TariffService", logLevel),
   );
   const statsService = new StatsService(db);
-  const configService = new ConfigService(
-    db,
-    energyManager,
-    encryptionKey,
-    new Logger("ConfigService", logLevel),
-  );
   const geocodeService = new GeocodeService(new Logger("Geocode", logLevel));
   const oidcService = new OidcService(
     db,
@@ -128,21 +120,13 @@ function buildAuxServices(
     vehicleManager,
     authService,
     oidcService,
-    chargingPoints,
+    chargingPointManager,
   );
   const logService = new LogService(db);
-
-  const poller = new EnergyPoller(
-    energyManager,
-    eventEmitter,
-    db,
-    new Logger("EnergyPoller", logLevel),
-  );
 
   return {
     tariffService,
     statsService,
-    configService,
     geocodeService,
     oidcService,
     rateLimiter,
@@ -151,7 +135,6 @@ function buildAuxServices(
     tunnelManager,
     wizardService,
     logService,
-    poller,
   };
 }
 
@@ -214,6 +197,56 @@ function startBackgroundServices(
   new Overseer(db, eventEmitter, new Logger("Overseer", logLevel));
 }
 
+// Construction order matters: energyManager → configService →
+// chargingPointManager is a dependency chain, and everything downstream
+// (vehicleService, aux services, poller) takes direct references.
+function buildManagers(
+  {
+    db,
+    eventEmitter,
+    encryptionKey,
+    vehicleRegistry,
+    energyRegistry,
+    chargerRegistry,
+    logLevel,
+  }: {
+    db: AppDatabase;
+    eventEmitter: TypedEventEmitter;
+    encryptionKey: string | null;
+    vehicleRegistry: VehiclePluginRegistry;
+    energyRegistry: EnergyPluginRegistry;
+    chargerRegistry: ChargerPluginRegistry;
+    logLevel: LogLevel;
+  },
+) {
+  const vehicleManager = new VehicleManager(
+    db,
+    eventEmitter,
+    new Logger("VehicleManager", logLevel),
+    vehicleRegistry,
+  );
+  const energyManager = new EnergyAdapterManager(
+    db,
+    energyRegistry,
+    new Logger("EnergyAdapter", logLevel),
+  );
+  const configService = new ConfigService(
+    db,
+    energyManager,
+    encryptionKey,
+    new Logger("ConfigService", logLevel),
+  );
+  const chargingPointManager = new ChargingPointManager(
+    db,
+    chargerRegistry,
+    vehicleManager,
+    configService,
+    eventEmitter,
+    new Logger("ChargingPointManager", logLevel),
+  );
+  return { vehicleManager, energyManager, configService, chargingPointManager };
+}
+
 function buildServices(
   {
     db,
@@ -241,41 +274,37 @@ function buildServices(
     new Logger("Notifications", logLevel),
   );
   new VehicleFetchLogger(db, eventEmitter, new Logger("FetchLog", logLevel));
-  const vehicleManager = new VehicleManager(
-    db,
-    eventEmitter,
-    new Logger("VehicleManager", logLevel),
-    vehicleRegistry,
-  );
-  const energyManager = new EnergyAdapterManager(
-    db,
-    energyRegistry,
-    new Logger("EnergyAdapter", logLevel),
-    () => chargingPointManager.getChargingLoadW(),
-  );
+  const { vehicleManager, energyManager, configService, chargingPointManager } =
+    buildManagers({
+      db,
+      eventEmitter,
+      encryptionKey,
+      vehicleRegistry,
+      energyRegistry,
+      chargerRegistry,
+      logLevel,
+    });
   const vehicleService = new VehicleService(
     db,
     vehicleManager,
     vehicleRegistry,
     eventEmitter,
     new Logger("VehicleService", logLevel),
-    () => chargingPointManager,
+    chargingPointManager,
   );
   const auxServices = buildAuxServices({
     db,
-    energyManager,
     encryptionKey,
     logLevel,
     port,
     vehicleRegistry,
     vehicleManager,
-    eventEmitter,
-    chargingPoints: () => chargingPointManager,
+    configService,
+    chargingPointManager,
   });
   const {
     tariffService,
     statsService,
-    configService,
     geocodeService,
     oidcService,
     rateLimiter,
@@ -284,7 +313,6 @@ function buildServices(
     tunnelManager,
     wizardService,
     logService,
-    poller,
   } = auxServices;
 
   registerNotificationListeners({
@@ -295,14 +323,12 @@ function buildServices(
     logLevel,
   });
 
-  const chargingPointManager = new ChargingPointManager(
-    db,
-    chargerRegistry,
-    vehicleManager,
-    poller,
-    configService,
+  const poller = new EnergyPoller(
+    energyManager,
+    chargingPointManager,
     eventEmitter,
-    new Logger("ChargingPointManager", logLevel),
+    db,
+    new Logger("EnergyPoller", logLevel),
   );
 
   const healthService = new HealthService(
@@ -520,9 +546,8 @@ function setupTrpcEndpoint(
   });
 }
 
-/** Supplied by the entrypoint rather than imported here: naming the plugin set
- *  is the composition root's job, and the host must not depend on the package
- *  that depends on it. */
+// Supplied by the entrypoint rather than imported here: naming the plugin set
+// is the composition root's job, and the host must not depend on the package that depends on it.
 export type RegisterPlugins = (
   host: Omit<PluginDependenciesInit, "pluginId">,
   vehicleRegistry: VehiclePluginRegistry,
@@ -530,11 +555,8 @@ export type RegisterPlugins = (
   chargerRegistry: ChargerPluginRegistry,
 ) => void;
 
-/**
- * Construct the entire app: infrastructure, services, plugins, HTTP router.
- * Returns a `shutdown` function that stops the server, shuts down plugins,
- * closes the tunnel, and closes the DB.
- */
+// Construct the entire app: infrastructure, services, plugins, HTTP router.
+// Returns a `shutdown` function that stops the server, shuts down plugins, closes the tunnel, and closes the DB.
 export async function bootstrap(
   registerPlugins: RegisterPlugins,
 ): Promise<

@@ -26,13 +26,13 @@ describe("ChargerCard", () => {
     energyAddedKwh: 0,
     status: "available",
     statusDetail: null,
+    controlMode: "amps",
     lastUpdated: "2024-01-01T00:00:00.000Z",
   };
 
   const renderCard = (
     vehicleResolution: "linked" | "inferred" | "ambiguous" | "none",
     resolvedVehicleName: string | null = null,
-    identifier: string | null = null,
   ) =>
     render(
       <Theme>
@@ -46,7 +46,6 @@ describe("ChargerCard", () => {
           controllerDetail={null}
           vehicleResolution={vehicleResolution}
           resolvedVehicleName={resolvedVehicleName}
-          identifier={identifier}
         />
       </Theme>,
     );
@@ -122,7 +121,6 @@ describe("ChargerCard", () => {
           controllerDetail={null}
           vehicleResolution="ambiguous"
           resolvedVehicleName={null}
-          identifier={null}
           onNavigateSettings={onNavigateSettings}
         />
       </Theme>,
@@ -167,7 +165,6 @@ describe("ChargerCard", () => {
           controllerDetail={null}
           vehicleResolution="none"
           resolvedVehicleName={null}
-          identifier={null}
         />
       </Theme>,
     );
@@ -188,7 +185,6 @@ describe("ChargerCard", () => {
           controllerDetail={null}
           vehicleResolution="none"
           resolvedVehicleName={null}
-          identifier={null}
         />
       </Theme>,
     );
@@ -217,25 +213,12 @@ describe("ChargerCard", () => {
           controllerDetail={null}
           vehicleResolution="none"
           resolvedVehicleName={null}
-          identifier={null}
         />
       </Theme>,
     );
 
     expect(screen.getByText("16A / 32A max")).toBeInTheDocument();
     expect(screen.queryByText(/16\.13/)).not.toBeInTheDocument();
-  });
-
-  // The heading is often just the plugin's label, so the id is the only thing
-  // on the card saying which physical charger it is.
-  it("badges the charge point id", () => {
-    renderCard("none", null, "vcp-dev-2");
-    expect(screen.getByTitle("Charge point id")).toHaveTextContent("vcp-dev-2");
-  });
-
-  it("shows no id badge for an adapter without one", () => {
-    renderCard("none");
-    expect(screen.queryByTitle("Charge point id")).not.toBeInTheDocument();
   });
 
   // The same formatted row the vehicle card uses, rather than the raw
@@ -254,7 +237,6 @@ describe("ChargerCard", () => {
           controllerReason="schedule"
           vehicleResolution="none"
           resolvedVehicleName={null}
-          identifier={null}
         />
       </Theme>,
     );
@@ -278,7 +260,6 @@ describe("ChargerCard", () => {
           controllerReason="solar_tracking"
           vehicleResolution="none"
           resolvedVehicleName={null}
-          identifier={null}
         />
       </Theme>,
     );

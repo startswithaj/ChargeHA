@@ -42,13 +42,12 @@ function parseTimezone(
   };
 }
 
-/** Parse an "HH:MM" schedule time into minutes since midnight. */
+// Parse an "HH:MM" schedule time into minutes since midnight.
 function toMinutes(time: string): number {
   const [hours, minutes] = time.split(":").map(Number);
   return hours * 60 + minutes;
 }
 
-/** Check whether a schedule is active at the given time. */
 export function isScheduleActiveNow(
   schedule: EngineSchedule,
   now: Date,
@@ -76,8 +75,8 @@ export function isScheduleActiveNow(
   }
 }
 
-/** Global schedules (no target) apply everywhere; targeted ones match the
- *  charging point directly or via its linked vehicle. */
+// Global schedules (no target) apply everywhere; targeted ones match the
+// charging point directly or via its linked vehicle.
 export function scheduleTargets(
   s: EngineSchedule,
   target: { id: string; vehicleId: string | null },
@@ -87,16 +86,16 @@ export function scheduleTargets(
   return true;
 }
 
-/** A charger-keyed schedule outranks a vehicle-keyed one, which outranks an
- *  untargeted one. Rank decides which schedule supplies the window and amps. */
+// A charger-keyed schedule outranks a vehicle-keyed one, which outranks an
+// untargeted one. Rank decides which schedule supplies the window and amps.
 function targetRank(s: EngineSchedule): number {
   if (s.chargerId !== null) return 0;
   if (s.vehicleId !== null) return 1;
   return 2;
 }
 
-/** Window length in minutes, wrapping past midnight the same way
- *  isScheduleActiveNow does. */
+// Window length in minutes, wrapping past midnight the same way
+// isScheduleActiveNow does.
 function windowMinutes(s: EngineSchedule): number {
   const start = toMinutes(s.startTime);
   const end = toMinutes(s.endTime);
@@ -104,9 +103,8 @@ function windowMinutes(s: EngineSchedule): number {
   return end + 1440 - start;
 }
 
-/** Total order over overlapping charge schedules: rank, then earliest start,
- *  then longest window, then id. Never depends on the order the database
- *  happened to return rows in. */
+// Total order over overlapping charge schedules: rank, then earliest start,
+// then longest window, then id — never depends on database row order.
 function compareSchedules(a: EngineSchedule, b: EngineSchedule): number {
   const byRank = targetRank(a) - targetRank(b);
   if (byRank !== 0) return byRank;
@@ -117,30 +115,17 @@ function compareSchedules(a: EngineSchedule, b: EngineSchedule): number {
   return a.id < b.id ? -1 : 1;
 }
 
-/** The charge schedule in force for one charging point at one instant. */
 export interface ActiveChargeSchedule {
-  /** Window and amps from the highest-ranked overlapping schedule, with
-   *  chargeLimitPct replaced by the strictest limit of the whole set. */
+  // Window and amps from the highest-ranked overlapping schedule, with
+  // chargeLimitPct replaced by the strictest limit of the whole set.
   effective: EngineSchedule;
-  /** Every overlapping schedule that contributed, in rank order. */
   contributors: EngineSchedule[];
-  /** True when more than one schedule overlapped and was merged. */
   merged: boolean;
 }
 
-/** Pick the charge schedule in force for a charging point right now.
- *
- *  Blockouts are always global. Charge schedules match the charging point
- *  directly (chargerId), via its linked vehicle (vehicleId), or everywhere
- *  when untargeted.
- *
- *  More than one charge schedule can be active in the same minute — a
- *  charger-keyed one, and a vehicle-keyed one for the car plugged into that
- *  charger. They are merged, not picked between: the highest-ranked schedule
- *  supplies the window and the amps, and the strictest chargeLimitPct of the
- *  overlapping set still stops the charge. Only overlapping minutes merge —
- *  isScheduleActiveNow filters by time first, so outside the shared window
- *  only one schedule is ever a candidate. */
+// Blockouts are always global; charge schedules match by chargerId,
+// vehicleId, or untargeted. Overlapping schedules (e.g. a charger-keyed one
+// and a vehicle-keyed one) merge: highest-ranked supplies window/amps, strictest chargeLimitPct still applies.
 export function selectActiveChargeSchedule(
   schedules: EngineSchedule[],
   target: { id: string; vehicleId: string | null },

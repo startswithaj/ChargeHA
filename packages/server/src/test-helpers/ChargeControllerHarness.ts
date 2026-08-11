@@ -1,15 +1,5 @@
-/**
- * Shared test harness for ChargeController test suites.
- *
- * Each test calls `setupController(opts)` and gets back a `ControllerCtx`
- * with fresh in-memory state plus bound helpers. Tests typically:
- *
- *   const ctx = await setupController({ isCharging: true });
- *   await ctx.runOneLoop();
- *   expect(ctx.adapter.commands).toContainEqual({ cmd: "stop" });
- *
- * Always pair with `afterEach(() => { ctx?.controller.stop(); ctx?.db.close(); })`.
- */
+// Shared test harness for ChargeController test suites. Each test calls
+// `setupController(opts)` and gets back a `ControllerCtx` with fresh in-memory state plus bound helpers, e.g. `const ctx = await setupController({ isCharging: true }); await ctx.runOneLoop(); expect(ctx.adapter.commands).toContainEqual({ cmd: "stop" });`. Always pair with `afterEach(() => { ctx?.controller.stop(); ctx?.db.close(); })`.
 
 import { assertExists } from "@std/assert";
 import type {
@@ -90,10 +80,8 @@ const ZERO_CUMULATIVE: CumulativeEnergyData = {
   dailyGridExportWh: 0,
 };
 
-/** Tests that call requestState directly are signalling "refetch now" — they
- *  usually just mutated adapter.state and want the middleware to see it. Use
- *  forceRefresh so the middleware bypasses its cache (which is otherwise
- *  fresh for 20 min under the no-solar/no-schedule/no-blockout defaults). */
+// Tests that call requestState directly are signalling "refetch now" — they usually just mutated adapter.state and want the middleware to see it. Use
+// forceRefresh so the middleware bypasses its cache (which is otherwise fresh for 20 min under the no-solar/no-schedule/no-blockout defaults).
 export const REQUEST_CONTEXT = {
   origin: "test",
   traceId: "test",
@@ -113,8 +101,8 @@ const DAY_MAP: Record<number, DayOfWeek> = {
   6: "sat",
 };
 
-/** A schedule window covering the next two hours from "now", on today's
- *  day-of-week. Use for tests that need a schedule that's active right now. */
+// A schedule window covering the next two hours from "now", on today's
+// day-of-week. Use for tests that need a schedule that's active right now.
 export function currentScheduleWindow(): {
   today: DayOfWeek;
   startTime: string;
@@ -164,8 +152,8 @@ export interface ControllerCtx {
   poller: MockEnergyPoller;
   controller: ChargeController;
   trackingEmitter: TrackingEventEmitter;
-  /** Run one controller loop iteration. Cancels the next-timer afterwards
-   *  so FakeTime.tick can't fire a concurrent loop later in the test. */
+  // Run one controller loop iteration. Cancels the next-timer afterwards
+  // so FakeTime.tick can't fire a concurrent loop later in the test.
   runOneLoop(): Promise<void>;
   // DB-only mode write; the next loop picks it up.
   setMode(mode: ChargingPointMode, vehicleId?: string): Promise<void>;
@@ -239,9 +227,8 @@ interface ControllerStack {
   trackingEmitter: TrackingEventEmitter;
 }
 
-/** Build the shared db/manager/poller/controller wiring used by both the
- *  single- and multi-vehicle setup helpers. The caller is responsible for
- *  inserting vehicles and seeding initial state before calling this. */
+// Build the shared db/manager/poller/controller wiring used by both the
+// single- and multi-vehicle setup helpers. The caller is responsible for inserting vehicles and seeding initial state before calling this.
 async function buildControllerStack(
   resolveAdapter: (row: VehicleRow) => MockAdapter,
   energy: EnergyData | null,
@@ -282,7 +269,6 @@ async function buildControllerStack(
     db,
     registries.chargers,
     manager,
-    poller as unknown as EnergyPoller,
     configService,
     trackingEmitter,
     new Logger("ChargingPointManager", "error"),
@@ -400,9 +386,8 @@ export interface MultiControllerCtx {
   getLogForVehicle(vehicleId: string): Promise<ParsedControllerLog | null>;
 }
 
-/** Multi-vehicle variant of setupController. Vehicles are inserted into the
- *  DB in array order — pass them in reverse-priority order to test that the
- *  controller honours `priority` rather than DB row order. */
+// Multi-vehicle variant of setupController. Vehicles are inserted into the
+// DB in array order — pass them in reverse-priority order to test that the controller honours `priority` rather than DB row order.
 export async function setupMultiVehicleController(
   vehicles: MultiVehicleSpec[],
   energy: EnergyData | null = BASE_ENERGY,

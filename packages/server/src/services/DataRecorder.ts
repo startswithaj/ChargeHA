@@ -19,10 +19,8 @@ export class DataRecorder {
   private readonly chargingPointManager: ChargingPointManager;
   private readonly tariffService: TariffService;
   private readonly logger: Logger;
-  /** Promise of the next pending setTimeout id. The async ctor-time
-   *  scheduling means the id isn't known synchronously — wrapping it in
-   *  a promise lets `stop()` always await the in-flight schedule and
-   *  clear whatever id it lands on. */
+  // Promise of the next pending setTimeout id. The async ctor-time scheduling means the id isn't known synchronously — wrapping it in a promise
+  // lets `stop()` always await the in-flight schedule and clear whatever id it lands on.
   private timer: Promise<ReturnType<typeof setTimeout>> | null = null;
   private latestRealtime: EnergyData | null = null;
   private tickCount = 0;
@@ -221,8 +219,8 @@ export class DataRecorder {
     );
   }
 
-  /** Resolve the per-vehicle attribution at home, routing all charging to grid
-   *  when the latest energy poll failed (we cannot trust solar/home values). */
+  // Resolve the per-vehicle attribution at home, routing all charging to grid
+  // when the latest energy poll failed (we cannot trust solar/home values).
   private attributeHomeCharge(
     energyPollFailed: boolean,
     chargePowerW: number,

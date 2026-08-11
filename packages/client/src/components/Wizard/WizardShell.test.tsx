@@ -14,7 +14,7 @@ describe("WizardShell", () => {
   const mockPatch = vi.fn();
   let currentStepId = "welcome";
 
-  /** Full 14-step flow (Tesla vehicle + inverter-setup energy step). */
+  // Tesla vehicle + inverter-setup energy step.
   const FULL_STEPS: [string, string][] = [
     ["welcome", "Welcome"],
     ["timezone", "Timezone"],
@@ -51,15 +51,12 @@ describe("WizardShell", () => {
       }),
     }));
 
-  /**
-   * The full flow, with the plugin steps gated off — the shape the real wizard
-   * has when a vehicle type without setup steps is selected. Core steps stay in
-   * the flow; only `when` decides they aren't in the list.
-   */
+  // The shape the real wizard has when a vehicle type without setup steps is
+  // selected. Core steps stay in the flow; only `when` decides presence.
   const makeCoreOnlyFlow = (): StepDef[] =>
     makeFlow().map((step) => gateOff(step, !CORE_ONLY_IDS.includes(step.id)));
 
-  /** Give a step an owner nothing has selected, so it drops out of the list. */
+  // Give a step an owner nothing has selected, so it drops out of the list.
   const gateOff = (step: StepDef, off: boolean): StepDef =>
     off ? { ...step, owner: "unpicked" } : step;
 

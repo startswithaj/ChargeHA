@@ -14,9 +14,9 @@ import {
   meterValues,
 } from "./test-helpers/ocppHarness.ts";
 
-/** The MeterValuesSampledData values we asked the charger to store, oldest
- *  first. Declared per describe (a test file may not hold module-level
- *  helpers), so this comment stands in for the repetition below. */
+// The MeterValuesSampledData values we asked the charger to store, oldest
+// first. Declared per describe (a test file may not hold module-level
+// helpers), so this comment stands in for the repetition below.
 describe("OCPP measurand negotiation — asking", () => {
   const CP = "ABB-83214";
   const BOOT = { chargePointVendor: "ACME", chargePointModel: "Wallbox9000" };
@@ -255,7 +255,7 @@ describe("OCPP measurand negotiation — verifying against arriving data", () =>
   const CP = "ABB-83214";
   const BOOT = { chargePointVendor: "ACME", chargePointModel: "Wallbox9000" };
 
-  /** Boot, then answer as a charger that accepts everything we ask. */
+  // Boot, then answer as a charger that accepts everything we ask.
   const acceptEverything = async (socket: FakeSocket, status = "Accepted") => {
     await call(socket, "BootNotification", BOOT);
     await answer(socket, {

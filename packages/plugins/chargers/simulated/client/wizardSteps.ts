@@ -1,10 +1,9 @@
 import type { PluginStepDef } from "../../../hostUi.ts";
 import type { ChargerPluginOption } from "../../../pluginOptions.ts";
-import { simulatedChargerSetupStep } from "./SimulatedChargerSetupStep.tsx";
 
-export const simulatedChargerWizardSteps: PluginStepDef[] = [
-  simulatedChargerSetupStep,
-];
+// No setup step: the row is created the moment the type is selected
+// (ensureOnSelect) — there is nothing to configure during the wizard.
+export const simulatedChargerWizardSteps: PluginStepDef[] = [];
 
 export const simulatedChargerOption: ChargerPluginOption = {
   id: "simulated_charger",
@@ -15,5 +14,6 @@ export const simulatedChargerOption: ChargerPluginOption = {
     "charger would.",
   iconKey: "monitor",
   directAdd: true,
+  ensureOnSelect: true,
   demoAvailable: true,
 };

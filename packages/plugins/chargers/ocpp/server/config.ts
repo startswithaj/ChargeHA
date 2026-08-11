@@ -49,5 +49,5 @@ export type OcppConfigKey = SectionKeys<typeof ocppConfigDef>;
 
 // Typed against the config keys so a rename is a compile error, not a
 // silently unencrypted secret (fronius-cloud pattern).
-/** OCPP stores no secrets. Kept so the plugin contract is explicit. */
+// OCPP stores no secrets. Kept so the plugin contract is explicit.
 export const OCPP_SECRET_KEYS = [] as const satisfies readonly OcppConfigKey[];

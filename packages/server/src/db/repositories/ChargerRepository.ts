@@ -6,21 +6,15 @@ import type { ChargerKind, ChargingPointMode } from "@chargeha/shared";
 
 type ChargerRecord = typeof chargers.$inferSelect;
 
-/** Raw contents of the encrypted secrets column, exactly as stored. */
+// Raw contents of the encrypted secrets column, exactly as stored.
 export interface ChargerSecretsRecord {
   value: string;
   isEncrypted: boolean;
 }
 
-/**
- * Map a DB record to the shared row shape.
- *
- * Fields are listed explicitly rather than spread: `charger_secrets` and
- * `charger_secrets_encrypted` are on the record and must NOT reach
- * `ChargerRow`, which is serialized to the browser by `trpc.charger.list`
- * and handed to plugins. A spread would leak credentials the moment the
- * column was added.
- */
+// Map a DB record to the shared row shape. Fields are listed explicitly
+// rather than spread: `charger_secrets` and `charger_secrets_encrypted` are on the record and must NOT reach `ChargerRow`, which is serialized to
+// the browser by `trpc.charger.list` and handed to plugins. A spread would leak credentials the moment the column was added.
 function toChargerRow(row: ChargerRecord): ChargerRow {
   return {
     id: row.id,
@@ -58,10 +52,8 @@ export class ChargerRepository {
     return row ? toChargerRow(row) : null;
   }
 
-  /**
-   * Upsert a charger row. `charger_secrets` is never in `values`, so an
-   * upsert of an existing row leaves the stored secrets untouched.
-   */
+  // Upsert a charger row. `charger_secrets` is never in `values`, so an
+  // upsert of an existing row leaves the stored secrets untouched.
   async upsertCharger(input: UpsertChargerInput): Promise<void> {
     const values = toColumns(input);
     await this.db.insert(chargers)
@@ -70,6 +62,20 @@ export class ChargerRepository {
         target: chargers.id,
         set: { ...values, updatedAt: new Date().toISOString() },
       });
+  }
+
+  async insertCharger(
+    input: UpsertChargerInput & {
+      chargerSecrets: string;
+      chargerSecretsEncrypted: boolean;
+    },
+  ): Promise<void> {
+    const { chargerSecrets, chargerSecretsEncrypted, ...rest } = input;
+    await this.db.insert(chargers).values({
+      ...toColumns(rest),
+      chargerSecrets,
+      chargerSecretsEncrypted: chargerSecretsEncrypted ? 1 : 0,
+    });
   }
 
   async updateChargerMode(id: string, mode: ChargingPointMode): Promise<void> {
@@ -90,8 +96,8 @@ export class ChargerRepository {
       .where(eq(chargers.id, id));
   }
 
-  /** Explicit vehicle assignment for a smart charger. `null` clears it,
-   *  returning resolution to inference — never `""`. */
+  // Explicit vehicle assignment for a smart charger. `null` clears it,
+  // returning resolution to inference — never `""`.
   async updateChargerVehicleId(
     id: string,
     vehicleId: string | null,
@@ -120,7 +126,7 @@ export class ChargerRepository {
   // AppDatabase's job — this class has no encryption key, like every other
   // repository.
 
-  /** Serialized config JSON for one row, or null when the row is absent. */
+  // Serialized config JSON for one row, or null when the row is absent.
   async getChargerConfigJson(id: string): Promise<string | null> {
     const rows = await this.db.select({ value: chargers.chargerConfig })
       .from(chargers).where(eq(chargers.id, id));
@@ -133,7 +139,7 @@ export class ChargerRepository {
       .where(eq(chargers.id, id));
   }
 
-  /** Raw secrets column + flag, or null when the row is absent. */
+  // Raw secrets column + flag, or null when the row is absent.
   async getChargerSecretsRecord(
     id: string,
   ): Promise<ChargerSecretsRecord | null> {

@@ -16,14 +16,7 @@ export const wizardRouter = router({
   }),
 
   complete: publicProcedure.mutation(async ({ ctx }) => {
-    // Read before complete() clears the nav state: finishing on the charger
-    // path creates the charger row — the host owns row creation.
-    const state = await ctx.wizardService.getState();
-    const result = await ctx.wizardService.complete();
-    if (state.controlPath === "charger" && state.chargerType !== null) {
-      await ctx.chargingPointManager.ensureCharger(state.chargerType);
-    }
-    return result;
+    return await ctx.wizardService.complete();
   }),
 
   demoSetup: publicProcedure

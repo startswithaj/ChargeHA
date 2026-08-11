@@ -8,10 +8,7 @@ import type {
 } from "@chargeha/shared";
 import { trpc } from "../trpc.ts";
 
-/**
- * Check whether two time ranges on the same day overlap.
- * Handles overnight ranges (e.g. 23:00–06:00).
- */
+// Handles overnight ranges (e.g. 23:00–06:00).
 export function timeRangesOverlap(
   aStart: string,
   aEnd: string,
@@ -45,10 +42,6 @@ export function daysOverlap(a: DayOfWeek[], b: DayOfWeek[]): boolean {
   return a.some((d) => b.includes(d));
 }
 
-/**
- * Validate that a schedule doesn't overlap with existing same-vehicle charge
- * schedules. Returns error message or null.
- */
 export function validateScheduleOverlap(
   data: ScheduleFormData,
   schedules: Schedule[],
@@ -158,10 +151,7 @@ function useDeleteScheduleMutation() {
   });
 }
 
-/**
- * Schedule management backed by tRPC with TanStack Query.
- * Client-side overlap validation is kept for immediate UX feedback.
- */
+// Client-side overlap validation is kept for immediate UX feedback.
 export function useSchedules() {
   const { data: scheduleData, isLoading: loading } = trpc.schedule.list
     .useQuery();

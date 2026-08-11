@@ -16,6 +16,7 @@ import { demoChargerDisplayNames } from "@chargeha/plugins/demoPluginSummaries";
 type ChargerMutations = Pick<
   MutationHandlers,
   | "charger.create"
+  | "charger.ensure"
   | "charger.setMode"
   | "charger.setAmps"
   | "charger.reorder"
@@ -26,6 +27,22 @@ type ChargerMutations = Pick<
 >;
 
 const CREATED_AT = "2026-01-01T00:00:00.000Z";
+
+// The full ChargerRow shape the server returns; demo chargers only track the
+// dynamic fields, so the rest is filled with fixed demo values.
+const toChargerRowResponse = (charger: DemoCharger) => ({
+  id: charger.id,
+  name: charger.name,
+  chargerAdapterType: charger.chargerAdapterType,
+  chargerConfig: "{}",
+  mode: charger.mode,
+  priority: charger.priority,
+  vehicleId: charger.vehicleId,
+  kind: "smart" as const,
+  active: true,
+  createdAt: CREATED_AT,
+  updatedAt: CREATED_AT,
+});
 
 const nextPriority = (chargers: DemoCharger[]): number =>
   chargers.reduce((max, c) => Math.max(max, c.priority), 0) + 1;
@@ -48,7 +65,7 @@ const patchVehicle = (
     vehicles: m.vehicles.map((v) => (v.id === vehicleId ? fn(v) : v)),
   }));
 
-/** Whether a vehicle should be charging given a newly-set mode. */
+// Whether a vehicle should be charging given a newly-set mode.
 const chargingForMode = (mode: DemoVehicleMode, current: boolean): boolean => {
   if (mode === "charge_now") return true;
   if (mode === "stop") return false;
@@ -78,19 +95,7 @@ export const chargerMutations: ChargerMutations = {
     };
     updateDemoState((m) => ({ ...m, chargers: [...m.chargers, charger] }));
     emitDemoEvent({ type: "chargers_changed", data: {} });
-    return {
-      id: charger.id,
-      name: charger.name,
-      chargerAdapterType: charger.chargerAdapterType,
-      chargerConfig: "{}",
-      mode: charger.mode,
-      priority: charger.priority,
-      vehicleId: charger.vehicleId,
-      kind: "smart" as const,
-      active: true,
-      createdAt: CREATED_AT,
-      updatedAt: CREATED_AT,
-    };
+    return toChargerRowResponse(charger);
   },
 
   "charger.setMode": (input) => {
@@ -153,6 +158,15 @@ export const chargerMutations: ChargerMutations = {
   "charger.setVehicleId": (input) => {
     patchCharger(input.id, (c) => ({ ...c, vehicleId: input.vehicleId }));
     emitDemoEvent({ type: "chargers_changed", data: {} });
+  },
+
+  // Find-or-create — mirrors ChargingPointManager.ensureCharger.
+  "charger.ensure": (input) => {
+    const existing = getDemoState().chargers.find(
+      (c) => c.chargerAdapterType === input.chargerAdapterType,
+    );
+    if (!existing) return chargerMutations["charger.create"](input);
+    return toChargerRowResponse(existing);
   },
 
   "plugin.charger.simulated_charger.updateState": (input) => {

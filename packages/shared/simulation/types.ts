@@ -44,8 +44,8 @@ export interface SimulationOptions {
   batteryPriorityLimit: number;
 }
 
-/** A charging point with a fixed default configuration, used to seed the
- *  simulator UI and CLI/browser devtools with a sensible starting point. */
+// A charging point with a fixed default configuration, used to seed the
+// simulator UI and CLI/browser devtools with a sensible starting point.
 export function makeDefaultVehicleConfig(
   overrides: Partial<VehicleConfig> & { id: string; name: string },
 ): VehicleConfig {

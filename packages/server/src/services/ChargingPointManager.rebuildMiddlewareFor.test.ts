@@ -1,7 +1,7 @@
 import { beforeEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { assertExists } from "@std/assert";
-import type { CallContext, ChargerInfo, ChargerState } from "@chargeha/shared";
+import type { CallContext, ChargerState } from "@chargeha/shared";
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { ChargerRow } from "../db/types.ts";
 import { ChargerPluginRegistry } from "@chargeha/server/bootstrap/ChargerPluginRegistry";
@@ -11,7 +11,6 @@ import type {
   ChargerRowConfig,
 } from "@chargeha/shared/plugins";
 import type { VehicleManager } from "./VehicleManager.ts";
-import type { EnergyPoller } from "./EnergyPoller.ts";
 import type { ConfigService } from "./ConfigService.ts";
 import type { TypedEventEmitter } from "./TypedEventEmitter.ts";
 import { ChargingPointManager } from "./ChargingPointManager.ts";
@@ -19,20 +18,17 @@ import { Logger } from "../lib/Logger.ts";
 import { MockEventEmitter } from "../test-helpers/MockEventEmitter.ts";
 import { throwingMock } from "../test-helpers/throwingMock.ts";
 
-/** Controllable ChargerMiddleware stub — same shape as the sibling test
- *  file's; kept local rather than shared so each test file is self-contained
- *  and can be read on its own. */
+// Controllable ChargerMiddleware stub — same shape as the sibling test
+// file's; kept local rather than shared so each test file is self-contained and can be read on its own.
 class StubChargerMiddleware implements ChargerMiddleware {
   setAmpsCalls: Array<{ amps: number; origin: string }> = [];
   shutdownCalls = 0;
   nextState: ChargerState | null;
-  info: ChargerInfo;
   setAmpsResult = true;
   private cached: ChargerState | null = null;
 
-  constructor(nextState: ChargerState | null, info: ChargerInfo) {
+  constructor(nextState: ChargerState | null) {
     this.nextState = nextState;
-    this.info = info;
   }
 
   requestState(_ctx: CallContext): Promise<ChargerState | null> {
@@ -42,10 +38,6 @@ class StubChargerMiddleware implements ChargerMiddleware {
 
   getCachedState(): ChargerState | null {
     return this.cached;
-  }
-
-  getChargerInfo(_ctx: CallContext): Promise<ChargerInfo> {
-    return Promise.resolve(this.info);
   }
 
   startCharging(_ctx: CallContext): Promise<boolean> {
@@ -73,7 +65,6 @@ describe("ChargingPointManager.rebuildMiddlewareFor", () => {
     middlewares: Map<string, StubChargerMiddleware>,
     type: string,
     displayName: string,
-    info: ChargerInfo,
     onCreate?: (row: ChargerRow, resolved: ChargerRowConfig) => void,
   ): void => {
     registry.register(throwingMock<ChargerPlugin>("ChargerPlugin", {
@@ -84,7 +75,7 @@ describe("ChargingPointManager.rebuildMiddlewareFor", () => {
         resolved: ChargerRowConfig,
       ) => {
         onCreate?.(row, resolved);
-        const mw = new StubChargerMiddleware(null, info);
+        const mw = new StubChargerMiddleware(null);
         middlewares.set(row.id, mw);
         return Promise.resolve(mw);
       },
@@ -93,18 +84,6 @@ describe("ChargingPointManager.rebuildMiddlewareFor", () => {
 
   const testLogger = new Logger("ChargingPointManager", "error");
   const CHARGER_TYPE = "sim";
-  const INFO: ChargerInfo = {
-    id: CHARGER_TYPE,
-    name: "Simulated",
-    vendor: "sim",
-    model: "sim-1",
-    firmwareVersion: "1.0",
-    maxAmps: 32,
-    minAmps: 6,
-    phases: 1,
-    connectorCount: 1,
-    controlMode: "amps",
-  };
   const ROW: ChargerRow = {
     id: "charger-1",
     name: "Test Charger",
@@ -131,6 +110,7 @@ describe("ChargingPointManager.rebuildMiddlewareFor", () => {
     energyAddedKwh: 0,
     status: "available",
     statusDetail: null,
+    controlMode: "amps",
     lastUpdated: "2024-01-01T00:00:00.000Z",
   };
   const CTX: CallContext = { origin: "test", traceId: "test" };
@@ -175,13 +155,9 @@ describe("ChargingPointManager.rebuildMiddlewareFor", () => {
       middlewares,
       CHARGER_TYPE,
       "Simulated Charger",
-      INFO,
     );
     emitter = new MockEventEmitter();
     const vehicleManager = throwingMock<VehicleManager>("VehicleManager", {});
-    const poller = throwingMock<EnergyPoller>("EnergyPoller", {
-      tryGetRealtimeSnapshot: () => null,
-    });
     const configService = throwingMock<ConfigService>("ConfigService", {
       getSolar: () => Promise.resolve({ ...SOLAR_DEFAULTS }),
     });
@@ -189,7 +165,6 @@ describe("ChargingPointManager.rebuildMiddlewareFor", () => {
       db,
       registry,
       vehicleManager,
-      poller,
       configService,
       emitter as unknown as TypedEventEmitter,
       testLogger,
@@ -261,7 +236,6 @@ describe("ChargingPointManager.rebuildMiddlewareFor", () => {
       middlewares,
       CHARGER_TYPE,
       "Simulated Charger",
-      INFO,
       (_row, resolved) => {
         seen.push(resolved);
       },
@@ -270,9 +244,6 @@ describe("ChargingPointManager.rebuildMiddlewareFor", () => {
       db,
       registry,
       throwingMock<VehicleManager>("VehicleManager", {}),
-      throwingMock<EnergyPoller>("EnergyPoller", {
-        tryGetRealtimeSnapshot: () => null,
-      }),
       throwingMock<ConfigService>("ConfigService", {
         getSolar: () => Promise.resolve({ ...SOLAR_DEFAULTS }),
       }),

@@ -3,17 +3,19 @@ import { observable } from "@trpc/server/observable";
 import type { Observable } from "@trpc/server/observable";
 import type { TypedEventEmitter } from "./TypedEventEmitter.ts";
 import type { EnergyAdapterManager } from "./EnergyAdapterManager.ts";
+import type { ChargingPointManager } from "./ChargingPointManager.ts";
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { Logger } from "../lib/Logger.ts";
 import { ServiceError } from "../lib/ServiceError.ts";
 
 export class EnergyPoller {
   private readonly em: EnergyAdapterManager;
+  private readonly chargingPoints: ChargingPointManager;
   private readonly eventEmitter: TypedEventEmitter;
   private readonly db: AppDatabase;
   private readonly logger: Logger;
   private timer: Promise<ReturnType<typeof setInterval>> | null = null;
-  /** In-flight poll, tracked so stop() can await it before shutdown. */
+  // In-flight poll, tracked so stop() can await it before shutdown.
   private polling: Promise<void> | null = null;
   private latestRealtime: EnergyData | null = null;
   private latestCumulative: CumulativeEnergyData | null = null;
@@ -22,11 +24,13 @@ export class EnergyPoller {
 
   constructor(
     em: EnergyAdapterManager,
+    chargingPoints: ChargingPointManager,
     eventEmitter: TypedEventEmitter,
     db: AppDatabase,
     logger: Logger,
   ) {
     this.em = em;
+    this.chargingPoints = chargingPoints;
     this.eventEmitter = eventEmitter;
     this.db = db;
     this.logger = logger;
@@ -70,7 +74,7 @@ export class EnergyPoller {
     this.latestCumulative = null;
   }
 
-  /** Stop and restart polling (picks up new adapter poll interval). */
+  // Stop and restart polling (picks up new adapter poll interval).
   async restart(): Promise<void> {
     await this.stop();
     this.timer = this.start();
@@ -102,7 +106,7 @@ export class EnergyPoller {
     };
   }
 
-  /** Returns an Observable that emits the initial snapshot (if any) then live energy updates. */
+  // Returns an Observable that emits the initial snapshot (if any) then live energy updates.
   subscribeToUpdates(): Observable<EnergyData & CumulativeEnergyData, unknown> {
     return observable<EnergyData & CumulativeEnergyData>((emit) => {
       // Initial snapshot (replaces WS onopen behavior)
@@ -124,7 +128,8 @@ export class EnergyPoller {
 
   private async poll(): Promise<void> {
     try {
-      const realtime = await this.em.getRealtimeData();
+      const load = await this.chargingPoints.getChargingLoadW();
+      const realtime = await this.em.getRealtimeData(load);
       const adapterName = this.em.constructor.name;
       this.logger.debug(
         `${adapterName} → solar=${realtime.solarProductionW}W grid=${realtime.gridPowerW}W consumption=${realtime.homeConsumptionW}W` +
@@ -200,9 +205,9 @@ export class EnergyPoller {
     }
   }
 
-  /** First failure is logged immediately; repeats at most every 5 minutes,
-   *  carrying the consecutive-failure count, so a dead inverter fills the
-   *  Logs page with a heartbeat rather than one row per tick. */
+  // First failure is logged immediately; repeats at most every 5 minutes,
+  // carrying the consecutive-failure count, so a dead inverter fills the
+  // Logs page with a heartbeat rather than one row per tick.
   private async recordPollFailure(error: unknown): Promise<void> {
     this.consecutivePollFailures++;
     const nowMs = Date.now();
@@ -242,8 +247,8 @@ export class EnergyPoller {
     }
   }
 
-  /** Build cumulative-from-DB block; on DB error, return zeros so a poll
-   *  failure path still produces a usable event. */
+  // Build cumulative-from-DB block; on DB error, return zeros so a poll
+  // failure path still produces a usable event.
   private async buildCumulativeFromDb(): Promise<CumulativeEnergyData> {
     try {
       const timezone = (await this.db.getConfig("timezone")) ?? "";

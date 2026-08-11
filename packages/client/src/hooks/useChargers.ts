@@ -5,13 +5,13 @@ import { useToast } from "./useToast.tsx";
 
 export type ChargerWithState = RouterOutputs["charger"]["list"][number];
 
-/** A smart charger controls whatever is plugged into it; a vehicle-API
- *  charging point is bound to one car. */
+// A smart charger controls whatever is plugged into it; a vehicle-API
+// charging point is bound to one car.
 export const isSmartCharger = (charger: ChargerWithState): boolean =>
   charger.kind === "smart";
 
-/** Charging points with live state; kept fresh by chargers_changed +
- *  charger_update SSE events (see RealtimeSync). */
+// Kept fresh by chargers_changed + charger_update SSE events (see
+// RealtimeSync).
 export function useChargers() {
   const query = trpc.charger.list.useQuery();
   return {
@@ -32,8 +32,8 @@ type ChargerCommandPending =
   | `mode:${ChargingPointMode}`
   | false;
 
-/** Mode/amps/start-stop control for one charging point — the dashboard's
- *  replacement for the removed vehicle.setMode/setAmps/command mutations. */
+// The dashboard's replacement for the removed
+// vehicle.setMode/setAmps/command mutations.
 export function useChargerCommands(chargerId: string | null) {
   const utils = trpc.useUtils();
   const { addToast } = useToast();

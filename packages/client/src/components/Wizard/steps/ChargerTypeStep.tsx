@@ -1,8 +1,12 @@
 import { Text } from "@radix-ui/themes";
 import { Monitor, Plug, Server } from "lucide-react";
 import { useWizardState } from "../../../hooks/useWizardState.ts";
-import { chargerPluginOptions } from "@chargeha/plugins/componentRegistry";
+import {
+  type ChargerPluginOption,
+  chargerPluginOptions,
+} from "@chargeha/plugins/componentRegistry";
 import { demoMode } from "../../../lib/featureFlags.ts";
+import { trpc } from "../../../trpc.ts";
 import type { StepDef, WizardNext } from "../flow.ts";
 import { OptionCard } from "./OptionCard.tsx";
 import styles from "./steps.module.css";
@@ -32,6 +36,16 @@ export const chargerTypeStep: StepDef = {
   useStep: ({ onAdvance }) => {
     const { state, isLoading } = useWizardState();
     const selectedType = state.chargerType;
+    const ensureMutation = trpc.charger.ensure.useMutation();
+
+    // A type with no setup step of its own (ensureOnSelect) gets its row
+    // created here — ensure is idempotent, so re-selecting is safe.
+    const select = async (option: ChargerPluginOption) => {
+      if (option.ensureOnSelect) {
+        await ensureMutation.mutateAsync({ chargerAdapterType: option.id });
+      }
+      onAdvance({ chargerType: option.id });
+    };
 
     return {
       next: chargerTypeNext(isLoading, selectedType),
@@ -53,11 +67,14 @@ export const chargerTypeStep: StepDef = {
                   description={option.description}
                   selected={option.id === selectedType}
                   disabled={blocked.has(option.id)}
-                  onSelect={() => onAdvance({ chargerType: option.id })}
+                  onSelect={() => select(option)}
                 />
               );
             })}
           </div>
+          {ensureMutation.isError && (
+            <Text size="2" color="red">{ensureMutation.error.message}</Text>
+          )}
         </div>
       ),
     };

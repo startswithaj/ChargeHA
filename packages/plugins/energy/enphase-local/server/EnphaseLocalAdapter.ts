@@ -22,7 +22,7 @@ const POLL_ERROR_RELOG_MS = 5 * 60 * 1000;
 type MeterConfig = { eid: number; state: string; measurementType: string };
 type MeterReading = { eid: number; activePower: number };
 
-/** eid → measurementType map from `/ivp/meters`, or null when no CT meters. */
+// eid → measurementType map from `/ivp/meters`, or null when no CT meters.
 type MeterMap = { production: number; netConsumption: number } | null;
 
 function meterMapFrom(meters: MeterConfig[]): MeterMap {
@@ -35,19 +35,9 @@ function meterMapFrom(meters: MeterConfig[]): MeterMap {
     : null;
 }
 
-/**
- * Reads an Enphase Envoy / IQ Gateway over its local HTTPS API and maps the
- * responses to the ChargeHA `EnergySourceAdapter` contract.
- *
- * Sign conventions:
- *  - `gridPowerW`: the Envoy's `net-consumption` CT reports + import / − export
- *    — same as ChargeHA's convention, passes through.
- *  - `batteryPowerW`: ensemble `real_power_mw` is + discharge / − charge —
- *    same as ChargeHA's convention, passes through.
- *
- * Without CT meters only solar production is known: grid is reported as 0 and
- * home consumption as the solar value.
- */
+// Reads an Enphase Envoy / IQ Gateway over its local HTTPS API. Sign
+// conventions pass through unchanged: `gridPowerW` and `batteryPowerW`
+// already match ChargeHA's + import/discharge, − export/charge convention.
 export class EnphaseLocalAdapter implements EnergySourceAdapter {
   private meterMap: MeterMap = null;
   private metersProbed = false;
@@ -164,7 +154,7 @@ export class EnphaseLocalAdapter implements EnergySourceAdapter {
     };
   }
 
-  /** No CT meters: solar watts from the legacy endpoint, grid unknown. */
+  // No CT meters: solar watts from the legacy endpoint, grid unknown.
   private async readPowerFallback(): Promise<
     { solarProductionW: number; gridPowerW: number }
   > {
@@ -177,7 +167,7 @@ export class EnphaseLocalAdapter implements EnergySourceAdapter {
     };
   }
 
-  /** + discharge / − charge. Absent (no IQ Battery) → null. */
+  // + discharge / − charge. Absent (no IQ Battery) → null.
   private async readBatteryPowerW(): Promise<number | null> {
     const power = await this.tryGetJson(ENSEMBLE_POWER_PATH) as
       | { devices?: { real_power_mw: number }[] }
@@ -196,8 +186,8 @@ export class EnphaseLocalAdapter implements EnergySourceAdapter {
     return secctrl?.agg_soc ?? null;
   }
 
-  /** Persist a poll failure to the plugin log. An unchanged error message is
-   *  re-logged at most once per POLL_ERROR_RELOG_MS, not every poll. */
+  // Persist a poll failure to the plugin log. An unchanged error message is
+  // re-logged at most once per POLL_ERROR_RELOG_MS, not every poll.
   private async recordPollError(err: unknown): Promise<void> {
     const message = err instanceof Error ? err.message : String(err);
     const repeated = message === this.lastPollError;
@@ -213,10 +203,9 @@ export class EnphaseLocalAdapter implements EnergySourceAdapter {
     });
   }
 
-  /** Optional read — ensemble endpoints 404 on battery-less systems; a
-   *  failure here never fails the whole poll. A 404 marks the ensemble as
-   *  absent so battery-less systems aren't re-probed (and re-logged) every
-   *  poll. */
+  // Optional read — ensemble endpoints 404 on battery-less systems; a failure
+  // here never fails the whole poll. A 404 marks the ensemble as absent so
+  // battery-less systems aren't re-probed (and re-logged) every poll.
   private async tryGetJson(path: string): Promise<unknown> {
     if (this.ensembleAbsent) return null;
     try {

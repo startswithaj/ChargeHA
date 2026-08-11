@@ -2,10 +2,9 @@ import { Switch, Text, Tooltip } from "@radix-ui/themes";
 import { trpc } from "../../../trpc.ts";
 import { isSmartCharger, useChargers } from "../../../hooks/useChargers.ts";
 
-/** Whether this car is driven by its own API or by whichever smart charger
- *  it is plugged into. Only meaningful once a smart charger exists — with no
- *  alternative controller there is nothing to switch to, so the control is
- *  hidden rather than shown disabled. */
+// Only meaningful once a smart charger exists — with no alternative
+// controller there is nothing to switch to, so the control is hidden
+// rather than shown disabled.
 export function VehicleControlToggle({ vehicleId }: { vehicleId: string }) {
   const { chargers } = useChargers();
   const utils = trpc.useUtils();

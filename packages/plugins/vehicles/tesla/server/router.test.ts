@@ -28,7 +28,7 @@ describe("Tesla Plugin Router", () => {
     return input.url;
   }
 
-  /** Seed tokens directly into the DB using namespaced config keys. */
+  // Seed tokens directly into the DB using namespaced config keys.
   async function seedTokens(
     db: AppDatabase,
     access: string,
@@ -46,13 +46,9 @@ describe("Tesla Plugin Router", () => {
     ),
   );
 
-  /**
-   * Build a full test context: real DB, registries, VehicleManager, and a
-   * registered TeslaVehiclePlugin. Returns a tRPC caller (fully typed — the
-   * router is built from the plugin instance) and the pieces tests need to
-   * inspect. Tests that need to mock Fleet API calls pass in a `serviceIo`,
-   * which is forwarded to the plugin's TeslaService.
-   */
+  // Build a full test context: real DB, registries, VehicleManager, and a
+  // registered TeslaVehiclePlugin. Returns a tRPC caller (fully typed) and
+  // the pieces tests need. A `serviceIo` mocks Fleet API calls when given.
   async function setupCaller(opts: {
     encryptionKey?: string | null;
     serviceIo?: TeslaServiceIo;

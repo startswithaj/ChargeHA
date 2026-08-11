@@ -3,7 +3,6 @@ import type { SystemAlert } from "./types.ts";
 import type { DecisionCheck } from "@chargeha/shared/engine";
 import type { DecisionInputs } from "./types.ts";
 
-/** Parse a JSON string into DecisionInputs, returning null on failure. */
 export function parseDecisionInputs(json: string): DecisionInputs | null {
   try {
     return JSON.parse(json) as DecisionInputs;
@@ -12,7 +11,6 @@ export function parseDecisionInputs(json: string): DecisionInputs | null {
   }
 }
 
-/** Parse a JSON string into DecisionCheck[], returning [] on failure. */
 export function parseDecisionChecks(json: string): DecisionCheck[] {
   try {
     return JSON.parse(json) as DecisionCheck[];
@@ -21,7 +19,6 @@ export function parseDecisionChecks(json: string): DecisionCheck[] {
   }
 }
 
-/** Parse a JSON string into SystemAlert, returning null on failure. */
 export function parseSystemAlert(json: string): SystemAlert | null {
   try {
     return JSON.parse(json) as SystemAlert;
@@ -30,7 +27,6 @@ export function parseSystemAlert(json: string): SystemAlert | null {
   }
 }
 
-/** Parse a JSON string into DayOfWeek[], returning [] on failure. */
 export function parseDays(json: string): DayOfWeek[] {
   try {
     return JSON.parse(json) as DayOfWeek[];

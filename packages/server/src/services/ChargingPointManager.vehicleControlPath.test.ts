@@ -3,7 +3,6 @@ import { expect } from "@std/expect";
 import { assertExists } from "@std/assert";
 import type {
   CallContext,
-  ChargerInfo,
   ChargerState,
   VehicleChargeState,
 } from "@chargeha/shared";
@@ -17,7 +16,6 @@ import type {
   ChargerRowConfig,
 } from "@chargeha/shared/plugins";
 import type { VehicleManager } from "./VehicleManager.ts";
-import type { EnergyPoller } from "./EnergyPoller.ts";
 import type { ConfigService } from "./ConfigService.ts";
 import type { TypedEventEmitter } from "./TypedEventEmitter.ts";
 import { ChargingPointManager } from "./ChargingPointManager.ts";
@@ -25,19 +23,16 @@ import { Logger } from "../lib/Logger.ts";
 import { MockEventEmitter } from "../test-helpers/MockEventEmitter.ts";
 import { throwingMock } from "../test-helpers/throwingMock.ts";
 
-/** Controllable ChargerMiddleware stub — same shape as the sibling test
- *  file's; kept local rather than shared so each test file is self-contained
- *  and can be read on its own. */
+// Controllable ChargerMiddleware stub — same shape as the sibling test
+// file's; kept local rather than shared so each test file is self-contained and can be read on its own.
 class StubChargerMiddleware implements ChargerMiddleware {
   startCalls: string[] = [];
   ampCalls: number[] = [];
   nextState: ChargerState | null;
-  info: ChargerInfo;
   private cached: ChargerState | null = null;
 
-  constructor(nextState: ChargerState | null, info: ChargerInfo) {
+  constructor(nextState: ChargerState | null) {
     this.nextState = nextState;
-    this.info = info;
   }
 
   requestState(_ctx: CallContext): Promise<ChargerState | null> {
@@ -47,10 +42,6 @@ class StubChargerMiddleware implements ChargerMiddleware {
 
   getCachedState(): ChargerState | null {
     return this.cached;
-  }
-
-  getChargerInfo(_ctx: CallContext): Promise<ChargerInfo> {
-    return Promise.resolve(this.info);
   }
 
   startCharging(ctx: CallContext): Promise<boolean> {
@@ -78,7 +69,6 @@ describe("ChargingPointManager vehicle control path", () => {
     middlewares: Map<string, StubChargerMiddleware>,
     type: string,
     displayName: string,
-    info: ChargerInfo,
   ): void => {
     registry.register(throwingMock<ChargerPlugin>("ChargerPlugin", {
       id: type,
@@ -87,7 +77,7 @@ describe("ChargingPointManager vehicle control path", () => {
         row: ChargerRow,
         _resolved: ChargerRowConfig,
       ) => {
-        const mw = new StubChargerMiddleware(null, info);
+        const mw = new StubChargerMiddleware(null);
         middlewares.set(row.id, mw);
         return Promise.resolve(mw);
       },
@@ -97,18 +87,6 @@ describe("ChargingPointManager vehicle control path", () => {
 
   const testLogger = new Logger("ChargingPointManager", "error");
   const CHARGER_TYPE = "sim";
-  const INFO: ChargerInfo = {
-    id: CHARGER_TYPE,
-    name: "Simulated",
-    vendor: "sim",
-    model: "sim-1",
-    firmwareVersion: "1.0",
-    maxAmps: 32,
-    minAmps: 6,
-    phases: 1,
-    connectorCount: 1,
-    controlMode: "amps",
-  };
   const ROW: ChargerRow = {
     id: "charger-1",
     name: "Test Charger",
@@ -135,6 +113,7 @@ describe("ChargingPointManager vehicle control path", () => {
     energyAddedKwh: 0,
     status: "available",
     statusDetail: null,
+    controlMode: "amps",
     lastUpdated: "2024-01-01T00:00:00.000Z",
   };
   const CTX: CallContext = { origin: "test", traceId: "test" };
@@ -174,6 +153,7 @@ describe("ChargingPointManager vehicle control path", () => {
       getVehicles: () => Promise.resolve(vehicleRows),
       getChargerConfig: () => Promise.resolve({}),
       getChargerSecrets: () => Promise.resolve({}),
+      createChargerWithConfig: (input) => db.upsertCharger(input),
       upsertCharger: (input) => {
         chargerRows = [
           ...chargerRows.filter((r) => r.id !== input.id),
@@ -213,15 +193,11 @@ describe("ChargingPointManager vehicle control path", () => {
       middlewares,
       CHARGER_TYPE,
       "Simulated Charger",
-      INFO,
     );
     emitter = new MockEventEmitter();
     const vehicleManager = throwingMock<VehicleManager>("VehicleManager", {
       getAllStates: () => Promise.resolve(vehicleStates),
       loadIsUnmetered: () => false,
-    });
-    const poller = throwingMock<EnergyPoller>("EnergyPoller", {
-      tryGetRealtimeSnapshot: () => null,
     });
     const configService = throwingMock<ConfigService>("ConfigService", {
       getSolar: () => Promise.resolve({ ...SOLAR_DEFAULTS }),
@@ -230,7 +206,6 @@ describe("ChargingPointManager vehicle control path", () => {
       db,
       registry,
       vehicleManager,
-      poller,
       configService,
       emitter as unknown as TypedEventEmitter,
       testLogger,
@@ -250,7 +225,7 @@ describe("ChargingPointManager vehicle control path", () => {
     });
 
     it("derives the id from the vehicle so it survives deactivation", async () => {
-      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla");
       await manager.init();
 
       await manager.ensureVehicleChargingPoint(vehicle("VIN1", "tesla"));
@@ -271,8 +246,8 @@ describe("ChargingPointManager vehicle control path", () => {
     });
 
     it("creates the row inactive, not skipped, while a smart charger owns control", async () => {
-      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
-      registerChargerPlugin(registry, middlewares, "tapo", "Tapo", INFO);
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla");
+      registerChargerPlugin(registry, middlewares, "tapo", "Tapo");
       chargerRows = [{ ...ROW, chargerAdapterType: "tapo", kind: "smart" }];
       await manager.init();
 
@@ -285,7 +260,7 @@ describe("ChargingPointManager vehicle control path", () => {
     });
 
     it("creates the row active when no smart charger exists yet", async () => {
-      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla");
       await manager.init();
 
       await manager.ensureVehicleChargingPoint(vehicle("VIN1", "tesla"));
@@ -296,7 +271,7 @@ describe("ChargingPointManager vehicle control path", () => {
     });
 
     it("is idempotent", async () => {
-      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla");
       await manager.init();
 
       await manager.ensureVehicleChargingPoint(vehicle("VIN1", "tesla"));
@@ -319,7 +294,7 @@ describe("ChargingPointManager vehicle control path", () => {
     });
 
     it("drops the charging point when its vehicle is deleted", async () => {
-      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla");
       vehicleRows = [vehicle("VIN1", "tesla")];
       await manager.init();
       await manager.ensureVehicleChargingPoint(vehicle("VIN1", "tesla"));
@@ -332,7 +307,7 @@ describe("ChargingPointManager vehicle control path", () => {
     });
 
     it("does not create points for newly added vehicles", async () => {
-      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla");
       await manager.init();
 
       vehicleRows = [vehicle("VIN1", "tesla")];
@@ -352,7 +327,7 @@ describe("ChargingPointManager vehicle control path", () => {
     });
 
     it("deactivates vehicle-API points when the first smart charger arrives", async () => {
-      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla");
       chargerRows = [linkedRow("VIN1")];
       await manager.init();
 
@@ -368,7 +343,7 @@ describe("ChargingPointManager vehicle control path", () => {
     });
 
     it("reactivates them when the last smart charger is removed", async () => {
-      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla");
       chargerRows = [linkedRow("VIN1")];
       await manager.init();
       const smart = await manager.createCharger({
@@ -384,7 +359,7 @@ describe("ChargingPointManager vehicle control path", () => {
     });
 
     it("switches one vehicle without touching the others", async () => {
-      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla");
       chargerRows = [linkedRow("VIN1"), linkedRow("VIN2")];
       await manager.init();
 
@@ -399,7 +374,7 @@ describe("ChargingPointManager vehicle control path", () => {
     });
 
     it("flipping the toggle off unregisters the point so it can no longer command the car", async () => {
-      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla");
       chargerRows = [linkedRow("VIN1")];
       await manager.init();
       const id = chargerRows[0].id;
@@ -412,7 +387,7 @@ describe("ChargingPointManager vehicle control path", () => {
     });
 
     it("flipping the toggle on registers an inactive point and lets it command the car", async () => {
-      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla");
       chargerRows = [{ ...linkedRow("VIN1"), active: false }];
       await manager.init();
       const id = chargerRows[0].id;
@@ -429,7 +404,7 @@ describe("ChargingPointManager vehicle control path", () => {
     });
 
     it("an inactive vehicle_api row never registers, so it cannot command the vehicle", async () => {
-      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla");
       chargerRows = [{ ...linkedRow("VIN1"), active: false }];
       await manager.init();
 
@@ -438,10 +413,8 @@ describe("ChargingPointManager vehicle control path", () => {
     });
   });
 
-  /** With API control on, the car's own API owns the session and the smart
-   *  charger it is plugged into must stop deciding — but must NOT be
-   *  unregistered, or it stops passing current and stops reporting the meter
-   *  reading everything else depends on. */
+  // With API control on, the car's own API owns the session and the smart charger it is plugged into must stop deciding — but must NOT be
+  // unregistered, or it stops passing current and stops reporting the meter reading everything else depends on.
   describe("passive smart charger", () => {
     const apiPoint = (vehicleId: string, active = true): ChargerRow => ({
       ...ROW,
@@ -460,10 +433,10 @@ describe("ChargingPointManager vehicle control path", () => {
         ...overrides,
       });
 
-    /** Registers both plugins, boots, and polls the smart charger once so it
-     *  has cached state to reason about. */
+    // Registers both plugins, boots, and polls the smart charger once so it
+    // has cached state to reason about.
     const boot = async (): Promise<void> => {
-      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla");
       await manager.init();
       const mw = middlewares.get(ROW.id);
       assertExists(mw);
@@ -561,7 +534,7 @@ describe("ChargingPointManager vehicle control path", () => {
     it("does nothing while nothing is plugged in", async () => {
       chargerRows = [ROW, apiPoint("VIN1")];
       vehicleStates = new Map([["VIN1", plugged("VIN1")]]);
-      registerChargerPlugin(registry, middlewares, "tesla", "Tesla", INFO);
+      registerChargerPlugin(registry, middlewares, "tesla", "Tesla");
       await manager.init();
       const mw = middlewares.get(ROW.id);
       assertExists(mw);

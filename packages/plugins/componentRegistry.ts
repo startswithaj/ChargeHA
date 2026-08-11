@@ -71,7 +71,6 @@ import {
   simulatedChargerWizardSteps,
 } from "./chargers/simulated/client/wizardSteps.ts";
 
-/** Energy plugin options for the inverter type selection step. */
 export const energyPluginOptions: EnergyPluginOption[] = [
   froniusLocalOption,
   froniusCloudOption,
@@ -81,7 +80,6 @@ export const energyPluginOptions: EnergyPluginOption[] = [
   simulatedEnergyOption,
 ];
 
-/** Vehicle plugin options for the vehicle type selection step. */
 export const vehiclePluginOptions: VehiclePluginOption[] = [
   teslaVehicleOption,
   {
@@ -100,18 +98,15 @@ export const vehiclePluginOptions: VehiclePluginOption[] = [
   },
 ];
 
-/** Schedule notes from vehicle plugins, shown on the Schedules page. */
 export const vehicleScheduleNotes: PluginScheduleNote[] = [
   teslaScheduleNote,
 ];
 
-/** Vehicle plugin wizard steps, keyed by VehicleAdapterType. */
 export const vehiclePluginSteps: Record<string, PluginStepDef[]> = {
   tesla: teslaWizardSteps,
   simulated: [],
 };
 
-/** Energy plugin wizard steps, keyed by energy adapter type. */
 export const energyPluginSteps: Record<string, PluginStepDef[]> = {
   fronius_local: froniusLocalWizardSteps,
   fronius_cloud: froniusCloudWizardSteps,
@@ -121,24 +116,18 @@ export const energyPluginSteps: Record<string, PluginStepDef[]> = {
   simulated_energy: simulatedEnergyWizardSteps,
 };
 
-/** Charger plugin options for the charger type selection step. */
 export const chargerPluginOptions: ChargerPluginOption[] = [
   tapoChargerOption,
   ocppChargerOption,
   simulatedChargerOption,
 ];
 
-/** Charger plugin wizard steps, keyed by charger adapter type. */
 export const chargerPluginSteps: Record<string, PluginStepDef[]> = {
   tapo: tapoWizardSteps,
   ocpp: ocppWizardSteps,
   simulated_charger: simulatedChargerWizardSteps,
 };
 
-/**
- * Maps settingsComponentKey strings (from EnergyPlugin) to React components.
- * Used by the settings page to render plugin-provided config forms dynamically.
- */
 export const pluginSettingsComponents: Record<
   string,
   ComponentType<PluginSettingsProps>

@@ -93,7 +93,7 @@ export function NoDrawNotice(
   );
 }
 
-/** Nothing will charge until someone intervenes: red card, warning icon. */
+// Nothing will charge until someone intervenes: red card, warning icon.
 const ALARM_STATUSES = new Set<ChargerState["status"]>([
   "faulted",
   "unconfigured",
@@ -102,14 +102,14 @@ const ALARM_STATUSES = new Set<ChargerState["status"]>([
 const isAlarm = (state: ChargerState | null): boolean =>
   state !== null && ALARM_STATUSES.has(state.status);
 
-/** Adapters phrase their detail as a sentence fragment ("off", "overheated"),
- *  but it leads its own line here. */
+// Adapters phrase their detail as a sentence fragment ("off", "overheated"),
+// but it leads its own line here.
 const sentenceCase = (text: string) =>
   text.charAt(0).toUpperCase() + text.slice(1);
 
-/** The device's own account of itself — raw OCPP status, or the wattage a
- *  smart plug actually measures. Worth a line even when it echoes the draw:
- *  this is the hardware talking, not the controller. */
+// The device's own account of itself — raw OCPP status, or the wattage a
+// smart plug measures. Worth a line even when it echoes the draw: this is
+// the hardware talking, not the controller.
 function DeviceStatusRow({ state }: { state: ChargerState | null }) {
   if (!state) return null;
   // The status line already carries the unconfigured reason in full.
@@ -168,20 +168,9 @@ function getStatusText(
   return `${label}${CHARGER_STATUS_LABELS[state.status]}`;
 }
 
-/** What the charger resolved to, in the user's words.
- *
- * A smart charger's assignment is a preference, not a lock (see
- * ChargingPointManager.resolveSmartCharger): "linked" means someone assigned
- * this car and it is plugged in here, "inferred" means nobody assigned
- * anything and ChargeHA found the only car that is plugged in. The wording
- * has to carry that difference, because only one of them survives a second
- * car being plugged in.
- *
- * Neither says "charging": resolution is about which car is on the charger,
- * and a plugged-in car that is not drawing still resolves.
- *
- * "none" and "ambiguous" get no line: there is no car to name, and the status
- * line and badge above already say the charger is idle. */
+// "linked" means someone assigned this car; "inferred" means ChargeHA found
+// the only car plugged in — that difference must survive a second car being
+// plugged in. "none"/"ambiguous" get no line; the badge above says idle.
 function resolvedVehicleText(
   kind: VehicleResolutionKind,
   name: string | null,
@@ -192,10 +181,9 @@ function resolvedVehicleText(
   return null;
 }
 
-/** What this charger has to say about the car on it. A passive charger says
- *  who is driving instead of what it resolved: it is holding a standing
- *  permission open for a car that commands itself, so "detected
- *  automatically" would imply a control it is not exercising. */
+// A passive charger says who is driving instead of what it resolved: it
+// holds a standing permission open for a car that commands itself, so
+// "detected automatically" would imply control it isn't exercising.
 function vehicleLine(
   controlOwner: ControlOwner,
   passiveForVehicleName: string | null,
@@ -210,9 +198,8 @@ function vehicleLine(
     : `Controlled by ${passiveForVehicleName}`;
 }
 
-/** Only rendered for a charger that is deciding for itself. A passive one
- *  would ignore these: it holds a standing permission open for a car that
- *  commands itself, and that car's own card is where the commands land. */
+// Only rendered for a charger deciding for itself. A passive one would
+// ignore these — that car's own card is where its commands land.
 function ModeToggle(
   { mode, commandPending, unconfigured, onChangeMode }: {
     mode: ChargingPointMode;
@@ -241,9 +228,8 @@ function ModeToggle(
   );
 }
 
-/** "Settings" as a link to the Chargers section, where the charger row's
- *  vehicle dropdown is. Falls back to plain text when the host gave us nowhere
- *  to navigate, so the sentence still reads. */
+// Falls back to plain text when the host gave us nowhere to navigate, so
+// the sentence still reads.
 function SettingsLink(
   { onNavigateSettings }: { onNavigateSettings?: () => void },
 ) {
@@ -275,7 +261,6 @@ export function ChargerCard(
     vehicleResolution,
     resolvedVehicleName,
     allocationStatus = null,
-    identifier,
     onNavigateSettings,
     controlOwner = "self",
     passiveForVehicleName = null,
@@ -287,37 +272,27 @@ export function ChargerCard(
     solarW: number;
     gridW: number;
     controllerDetail: string | null;
-    /** Reason behind `controllerDetail`. A reason with user-facing phrasing
-     *  gets the same formatted row the vehicle card uses; anything else falls
-     *  back to the raw detail below. */
+    // A reason with user-facing phrasing gets the same formatted row the
+    // vehicle card uses; anything else falls back to the raw detail below.
     controllerReason?: string | null;
-    /** "ambiguous" (several cars plugged in, none assigned) is the only kind
-     *  worth a card warning; "linked" and "inferred" name the car instead,
-     *  and the rest have nothing to say. */
+    // "ambiguous" (several cars plugged in, none assigned) is the only kind
+    // worth a card warning; "linked"/"inferred" name the car instead.
     vehicleResolution: VehicleResolutionKind;
-    /** Name of the car `vehicleResolution` resolved to, null when it resolved
-     *  to nothing, the vehicle is not in the list, or another point is already
-     *  showing that car's card — two chargers can infer the same car when only
-     *  one is plugged in, and only the one holding its card may claim it. */
+    // Null when resolved to nothing, not in the list, or another point is
+    // already showing that car — two chargers can infer the same car when
+    // only one is plugged in, and only the one holding its card may claim it.
     resolvedVehicleName: string | null;
-    /** Priority-charging status for this point. It lives here rather than on
-     *  the car's card because a paired card is read-only and drops its whole
-     *  charge-detail block. */
+    // Lives here rather than on the car's card because a paired card is
+    // read-only and drops its whole charge-detail block.
     allocationStatus?: string | null;
-    /** The charge point's own id (OCPP's charge point id), null when the
-     *  adapter has none. The heading is often just the plugin's label, so this
-     *  is the only thing saying which physical charger the card is. */
-    identifier: string | null;
-    /** Same convention the vehicle cards use. Absent means the host has no
-     *  settings route, and the warning degrades to plain text. */
+    // Same convention the vehicle cards use. Absent means the host has no
+    // settings route, and the warning degrades to plain text.
     onNavigateSettings?: () => void;
-    /** "vehicle_api" means this charger is passive: it has been opened to its
-     *  maximum and started once for a car that commands itself, and it decides
-     *  nothing until that car leaves. Its mode buttons would be ignored, so it
-     *  does not offer them. The live readings stay — this is where the meter
-     *  is. */
+    // "vehicle_api" means this charger is passive: opened to max and started
+    // once for a car that commands itself; it decides nothing until that
+    // car leaves, so it offers no mode buttons. Live readings still show.
     controlOwner?: ControlOwner;
-    /** The self-driving car a passive charger is passing current to. */
+    // The self-driving car a passive charger is passing current to.
     passiveForVehicleName?: string | null;
   },
 ) {
@@ -346,11 +321,6 @@ export function ChargerCard(
         <div className={layout.headerLeft}>
           <Zap size={20} style={{ color: "var(--color-charging)" }} />
           <Text size="3" weight="bold">{name}</Text>
-          {identifier && (
-            <Badge variant="soft" size="1" title="Charge point id">
-              {identifier}
-            </Badge>
-          )}
         </div>
         <Badge
           variant="soft"

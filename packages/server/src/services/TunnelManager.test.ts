@@ -13,7 +13,6 @@ describe("TunnelManager", () => {
     debug: () => {},
   };
 
-  /** Create a ReadableStream from string chunks. */
   function createReadableStream(chunks: string[]): ReadableStream<Uint8Array> {
     const encoder = new TextEncoder();
     return new ReadableStream({
@@ -26,7 +25,6 @@ describe("TunnelManager", () => {
     });
   }
 
-  /** Create a ReadableStream that never provides data (hangs on read). */
   function createHangingStream(): ReadableStream<Uint8Array> {
     return new ReadableStream({
       pull() {
@@ -35,7 +33,6 @@ describe("TunnelManager", () => {
     });
   }
 
-  /** Create a mock ChildProcess with controllable stderr and status. */
   function createMockProcess(options: {
     stderrChunks?: string[];
     hangingStderr?: boolean;
@@ -128,7 +125,7 @@ describe("TunnelManager", () => {
     return new commandHolder.factory(path, options);
   } as unknown as typeof Deno.Command;
 
-  /** Reset the captured middleware-server state between tests. */
+  // Reset the captured middleware-server state between tests.
   function stubDenoServe(): void {
     mockServerShutdownCalled = false;
     capturedMiddlewareHandler = null;
@@ -145,10 +142,10 @@ describe("TunnelManager", () => {
     } as unknown as typeof Deno.Command;
   }
 
-  /** Routes returned by the injected provider — tests mutate between calls. */
+  // Routes returned by the injected provider — tests mutate between calls.
   const routesHolder: { routes: PluginTunnelRoute[] } = { routes: [] };
 
-  /** Provider matching the mock process output used across these tests. */
+  // Provider matching the mock process output used across these tests.
   const testProvider = {
     name: "test-tunnel",
     path: "test-tunnel-bin",
@@ -158,7 +155,6 @@ describe("TunnelManager", () => {
     expiryMinutes: null,
   };
 
-  /** Construct a TunnelManager with the fake serve + command injected. */
   const makeTunnelManager = (
     logger: unknown = mockLogger,
     middlewarePort = 4040,

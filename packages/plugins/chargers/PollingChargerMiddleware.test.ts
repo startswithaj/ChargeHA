@@ -5,22 +5,20 @@ import { Logger } from "@chargeha/server/lib/Logger";
 import type {
   CallContext,
   ChargerAdapter,
-  ChargerInfo,
   ChargerState,
 } from "@chargeha/shared";
 import { PollingChargerMiddleware } from "./PollingChargerMiddleware.ts";
 
 interface Handlers {
   getChargerState: (callIndex: number) => Promise<ChargerState>;
-  getChargerInfo: () => Promise<ChargerInfo>;
   startCharging: () => Promise<boolean>;
   stopCharging: () => Promise<boolean>;
   setChargeAmps: (amps: number) => Promise<boolean>;
 }
 
-/** Stub over the ChargerAdapter surface PollingChargerMiddleware calls.
- *  Records call order; unstubbed methods throw so a test only exercising
- *  a subset of the interface still catches unexpected device calls. */
+// Stub over the ChargerAdapter surface PollingChargerMiddleware calls.
+// Records call order; unstubbed methods throw so a test only exercising
+// a subset of the interface still catches unexpected device calls.
 class StubChargerAdapter implements ChargerAdapter {
   readonly calls: string[] = [];
   disconnectCalls = 0;
@@ -48,12 +46,6 @@ class StubChargerAdapter implements ChargerAdapter {
       StubChargerAdapter.notStubbed("getChargerState"))(callIndex);
   }
 
-  getChargerInfo(_ctx: CallContext): Promise<ChargerInfo> {
-    this.calls.push("getChargerInfo");
-    return (this.handlers.getChargerInfo ??
-      StubChargerAdapter.notStubbed("getChargerInfo"))();
-  }
-
   startCharging(_ctx: CallContext): Promise<boolean> {
     this.calls.push("startCharging");
     return (this.handlers.startCharging ??
@@ -78,7 +70,7 @@ class StubChargerAdapter implements ChargerAdapter {
   }
 }
 
-/** Records error() calls instead of writing to the console. */
+// Records error() calls instead of writing to the console.
 class SpyLogger extends Logger {
   readonly errorCalls: Array<{ message: string; args: unknown[] }> = [];
 
@@ -107,21 +99,8 @@ describe("PollingChargerMiddleware", () => {
     energyAddedKwh: 0,
     status: "charging",
     statusDetail: null,
-    lastUpdated: "2024-01-01T00:00:00.000Z",
-    ...overrides,
-  });
-
-  const buildInfo = (overrides: Partial<ChargerInfo> = {}): ChargerInfo => ({
-    id: "charger-1",
-    name: "Test Charger",
-    vendor: "Acme",
-    model: "X1",
-    firmwareVersion: "1.0.0",
-    maxAmps: 32,
-    minAmps: 6,
-    phases: 1,
-    connectorCount: 1,
     controlMode: "amps",
+    lastUpdated: "2024-01-01T00:00:00.000Z",
     ...overrides,
   });
 
@@ -275,17 +254,6 @@ describe("PollingChargerMiddleware", () => {
 
       expect(result).toBe(true);
       expect(adapter.calls).toEqual(["setChargeAmps"]);
-    });
-
-    it("getChargerInfo returns the adapter's info", async () => {
-      const adapter = new StubChargerAdapter(30, {
-        getChargerInfo: () => Promise.resolve(buildInfo()),
-      });
-      const middleware = new PollingChargerMiddleware(adapter, new SpyLogger());
-
-      const info = await middleware.getChargerInfo(ctx);
-
-      expect(info).toEqual(buildInfo());
     });
   });
 

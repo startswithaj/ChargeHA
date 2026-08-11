@@ -127,8 +127,8 @@ export function makeSleepingVehicle(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** Charging points mirroring the mocked vehicles — the dashboard iterates
- *  charger.list, so every vehicle fixture needs its linked point. */
+// Charging points mirroring the mocked vehicles — the dashboard iterates
+// charger.list, so every vehicle fixture needs its linked point.
 function chargerStateFrom(
   vehicleId: unknown,
   state: Record<string, unknown> | null,

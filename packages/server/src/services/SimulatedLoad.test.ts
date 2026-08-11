@@ -24,7 +24,6 @@ import { EnergyPluginRegistry } from "@chargeha/server/bootstrap/EnergyPluginReg
 import { ChargingPointManager } from "./ChargingPointManager.ts";
 import { EnergyAdapterManager } from "./EnergyAdapterManager.ts";
 import type { VehicleManager } from "./VehicleManager.ts";
-import type { EnergyPoller } from "./EnergyPoller.ts";
 import type { ConfigService } from "./ConfigService.ts";
 import type { TypedEventEmitter } from "./TypedEventEmitter.ts";
 import { Logger } from "../lib/Logger.ts";
@@ -35,8 +34,8 @@ import { throwingMock } from "../test-helpers/throwingMock.ts";
 describe("simulated load — the four inverter/vehicle combinations", () => {
   const testLogger = new Logger("SimulatedLoad", "error");
 
-  /** Exporting 2kW with nothing charging. A 3kW car swings that to 1kW of
-   *  import — but only if the car reaches the figures at all. */
+  // Exporting 2kW with nothing charging. A 3kW car swings that to 1kW of
+  // import — but only if the car reaches the figures at all.
   const BASE_REALTIME: EnergyData = {
     solarProductionW: 5000,
     gridPowerW: -2000,
@@ -55,7 +54,7 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
   };
 
   const CAR_KW = 3;
-  /** A plugin id the classifier must never special-case — the flag decides. */
+  // A plugin id the classifier must never special-case — the flag decides.
   const SIMULATED_VEHICLE = "pretend-cars";
   const REAL_VEHICLE = "actual-cars";
 
@@ -76,15 +75,19 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
     emitter = new MockEventEmitter();
   });
 
-  /** Wire the real pair: CPM classifies, EAM decides. Nothing here is a
-   *  stand-in for the code under test — only its surroundings. */
+  // Wire the real pair: CPM classifies, EAM decides. Nothing here is a
+  // stand-in for the code under test — only its surroundings.
   function build(
     { vehicleType, measuresLoad, pointKind = "vehicle_api" }: {
       vehicleType: string;
       measuresLoad: boolean;
       pointKind?: ChargerRow["kind"];
     },
-  ): { manager: EnergyAdapterManager; registerPoint: () => Promise<void> } {
+  ): {
+    manager: EnergyAdapterManager;
+    chargingPoints: ChargingPointManager;
+    registerPoint: () => Promise<void>;
+  } {
     const states = new Map<string, VehicleChargeState>([[
       "car-1",
       buildVehicleChargeState({ isCharging: true, chargePowerKw: CAR_KW }),
@@ -132,12 +135,12 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
       energyAddedKwh: 0,
       status: "charging",
       statusDetail: null,
+      controlMode: "amps",
       lastUpdated: "2024-01-01T00:00:00.000Z",
     };
     const pointMiddleware: ChargerMiddleware = {
       requestState: () => Promise.resolve(pointState),
       getCachedState: () => pointState,
-      getChargerInfo: () => Promise.reject(new Error("not used")),
       startCharging: () => Promise.resolve(true),
       stopCharging: () => Promise.resolve(true),
       setChargeAmps: () => Promise.resolve(true),
@@ -158,9 +161,6 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
       db,
       chargerPlugins,
       vehicleManager,
-      throwingMock<EnergyPoller>("EnergyPoller", {
-        tryGetRealtimeSnapshot: () => null,
-      }),
       throwingMock<ConfigService>("ConfigService", {}),
       emitter as unknown as TypedEventEmitter,
       testLogger,
@@ -188,25 +188,27 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
         db,
         energyPlugins,
         testLogger,
-        () => chargingPoints.getChargingLoadW(),
       ),
+      chargingPoints,
       registerPoint: () => chargingPoints.addCharger(pointRow),
     };
   }
 
-  /** Run with the car's charging point registered, as the app always does.
-   *  The same four expectations must hold either way: one physical session is
-   *  one load, whichever interface reports it. */
+  // Run with the car's charging point registered, as the app always does.
+  // The same four expectations must hold either way: one physical session is one load, whichever interface reports it.
   const readingFor = async (opts: {
     vehicleType: string;
     measuresLoad: boolean;
     withChargingPoint?: boolean;
     pointKind?: ChargerRow["kind"];
   }) => {
-    const { manager, registerPoint } = build(opts);
+    const { manager, chargingPoints, registerPoint } = build(opts);
     if (opts.withChargingPoint) await registerPoint();
     await manager.ready();
-    return await manager.getRealtimeData();
+    // Same orchestration as EnergyPoller.poll: fetch the load, pass it in.
+    return await manager.getRealtimeData(
+      await chargingPoints.getChargingLoadW(),
+    );
   };
 
   it("1. simulated inverter + simulated car — nothing measured anything, so the draw is added", async () => {

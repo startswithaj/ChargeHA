@@ -11,7 +11,7 @@ export interface KlapSessionKeys {
   initialSeq: number; // signed int32 BE from the iv derivation's last 4 bytes
 }
 
-/** Stateless crypto primitives, grouped like SolarAllocator. */
+// Stateless crypto primitives, grouped like SolarAllocator.
 export class KlapCrypto {
   static concatBytes(
     ...parts: Uint8Array<ArrayBuffer>[]
@@ -36,7 +36,7 @@ export class KlapCrypto {
     return new Uint8Array(await crypto.subtle.digest("SHA-256", data));
   }
 
-  /** auth_hash = sha256(sha1(email) + sha1(password)) — raw bytes throughout. */
+  // auth_hash = sha256(sha1(email) + sha1(password)) — raw bytes throughout.
   static async computeAuthHash(
     email: string,
     password: string,
@@ -79,7 +79,7 @@ export class KlapCrypto {
     };
   }
 
-  /** Expected handshake1 server hash: sha256(localSeed + remoteSeed + authHash). */
+  // Expected handshake1 server hash: sha256(localSeed + remoteSeed + authHash).
   static serverHash(
     localSeed: Uint8Array<ArrayBuffer>,
     remoteSeed: Uint8Array<ArrayBuffer>,
@@ -90,7 +90,7 @@ export class KlapCrypto {
     );
   }
 
-  /** handshake2 body: sha256(remoteSeed + localSeed + authHash). */
+  // handshake2 body: sha256(remoteSeed + localSeed + authHash).
   static handshake2Hash(
     localSeed: Uint8Array<ArrayBuffer>,
     remoteSeed: Uint8Array<ArrayBuffer>,
@@ -120,7 +120,7 @@ export class KlapCrypto {
     );
   }
 
-  /** Encrypted request body: sha256(sigKey + seq + ciphertext) + ciphertext. */
+  // Encrypted request body: sha256(sigKey + seq + ciphertext) + ciphertext.
   static async encryptPayload(
     keys: KlapSessionKeys,
     seq: number,
@@ -137,7 +137,7 @@ export class KlapCrypto {
     return KlapCrypto.concatBytes(signature, ciphertext);
   }
 
-  /** Response body has the same layout: 32-byte signature + ciphertext. */
+  // Response body has the same layout: 32-byte signature + ciphertext.
   static async decryptPayload(
     keys: KlapSessionKeys,
     seq: number,

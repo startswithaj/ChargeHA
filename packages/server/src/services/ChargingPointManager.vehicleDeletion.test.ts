@@ -3,7 +3,6 @@ import { expect } from "@std/expect";
 import { assertExists } from "@std/assert";
 import type {
   CallContext,
-  ChargerInfo,
   ChargerState,
   VehicleChargeState,
 } from "@chargeha/shared";
@@ -16,7 +15,6 @@ import type {
   ChargerRowConfig,
 } from "@chargeha/shared/plugins";
 import type { VehicleManager } from "./VehicleManager.ts";
-import type { EnergyPoller } from "./EnergyPoller.ts";
 import type { ConfigService } from "./ConfigService.ts";
 import type { TypedEventEmitter } from "./TypedEventEmitter.ts";
 import { ChargingPointManager } from "./ChargingPointManager.ts";
@@ -24,37 +22,15 @@ import { Logger } from "../lib/Logger.ts";
 import { MockEventEmitter } from "../test-helpers/MockEventEmitter.ts";
 import { throwingMock } from "../test-helpers/throwingMock.ts";
 
-/** What happens to charging points and their schedules when the vehicle a
- *  point is attached to is deleted.
- *
- *  Uses a real in-memory database rather than a stubbed one, because the
- *  question is partly about what `AppDatabase.deleteCharger` cascades — a
- *  stub would answer with whatever the stub was written to do. */
-/** Inert middleware — these tests are about row lifecycle, not charging.
- *  Its ChargerInfo lives on the class because the lint rules put classes at
- *  module scope but keep consts inside describe(). */
+// What happens to charging points and their schedules when the vehicle a point is attached to is deleted. Uses a real in-memory database rather
+// than a stubbed one, because the question is partly about what `AppDatabase.deleteCharger` cascades — a stub would answer with whatever the stub
+// was written to do. Inert middleware — these tests are about row lifecycle, not charging.
 class StubChargerMiddleware implements ChargerMiddleware {
-  private readonly info: ChargerInfo = {
-    id: "sim",
-    name: "Simulated",
-    vendor: "sim",
-    model: "sim-1",
-    firmwareVersion: "1.0",
-    maxAmps: 32,
-    minAmps: 6,
-    phases: 1,
-    connectorCount: 1,
-    controlMode: "amps",
-  };
-
   requestState(_ctx: CallContext): Promise<ChargerState | null> {
     return Promise.resolve(null);
   }
   getCachedState(): ChargerState | null {
     return null;
-  }
-  getChargerInfo(_ctx: CallContext): Promise<ChargerInfo> {
-    return Promise.resolve(this.info);
   }
   startCharging(_ctx: CallContext): Promise<boolean> {
     return Promise.resolve(true);
@@ -121,9 +97,6 @@ describe("ChargingPointManager vehicle deletion", () => {
         Promise.resolve(new Map<string, VehicleChargeState>()),
       loadIsUnmetered: () => false,
     });
-    const poller = throwingMock<EnergyPoller>("EnergyPoller", {
-      tryGetRealtimeSnapshot: () => null,
-    });
     const configService = throwingMock<ConfigService>("ConfigService", {
       getSolar: () => Promise.resolve({ ...SOLAR_DEFAULTS }),
     });
@@ -132,7 +105,6 @@ describe("ChargingPointManager vehicle deletion", () => {
       db,
       registry,
       vehicleManager,
-      poller,
       configService,
       emitter as unknown as TypedEventEmitter,
       testLogger,
@@ -175,9 +147,8 @@ describe("ChargingPointManager vehicle deletion", () => {
     (await db.getSchedules()).map((s) => s.id).toSorted();
 
   describe("a smart charger the deleted vehicle was assigned to", () => {
-    /** Sets up what a user actually has: a wallbox they own, a car assigned
-     *  to it through the real assignment path, and a schedule they set on the
-     *  wallbox itself. */
+    // Sets up what a user actually has: a wallbox they own, a car assigned
+    // to it through the real assignment path, and a schedule they set on the wallbox itself.
     const setUpAssignedWallbox = async (): Promise<void> => {
       await seedVehicle("VIN1");
       await db.upsertCharger({

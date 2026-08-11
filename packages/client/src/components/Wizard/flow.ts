@@ -1,60 +1,48 @@
 import type { ReactNode } from "react";
 import type { WizardNavState } from "@chargeha/shared";
 
-/** The wizard's single "move forward" operation. One mover, not two: when the
- *  step and the shell both moved, the second recomputed the next step from
- *  state that predated the first and silently overwrote it. */
+// One mover, not two: when the step and the shell both moved, the second
+// recomputed the next step from state that predated the first and silently
+// overwrote it.
 export type WizardAdvance = (selection?: Partial<WizardNavState>) => void;
 
-/** Navigation handed to every step by the wizard shell. Skip is not here: the
- *  shell owns that button and no step drives it. */
+// Skip is not here: the shell owns that button and no step drives it.
 export interface StepProps {
-  /** Apply a selection (if any) and move to whatever step it leads to.
-   *
-   *  A selection can change which steps exist (picking Tesla adds Tesla's setup
-   *  steps), so the destination is a fact about the flow under the *new*
-   *  selection. Taking the change rather than a destination is why steps never
-   *  name their successor. Called with no argument, this is plain "next". */
+  // A selection can change which steps exist, so the destination is a fact
+  // about the flow under the *new* selection. Called with no argument, this
+  // is plain "next".
   onAdvance: WizardAdvance;
   onBack: () => void;
-  /** Jump to a step by id. Steps are addressed by id everywhere — a position
-   *  means something different depending on which plugins are selected. */
+  // Steps are addressed by id everywhere — a position means something
+  // different depending on which plugins are selected.
   onSkipTo: (id: string) => void;
   onSkipToEnd: () => void;
-  /** The charger row a charger plugin's steps act on this run, or null before
-   *  its setup step has saved. Not persisted — a reload between that save and
-   *  a later step in the same run loses it (see the wizard shell). */
+  // Not persisted — a reload between the setup step's save and a later step
+  // in the same run loses it (see the wizard shell).
   chargerId: string | null;
-  /** Reports the id a charger step's save created, so later steps in the same
-   *  run (e.g. a verify step) can address the same row. */
+  // So later steps in the same run (e.g. a verify step) can address the
+  // same row.
   setChargerId: (id: string) => void;
 }
 
-/** Runs when Next is clicked. Resolve to advance; throw to stay on the step —
- *  the thrown message is shown to the user as the reason, so it must read as
- *  one ("Could not reach the inverter"), not as an internal error.
- *
- *  A selection step resolves with its selection instead of applying it itself.
- *  The shell then applies selection and step id in one move: two movers meant
- *  the second recomputed the next step from state that predated the first. */
+// Resolve to advance; throw to stay on the step — the thrown message is
+// shown to the user as the reason, so it must read as one, not as an
+// internal error.
 export type WizardNextHandler = () => Promise<Partial<WizardNavState> | void>;
 
-/** What a step's Next button is. */
 export type WizardNext =
-  /** No Next button — the step completes via its own CTA (e.g. Done). */
+  // No Next button — the step completes via its own CTA (e.g. Done).
   | { kind: "hidden" }
-  /** Disabled with no hint yet. A hint that flips to ready milliseconds after
-   *  mount reads as a flash in the nav, so steps say "loading" instead. */
+  // A hint that flips to ready milliseconds after mount reads as a flash
+  // in the nav, so steps say "loading" instead.
   | { kind: "loading" }
-  /** Disabled, with the reason it isn't ready. */
   | { kind: "blocked"; reason: string }
-  /** Enabled. onNext runs on click; the step advances if it resolves.
-   *  `hint` says what Next will do; null is a deliberate "nothing to say", not
-   *  an oversight — the step has to decide. */
+  // `hint` says what Next will do; null is a deliberate "nothing to say",
+  // not an oversight.
   | { kind: "ready"; hint: string | null; onNext: WizardNextHandler };
 
-/** For a step whose Next does nothing but move on — says so out loud, rather
- *  than leaving it to be inferred from an absent handler. */
+// Says so out loud, rather than leaving it to be inferred from an absent
+// handler.
 export const advanceOnly: WizardNextHandler = () => Promise.resolve();
 
 export interface StepBehaviour {
@@ -62,52 +50,39 @@ export interface StepBehaviour {
   view: ReactNode;
 }
 
-/** Where a shell's step state lives. The setup wizard persists to the DB; a
- *  plugin's own onboarding run persists to localStorage. */
+// The setup wizard persists to the DB; a plugin's own onboarding run
+// persists to localStorage.
 export interface WizardStore {
   state: WizardNavState;
   patch: (next: Partial<WizardNavState>) => void;
   isLoading: boolean;
 }
 
-/**
- * A step, as its author writes it. `useStep` owns the step's state and
- * declares both what Next does and what to render, so a step cannot be
- * rendered without its Next behaviour coming along.
- */
 export interface PluginStepDef {
-  /** Unique string identifier for this step (persisted to the database). */
+  // Persisted to the database.
   id: string;
   label: string;
   useStep: (props: StepProps) => StepBehaviour;
 }
 
-/**
- * A step as the flow holds it. Order is this def's position in its flow array;
- * presence is `owner`. Nothing here names another step, so adding, removing or
- * reordering a step is an edit to one array and nothing else.
- */
+// Order is this def's position in its flow array; presence is `owner`.
+// Nothing here names another step, so adding, removing or reordering a
+// step is an edit to one array and nothing else.
 export interface StepDef extends PluginStepDef {
-  /** The plugin whose selection this step belongs to (e.g. "tesla"). Injected
-   *  from the registry key — plugin authors never set it. Absent for core
-   *  steps, which are always in the list.
-   *
-   *  One fact, two jobs: the step is in the list only while its owner is the
-   *  selected type, and Skip abandons every step sharing an owner as a block
-   *  rather than stepping through a plugin's setup one screen at a time. */
+  // Injected from the registry key — plugin authors never set it. Absent
+  // for core steps, which are always in the list. Also controls Skip:
+  // it abandons every step sharing an owner as a block.
   owner?: string;
-  /** Core steps only: present when this returns true (default: always). */
+  // Core steps only: present when this returns true (default: always).
   presentWhen?: (state: WizardNavState) => boolean;
 }
 
-/** Whether a plugin's steps are in play, i.e. its type is the selected one. */
 function isOwnerSelected(owner: string, state: WizardNavState): boolean {
   return state.vehicleType === owner ||
     state.energyType === owner ||
     state.chargerType === owner;
 }
 
-/** The steps the given selections put in the list, in flow order. */
 export function activeSteps(flow: StepDef[], state: WizardNavState): StepDef[] {
   return flow.filter((step) =>
     (!step.owner || isOwnerSelected(step.owner, state)) &&
@@ -115,14 +90,9 @@ export function activeSteps(flow: StepDef[], state: WizardNavState): StepDef[] {
   );
 }
 
-/**
- * Resolve the current step's index within the active list.
- *
- * A stored id can name a step the current selections don't include — a resumed
- * wizard whose plugin steps are gone, or a stale/hand-edited id. Falling back
- * to 0 would silently restart setup, so land on the first step the selections
- * do include at or after where the id used to sit.
- */
+// A stored id can name a step the current selections don't include (resumed
+// wizard, stale/hand-edited id). Falling back to 0 would silently restart
+// setup, so land on the first included step at or after where it used to sit.
 export function resolveStepIndex(
   flow: StepDef[],
   state: WizardNavState,
@@ -137,14 +107,9 @@ export function resolveStepIndex(
   return recovered >= 0 ? recovered : Math.max(0, active.length - 1);
 }
 
-/**
- * The id of the step following `state.stepId`, computed against the list the
- * given state produces. Returns null at the end of the flow.
- *
- * Pass the state a selection is moving to, not the current one: choosing a
- * vehicle type both changes the list and decides what comes next, and both
- * fall out of the same call.
- */
+// Pass the state a selection is moving to, not the current one: choosing a
+// vehicle type both changes the list and decides what comes next, and both
+// fall out of the same call.
 export function nextStepId(
   flow: StepDef[],
   state: WizardNavState,
@@ -154,14 +119,9 @@ export function nextStepId(
   return active[index + 1]?.id ?? null;
 }
 
-/**
- * The id of the step Back lands on, or null on the first step.
- *
- * A plugin's steps are one block from the outside and individual steps from
- * within: stepping back inside Tesla setup moves one screen, but stepping back
- * from after it returns to the choice that led in — not to the last screen of
- * a block the user just skipped past.
- */
+// A plugin's steps are one block from the outside: stepping back from after
+// it returns to the choice that led in, not to the last screen of a block
+// the user just skipped past.
 export function backTargetId(
   flow: StepDef[],
   state: WizardNavState,
@@ -182,15 +142,9 @@ export function backTargetId(
   return before?.id ?? active[0].id;
 }
 
-/**
- * The id of the step Skip lands on, or null when there is nowhere left to go.
- *
- * A plugin's steps are a chain — credentials feed registration, which feeds
- * auth — so skipping any one of them abandons the whole block rather than
- * dropping the user on a later step that needs what was just skipped. Null
- * means the block ran to the end of the flow and the caller should leave the
- * wizard instead.
- */
+// A plugin's steps are a chain, so skipping any one abandons the whole
+// block rather than dropping the user on a step that needs what was
+// skipped. Null means the block ran to the end; the caller should exit.
 export function skipTargetId(
   flow: StepDef[],
   state: WizardNavState,

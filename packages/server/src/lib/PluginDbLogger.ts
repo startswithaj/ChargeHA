@@ -1,9 +1,7 @@
 import type { Logger } from "./Logger.ts";
 
-/**
- * Callback signature for persisting a log entry.
- * Provided by PluginDependencies — plugins never import AppDatabase.
- */
+// Callback signature for persisting a log entry. Provided by
+// PluginDependencies — plugins never import AppDatabase.
 export type PersistLogFn = (entry: {
   level: string;
   message: string;
@@ -18,11 +16,8 @@ interface LogOpts {
   traceId?: string;
 }
 
-/**
- * Structured database logger injected into plugins via PluginDependencies.
- * Persists log entries through a callback so plugins stay decoupled from the DB.
- * Persist failures are caught internally and logged via the injected Logger.
- */
+// Structured database logger injected into plugins via PluginDependencies.
+// Persists log entries through a callback so plugins stay decoupled from the DB. Persist failures are caught internally and logged via the injected Logger.
 export class PluginDbLogger {
   private readonly persist: PersistLogFn;
   private readonly logger: Logger;

@@ -51,7 +51,7 @@ class EnphaseDiscovery extends NetworkDiscovery<EnphaseDevice> {
   }
 }
 
-/** Scan the local network for Enphase Envoy / IQ Gateway devices. */
+// Scan the local network for Enphase Envoy / IQ Gateway devices.
 export function discoverEnphase(
   logger: Logger,
   subnet?: string,

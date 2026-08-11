@@ -9,6 +9,7 @@ import { TAPO_SECRET_KEYS, tapoConfigDef } from "./config.ts";
 import { discoverTapo } from "./TapoDiscovery.ts";
 import { KlapClient } from "./KlapClient.ts";
 import { TapoApiError, TapoAuthError, TapoLockedError } from "./errors.ts";
+import { decodeNickname } from "./TapoChargerAdapter.ts";
 import type { TapoDeviceInfo, TapoEnergyUsage } from "./TapoChargerAdapter.ts";
 
 const discoverInput = z.object({
@@ -21,8 +22,8 @@ const testConnectionInput = z.object({
   password: z.string(),
 });
 
-/** Which charger row to act on. `chargerRowId`, not `chargerId`, because a
- *  Tapo row has no device-side id and the two would be easy to confuse. */
+// Which charger row to act on. `chargerRowId`, not `chargerId`, because a
+// Tapo row has no device-side id and the two would be easy to confuse.
 const chargerInput = z.object({
   chargerRowId: z.string(),
 });
@@ -32,8 +33,8 @@ const setPowerInput = z.object({
   on: z.boolean(),
 });
 
-/** A client for the plug configured on ONE charger row. Two Tapo rows resolve
- *  to two different plugs; there is no "the" saved plug any more. */
+// A client for the plug configured on ONE charger row. Two Tapo rows resolve
+// to two different plugs; there is no "the" saved plug any more.
 async function savedClient(
   deps: PluginDependencies,
   chargerRowId: string,
@@ -83,11 +84,12 @@ export function createTapoRouter(deps: PluginDependencies) {
     testConnection: publicProcedure
       .input(testConnectionInput)
       .mutation(async ({ input }) => {
+        const logger = deps.log;
         const client = new KlapClient(
           input.host,
           input.email,
           input.password,
-          deps.log,
+          logger,
           deps.dbLog,
           // No charger row exists yet during wizard setup — a stable label
           // instead of an id keeps this call distinguishable in the log.
@@ -115,6 +117,8 @@ export function createTapoRouter(deps: PluginDependencies) {
             success: true as const,
             model: info.model,
             firmwareVersion: info.fw_ver,
+            // The name set in the Tapo app — what the user calls this plug.
+            nickname: decodeNickname(info.nickname, logger),
             powerW: energy.current_power / 1000,
           };
         } catch (err) {

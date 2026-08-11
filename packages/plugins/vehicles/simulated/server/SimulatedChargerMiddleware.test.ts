@@ -17,9 +17,9 @@ interface Handlers {
   setChargeAmps: (amps: number) => Promise<boolean>;
 }
 
-/** Stub over the SimulatedVehicleMiddleware surface the charger view calls.
- *  Records call order and args; unstubbed methods throw so a test only
- *  exercising a subset of the interface still catches unexpected calls. */
+// Stub over the SimulatedVehicleMiddleware surface the charger view calls.
+// Records call order and args; unstubbed methods throw so a test only
+// exercising a subset of the interface still catches unexpected calls.
 class StubVehicleMiddleware {
   readonly calls: string[] = [];
   requestStateArgs: VehicleRequestContext[] = [];
@@ -200,60 +200,6 @@ describe("SimulatedChargerMiddleware", () => {
       );
 
       expect(middleware.getCachedState()?.energyAddedKwh).toBe(3.5);
-    });
-  });
-
-  describe("getChargerInfo", () => {
-    it("uses the shared vehicle's name and limits when cached state exists", async () => {
-      const state = buildVehicleChargeState({
-        vehicleName: "Test Car",
-        chargeAmpsMax: 40,
-        chargeAmpsMin: 6,
-        chargerPhases: 3,
-      });
-      const stub = new StubVehicleMiddleware({ getCachedState: () => state });
-      const middleware = new SimulatedChargerMiddleware(
-        buildRow({ id: "charger-1", name: "Sim Charger" }),
-        asShared(stub),
-      );
-
-      const info = await middleware.getChargerInfo(ctx);
-
-      expect(info).toEqual({
-        id: "charger-1",
-        name: "Sim Charger",
-        vendor: "ChargeHA",
-        model: "Test Car",
-        firmwareVersion: "unknown",
-        maxAmps: 40,
-        minAmps: 6,
-        phases: 3,
-        connectorCount: 1,
-        controlMode: "amps",
-      });
-    });
-
-    it("falls back to row name and defaults when no cached state exists", async () => {
-      const stub = new StubVehicleMiddleware({ getCachedState: () => null });
-      const middleware = new SimulatedChargerMiddleware(
-        buildRow({ id: "charger-1", name: "Sim Charger" }),
-        asShared(stub),
-      );
-
-      const info = await middleware.getChargerInfo(ctx);
-
-      expect(info).toEqual({
-        id: "charger-1",
-        name: "Sim Charger",
-        vendor: "ChargeHA",
-        model: "Sim Charger",
-        firmwareVersion: "unknown",
-        maxAmps: 32,
-        minAmps: 5,
-        phases: 1,
-        connectorCount: 1,
-        controlMode: "amps",
-      });
     });
   });
 

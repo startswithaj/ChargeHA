@@ -1,6 +1,5 @@
 import type {
   CallContext,
-  ChargerInfo,
   ChargerState,
   ChargerStatus,
 } from "@chargeha/shared";
@@ -9,9 +8,9 @@ import type { ChargerMiddleware } from "@chargeha/shared/plugins";
 import type { ChargerRow } from "@chargeha/shared";
 import type { SimulatedVehicleMiddleware } from "./SimulatedVehicleMiddleware.ts";
 
-/** ChargerMiddleware view over the shared per-vehicle SimulatedVehicleMiddleware.
- *  Commands and state ride the same instance the vehicle role uses — never a
- *  second adapter, never a second cache. */
+// ChargerMiddleware view over the shared per-vehicle SimulatedVehicleMiddleware.
+// Commands and state ride the same instance the vehicle role uses — never a
+// second adapter, never a second cache.
 export class SimulatedChargerMiddleware implements ChargerMiddleware {
   constructor(
     private readonly row: ChargerRow,
@@ -32,22 +31,6 @@ export class SimulatedChargerMiddleware implements ChargerMiddleware {
   getCachedState(): ChargerState | null {
     const state = this.shared.getCachedState();
     return state ? this.toChargerState(state) : null;
-  }
-
-  getChargerInfo(_ctx: CallContext): Promise<ChargerInfo> {
-    const state = this.shared.getCachedState();
-    return Promise.resolve({
-      id: this.row.id,
-      name: this.row.name,
-      vendor: "ChargeHA",
-      model: state?.vehicleName ?? this.row.name,
-      firmwareVersion: "unknown",
-      maxAmps: state?.chargeAmpsMax ?? 32,
-      minAmps: state?.chargeAmpsMin ?? 5,
-      phases: state?.chargerPhases ?? 1,
-      connectorCount: 1,
-      controlMode: "amps",
-    });
   }
 
   startCharging(ctx: CallContext): Promise<boolean> {
@@ -83,6 +66,7 @@ export class SimulatedChargerMiddleware implements ChargerMiddleware {
       status: simulatedStatus(state),
       statusDetail:
         `SOC ${state.batteryLevel}%/${state.chargeLimit}%, ${state.chargeAmps}A`,
+      controlMode: "amps",
       lastUpdated: state.lastUpdated,
     };
   }

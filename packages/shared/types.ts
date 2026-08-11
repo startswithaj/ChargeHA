@@ -94,57 +94,33 @@ export interface DeviceInfo {
 // ---- Adapter Interfaces ----
 
 export interface EnergySourceAdapter {
-  /** Establish connection to the energy source. */
   connect(): Promise<void>;
-
-  /** Clean up connection. */
   disconnect(): Promise<void>;
-
-  /** Returns current energy state. */
   getRealtimeData(): Promise<EnergyData>;
-
-  /** Returns adapter/device identification info. */
   getDeviceInfo(): Promise<DeviceInfo>;
-
-  /** Recommended polling interval in seconds. */
   pollIntervalSeconds(): number;
 }
 
-/** Per-call metadata threaded through adapter + middleware layers.
- *  `origin` is a caller-chosen tag (e.g. `controller:grace_period:set-amps`);
- *  `traceId` groups all calls made within one logical operation (one
- *  controller loop iteration, one user action) so logs can be correlated. */
+// `origin` is a caller-chosen tag (e.g. `controller:grace_period:set-amps`);
+// `traceId` groups all calls made within one logical operation so logs can be correlated.
 export interface CallContext {
   origin: string;
   traceId: string;
 }
 
-/** Mint a new traceId. Callers that don't have an upstream trace should
- *  create one at the top of their operation so all downstream logs group. */
+// Callers that don't have an upstream trace should create one at the top
+// of their operation so all downstream logs group.
 export function createTraceId(): string {
   return crypto.randomUUID().slice(0, 8);
 }
 
 export interface VehicleAdapter {
-  /** Establish connection / authenticate with vehicle API. */
   connect(ctx: CallContext): Promise<void>;
-
-  /** Clean up connection. */
   disconnect(): Promise<void>;
-
-  /** Returns current charging state. */
   getChargeState(ctx: CallContext): Promise<AdapterVehicleChargeState>;
-
-  /** Set charge limit percentage. Returns true on success. */
   setChargeLimit(percent: number, ctx: CallContext): Promise<boolean>;
-
-  /** Wake the vehicle if asleep. Returns true when online. */
   wakeVehicle(ctx: CallContext): Promise<boolean>;
-
-  /** Check if vehicle is currently online/reachable. */
   isVehicleOnline(ctx: CallContext): Promise<boolean>;
-
-  /** Returns simulation controls if this adapter supports simulation. */
   getSimulationControls?(): SimulationControls | null;
 }
 
@@ -158,11 +134,10 @@ export interface SimulationControls {
 
 export type ChargerControlMode = "amps" | "switch";
 
-/** A smart charger controls whatever is plugged into it; a vehicle-API
- *  charging point drives one specific car through its own API. */
+// A smart charger controls whatever is plugged into it; a vehicle-API
+// charging point drives one specific car through its own API.
 export type ChargerKind = "smart" | "vehicle_api";
 
-/** How a charging point's vehicle was determined. */
 export type VehicleResolutionKind =
   | "linked"
   | "inferred"
@@ -177,17 +152,17 @@ export type ChargerStatus =
   | "faulted"
   | "finishing"
   | "no_draw"
-  /** No adapter was ever created for this charging point — its config is
-   *  missing or was rejected. Nothing behind it to report on. */
+  // No adapter was ever created for this charging point — its config is
+  // missing or was rejected. Nothing behind it to report on.
   | "unconfigured";
 
 export interface ChargerState {
   chargerId: string;
   isCharging: boolean;
-  /** null = this charger type cannot observe cable state (smart plugs). */
+  // null = this charger type cannot observe cable state (smart plugs).
   isPluggedIn: boolean | null;
-  /** Measured fields: null = not measured, never zero. Core derives amps
-   *  from measured watts when null (see ChargingPointManager). */
+  // Measured fields: null = not measured, never zero. Core derives amps
+  // from measured watts when null (see ChargingPointManager).
   chargeAmps: number | null;
   chargeAmpsMax: number;
   chargeAmpsMin: number;
@@ -196,22 +171,11 @@ export interface ChargerState {
   chargerPhases: number;
   energyAddedKwh: number;
   status: ChargerStatus;
-  /** The adapter's native status, as close to the device as possible. */
+  // The adapter's native status, as close to the device as possible.
   statusDetail: string | null;
-  lastUpdated: string;
-}
-
-export interface ChargerInfo {
-  id: string;
-  name: string;
-  vendor: string;
-  model: string;
-  firmwareVersion: string;
-  maxAmps: number;
-  minAmps: number;
-  phases: number;
-  connectorCount: number;
+  // Whether this charger accepts an amperage setpoint or is on/off only.
   controlMode: ChargerControlMode;
+  lastUpdated: string;
 }
 
 export interface ChargerAdapter {
@@ -223,12 +187,11 @@ export interface ChargerAdapter {
   stopCharging(ctx: CallContext): Promise<boolean>;
   setChargeAmps(amps: number, ctx: CallContext): Promise<boolean>;
   getChargerState(ctx: CallContext): Promise<ChargerState>;
-  getChargerInfo(ctx: CallContext): Promise<ChargerInfo>;
-  /** null = push-based (no polling); a number = min seconds between fetches. */
+  // null = push-based (no polling); a number = min seconds between fetches.
   pollIntervalSeconds(): number | null;
 }
 
-/** Charging point mode reuses the existing values ("auto"|"charge_now"|"stop"). */
+// Charging point mode reuses the existing values ("auto"|"charge_now"|"stop").
 export type ChargingPointMode = VehicleMode;
 
 // ---- Schedule Types ----
@@ -245,7 +208,7 @@ export interface ChargeSchedule {
   endTime: string; // HH:MM 24h format
   days: DayOfWeek[];
   chargeAmps: number;
-  /** Null for charger-keyed schedules — no battery visibility. */
+  // Null for charger-keyed schedules — no battery visibility.
   chargeLimitPct: number | null;
   enabled: boolean;
 }
@@ -298,7 +261,7 @@ export interface NotificationEventInfo {
   description: string;
 }
 
-/** Central definition of all notification events — used by both server and client. */
+// Central definition of all notification events — used by both server and client.
 export const NOTIFICATION_EVENTS: NotificationEventInfo[] = [
   {
     key: "error",
@@ -376,29 +339,9 @@ export const NOTIFICATION_EVENTS: NotificationEventInfo[] = [
 
 // ---- WebSocket Message Types ----
 
-/**
- * Discriminated union for all SSE events sent over the single subscription.
- *
- * WHY A SINGLE SUBSCRIPTION:
- * tRPC's httpSubscriptionLink opens one EventSource (HTTP long-lived connection)
- * per useSubscription() call. Browsers limit HTTP/1.1 to 6 concurrent connections
- * per origin (Chromium, Firefox). With multiple subscriptions, each holds a
- * connection permanently. React StrictMode in development double-mounts components,
- * briefly doubling the connection count. With 3 subscriptions × 2 mounts = 6
- * connections, Chrome's entire pool is exhausted — page refresh hangs because the
- * new document request has no available connection slot.
- *
- * Even in production (no StrictMode), 3+ subscriptions leaves only 3 connection
- * slots for all other requests (API calls, static assets), and adding any future
- * subscription would push past the limit.
- *
- * The solution: multiplex all real-time events over a single SSE connection using
- * a discriminated union. The server emits tagged events, the client routes them
- * by `type`. One connection, fully typed, no pool issues.
- *
- * HTTP/2 would also solve this (100+ multiplexed streams), but Deno.serve only
- * supports HTTP/2 over TLS, and the app runs on plain HTTP behind a reverse proxy.
- */
+// Single SSE subscription multiplexing all real-time events. Multiple
+// useSubscription() calls exhaust the browser's 6-connection HTTP/1.1 pool.
+// See docs/realtime.md for the full reasoning.
 export type SSEEvent =
   | { type: "energy_update"; data: EnergyData & CumulativeEnergyData }
   | { type: "vehicle_update"; data: VehicleChargeState }
@@ -508,26 +451,24 @@ export interface VehicleSocSnapshot {
 
 // ---- Wizard Navigation State ----
 
-/** Where the setup wizard is, and the selections that decide which steps exist.
- *  Read and written as one record so the step id can never name a step the
- *  current selections haven't put in the list. */
+// Where the setup wizard is, and the selections that decide which steps
+// exist. Read and written as one record so the step id can never name a
+// step the current selections haven't put in the list.
 export interface WizardNavState {
-  /** null = wizard not started (the old "" sentinel, retired). */
+  // null = wizard not started (the old "" sentinel, retired).
   stepId: string | null;
-  /** null = not selected. The existing "" sentinels migrate to null; the
-   *  WizardService data layer maps null ↔ absent config key (code.md: no
-   *  empty-string sentinels). */
+  // null = not selected. The existing "" sentinels migrate to null; the
+  // WizardService data layer maps null ↔ absent config key (code.md: no empty-string sentinels).
   vehicleType: string | null;
   energyType: string | null;
   chargerType: string | null;
-  /** The installation's control-path decision. null = the
-   *  question has not been answered — the wizard blocks until it is.
-   *  Migration writes "vehicle" once for existing installs. */
+  // The installation's control-path decision. null = the question has not
+  // been answered — the wizard blocks until it is. Migration writes "vehicle" once for existing installs.
   controlPath: "charger" | "vehicle" | null;
 }
 
-/** Persisted vehicle. Lives here rather than in the db layer because plugins
- *  receive it through the plugin contract. */
+// Persisted vehicle. Lives here rather than in the db layer because
+// plugins receive it through the plugin contract.
 export interface VehicleRow {
   id: string;
   name: string;
@@ -539,7 +480,7 @@ export interface VehicleRow {
   updatedAt: string;
 }
 
-/** Persisted charging point. Handed to charger plugins, hence shared. */
+// Persisted charging point. Handed to charger plugins, hence shared.
 export interface ChargerRow {
   id: string;
   name: string;
@@ -549,21 +490,19 @@ export interface ChargerRow {
   priority: number;
   vehicleId: string | null;
   kind: ChargerKind;
-  /** Inactive points keep their row (and schedules) but are not controlled. */
+  // Inactive points keep their row (and schedules) but are not controlled.
   active: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-/** Non-secret, row-scoped plugin config. Values are strings so the shape
- *  matches the plugin config store's `string | null` contract; absence of a
- *  key means "not set" — never `""`. */
+// Non-secret, row-scoped plugin config. Values are strings so the shape
+// matches the plugin config store's `string | null` contract; absence of a key means "not set" — never `""`.
 export type ChargerConfigMap = Readonly<Record<string, string>>;
 
-/** Secret, row-scoped plugin config. Same shape as `ChargerConfigMap`, but
- *  persisted to the encrypted `charger_secrets` column and never placed on
- *  `ChargerRow`. */
+// Secret, row-scoped plugin config. Same shape as `ChargerConfigMap`, but
+// persisted to the encrypted `charger_secrets` column and never placed on `ChargerRow`.
 export type ChargerSecretsMap = Readonly<Record<string, string>>;
 
-/** A patch applied to a row's config or secrets. `null` deletes the key. */
+// A patch applied to a row's config or secrets. `null` deletes the key.
 export type ChargerConfigPatch = Readonly<Record<string, string | null>>;

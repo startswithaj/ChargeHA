@@ -1,7 +1,5 @@
-/**
- * Shared test factories for building mock data with sensible defaults.
- * Usage: `buildVehicleChargeState({ batteryLevel: 95 })` — override only what matters for your test.
- */
+// Shared test factories for building mock data with sensible defaults.
+// Usage: `buildVehicleChargeState({ batteryLevel: 95 })` — override only what matters for your test.
 import type {
   BlockoutSchedule,
   ChargeSchedule,

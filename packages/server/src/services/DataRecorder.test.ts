@@ -73,9 +73,8 @@ describe("DataRecorder", () => {
     dailyGridExportWh: 0,
   };
 
-  /** Charging points mirroring the mock vehicles 1:1 (Tesla parity):
-   *  linked point per vehicle, charger state carrying the same
-   *  measured values. */
+  // Charging points mirroring the mock vehicles 1:1 (Tesla parity): linked
+  // point per vehicle, charger state carrying the same measured values.
   function mockChargingPoints(
     vehicles: MockRecorderVehicleManager,
   ): ChargingPointManager {
@@ -96,7 +95,6 @@ describe("DataRecorder", () => {
     } as unknown as ChargingPointManager;
   }
 
-  /** Emit an energy_update event to feed data into the recorder. */
   function feedEnergy(
     emitter: TypedEventEmitter,
     data: EnergyData,
@@ -104,7 +102,7 @@ describe("DataRecorder", () => {
     emitter.emit("energy_update", { ...data, ...CUMULATIVE_DEFAULTS });
   }
 
-  /** Rows actually written to vehicle_charge_readings, oldest first. */
+  // Rows actually written to vehicle_charge_readings, oldest first.
   const chargeReadingVehicleIds = (database: AppDatabase): string[] =>
     (testable(database).sqlite.prepare(
       "SELECT vehicle_id FROM vehicle_charge_readings ORDER BY id",
@@ -864,8 +862,8 @@ describe("DataRecorder", () => {
   });
 
   describe("pruning logic", () => {
-    /** Drives the recorder's own prune tick (every 100th) and reports the
-     *  retention day counts it passed to each prune call. */
+    // Drives the recorder's own prune tick (every 100th) and reports the
+    // retention day counts it passed to each prune call.
     const pruneDaysOnTick = async (): Promise<{
       energy: number[];
       charge: number[];

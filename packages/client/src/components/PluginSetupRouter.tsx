@@ -22,13 +22,8 @@ function resolvePluginKind(
   return "charger";
 }
 
-/**
- * Plugin setup wizard component. Detects whether the plugin is a vehicle,
- * energy, or charger plugin, renders the wizard shell against
- * localStorage-backed state, and refreshes the plugin list on completion.
- * Plugins are already initialized at server startup, so no on-demand init
- * call is needed here.
- */
+// Plugins are already initialized at server startup, so no on-demand init
+// call is needed here.
 export function PluginSetupRouter(
   { pluginId }: PluginSetupRouterProps,
 ) {

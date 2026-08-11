@@ -1,7 +1,6 @@
 import type {
   CallContext,
   ChargerAdapter,
-  ChargerInfo,
   ChargerState,
   ChargerStatus,
 } from "@chargeha/shared";
@@ -38,11 +37,11 @@ export interface OcppAdapterConfig {
   meterTimeoutSeconds: number;
   maxAmps: number;
   minAmps: number;
-  /** From the plugin's phases setting — a charger can't report this. */
+  // From the plugin's phases setting — a charger can't report this.
   phases: number;
 }
 
-/** Push-based adapter: all reads come from the central system's cache. */
+// Push-based adapter: all reads come from the central system's cache.
 export class OcppChargerAdapter implements ChargerAdapter {
   // Tracks whether the last computed state was stale, so the dashboard's
   // frequent polling only writes a log row on the transition, not every poll.
@@ -50,7 +49,7 @@ export class OcppChargerAdapter implements ChargerAdapter {
 
   constructor(
     private readonly config: OcppAdapterConfig,
-    /** Bound to this charger, so the adapter cannot command another one. */
+    // Bound to this charger, so the adapter cannot command another one.
     private readonly cs: OcppChargerHandle,
     private readonly dbLog: PluginDbLogger,
   ) {}
@@ -63,17 +62,23 @@ export class OcppChargerAdapter implements ChargerAdapter {
     return Promise.resolve();
   }
 
-  startCharging(_ctx: CallContext): Promise<boolean> {
+  startCharging(ctx: CallContext): Promise<boolean> {
+    this.command("info", "remoteStart", {}, ctx);
     return this.cs.remoteStart();
   }
 
-  stopCharging(_ctx: CallContext): Promise<boolean> {
+  stopCharging(ctx: CallContext): Promise<boolean> {
+    this.command("info", "remoteStop", {}, ctx);
     return this.cs.remoteStop();
   }
 
-  /** Three-tier profile per the HA-integration pattern. */
-  setChargeAmps(amps: number, _ctx: CallContext): Promise<boolean> {
+  // Three-tier profile per the HA-integration pattern.
+  setChargeAmps(amps: number, ctx: CallContext): Promise<boolean> {
     const tx = this.cs.getData().transactionId ?? undefined;
+    this.command("debug", "setChargeAmps", {
+      amps,
+      transactionId: tx ?? null,
+    }, ctx);
     return this.cs.setChargingProfiles([
       chargingProfilePayload("ChargePointMaxProfile", amps),
       chargingProfilePayload("TxDefaultProfile", amps),
@@ -83,27 +88,24 @@ export class OcppChargerAdapter implements ChargerAdapter {
     ]);
   }
 
-  getChargerState(_ctx: CallContext): Promise<ChargerState> {
-    return Promise.resolve(this.buildState(this.cs.getData()));
+  getChargerState(ctx: CallContext): Promise<ChargerState> {
+    return Promise.resolve(this.buildState(this.cs.getData(), ctx));
   }
 
-  getChargerInfo(_ctx: CallContext): Promise<ChargerInfo> {
-    const data = this.cs.getData();
-    return Promise.resolve({
-      id: this.config.chargerId,
-      name: data.info?.model ?? this.config.chargerId,
-      vendor: data.info?.vendor ?? "unknown",
-      model: data.info?.model ?? "unknown",
-      firmwareVersion: data.info?.firmwareVersion ?? "unknown",
-      maxAmps: this.config.maxAmps,
-      minAmps: this.config.minAmps,
-      phases: this.config.phases,
-      connectorCount: 1,
-      controlMode: "amps",
+  private command(
+    level: "info" | "debug",
+    name: string,
+    payload: Record<string, unknown>,
+    ctx: CallContext,
+  ): void {
+    this.dbLog.log(level, `${name} (${this.config.chargerId})`, {
+      payload: { chargerId: this.config.chargerId, ...payload },
+      origin: ctx.origin,
+      traceId: ctx.traceId,
     });
   }
 
-  private buildState(data: OcppLiveData): ChargerState {
+  private buildState(data: OcppLiveData, ctx: CallContext): ChargerState {
     const meterAgeMs = data.lastMeterValuesAt === null
       ? null
       : Date.now() - data.lastMeterValuesAt;
@@ -118,10 +120,14 @@ export class OcppChargerAdapter implements ChargerAdapter {
           meterAgeMs,
           timeoutSeconds: this.config.meterTimeoutSeconds,
         },
+        origin: ctx.origin,
+        traceId: ctx.traceId,
       });
     } else if (!meterStale && this.wasStale) {
       this.dbLog.info(`Meter values fresh again (${this.config.chargerId})`, {
         payload: { chargerId: this.config.chargerId },
+        origin: ctx.origin,
+        traceId: ctx.traceId,
       });
     }
     this.wasStale = meterStale;
@@ -147,6 +153,7 @@ export class OcppChargerAdapter implements ChargerAdapter {
       energyAddedKwh: sessionEnergyKwh(data),
       status,
       statusDetail: statusDetail(data, disconnected),
+      controlMode: "amps",
       lastUpdated: data.lastUpdated,
     };
   }
@@ -164,9 +171,9 @@ function resolveStatus(
   return STATUS_MAP[status];
 }
 
-/** null means "unknown", which the controller engine treats as plugged in —
- *  only a definite false blocks charging. A session running with no status yet
- *  is definitely plugged in, so say so rather than leaving it unknown. */
+// null means "unknown", which the controller engine treats as plugged in —
+// only a definite false blocks charging. A session running with no status
+// yet is definitely plugged in, so say so rather than leaving it unknown.
 function resolvePluggedIn(
   status: ChargePointStatus | null,
   charging: boolean,
@@ -175,13 +182,9 @@ function resolvePluggedIn(
   return charging ? true : null;
 }
 
-/** A charger that reconnects mid-session re-announces its connector status but
- *  has no reason to resend Charging — from its side nothing changed. Our own
- *  `status` is reset on every new socket, so after a ChargeHA restart the live
- *  transaction and real power are the only honest evidence a session is
- *  running. Trust them over a status that predates the current socket.
- *  Power must be non-zero: SuspendedEV/SuspendedEVSE hold a transaction open
- *  at zero power and must keep reporting not-charging. */
+// A reconnecting charger re-announces connector status but has no reason to
+// resend Charging. After a ChargeHA restart the live transaction and real
+// power are the only honest evidence, trusted over a stale status.
 function isChargingNow(data: OcppLiveData): boolean {
   if (data.status === "Charging") return true;
   // Inference fills a gap; it must never contradict the charger. Any other
@@ -194,13 +197,9 @@ function isChargingNow(data: OcppLiveData): boolean {
   return data.transactionId !== null && (data.powerW ?? 0) > 0;
 }
 
-/** Tier 3 of the measurand fallback chain: no power measurand and no
- *  register delta, so derive from amps × volts. Two explicit paths rather
- *  than one averaged round trip.
- *  - Per-phase currents: the sum already carries the phase count, and stays
- *    exact on an unbalanced load. config.phases is not consulted at all —
- *    the charger's own report beats the declared installation.
- *  - One unphased current: nothing to sum, so scale by config.phases. */
+// Tier 3: no power measurand, no register delta, derive from amps × volts.
+// Per-phase currents: sum stays exact on unbalanced load, config.phases
+// unused. One unphased current: nothing to sum, scale by config.phases.
 function derivedPowerKw(data: OcppLiveData, phases: number): number | null {
   if (data.voltageV === null) return null;
   if (data.currentSumA !== null) {

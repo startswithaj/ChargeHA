@@ -17,12 +17,9 @@ import { parseDecisionInputs } from "../db/Serialization.ts";
 import { isHome, parseHomeCoords } from "@chargeha/shared/geo";
 
 const RECENT_LOG_MS = 2 * 60 * 1000; // 2 minutes
-/** Result of a vehicle command (start/stop/setAmps/etc). */
 export interface CommandResult {
   success: boolean;
-  /** Updated state after command (if successful). */
   state?: VehicleChargeState;
-  /** Error message (if failed). */
   error?: string;
 }
 
@@ -30,29 +27,16 @@ interface VehicleEntry {
   middleware: VehicleMiddleware;
 }
 
-/** Per-vehicle tracking for plug + home transition detection. */
+// Per-vehicle tracking for plug + home transition detection.
 interface PlugTracker {
   wasPluggedIn: boolean;
   wasHome: boolean | null;
   initialized: boolean;
 }
 
-/**
- * Internal layer that owns vehicle lifecycle and state. Wraps each vehicle's
- * plugin-provided VehicleMiddleware (which handles caching, API cost decisions,
- * and command execution) and adds:
- *
- * - Lifecycle: add/remove vehicles, sync with DB, initial state seeding
- * - Data access: requestState() for the controller, getState() for SSE/reads
- * - Plug transitions: detects plug-in/plug-out and emits events
- * - Error tracking: per-vehicle poll errors surfaced to the dashboard
- * - SSE: subscribeToUpdates / subscribeToErrors for the dashboard
- * - Mode reset: switches charge_now/stop back to auto on unplug
- *
- * Consumers: ChargeController (data + commands), DataRecorder (data),
- * VehicleService (data + commands, from tRPC). None of them touch the plugin
- * adapter directly — everything flows through the middleware.
- */
+// Internal layer that owns vehicle lifecycle and state. Wraps each vehicle's plugin-provided VehicleMiddleware (caching, API cost decisions, command
+// execution) and adds: lifecycle (add/remove, DB sync, initial state seeding); data access (requestState for the controller, getState for SSE/reads);
+// plug-transition detection/events; per-vehicle error tracking; SSE subscriptions; and mode reset (charge_now/stop → auto on unplug). Consumers: ChargeController, DataRecorder, VehicleService — none touch the plugin adapter directly, everything flows through the middleware.
 export class VehicleManager {
   private vehicles = new Map<string, VehicleEntry>();
   private plugTrackers = new Map<string, PlugTracker>();
@@ -179,8 +163,8 @@ export class VehicleManager {
     this.logger.info(`Vehicle removed: ${id}`);
   }
 
-  /** Permanently delete a vehicle: drop live state, delete the row (cascades
-   *  its schedules), and renumber remaining priorities so there are no gaps. */
+  // Permanently delete a vehicle: drop live state, delete the row (cascades
+  // its schedules), and renumber remaining priorities so there are no gaps.
   async deleteVehicle(id: string): Promise<void> {
     await this.removeVehicle(id);
     await this.db.deleteVehicle(id);
@@ -190,8 +174,8 @@ export class VehicleManager {
 
   // ── Data requests ─────────────────────────────────────────────────────
 
-  /** Request vehicle state via the middleware. Detects plug transitions
-   *  and emits events when fresh data arrives. */
+  // Request vehicle state via the middleware. Detects plug transitions
+  // and emits events when fresh data arrives.
   async requestState(
     vehicleId: string,
     context: VehicleRequestContext,
@@ -237,8 +221,8 @@ export class VehicleManager {
     return await this.wrapWithIsHome(raw);
   }
 
-  /** True when this adapter type's vehicles draw no real power, so no meter
-   *  can observe them. See docs/simulated-load.md. */
+  // True when this adapter type's vehicles draw no real power, so no meter
+  // can observe them. See docs/simulated-load.md.
   loadIsUnmetered(adapterType: string): boolean {
     return this.vehiclePlugins.get(adapterType)?.loadIsUnmetered ?? false;
   }

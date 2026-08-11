@@ -13,9 +13,9 @@ import type { TeslaService } from "./TeslaService.ts";
 import { TESLA_SECRET_KEYS, teslaConfigDef } from "./config.ts";
 import { createPluginConfigProcedures } from "../../../createPluginConfigProcedures.ts";
 
-/** The slice of the plugin this router calls. Declared here rather than
- *  imported from index.ts, which imports this module — the class satisfies it
- *  structurally. */
+// The slice of the plugin this router calls. Declared here rather than
+// imported from index.ts, which imports this module — the class satisfies it
+// structurally.
 interface TeslaRouterPlugin {
   readonly teslaTokenManager: TeslaTokenManager;
   readonly teslaService: TeslaService;

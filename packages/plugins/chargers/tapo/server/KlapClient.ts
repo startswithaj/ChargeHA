@@ -27,9 +27,9 @@ const REQUEST_TIMEOUT_MS = 5000;
 // per window still proves the poll loop is alive without drowning real faults.
 const SUCCESS_LOG_THROTTLE_MS = 5 * 60 * 1000;
 
-/** Speaks KLAP v2 to one device: two-stage seed handshake, then AES-CBC
- *  encrypted JSON requests with per-request sequence numbers. Re-handshakes
- *  once on session expiry (403). */
+// Speaks KLAP v2 to one device: two-stage seed handshake, then AES-CBC
+// encrypted JSON requests with per-request sequence numbers. Re-handshakes
+// once on session expiry (403).
 export class KlapClient {
   private session: KlapSession | null = null;
   // Instance-scoped so two Tapo plugs (two KlapClient instances, one per
