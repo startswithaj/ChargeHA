@@ -216,6 +216,7 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
   /** Login mode that last succeeded, tried first next time. */
   private preferredMode: LoginMode | null = null;
   private readonly gatewayProbe: SemsGatewayProbe;
+  private loginPromise: Promise<void> | null = null;
 
   constructor(
     private readonly account: string,
@@ -228,6 +229,20 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
 
   clearSession(): void {
     this.token = null;
+  }
+
+  /** Single-flight login gate: concurrent callers share one in-flight login
+   *  instead of each firing their own CrossLogin — SEMS rate-limits logins
+   *  hard, and overlapping polls or two browser tabs would otherwise
+   *  double-login on the same client. */
+  private async ensureLoggedIn(): Promise<void> {
+    if (this.token) return;
+    if (!this.loginPromise) {
+      this.loginPromise = this.login().finally(() => {
+        this.loginPromise = null;
+      });
+    }
+    await this.loginPromise;
   }
 
   async login(): Promise<void> {
@@ -312,7 +327,7 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     body: Record<string, unknown> | null,
     isRetry = false,
   ): Promise<unknown> {
-    if (!this.token) await this.login();
+    await this.ensureLoggedIn();
     const token = this.token;
     if (!token) throw new GoodweSemsAuthError("SEMS login produced no token");
 

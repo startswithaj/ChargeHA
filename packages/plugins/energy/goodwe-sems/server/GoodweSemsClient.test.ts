@@ -159,6 +159,22 @@ describe("GoodweSemsClient", () => {
   });
 
   describe("getStationDetail", () => {
+    it("shares one login across concurrent calls", async () => {
+      mock.setPathResponse(NEW_LOGIN_PATH, loginOk("tok", GATEWAY_API));
+      mock.setPathResponse(STATION_DETAIL_PATH, semsOk(stationDetailPayload));
+
+      const client = makeClient();
+      await Promise.all([
+        client.getStationDetail("station-1"),
+        client.getStationDetail("station-1"),
+      ]);
+
+      const loginCalls = mock.fetchCalls.filter((c) =>
+        c.url.includes(NEW_LOGIN_PATH)
+      );
+      expect(loginCalls.length).toBe(1);
+    });
+
     it("rewrites PowerStation routes off a SEMS+ gateway base onto the region", async () => {
       mock.setPathResponse(NEW_LOGIN_PATH, loginOk("tok", GATEWAY_API));
       mock.setPathResponse(STATION_DETAIL_PATH, semsOk(stationDetailPayload));
