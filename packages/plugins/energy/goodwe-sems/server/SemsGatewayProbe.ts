@@ -52,6 +52,15 @@ async function gatewayHeaders(
   };
 }
 
+function redactToken(body: string, token: SemsToken): string {
+  return [String(token.token ?? ""), String(token.uid ?? "")]
+    .filter((secret) => secret.length >= 8)
+    .reduce(
+      (scrubbed, secret) => scrubbed.replaceAll(secret, "REDACTED"),
+      body,
+    );
+}
+
 export class SemsGatewayProbe {
   private lastProbeAtMs = 0;
 
@@ -81,7 +90,12 @@ export class SemsGatewayProbe {
         headers: await gatewayHeaders(token),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
-      const body = (await response.text()).slice(0, 4000);
+      // Some APIs echo auth material back in error responses — scrub the
+      // session token and uid before the body reaches any log.
+      const body = redactToken(
+        (await response.text()).slice(0, 4000),
+        token,
+      );
       const durationMs = Math.round(performance.now() - startedAt);
       this.logger.info(
         `SEMS gateway probe ${url} → HTTP ${response.status} in ${durationMs}ms: ${body}`,
