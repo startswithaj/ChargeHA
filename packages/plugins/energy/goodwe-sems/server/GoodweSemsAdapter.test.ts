@@ -1,14 +1,19 @@
-import { describe, it } from "@std/testing/bdd";
+import { beforeEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { assertExists } from "@std/assert";
 import { FakeTime } from "@std/testing/time";
 import {
   applyStatus,
   parseSemsValue,
+  resetSemsBackoffForTests,
   toBatteryPowerW,
   toEnergyData,
   toGridPowerW,
 } from "./GoodweSemsAdapter.ts";
+
+beforeEach(() => {
+  resetSemsBackoffForTests();
+});
 import {
   GoodweSemsConnectionError,
   GoodweSemsRateLimitError,
@@ -442,21 +447,31 @@ describe("GoodweSemsAdapter", () => {
       );
     });
 
-    it("clears the backoff window", async () => {
-      const client = makeFakeClient(rateLimit());
-      const adapter = makeAdapter(client);
+    it("keeps the backoff window across disconnect", async () => {
+      const time = new FakeTime(new Date("2026-01-01T00:00:00.000Z"));
+      try {
+        const client = makeFakeClient(rateLimit());
+        const adapter = makeAdapter(client);
 
-      await expect(adapter.getRealtimeData()).rejects.toBeInstanceOf(
-        GoodweSemsConnectionError,
-      );
-      const callsAfterRateLimit = client.calls.length;
+        await expect(adapter.getRealtimeData()).rejects.toBeInstanceOf(
+          GoodweSemsConnectionError,
+        );
+        const callsAfterRateLimit = client.calls.length;
 
-      await adapter.disconnect();
-      client.setResult(buildStationDetail());
-      const data = await adapter.getRealtimeData();
+        await adapter.disconnect();
+        client.setResult(buildStationDetail());
+        // Still inside the window: lifecycle churn must not reach SEMS.
+        await expect(adapter.getRealtimeData()).rejects.toBeInstanceOf(
+          GoodweSemsConnectionError,
+        );
+        expect(client.calls.length).toBe(callsAfterRateLimit);
 
-      assertExists(data.lastUpdated);
-      expect(client.calls.length).toBe(callsAfterRateLimit + 1);
+        time.tick(RATE_LIMIT_MS + 1000);
+        const data = await adapter.getRealtimeData();
+        assertExists(data.lastUpdated);
+      } finally {
+        time.restore();
+      }
     });
   });
 });

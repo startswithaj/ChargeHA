@@ -19,6 +19,14 @@ const MAX_STALE_MS = 15 * 60 * 1000;
 
 const LOAD_STATUS_IMPORTING = 1;
 
+// Backoff windows outlive adapter instances: a config save rebuilds the
+// adapter, and a fresh instance must not call SEMS inside a declared window.
+const backoffUntilByStation = new Map<string, number>();
+
+export function resetSemsBackoffForTests(): void {
+  backoffUntilByStation.clear();
+}
+
 const UNIT_SCALES: Record<string, number> = { w: 1, kw: 1000, mw: 1_000_000 };
 
 export function parseSemsValue(
@@ -80,7 +88,6 @@ export function toEnergyData(flow: SemsPowerflow): EnergyData {
 export class GoodweSemsAdapter implements EnergySourceAdapter {
   private lastGood: EnergyData | null = null;
   private lastGoodAtMs = 0;
-  private backoffUntilMs = 0;
   private gridDirectionUnknown = false;
 
   constructor(
@@ -150,11 +157,12 @@ export class GoodweSemsAdapter implements EnergySourceAdapter {
     this.gridDirectionUnknown = unknown;
   }
 
+  // Backoff deliberately survives disconnect: lifecycle churn must not erase
+  // a rate-limit window SEMS has declared.
   disconnect(): Promise<void> {
     this.client.clearSession();
     this.lastGood = null;
     this.lastGoodAtMs = 0;
-    this.backoffUntilMs = 0;
     return Promise.resolve();
   }
 
@@ -200,19 +208,26 @@ export class GoodweSemsAdapter implements EnergySourceAdapter {
     };
   }
 
+  private backoffUntilMs(): number {
+    return backoffUntilByStation.get(this.stationId) ?? 0;
+  }
+
   private isBackingOff(): boolean {
-    return Date.now() < this.backoffUntilMs;
+    return Date.now() < this.backoffUntilMs();
   }
 
   private async guarded<T>(call: () => Promise<T>): Promise<T> {
     if (this.isBackingOff()) {
-      throw new GoodweSemsRateLimitError(this.backoffUntilMs - Date.now());
+      throw new GoodweSemsRateLimitError(this.backoffUntilMs() - Date.now());
     }
     try {
       return await call();
     } catch (error) {
       if (error instanceof GoodweSemsRateLimitError) {
-        this.backoffUntilMs = Date.now() + error.retryAfterMs;
+        backoffUntilByStation.set(
+          this.stationId,
+          Date.now() + error.retryAfterMs,
+        );
         this.logger.warn(
           `SEMS rate limited — pausing requests for ${
             Math.round(error.retryAfterMs / 1000)

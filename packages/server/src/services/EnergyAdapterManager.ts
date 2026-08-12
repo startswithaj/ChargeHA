@@ -136,7 +136,13 @@ export class EnergyAdapterManager {
         `New energy adapter connection failed — will retry on first poll: ${err}`,
       );
     }
+    const previous = this.adapter;
     this.adapter = newAdapter;
+    // The replaced adapter holds a live session; leaving it undisconnected
+    // leaks it.
+    await previous?.disconnect().catch((err) =>
+      this.logger.warn(`Previous energy adapter disconnect failed: ${err}`)
+    );
     this.logger.info(
       `Energy adapter reconfigured to ${newAdapter.constructor.name}`,
     );
