@@ -1,7 +1,7 @@
 import type { Logger } from "@chargeha/server/lib/Logger";
 import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
-import { type OcppFrame, OcppFraming, PendingCalls } from "./OcppFraming.ts";
-import { OcppMessageQueue } from "./OcppMessageQueue.ts";
+import { type OcppFrame, OcppFraming } from "./OcppFraming.ts";
+import { freshData, OcppConnection } from "./OcppConnection.ts";
 import {
   authorizeReq,
   bootNotificationReq,
@@ -79,34 +79,6 @@ function withCharger(
   return seen.map((c) => c.chargerId === chargerId ? { ...c, at } : c);
 }
 
-const freshData = (): OcppLiveData => ({
-  connected: false,
-  status: null,
-  errorCode: null,
-  info: null,
-  transactionId: null,
-  meterStartWh: null,
-  powerW: null,
-  currentA: null,
-  currentSumA: null,
-  voltageV: null,
-  energyRegisterWh: null,
-  lastMeterValuesAt: null,
-  lastUpdated: new Date().toISOString(),
-});
-
-// Per connection, not fields on the class, so a second charger cannot evict
-// the first nor share its transaction counter.
-interface OcppConnection {
-  socket: WebSocket;
-  data: OcppLiveData;
-  // Per socket: one charger's CALLRESULT must never settle another's call.
-  pending: PendingCalls;
-  transactionCounter: number;
-  // Per socket so a reconnect gets a fresh queue, not a dead socket's backlog.
-  queue: OcppMessageQueue;
-}
-
 // Bound to one charge point, so an adapter cannot command another charger nor
 // reach plugin-wide operations like pairing.
 export interface OcppChargerHandle {
@@ -149,7 +121,7 @@ export class OcppCentralSystem {
   // Fresh state rather than nothing, so callers never special-case "no
   // connection yet".
   getData(chargePointId: string): OcppLiveData {
-    return this.connections.get(chargePointId)?.data ?? freshData();
+    return this.connections.get(chargePointId)?.getData() ?? freshData();
   }
 
   // Lets the panel prove reachability before the user commits a charger id.
@@ -173,7 +145,9 @@ export class OcppCentralSystem {
     this.pairing = idlePairing();
     await Promise.all(
       [...this.connections.entries()].map(async ([id, connection]) => {
-        if (!(await this.hasChargerRow(id))) connection.socket.close();
+        if (!(await this.hasChargerRow(id))) {
+          connection.close("Pairing cancelled");
+        }
       }),
     );
   }
@@ -199,22 +173,11 @@ export class OcppCentralSystem {
   attach(socket: WebSocket, opts: { chargerId: string }): void {
     const id = opts.chargerId;
     // Only the previous socket for THIS id — closing another id's socket is
-    // what made a second charger evict the first.
-    const previous = this.connections.get(id);
-    if (previous !== undefined) {
-      // onClose disqualifies itself once the new entry is in the map, so the
-      // replaced connection's callers are failed here or never.
-      previous.pending.rejectAll("Charger reconnected");
-      previous.queue.stop();
-      previous.socket.close();
-    }
-    const connection: OcppConnection = {
-      socket,
-      data: { ...freshData(), connected: true },
-      pending: new PendingCalls(),
-      transactionCounter: 0,
-      queue: new OcppMessageQueue(this.logger, id),
-    };
+    // what made a second charger evict the first. onClose disqualifies itself
+    // once the new entry is in the map, so this is the last chance to fail the
+    // replaced connection's callers.
+    this.connections.get(id)?.close("Charger reconnected");
+    const connection = new OcppConnection(socket, id, this.logger, this.dbLog);
     this.connections.set(id, connection);
     // deno-lint-ignore custom-no-param-mutation/no-param-mutation -- WebSocket handler wiring
     socket.onmessage = (event) => this.onMessage(id, String(event.data));
@@ -275,9 +238,7 @@ export class OcppCentralSystem {
 
   shutdown(): void {
     this.connections.forEach((connection) => {
-      connection.pending.rejectAll("Central system shutting down");
-      connection.queue.stop();
-      connection.socket.close();
+      connection.close("Central system shutting down");
     });
     this.connections.clear();
   }
@@ -371,7 +332,7 @@ export class OcppCentralSystem {
     if (frame === null) return;
     // Must stay synchronous and above the queue: a queued handler can be
     // mid-send() awaiting this very reply, so queueing it deadlocks.
-    if (connection.pending.settle(frame)) return;
+    if (connection.settle(frame)) return;
     if (frame.kind !== "call") return;
     this.queueCall(chargePointId, connection, frame);
   }
@@ -390,15 +351,15 @@ export class OcppCentralSystem {
     connection: OcppConnection,
     frame: OcppFrame & { kind: "call" },
   ): void {
-    const queued = connection.queue.enqueue(() =>
-      this.reply(chargePointId, connection.socket, frame)
+    const queued = connection.enqueue(() =>
+      this.reply(chargePointId, connection, frame)
     );
     if (queued) return;
     // The charger already hung up, so there is nobody to read a CALLERROR.
-    if (connection.queue.isStopped) return;
+    if (connection.isStopped) return;
     // Bounded, not dropped: chargers retry a CALLERROR, so this is recoverable
     // in a way a silent drop is not.
-    connection.socket.send(
+    connection.sendRaw(
       OcppFraming.error(
         frame.id,
         "InternalError",
@@ -409,7 +370,7 @@ export class OcppCentralSystem {
 
   private async reply(
     chargePointId: string,
-    socket: WebSocket,
+    connection: OcppConnection,
     frame: OcppFrame & { kind: "call" },
   ): Promise<void> {
     try {
@@ -421,7 +382,7 @@ export class OcppCentralSystem {
       const message = payload === null
         ? OcppFraming.error(frame.id, "NotImplemented", frame.action)
         : OcppFraming.result(frame.id, payload);
-      socket.send(message);
+      connection.sendRaw(message);
       // Never before: a charge point need not answer our CALLs until we have
       // accepted its BootNotification.
       if (frame.action === "BootNotification") {
@@ -431,7 +392,7 @@ export class OcppCentralSystem {
       // OCPP-J: a bad payload still gets a targeted CALLERROR, never a silent
       // drop that leaves the charger waiting on its timeout.
       this.logger.warn(`OCPP ${frame.action} payload rejected: ${error}`);
-      socket.send(
+      connection.sendRaw(
         OcppFraming.error(frame.id, "FormationViolation", String(error)),
       );
     }
@@ -529,13 +490,13 @@ export class OcppCentralSystem {
         const start = startTransactionReq.parse(payload);
         const connection = this.connections.get(chargePointId);
         if (connection === undefined) return null;
-        connection.transactionCounter++;
+        const transactionId = connection.nextTransactionId();
         this.patch(chargePointId, {
-          transactionId: connection.transactionCounter,
+          transactionId,
           meterStartWh: start.meterStart,
         });
         return {
-          transactionId: connection.transactionCounter,
+          transactionId,
           idTagInfo: { status: "Accepted" },
         };
       }
@@ -561,13 +522,9 @@ export class OcppCentralSystem {
     if (transactionId === undefined) return {};
     const connection = this.connections.get(chargePointId);
     if (connection === undefined) return {};
-    if (connection.data.transactionId === transactionId) return {};
-    // Keep the counter ahead so a later StartTransaction cannot hand back an
-    // id the charger already considers in use.
-    connection.transactionCounter = Math.max(
-      connection.transactionCounter,
-      transactionId,
-    );
+    const data = connection.getData();
+    if (data.transactionId === transactionId) return {};
+    connection.reserveTransactionId(transactionId);
     this.logger.info(
       `Adopted transaction ${transactionId} for ${chargePointId} from MeterValues`,
     );
@@ -578,7 +535,7 @@ export class OcppCentralSystem {
     return {
       transactionId,
       // A real StartTransaction baseline must never be overwritten.
-      meterStartWh: connection.data.meterStartWh ?? energyRegisterWh,
+      meterStartWh: data.meterStartWh ?? energyRegisterWh,
     };
   }
 
@@ -614,8 +571,7 @@ export class OcppCentralSystem {
     // A reconnect already replaced this entry — the old socket closing must
     // not tear down the new one.
     if (connection === undefined || connection.socket !== socket) return;
-    connection.pending.rejectAll("Charger disconnected");
-    connection.queue.stop();
+    connection.close("Charger disconnected");
     this.connections.delete(chargePointId);
     this.logger.warn(`Charger ${chargePointId} disconnected`);
     this.dbLog.warn(`Charger ${chargePointId} disconnected`, {
@@ -629,28 +585,14 @@ export class OcppCentralSystem {
     payload: unknown,
   ): Promise<unknown> {
     const connection = this.connections.get(chargePointId);
-    if (
-      connection === undefined ||
-      connection.socket.readyState !== WebSocket.OPEN
-    ) {
+    if (connection === undefined) {
       throw new Error(`Charger ${chargePointId} not connected`);
     }
-    const id = crypto.randomUUID();
-    this.dbLog.debug(`→ ${action} (${chargePointId})`, {
-      payload: { chargePointId, raw: payload },
-    });
-    connection.socket.send(OcppFraming.call(id, action, payload));
-    return await connection.pending.wait(id);
+    return await connection.send(action, payload);
   }
 
   private patch(chargePointId: string, delta: Partial<OcppLiveData>): void {
-    const connection = this.connections.get(chargePointId);
-    if (connection === undefined) return;
-    connection.data = {
-      ...connection.data,
-      ...delta,
-      lastUpdated: new Date().toISOString(),
-    };
+    this.connections.get(chargePointId)?.patch(delta);
   }
 }
 

@@ -94,6 +94,37 @@ describe("OcppMessageQueue", () => {
     expect(ran).toEqual(["second"]);
   });
 
+  it("drops the backlog and refuses more once stopped", async () => {
+    const queue = new OcppMessageQueue(logger, "cp-1");
+    const ran: number[] = [];
+    const resolver = { release: () => {} };
+
+    queue.enqueue(() =>
+      new Promise<void>((resolve) => {
+        ran.push(1);
+        resolver.release = resolve;
+      })
+    );
+    queue.enqueue(() => {
+      ran.push(2);
+      return Promise.resolve();
+    });
+
+    queue.stop();
+
+    expect(queue.isStopped).toBe(true);
+    expect(queue.enqueue(() => {
+      ran.push(3);
+      return Promise.resolve();
+    })).toBe(false);
+
+    // Let the running job finish: job 2 was queued behind it and must have
+    // been discarded rather than picked up by the drain loop.
+    resolver.release();
+    await tick();
+    expect(ran).toEqual([1]);
+  });
+
   it("a job that never settles is abandoned after its timeout, freeing the queue for the next one", async () => {
     const queue = new OcppMessageQueue(logger, "cp-1", 64, 10); // 10ms timeout
     const ran: string[] = [];
