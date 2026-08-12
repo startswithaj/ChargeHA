@@ -199,6 +199,14 @@ function isEmptyData(data: unknown): boolean {
   return false;
 }
 
+// A region must be a short lowercase code before it becomes a DNS label —
+// SEMS has been seen sending junk in the token's region field.
+function validRegion(region: unknown): string | null {
+  if (typeof region !== "string") return null;
+  const trimmed = region.trim().toLowerCase();
+  return /^[a-z]{2,4}$/.test(trimmed) ? trimmed : null;
+}
+
 function extractRegion(base: string): string | null {
   const host = base.split("//").at(-1)?.split("/")[0] ?? "";
   if (host.endsWith("-gateway.semsportal.com")) {
@@ -495,14 +503,19 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     const isStationRoute = path.startsWith("/PowerStation") ||
       path.startsWith("/v3/PowerStation");
     if (!isStationRoute) return base;
-    if (!base.includes("/web/sems") && !base.includes("/sems/")) return base;
+    // Rewrite decided by the host, not a path substring — a gateway base
+    // without /web/sems still has no PowerStation routes.
+    const host = base.split("//").at(-1)?.split("/")[0] ?? "";
+    const isSemsPlusHost = host.endsWith("-gateway.semsportal.com") ||
+      host.endsWith("semsplus.goodwe.com");
+    if (!isSemsPlusHost) return base;
 
-    const region = typeof token.region === "string" && token.region
-      ? token.region
-      : extractRegion(base);
-    return region
-      ? `https://${region}.semsportal.com/api`
-      : LEGACY_API_FALLBACK;
+    const region = validRegion(token.region) ?? extractRegion(base);
+    if (region) return `https://${region}.semsportal.com/api`;
+    this.logger.warn(
+      `SEMS region unresolvable from api base ${base} — falling back to ${LEGACY_API_FALLBACK}`,
+    );
+    return LEGACY_API_FALLBACK;
   }
 
   private async post(

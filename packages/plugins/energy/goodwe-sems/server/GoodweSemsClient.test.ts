@@ -211,6 +211,44 @@ describe("GoodweSemsClient", () => {
       expect(detailCall.body).toContain("station-1");
     });
 
+    it("rewrites a gateway base without a /web/sems path", async () => {
+      mock.setPathResponse(
+        NEW_LOGIN_PATH,
+        semsOk(
+          { token: "tok", api: "https://au-gateway.semsportal.com" },
+          "https://au-gateway.semsportal.com",
+        ),
+      );
+      mock.setPathResponse(STATION_DETAIL_PATH, semsOk(stationDetailPayload));
+
+      await makeClient().getStationDetail("station-1");
+
+      const detailCall = mock.fetchCalls.find((c) =>
+        c.url.includes(STATION_DETAIL_PATH)
+      );
+      assertExists(detailCall);
+      expect(detailCall.url).toContain("https://au.semsportal.com/api");
+    });
+
+    it("ignores a junk region field and derives the region from the host", async () => {
+      mock.setPathResponse(
+        NEW_LOGIN_PATH,
+        semsOk(
+          { token: "tok", api: GATEWAY_API, region: "Australia " },
+          GATEWAY_API,
+        ),
+      );
+      mock.setPathResponse(STATION_DETAIL_PATH, semsOk(stationDetailPayload));
+
+      await makeClient().getStationDetail("station-1");
+
+      const detailCall = mock.fetchCalls.find((c) =>
+        c.url.includes(STATION_DETAIL_PATH)
+      );
+      assertExists(detailCall);
+      expect(detailCall.url).toBe(REGION_API + STATION_DETAIL_PATH);
+    });
+
     it("prefers the token's own region over the host when rewriting", async () => {
       mock.setPathResponse(
         NEW_LOGIN_PATH,
