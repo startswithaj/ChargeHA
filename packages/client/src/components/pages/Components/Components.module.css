@@ -1,0 +1,284 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ── Sticky index ─────────────────────────────────────────── */
+
+.toc {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  /* Bleeds to the edges of .main's 24px padding. */
+  margin: 0 -24px;
+  padding: 14px 24px;
+  background: var(--color-background);
+  border-bottom: 1px solid var(--gray-a4);
+  /* Content visibly passes under the bar. */
+  box-shadow: 0 8px 14px -10px var(--gray-a8);
+}
+
+@media (max-width: 640px) {
+  .toc {
+    margin: 0 -12px;
+    padding: 10px 12px;
+  }
+}
+
+.tocGroup {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tocGroupTitle {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gray-10);
+}
+
+/* ── Top-level groups ─────────────────────────────────────── */
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  scroll-margin-top: 56px;
+}
+
+.groupHeader {
+  padding-top: 8px;
+  border-top: 2px solid var(--gray-a5);
+}
+
+.tocLink {
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--gray-a2);
+  color: var(--gray-11);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.tocLink:hover {
+  background: var(--gray-a3);
+  color: var(--gray-12);
+}
+
+/* ── Specimen scaffolding ─────────────────────────────────── */
+
+.specimen {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.specimenLabel {
+  font-family: var(--code-font-family);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--gray-10);
+}
+
+/* No-subgrid fallback: reserve two lines so bodies still start at the same y. */
+.row .specimenLabel {
+  min-height: calc(2 * 1.45em);
+  align-self: end;
+}
+
+/* A common floor, so short and tall specimens line up across a row. */
+.specimenBody {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 36px;
+}
+
+/* Columns rather than wrapped flex, so labels line up down the page. */
+.row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 18px 24px;
+  align-items: start;
+}
+
+/* Label and body take their own track from the parent grid. */
+@supports (grid-template-rows: subgrid) {
+  .row .specimen {
+    display: grid;
+    grid-template-rows: subgrid;
+    grid-row: span 2;
+    gap: 6px;
+  }
+
+  .row .specimenLabel {
+    min-height: 0;
+    align-self: end;
+  }
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.bareSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bareHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bareIcon {
+  color: var(--gray-9);
+  display: flex;
+  align-items: center;
+}
+
+/* Type scale: sample left, the spec that produces it right. */
+.scaleList {
+  display: flex;
+  flex-direction: column;
+}
+
+.scaleRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 24px;
+  padding: 10px 0;
+  border-top: 1px solid var(--gray-a3);
+}
+
+.scaleRow:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.scaleSpec {
+  font-family: var(--code-font-family);
+  font-size: 11px;
+  color: var(--gray-10);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.scaleUse {
+  font-size: 11px;
+  color: var(--gray-9);
+  display: block;
+  text-align: right;
+}
+
+/* ── Colour swatches ──────────────────────────────────────── */
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.swatch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--gray-a2);
+}
+
+.swatchChip {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: 1px solid var(--gray-a5);
+  flex-shrink: 0;
+}
+
+/* ── Pattern blocks lifted from docs/settings-ui.md ───────── */
+
+.entityRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--gray-a2);
+}
+
+.entityRowMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.entityRowActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.formBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 6px;
+  background: var(--gray-a2);
+  border: 1px solid var(--gray-a5);
+}
+
+.formFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.confirmBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--orange-a2);
+  border: 1px solid var(--orange-a5);
+}
+
+.subSection {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--gray-a4);
+}
+
+/* Makes a row plus its open editor read as one block. */
+.expandedBand {
+  border-radius: 6px;
+  background: var(--gray-a2);
+}

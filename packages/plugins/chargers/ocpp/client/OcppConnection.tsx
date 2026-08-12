@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { Badge, Button, Code, Text, TextField } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
-import { Spinner, TestResultBadge, type TestStatus } from "../../../hostUi.ts";
+import {
+  Spinner,
+  TestResultBadge,
+  type TestStatus,
+  WaitingBars,
+} from "../../../hostUi.ts";
 import {
   isLikelyDockerNetwork,
   isPrivateLanIpv4,
@@ -153,28 +158,6 @@ function AddressStep(
         </Text>
       )}
     </div>
-  );
-}
-
-// Three bars bouncing in sequence. The wait has no measurable pace, so this
-// says "still going" without implying progress toward a deadline — the only
-// real number, the window countdown, is in step 1.
-function WaitingBars() {
-  return (
-    <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
-      {[0, 1, 2].map((i) => (
-        <span
-          key={i}
-          style={{
-            width: 3,
-            height: 14,
-            borderRadius: 2,
-            background: "var(--blue-9)",
-            animation: `waitBounce 1s ${i * 0.15}s infinite`,
-          }}
-        />
-      ))}
-    </span>
   );
 }
 

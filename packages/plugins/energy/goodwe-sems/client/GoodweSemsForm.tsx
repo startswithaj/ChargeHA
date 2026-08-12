@@ -8,6 +8,7 @@ import {
   type TestStatus,
 } from "../../../hostUi.ts";
 import { type StationOption, StationPicker } from "./StationPicker.tsx";
+import { FormError } from "../../../hostUi.ts";
 
 interface GoodweSemsFormProps {
   initialAccount: string;
@@ -185,9 +186,7 @@ export function GoodweSemsForm({
         disabled={!account || !password || stationsMutation.isPending}
         onClick={() => stationsMutation.mutate({ account, password })}
       >
-        {stationsError
-          ? <Text size="2" color="red">{stationsError}</Text>
-          : null}
+        <FormError message={stationsError} />
       </ActionRow>
 
       <StationPicker

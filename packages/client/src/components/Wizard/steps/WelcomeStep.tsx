@@ -5,6 +5,7 @@ import { trpc } from "../../../trpc.ts";
 import { advanceOnly, type StepDef, type StepProps } from "../flow.ts";
 import logoSrc from "../../../assets/chargeha_soft-plug_brand.svg";
 import styles from "./steps.module.css";
+import { FormError } from "../../ui/FormError.tsx";
 
 const demoPlugin = vehiclePluginOptions.find((o) => o.demoSetup);
 
@@ -83,11 +84,7 @@ function WelcomeContent({ onAdvance, onSkipToEnd }: StepProps) {
         can explore the full app with no manual setup.
       </Text>
 
-      {error && (
-        <Text as="p" size="2" color="red">
-          {error.message}
-        </Text>
-      )}
+      <FormError message={error?.message} size="2" />
     </div>
   );
 }

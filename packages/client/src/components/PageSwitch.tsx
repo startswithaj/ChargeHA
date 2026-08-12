@@ -13,6 +13,12 @@ const LazySimulator = lazy(() =>
   }))
 );
 
+const LazyComponents = lazy(() =>
+  import("./pages/Components/Components.tsx").then((m) => ({
+    default: m.Components,
+  }))
+);
+
 const PAGE_LABELS: Record<Page, string> = {
   dashboard: "Dashboard",
   stats: "Stats",
@@ -20,6 +26,7 @@ const PAGE_LABELS: Record<Page, string> = {
   logs: "Logs",
   settings: "Settings",
   simulator: "Simulator",
+  components: "Components",
 };
 
 export function renderPage(page: Page, onNavigate: (p: Page) => void) {
@@ -36,6 +43,11 @@ export function renderPage(page: Page, onNavigate: (p: Page) => void) {
     simulator: () => (
       <Suspense fallback={<div>Loading simulator...</div>}>
         <LazySimulator />
+      </Suspense>
+    ),
+    components: () => (
+      <Suspense fallback={<div>Loading components...</div>}>
+        <LazyComponents />
       </Suspense>
     ),
   };

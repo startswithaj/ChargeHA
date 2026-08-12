@@ -19,6 +19,7 @@ import { trpc } from "../../../trpc.ts";
 import { useRouter } from "../../../hooks/useRouter.ts";
 import { demoMode, Feature } from "../../../lib/featureFlags.ts";
 import { SettingsRow, SettingsSection } from "./SettingsLayout.tsx";
+import { FormError } from "../../ui/FormError.tsx";
 
 type AuthMode = "none" | "local" | "oidc";
 
@@ -310,11 +311,7 @@ function ChangePasswordForm({
         setConfirmPassword={setConfirmPassword}
       />
 
-      {error && (
-        <Text as="p" size="2" color="red" data-testid="password-error">
-          {error}
-        </Text>
-      )}
+      <FormError message={error} />
 
       {success && (
         <Text as="p" size="2" color="green" data-testid="password-success">
@@ -526,11 +523,7 @@ function ModeChangeForm({
         />
       )}
 
-      {error && (
-        <Text as="p" size="2" color="red" data-testid="mode-change-error">
-          {error}
-        </Text>
-      )}
+      <FormError message={error} />
 
       <FormButtons
         onCancel={onCancel}
@@ -597,11 +590,7 @@ function OidcEditForm({ currentConfig, onCancel }: OidcEditFormProps) {
         secretPlaceholder="Enter new client secret"
       />
 
-      {error && (
-        <Text as="p" size="2" color="red" data-testid="oidc-edit-error">
-          {error}
-        </Text>
-      )}
+      <FormError message={error} />
 
       <FormButtons
         onCancel={onCancel}
@@ -638,7 +627,7 @@ function NoneWarningDialog({
           This will remove authentication. Anyone on your network will have full
           access.
         </Dialog.Description>
-        <Flex gap="3" mt="4" justify="end">
+        <Flex gap="2" mt="4" justify="end">
           <Dialog.Close>
             <Button variant="soft" color="gray" onClick={onCancel}>
               Cancel
@@ -774,11 +763,7 @@ function OidcBanners(
           {oidcSuccess}
         </Text>
       )}
-      {oidcError && (
-        <Text as="p" size="2" color="red" data-testid="oidc-error">
-          {oidcError}
-        </Text>
-      )}
+      <FormError message={oidcError} />
       {showEditButton && (
         <Button
           size="2"

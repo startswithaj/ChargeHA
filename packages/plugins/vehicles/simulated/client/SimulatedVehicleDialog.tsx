@@ -3,6 +3,7 @@ import { Button, Switch, Text } from "@radix-ui/themes";
 import type { VehicleChargeState } from "@chargeha/shared";
 import { LocationField } from "./LocationField.tsx";
 import { dialogStyles as styles } from "../../../hostUi.ts";
+import { FormError } from "../../../hostUi.ts";
 
 export interface SimulatedVehicleDialogProps {
   vehicleState: VehicleChargeState | null;
@@ -203,11 +204,7 @@ export function SimulatedVehicleDialog({
           onStep={stepLimit}
         />
 
-        {error && (
-          <div className={styles.error}>
-            <Text size="2" color="red">{error}</Text>
-          </div>
-        )}
+        <FormError message={error} />
 
         <div className={styles.footer} style={{ marginTop: 0 }}>
           <Button type="button" variant="soft" color="gray" onClick={onCancel}>

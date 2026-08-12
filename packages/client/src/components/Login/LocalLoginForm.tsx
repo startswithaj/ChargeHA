@@ -2,6 +2,7 @@ import { type FormEvent, useState } from "react";
 import { Button, Text, TextField } from "@radix-ui/themes";
 import { LogIn } from "lucide-react";
 import { trpc } from "../../trpc.ts";
+import { FormError } from "../ui/FormError.tsx";
 
 interface LocalLoginFormProps {
   onSuccess: () => void;
@@ -60,11 +61,7 @@ export function LocalLoginForm({ onSuccess }: LocalLoginFormProps) {
         />
       </div>
 
-      {errorMessage && (
-        <Text as="p" size="2" color="red">
-          {errorMessage}
-        </Text>
-      )}
+      <FormError message={errorMessage} size="2" />
 
       <Button
         type="submit"

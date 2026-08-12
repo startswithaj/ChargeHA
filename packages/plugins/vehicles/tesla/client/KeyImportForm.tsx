@@ -51,7 +51,10 @@ export function KeyImportForm(
         />
       </div>
 
-      <div className={styles.stepActions}>
+      <div
+        className={styles.stepActions}
+        style={{ justifyContent: "flex-end" }}
+      >
         <Button
           variant="soft"
           color="gray"

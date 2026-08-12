@@ -14,6 +14,7 @@ import { trpc } from "../../../trpc.ts";
 import { useHomeConfigMutation } from "../../../hooks/useSectionConfig.ts";
 import { SettingsSection } from "./SettingsLayout.tsx";
 import { AddressSearchInput } from "./AddressSearchInput.tsx";
+import { FormError } from "../../ui/FormError.tsx";
 
 // ── Home Location Section ──
 
@@ -211,9 +212,7 @@ export function HomeLocationSection({
         <Text size="2" color="gray">{geo.geoLoadingMsg}</Text>
       )}
 
-      {geo.geoStatus === "error" && (
-        <Text size="2" color="red">{geo.geoError}</Text>
-      )}
+      {geo.geoStatus === "error" && <FormError message={geo.geoError} />}
 
       {hasCoords && (
         <CoordsDisplay lat={lat} lng={lng} mutation={mutation} ac={ac} />
