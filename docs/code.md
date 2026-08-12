@@ -99,6 +99,9 @@ packages/client/src/
     Schedules/               — Charge schedule management
     Settings/                — Auth, inverter, tariff, notification, vehicle config
     Logs/                    — Controller/energy/vehicle logs
+    Components/              — Style guide. Every shipped component on one page,
+                               rendered from static fixtures (no network). At
+                               /components — see docs/settings-ui.md for the rules.
   components/Wizard/         — First-run setup wizard (see Wizard Steps below)
   hooks/                     — React hooks (useVehicles, useStats, etc.)
   lib/                       — Client utilities (stores, tRPC setup, solar allocation)

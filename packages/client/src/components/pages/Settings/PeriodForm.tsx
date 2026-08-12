@@ -2,6 +2,7 @@ import { Button, Text, TextField } from "@radix-ui/themes";
 import { TimePicker } from "../../TimePicker/TimePicker.tsx";
 import { DaySelector } from "./DaySelector.tsx";
 import type { PeriodFormData } from "./tariffUtils.ts";
+import { FormError } from "../../ui/FormError.tsx";
 
 export function PeriodForm({
   form,
@@ -95,7 +96,7 @@ export function PeriodForm({
         />
       </div>
 
-      {error && <Text size="2" color="red">{error}</Text>}
+      <FormError message={error} />
 
       <div
         style={{

@@ -3,6 +3,7 @@ import { LocalLoginForm } from "./LocalLoginForm.tsx";
 import { OidcLoginButton } from "./OidcLoginButton.tsx";
 import logoSrc from "../../assets/chargeha_soft-plug_brand.svg";
 import styles from "./LoginPage.module.css";
+import { FormError } from "../ui/FormError.tsx";
 
 type AuthMode = "none" | "local" | "oidc";
 
@@ -38,13 +39,7 @@ export function LoginPage({ authMode, onSuccess, errorCode }: LoginPageProps) {
           </Text>
         </div>
 
-        {errorMessage && (
-          <div className={styles.errorBanner}>
-            <Text as="p" size="2" color="red">
-              {errorMessage}
-            </Text>
-          </div>
-        )}
+        <FormError message={errorMessage} size="2" />
 
         <div className={styles.formWrapper}>
           {authMode === "local" && <LocalLoginForm onSuccess={onSuccess} />}

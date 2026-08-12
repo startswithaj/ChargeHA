@@ -11,6 +11,7 @@ import {
   type OverlapError,
   type PeriodFormData,
 } from "./tariffUtils.ts";
+import { FormError } from "../../ui/FormError.tsx";
 
 function PeriodRow(
   { period, currencySymbol, onStartEdit, onDelete }: {
@@ -92,20 +93,10 @@ function PeriodMessages(
   return (
     <>
       {hasOverlaps && (
-        <div
-          style={{
-            marginTop: 8,
-            padding: "8px 12px",
-            borderRadius: 6,
-            background: "var(--red-a2)",
-            border: "1px solid var(--red-a5)",
-          }}
-        >
-          {overlapErrors.map((overlap, i) => (
-            <Text key={i} size="2" color="red" style={{ display: "block" }}>
-              {formatOverlapMessage(overlap)}
-            </Text>
-          ))}
+        <div style={{ marginTop: 8 }}>
+          <FormError
+            message={overlapErrors.map(formatOverlapMessage).join(" ")}
+          />
         </div>
       )}
       {gapWarnings.length > 0 && (
