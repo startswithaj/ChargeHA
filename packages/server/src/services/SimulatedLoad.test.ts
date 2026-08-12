@@ -1,8 +1,3 @@
-// The four combinations from docs/simulated-load.md, end to end: a real
-// ChargingPointManager classifying the load and a real EnergyAdapterManager
-// deciding what to add. Split across the two units, each half can pass while
-// the pair is wrong — a vehicle miscl assified as metered still satisfies the
-// manager's own tests, because they take the classification as an input.
 import { beforeEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import type {
@@ -34,8 +29,6 @@ import { throwingMock } from "../test-helpers/throwingMock.ts";
 describe("simulated load — the four inverter/vehicle combinations", () => {
   const testLogger = new Logger("SimulatedLoad", "error");
 
-  // Exporting 2kW with nothing charging. A 3kW car swings that to 1kW of
-  // import — but only if the car reaches the figures at all.
   const BASE_REALTIME: EnergyData = {
     solarProductionW: 5000,
     gridPowerW: -2000,
@@ -54,7 +47,6 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
   };
 
   const CAR_KW = 3;
-  // A plugin id the classifier must never special-case — the flag decides.
   const SIMULATED_VEHICLE = "pretend-cars";
   const REAL_VEHICLE = "actual-cars";
 
@@ -75,8 +67,6 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
     emitter = new MockEventEmitter();
   });
 
-  // Wire the real pair: CPM classifies, EAM decides. Nothing here is a
-  // stand-in for the code under test — only its surroundings.
   function build(
     { vehicleType, measuresLoad, pointKind = "vehicle_api" }: {
       vehicleType: string;
@@ -97,9 +87,6 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
       loadIsUnmetered: (adapterType: string) =>
         adapterType === SIMULATED_VEHICLE,
     });
-    // The car's own charging point, exactly as ensureVehicleChargingPoint
-    // creates it: every vehicle whose plugin also has a charger role has one
-    // in the running app, so the four cases must hold with it registered.
     const pointRow: ChargerRow = {
       id: "point-car-1",
       name: "Car",
@@ -120,8 +107,6 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
       getChargerSecrets: () => Promise.resolve({}),
       getConfig: () => Promise.resolve("inverter"),
     });
-    // A vehicle_api point reports the same draw the car does — it is the car's
-    // own API, reached through the charger interface.
     const pointState: ChargerState = {
       chargerId: pointRow.id,
       isCharging: true,
@@ -150,11 +135,7 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
     chargerPlugins.register(throwingMock<ChargerPlugin>("ChargerPlugin", {
       id: vehicleType,
       displayName: vehicleType,
-      // The same plugin object fills both roles for simulated vehicles, so
-      // the flag it declares as a charger matches the vehicle one.
       loadIsUnmetered: vehicleType === SIMULATED_VEHICLE,
-      // A plain object, not throwingMock: awaiting the returned middleware
-      // probes `.then` on it, which a throwing proxy answers by throwing.
       createChargerMiddleware: () => Promise.resolve(pointMiddleware),
     }));
     const chargingPoints = new ChargingPointManager(
@@ -194,8 +175,6 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
     };
   }
 
-  // Run with the car's charging point registered, as the app always does.
-  // The same four expectations must hold either way: one physical session is one load, whichever interface reports it.
   const readingFor = async (opts: {
     vehicleType: string;
     measuresLoad: boolean;
@@ -205,7 +184,6 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
     const { manager, chargingPoints, registerPoint } = build(opts);
     if (opts.withChargingPoint) await registerPoint();
     await manager.ready();
-    // Same orchestration as EnergyPoller.poll: fetch the load, pass it in.
     return await manager.getRealtimeData(
       await chargingPoints.getChargingLoadW(),
     );
@@ -218,7 +196,7 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
     });
 
     expect(data.homeConsumptionW).toBe(6000);
-    expect(data.gridPowerW).toBe(1000); // export becomes import
+    expect(data.gridPowerW).toBe(1000);
   });
 
   it("2. simulated inverter + real car — the draw is real but this inverter measured nothing, so it is added", async () => {
@@ -250,10 +228,6 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
     expect(data).toEqual(BASE_REALTIME);
   });
 
-  // The same four, with the vehicle_api charging point registered — the shape
-  // the app actually runs in. Case 3 failed here while the point's draw was
-  // classified as metered: the car vanished from a real inverter's reading,
-  // so the controller ramped against surplus that did not exist.
   describe("with the car's own charging point registered", () => {
     const withPoint = { withChargingPoint: true };
 
@@ -301,9 +275,6 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
     });
   });
 
-  // Same rule one level out: what decides is whether the equipment reporting
-  // the draw could have moved any electricity, not whether it is a car or a
-  // charger. An in-memory EVSE cannot, so a real inverter never saw it.
   describe("with a smart charger reporting the draw", () => {
     const smart = { withChargingPoint: true, pointKind: "smart" as const };
 

@@ -1,12 +1,5 @@
-// KlapHttp exists because Tapo's embedded "SHIP 2.0" server matches the
-// `Content-Length` header name case-sensitively, and Deno's fetch is required
-// by the WHATWG spec to lowercase it — so fetch can never handshake with these
-// devices (verified on a P110(AU): `Content-Length` → 200, `content-length` →
-// 400 Bad Request, otherwise byte-identical requests).
-//
-// These tests assert the raw bytes we put on the wire rather than round-tripping
-// through a lenient server: Deno.serve normalises header casing, so a test built
-// on it would keep passing after a regression back to fetch.
+// Tapo needs a case-sensitive `Content-Length`, which fetch lowercases — so
+// these tests assert raw wire bytes, not a lenient server's normalised view.
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { KlapHttp } from "./KlapHttp.ts";

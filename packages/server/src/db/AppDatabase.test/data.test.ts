@@ -228,7 +228,6 @@ describe("AppDatabase", () => {
       expect(schedule.startTime).toBe("23:00");
       expect(schedule.chargeAmps).toBe(32);
       expect(schedule.enabled).toBe(false);
-      // Unchanged fields remain
       expect(schedule.endTime).toBe("06:00");
       expect(schedule.days).toEqual(["mon", "tue", "wed", "thu", "fri"]);
     });
@@ -278,10 +277,6 @@ describe("AppDatabase", () => {
     });
   });
 
-  // The schedules table has no foreign key to chargers or vehicles, so
-  // deleting a target cannot cascade at the DB level — AppDatabase does it.
-  // Without these, a target could start leaving its schedules behind again and
-  // nothing would notice until they surfaced as orphans in the UI.
   describe("deleting a target takes its schedules with it", () => {
     const chargerKeyed: CreateScheduleInput = {
       id: "sched-charger",
@@ -333,8 +328,6 @@ describe("AppDatabase", () => {
 
       await db.deleteCharger("cp-1");
 
-      // The vehicle-keyed schedule stays: that car may be plugged into a
-      // different charger tomorrow.
       expect(await remainingIds()).toEqual(["sched-blockout", "sched-vehicle"]);
     });
 
@@ -358,8 +351,6 @@ describe("AppDatabase", () => {
     it("deactivating a charging point keeps its schedules", async () => {
       await seed();
 
-      // vehicle_api points are deactivated rather than deleted precisely so
-      // their schedules survive a control-path switch (ChargingPointManager).
       await db.updateChargerActive("cp-1", false);
 
       expect(await remainingIds()).toEqual([
@@ -595,8 +586,6 @@ describe("AppDatabase", () => {
     });
 
     it("search supports `-term` to exclude matching rows", async () => {
-      // Tesla has a high-volume `controller:online-check` polling log;
-      // users need to exclude it with `-online-check` to read other logs.
       await db.insertPluginLog({
         ...samplePluginLog,
         message: "Vehicle came online",

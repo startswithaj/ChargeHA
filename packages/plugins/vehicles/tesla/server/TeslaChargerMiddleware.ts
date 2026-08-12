@@ -8,9 +8,7 @@ import type { ChargerMiddleware } from "@chargeha/shared/plugins";
 import type { ChargerRow } from "@chargeha/shared";
 import type { TeslaVehicleMiddleware } from "./TeslaVehicleMiddleware.ts";
 
-// ChargerMiddleware view over the shared per-VIN TeslaVehicleMiddleware.
-// Commands and state ride the same cost-aware instance the vehicle role
-// uses — never a second poller, never a second wake decision.
+// Exposes a Tesla as a charger by delegating to the same TeslaVehicleMiddleware instance the vehicle role uses.
 export class TeslaChargerMiddleware implements ChargerMiddleware {
   constructor(
     private readonly row: ChargerRow,

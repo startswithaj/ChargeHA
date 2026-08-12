@@ -7,8 +7,6 @@ import { OCPP_SECRET_KEYS, ocppConfigDef } from "./config.ts";
 import type { OcppCentralSystem } from "./OcppCentralSystem.ts";
 import type { OcppChargerPlugin } from "./OcppChargerPlugin.ts";
 
-// Long enough to walk to the charger and paste a URL into its app, short
-// enough that an unattended window closes on its own.
 const PAIRING_TTL_MS = 5 * 60 * 1000;
 
 // Same default as bootstrap.ts, which owns the actual listen port.
@@ -41,14 +39,10 @@ function lanBaseUrls(
   );
 }
 
-// The pairing lifecycle, grouped so the main router stays readable.
-// Session-authenticated: the whole /trpc mount sits behind
-// createAuthMiddleware — only the charger websocket itself is public.
+// Auth comes from createAuthMiddleware on the /trpc mount; only the charger websocket is public.
 function pairingProcedures(centralSystem: OcppCentralSystem) {
   return {
-    // Open a window in which a charger announcing any id may connect
-    // provisionally, so it can prove it reaches us before an id is saved.
-    // Plugin-wide: the window is a property of the listener, not any one row.
+    // Plugin-wide window letting any unknown id connect provisionally to prove reachability before it is saved.
     beginPairing: publicProcedure.mutation(() => {
       centralSystem.armPairing(PAIRING_TTL_MS);
       return { expiresInMs: PAIRING_TTL_MS };
@@ -69,10 +63,6 @@ function pairingProcedures(centralSystem: OcppCentralSystem) {
           // Epoch ms, which identifies the window — the panel re-anchors its
           // countdown when this changes.
           expiresAt: pairing.expiresAt,
-          // Time left by the SERVER's clock. The panel counts down from this
-          // rather than subtracting `expiresAt` from its own clock: the two
-          // machines disagree by seconds, which showed as "5:04 left" on a
-          // five-minute window.
           expiresInMs: pairing.expiresAt === null
             ? null
             : Math.max(0, pairing.expiresAt - Date.now()),

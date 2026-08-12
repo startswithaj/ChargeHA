@@ -1,19 +1,8 @@
-// The one local-network device search control, shared by every plugin that can
-// discover hardware on the LAN.
-//
-// Imports nothing from hostUi.ts: hostUi is what plugin client code imports
-// from, and componentRegistry imports hostUi in turn, so pulling hostUi in
-// here would close a cycle. Spinner therefore comes from Radix rather than
-// the client's own, and JSX.Element is used instead of importing React's
-// ReactNode. See the dependency rules in docs/code.md.
 import { useEffect, useRef } from "react";
 import { Badge, Button, Spinner, Text, TextField } from "@radix-ui/themes";
 import { Search } from "lucide-react";
 import { isLikelyDockerNetwork } from "@chargeha/shared/lanAddresses";
 
-// Defaults `subnet` to the first server-detected LAN subnet, once, the first
-// time results arrive with the field still untouched — reads ChargeHA's own
-// network interfaces rather than guessing from the browser's hostname.
 export function useDefaultSubnet(
   detectedSubnets: string[] | undefined,
   subnet: string,
@@ -41,11 +30,7 @@ export interface DiscoveryResult {
 
 export interface NetworkSearchResult {
   host: string;
-  // Primary line. Falls back to the host when discovery cannot name the
-  // device — Tapo's handshake probe yields no name without credentials.
   name?: string;
-  // When set, the row is informational: this badge replaces the Use button,
-  // so a protocol can surface a device it found but cannot drive.
   unavailable?: string;
 }
 
@@ -138,9 +123,6 @@ export function DiscoveryResultList<T extends DiscoveryResult>(
   );
 }
 
-// Scan button, optional subnet scope, scanning line, result rows and empty
-// state. Every discovery-capable plugin renders this rather than keeping its
-// own copy — five near-identical copies had already drifted apart.
 export function NetworkDeviceSearch<T extends NetworkSearchResult>(
   {
     deviceNoun,
@@ -155,23 +137,16 @@ export function NetworkDeviceSearch<T extends NetworkSearchResult>(
     footer,
     detectedSubnets,
   }: {
-    // Plural, e.g. "Fronius inverters" — reads as "...for Fronius inverters".
     deviceNoun: string;
     subnet: string;
     onSubnetChange: (value: string) => void;
     onSearch: () => void;
     isPending: boolean;
-    // True once a scan has finished, so the empty state stays hidden until
-    // the user has actually searched.
     searched: boolean;
     results: T[];
     onUse: (device: T) => void;
     emptyMessage: JSX.Element | string;
-    // Extra guidance below the results, e.g. Tapo's locked-plug fix.
     footer?: JSX.Element | false;
-    // Subnets ChargeHA itself was detected on. The caller already defaults
-    // `subnet` to the first candidate — this offers the rest only when a
-    // machine sits on more than one LAN, so the user can pick instead of guessing.
     detectedSubnets?: string[];
   },
 ) {
@@ -183,7 +158,6 @@ export function NetworkDeviceSearch<T extends NetworkSearchResult>(
           {isPending ? <Spinner /> : <Search size={14} />}
           {isPending ? "Scanning..." : "Search Network"}
         </Button>
-        {/* Not an alternative to the button — it narrows the same scan. */}
         <Text size="1" color="gray">limit to subnet (optional):</Text>
         <TextField.Root
           size="1"
@@ -196,10 +170,6 @@ export function NetworkDeviceSearch<T extends NetworkSearchResult>(
         />
       </div>
 
-      {
-        /* ChargeHA is reachable on more than one LAN — offer the others
-       *  rather than silently picking one for the user. */
-      }
       {alternateSubnets.length > 0 && (
         <div style={styles.searchRow}>
           <Text size="1" color="gray">also detected:</Text>

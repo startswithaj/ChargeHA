@@ -67,10 +67,6 @@ export class TapoChargerAdapter implements ChargerAdapter {
     return this.config.pollSeconds;
   }
 
-  // No connect(): the KLAP client handshakes lazily on the first request,
-  // and the meterless (P100/P105) rejection happens at setup via the
-  // wizard's testConnection — an offline plug can never block startup.
-
   disconnect(): Promise<void> {
     return Promise.resolve();
   }

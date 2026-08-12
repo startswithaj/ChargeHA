@@ -39,9 +39,21 @@ export class SolarAllocator {
     return config.threePhaseCharger ? 3 : state.chargerPhases;
   }
 
-  // Surplus solar before the safety margin: grid export, minus battery
-  // discharge (else the EV's own draw reappears as "available solar" and the
-  // car charges off the battery), plus `addBackW` (EV draw the meter already counted), capped at solar production.
+  // Surplus solar in watts, before the safety margin.
+  //
+  // Starts from grid export, then:
+  // - Subtracts home battery discharge. Power leaving the battery is not
+  //   solar. Without this, a battery operating in self-consumption won't be
+  //   drawing from the grid, and would makes the EV's own draw reappear as
+  //   "available solar" through the add-back below, and the car would charge
+  //   off the home battery.
+  // - Adds back the EV's charge power when the meter includes EV load in
+  //   consumption (the default), since the car's own draw suppresses export.
+  // - Caps at solar production: surplus can never exceed what the panels are
+  //   making right now.
+  //
+  // `addBackW` is the charge power to add back — 0 when the meter excludes EV
+  // load or nothing is charging.
   static surplusW(
     energy: EnergyData,
     addBackW: number,

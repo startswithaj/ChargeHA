@@ -1,8 +1,8 @@
 // A ChargeHA restart drops the socket mid-charge. The charger reconnects and
 // keeps charging, but OCPP 1.6 gives no way to ask "what transaction are you
 // on" — the only re-announcement is `transactionId` riding along on every
-// in-transaction MeterValues (~once a minute). These tests drive that
-// adoption path over a fake socket, the same way OcppPairing.test.ts drives
+// in-transaction MeterValues (~once a minute). These tests exercise that
+// adoption path over a fake socket, the same way OcppPairing.test.ts exercises
 // the message handler rather than asserting on internal flags.
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";

@@ -1,12 +1,3 @@
-// onMessage() used to call reply() without awaiting it, so two CALLs that
-// arrived in correct wire order could finish their state mutations in either
-// order — whichever one's charger-row lookup (hasChargerRow, a DB round
-// trip) happened to come back first. A MeterValues racing ahead of the
-// StartTransaction it followed would then baseline meterStartWh from the
-// wrong reading, permanently. These tests drive that race directly, over the
-// real message handler and a controllable row lookup, the same way
-// OcppTransactionAdoption.test.ts and OcppPairing.test.ts drive the handler
-// rather than asserting on internal flags.
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { attached, fakeSocket } from "./test-helpers/ocppHarness.ts";

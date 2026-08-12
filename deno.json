@@ -5,6 +5,7 @@
     "./packages/client",
     "./packages/plugins"
   ],
+  "license": "AGPL-3.0-only",
   "nodeModulesDir": "auto",
   "minimumDependencyAge": "P14D",
   "compilerOptions": {

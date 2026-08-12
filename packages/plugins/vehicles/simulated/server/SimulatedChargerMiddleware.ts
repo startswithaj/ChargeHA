@@ -8,9 +8,7 @@ import type { ChargerMiddleware } from "@chargeha/shared/plugins";
 import type { ChargerRow } from "@chargeha/shared";
 import type { SimulatedVehicleMiddleware } from "./SimulatedVehicleMiddleware.ts";
 
-// ChargerMiddleware view over the shared per-vehicle SimulatedVehicleMiddleware.
-// Commands and state ride the same instance the vehicle role uses — never a
-// second adapter, never a second cache.
+// ChargerMiddleware view over the same SimulatedVehicleMiddleware instance the vehicle role uses.
 export class SimulatedChargerMiddleware implements ChargerMiddleware {
   constructor(
     private readonly row: ChargerRow,
