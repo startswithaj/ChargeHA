@@ -9,7 +9,7 @@ import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import { TESLA_SECRET_KEYS, teslaConfigDef } from "./config.ts";
 import { createPluginConfigProcedures } from "../../../createPluginConfigProcedures.ts";
-import type { TeslaVehiclePlugin } from "./index.ts";
+import type { TeslaVehiclePlugin } from "./TeslaVehiclePlugin.ts";
 
 type TeslaRouterPlugin = Pick<
   TeslaVehiclePlugin,
