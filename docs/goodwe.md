@@ -39,7 +39,7 @@ station until a meter is fitted.
 3. Click **Load Stations**. ChargeHA logs in and lists every station on the
    account.
 4. Pick your station from the list.
-5. Run the connection test. It confirms the login works and that the station
+5. Click **Test Connection**. It confirms the login works and that the station
    reports power flow data.
 
 The password is stored in the database, and encrypted at rest only if
@@ -69,8 +69,9 @@ adjusts on a one-minute cadence.
 ## Rate limits
 
 If SEMS says you are being rate limited, ChargeHA stops making requests for **5
-minutes** and keeps showing the last reading it got. Continuing to call during a
-throttle is what turns it into a longer block, so it stays quiet.
+minutes** and keeps showing the last reading it got, with that reading's
+original timestamp rather than a fresh one. Continuing to call during a throttle
+is what turns it into a longer block, so it stays quiet.
 
 If the throttle lasts longer than **15 minutes**, ChargeHA stops presenting the
 old reading as current and reports the energy source as failed instead. You will
@@ -81,6 +82,9 @@ restarting.
 
 ## Limitations
 
+- If SEMS sends a grid figure without a usable direction flag, ChargeHA reports
+  0 W rather than guessing, and logs a warning. Guessing wrong would read an
+  export as an import, or start a charge on solar that is not there.
 - Grid voltage is not available. SEMS reports it per inverter, but not in the
   station power flow figures ChargeHA reads.
 - Readings are as fresh as the cloud makes them. SEMS itself updates on its own
@@ -129,8 +133,9 @@ Leave that unset to talk to the real SEMS Portal.
 Setting `GOODWE_SEMS_GATEWAY_PROBE=1` (in the environment or `.env`) enables a
 shadow probe of the native SEMS+ gateway flow endpoint: every 30 minutes the raw
 gateway response is logged beside the legacy powerflow it should mirror, without
-affecting the data ChargeHA serves. Diagnostics for the 2026-08-30 legacy portal
-shutdown; implemented entirely in `SemsGatewayProbe.ts`.
+affecting the data ChargeHA serves. It is skipped when `GOODWE_SEMS_BASE_URL` is
+set, since the simulator has no gateway routes. Diagnostics for the 2026-08-30
+legacy portal shutdown; implemented entirely in `SemsGatewayProbe.ts`.
 
 It serves four station profiles (three-phase without a battery, hybrid with a
 battery, multi-inverter, and one with no HomeKit fitted), simulates a daily
