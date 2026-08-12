@@ -45,8 +45,17 @@ async function gatewayHeaders(
     "SHA-256",
     new TextEncoder().encode(`${ms}@${uid}@${inner}`),
   );
+  // The gateway rejects non-browser identities, so mimic the SEMS+ web app.
+  const region = typeof token.region === "string" && token.region
+    ? token.region
+    : "au";
+  const origin = `https://${region}-semsplus.goodwe.com`;
   return {
     "Accept": "application/json, text/plain, */*",
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Origin": origin,
+    "Referer": `${origin}/`,
     "token": JSON.stringify({ ...token, client: "semsPlusWeb" }),
     "X-Signature": btoa(`${encodeHex(new Uint8Array(digest))}@${ms}`),
   };
