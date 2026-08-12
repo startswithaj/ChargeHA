@@ -16,9 +16,9 @@ interface SigenergyLocalConfigValues {
 
 type SigenergyDraft = Partial<SigenergyLocalConfigValues>;
 
-/** Buffered like FroniusLocalConfig: a write per keystroke would rebuild the
- *  energy adapter — and reopen the Modbus TCP connection — against every
- *  half-typed host (config_changed → poller). */
+// Buffered like FroniusLocalConfig: a write per keystroke would rebuild the
+// energy adapter — and reopen the Modbus TCP connection — against every
+// half-typed host (config_changed → poller).
 function useSigenergyDraft(config: SigenergyLocalConfigValues | undefined) {
   const utils = trpc.useUtils();
   const configMutation = trpc.plugin.energy.sigenergy_local.setConfig

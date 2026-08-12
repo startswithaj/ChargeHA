@@ -35,13 +35,10 @@ import {
 const RATE_LIMIT_CODE = "GY0429";
 const TOKEN_EXPIRED_CODE = "100002";
 
-/** Tokens handed out by a successful login. The `token` header on an
- *  authenticated call is checked against this set. */
 const issuedTokens = new Set<string>();
 
 const SUCCESS_CODES = new Set<string>(["0", "00000"]);
 
-/** Which SEMS operation a path maps to, for the request line. */
 const operationFor = (method: string, path: string): string => {
   if (path === "/health") return "health";
   if (path === "/control") return method === "GET" ? "control-read" : "control";
@@ -86,8 +83,6 @@ const envelope = (
 const rateLimited = (): Envelope =>
   envelope(RATE_LIMIT_CODE, "Too many requests, please try later", null);
 
-/** Consume one unit of the rate-limit budget. Returns true when this request
- *  should be answered with GY0429. */
 const shouldRateLimit = (): boolean => {
   if (state.rateLimitUntilCleared) return true;
   if (state.rateLimitRequests > 0) {
@@ -100,8 +95,6 @@ const shouldRateLimit = (): boolean => {
 const md5Base64 = (value: string): string =>
   btoa(createHash("md5").update(value).digest("hex"));
 
-/** What the login responses advertise as the API base, and whether the token
- *  payload carries an explicit region. See README "api base mode". */
 const loginApi = (): {
   api: string | undefined;
   region: string | undefined;
@@ -118,8 +111,6 @@ const loginApi = (): {
         region: REGION,
       };
     case "missing":
-      // The SEMS+ client has a hardcoded fallback for this; the legacy client
-      // does not, so a legacy login here is expected to be rejected.
       return { api: undefined, region: undefined };
     case "direct":
     default:
@@ -157,8 +148,6 @@ const readJson = async (
     debug("BODY", `request ${redactedJson(parsed)}`);
     return parsed;
   } catch {
-    // Unparseable bodies could hold anything, including a password, so the
-    // raw text never reaches the log.
     debug("BODY", `request (${text.length} bytes, not JSON)`);
     return null;
   }
@@ -183,8 +172,6 @@ const handleLogin = async (
     return json(envelope("100005", "Email or password error", null));
   }
   if (mode === "new") {
-    // SEMS+ carries these three extras; a client that omits them is not
-    // speaking the SEMS+ protocol.
     const missing = ["agreement", "isChinese", "isLocal"].filter((key) =>
       !(key in body)
     );
@@ -206,9 +193,6 @@ const handleLogin = async (
   return json(envelope(mode === "new" ? "00000" : 0, "success", payload, api));
 };
 
-/** Validate the `token` header, which is the login `data` payload re-encoded
- *  as JSON verbatim. Returns an error envelope, or null when the call may
- *  proceed. */
 const authFailure = (request: Request): Envelope | null => {
   const header = request.headers.get("token");
   if (!header) {
@@ -248,9 +232,6 @@ const authFailure = (request: Request): Envelope | null => {
   return null;
 };
 
-/** Non-mutating read of the auth state, for the request line. Logins carry a
- *  bootstrap header rather than an issued token, and the helper endpoints do
- *  not authenticate at all, so neither is judged against the issued set. */
 const tokenSummary = (request: Request, operation: string): string => {
   const header = request.headers.get("token");
   if (operation.startsWith("control") || operation === "health") return "";
@@ -305,8 +286,6 @@ const route = async (request: Request, path: string): Promise<Response> => {
     return json({ error: "method not allowed" }, 405);
   }
 
-  // Rate limiting sits in front of everything, login included — that is how
-  // the real portal behaves when an account polls too hard.
   if (shouldRateLimit()) {
     const remaining = state.rateLimitUntilCleared
       ? "until cleared"
@@ -362,8 +341,6 @@ const BATTERY: Record<number, string> = {
   0: "idle",
 };
 
-/** The line a developer is actually watching: exactly what powerflow values
- *  went out on the wire, plus the mode that shaped them. */
 const logPowerflow = (stationId: string, flow: Powerflow | null) => {
   if (flow === null) {
     info("PWRFLOW", `station=${stationId.slice(0, 8)} no powerflow block`);
@@ -392,8 +369,6 @@ const logPowerflow = (stationId: string, flow: Powerflow | null) => {
   );
 };
 
-/** Pull the envelope `code`/`msg` out of a response without disturbing the
- *  body the client will actually receive. */
 const logResponse = async (response: Response) => {
   if (!isInfo) return;
   const text = await response.clone().text();
@@ -444,7 +419,6 @@ const banner = () => {
   row("tls", TLS_ENABLED ? `on (port ${TLS_PORT})` : "off");
   row("logLevel", LOG_LEVEL);
   row("account", ACCOUNT);
-  // PASSWORD is deliberately not printed; it is redacted everywhere else too.
   row("password", "(never logged — see README / SEMS_PASSWORD)");
   row("region", REGION);
   startup(colour.bold("  control state"));
@@ -459,8 +433,6 @@ banner();
 Deno.serve({ port: PORT, hostname: "0.0.0.0" }, handler);
 
 if (TLS_ENABLED) {
-  // Serving TLS lets the fake stand in for https://<region>.semsportal.com,
-  // which is where the client rewrites PowerStation calls in gateway mode.
   Deno.serve({
     port: TLS_PORT,
     hostname: "0.0.0.0",

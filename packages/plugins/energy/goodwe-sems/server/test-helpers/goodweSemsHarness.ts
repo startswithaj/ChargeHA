@@ -15,16 +15,16 @@ export const testDbLogger = new PluginDbLogger(
   testLogger,
 );
 
-/** Mirrors the client's RATE_LIMIT_BACKOFF_MS and the adapter's MAX_STALE_MS.
- *  Both are internal to their modules; the tests need the same numbers to
- *  drive FakeTime past each window. */
+// Mirrors the client's RATE_LIMIT_BACKOFF_MS and the adapter's MAX_STALE_MS.
+// Both are internal to their modules; the tests need the same numbers to
+// drive FakeTime past each window.
 export const RATE_LIMIT_MS = 300_000;
 export const MAX_STALE_MS = 15 * 60 * 1000;
 
 export const rateLimitError = (): GoodweSemsRateLimitError =>
   new GoodweSemsRateLimitError(RATE_LIMIT_MS);
 
-/** SEMS+ gateway and regional portal bases, as returned by the two logins. */
+// SEMS+ gateway and regional portal bases, as returned by the two logins.
 export const GATEWAY_API = "https://au-gateway.semsportal.com/web/sems";
 export const REGION_API = "https://au.semsportal.com/api";
 
@@ -58,11 +58,11 @@ export interface MockResp {
 
 export interface FetchMock {
   fetchCalls: FetchCall[];
-  /** Respond to any URL containing the given substring. Later registrations
-   *  win over earlier ones for the same substring. */
+  // Respond to any URL containing the given substring. Later registrations
+  // win over earlier ones for the same substring.
   setPathResponse(pathSubstring: string, resp: MockResp): void;
-  /** Queue responses for a substring, consumed one per matching request. Once
-   *  drained, falls back to the `setPathResponse` entry. */
+  // Queue responses for a substring, consumed one per matching request. Once
+  // drained, falls back to the `setPathResponse` entry.
   queuePathResponses(pathSubstring: string, resps: MockResp[]): void;
   restore(): void;
 }
@@ -85,14 +85,14 @@ const buildResponse = (resp: MockResp): Response =>
     headers: { "Content-Type": "application/json" },
   });
 
-/** A SEMS envelope with a success code. */
+// A SEMS envelope with a success code.
 export const semsOk = (data: unknown, api?: string): MockResp => ({
   ok: true,
   status: 200,
   json: api === undefined ? { code: "0", data } : { code: "0", api, data },
 });
 
-/** A SEMS envelope carrying an arbitrary failure code. */
+// A SEMS envelope carrying an arbitrary failure code.
 export const semsCode = (code: string, data: unknown = null): MockResp => ({
   ok: true,
   status: 200,
@@ -187,11 +187,11 @@ export const buildStationDetail = (
 });
 
 export interface FakeStationClient extends GoodweSemsStationReader {
-  /** Station ids passed to getStationDetail, one entry per HTTP-equivalent
-   *  call. Assert on `.length` to prove no request was issued. */
+  // Station ids passed to getStationDetail, one entry per HTTP-equivalent
+  // call. Assert on `.length` to prove no request was issued.
   readonly calls: string[];
   readonly clearSessionCalls: () => number;
-  /** What the next (and every subsequent) call produces. */
+  // What the next (and every subsequent) call produces.
   setResult(result: SemsStationDetail | Error): void;
 }
 

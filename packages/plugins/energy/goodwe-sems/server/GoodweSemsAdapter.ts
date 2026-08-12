@@ -15,19 +15,10 @@ import {
 
 const POLL_INTERVAL_SECONDS = 60;
 
-/** How long a cached reading may be served while SEMS is rate limiting us.
- *  Past this the adapter throws instead, so EnergyPoller records the outage
- *  rather than the dashboard showing stale numbers as current. */
 const MAX_STALE_MS = 15 * 60 * 1000;
 
-/** `loadStatus` value that means power is flowing in from the grid. The
- *  opposite value (-1) means exporting. See toGridPowerW. */
 const LOAD_STATUS_IMPORTING = 1;
 
-/** Strip the unit suffix SEMS appends to power values ("1234(W)") and parse.
- *  Returns null for absent, blank or unparseable fields — a non-battery
- *  inverter simply omits the battery keys. Accepts numbers because SEMS is
- *  inconsistent about quoting. */
 export function parseSemsValue(
   raw: string | number | undefined,
 ): number | null {
@@ -39,7 +30,6 @@ export function parseSemsValue(
   return Number.isFinite(value) ? value : null;
 }
 
-/** Apply the SEMS status multiplier to a magnitude. */
 export function applyStatus(
   magnitude: number,
   status: number | string | undefined,
@@ -49,31 +39,20 @@ export function applyStatus(
   return magnitude * multiplier;
 }
 
-/** Convert the SEMS grid reading to ChargeHA's convention (positive = import).
- *
- *  SEMS sends `grid` as an UNSIGNED magnitude — it is positive whether the
- *  house is importing or exporting. The direction lives in `loadStatus`
- *  (1 = importing, -1 = exporting), confirmed against four real captured
- *  payloads covering both directions.
- *
- *  `gridStatus` looks like the obvious candidate and agrees on three of those
- *  four, but is -1 in both directions on a multi-inverter station, so it is
- *  not safe to sign by. Getting this wrong is not a cosmetic error: an
- *  exporting system would report as importing, and solar excess would never
- *  trigger a charge. */
+// SEMS sends `grid` unsigned in both directions; `loadStatus` carries the
+// direction. `gridStatus` is -1 in both directions on multi-inverter stations,
+// so it is not safe to sign by.
 export function toGridPowerW(flow: SemsPowerflow): number {
   const magnitude = parseSemsValue(flow.grid);
   if (magnitude === null) return 0;
   const status = Number(flow.loadStatus);
-  // Unknown direction must never read as export: phantom export starts a
-  // charge that draws real grid power. Zero is the safe answer.
+  // Unknown direction must not read as export: phantom export starts a charge
+  // that draws real grid power.
   if (!Number.isFinite(status) || status === 0) return 0;
   const direction = status === LOAD_STATUS_IMPORTING ? 1 : -1;
   return Math.abs(magnitude) * direction;
 }
 
-/** Battery power, signed by its own status multiplier. SEMS spells the keys
- *  "bettery" / "betteryStatus". Null on inverters without a battery. */
 export function toBatteryPowerW(flow: SemsPowerflow): number | null {
   const magnitude = parseSemsValue(flow.bettery);
   if (magnitude === null) return null;
@@ -85,8 +64,6 @@ export function toEnergyData(flow: SemsPowerflow): EnergyData {
   return {
     solarProductionW: parseSemsValue(flow.pv) ?? 0,
     gridPowerW: toGridPowerW(flow),
-    // Load is reported as a magnitude with its own status sign; consumption is
-    // never negative in EnergyData.
     homeConsumptionW: load === null ? 0 : Math.abs(load),
     batteryPowerW: toBatteryPowerW(flow),
     batterySoc: parseSemsValue(flow.soc),
@@ -98,12 +75,9 @@ export function toEnergyData(flow: SemsPowerflow): EnergyData {
 export class GoodweSemsAdapter implements EnergySourceAdapter {
   private lastGood: EnergyData | null = null;
   private lastGoodAtMs = 0;
-  /** Epoch ms before which no request may be issued. Set on a rate limit. */
   private backoffUntilMs = 0;
   private gridDirectionUnknown = false;
 
-  /** Takes an assembled client rather than credentials — everything is known
-   *  at construction time and tests inject a fake without an optional param. */
   constructor(
     private readonly client: GoodweSemsStationReader,
     private readonly stationId: string,
@@ -143,11 +117,9 @@ export class GoodweSemsAdapter implements EnergySourceAdapter {
     this.logger.info(`Connected to SEMS station ${this.stationId}`);
     const flow = detail.powerflow;
     if (flow) {
-      // Seed the cache from the connect read so a rate limit on the very first
-      // poll serves data instead of throwing.
+      // Seed the cache so a rate limit on the first poll serves data instead
+      // of throwing.
       this.remember(toEnergyData(flow));
-      // The grid sign convention is unresolved (see toGridPowerW). Logged once
-      // per connect at info so the first real station answers it.
       this.logger.info(
         `SEMS raw flow — grid=${flow.grid} gridStatus=${flow.gridStatus} ` +
           `loadStatus=${flow.loadStatus} pv=${flow.pv} load=${flow.load}`,
@@ -155,8 +127,6 @@ export class GoodweSemsAdapter implements EnergySourceAdapter {
     }
   }
 
-  /** Logged on state change, not per poll — an inverter can sit in this state
-   *  for hours and one row marks the whole span. */
   private trackGridDirection(flow: SemsPowerflow): void {
     const status = Number(flow.loadStatus);
     const gridMagnitude = parseSemsValue(flow.grid);
@@ -184,8 +154,8 @@ export class GoodweSemsAdapter implements EnergySourceAdapter {
   }
 
   async getRealtimeData(): Promise<EnergyData> {
-    // Already backing off — serve cache without touching the network. Calling
-    // during the window is what escalates a throttle into a block.
+    // Calling during a backoff window is what escalates a throttle into a
+    // block, so serve cache without touching the network.
     if (this.isBackingOff()) return this.serveCached();
 
     try {
@@ -229,9 +199,6 @@ export class GoodweSemsAdapter implements EnergySourceAdapter {
     return Date.now() < this.backoffUntilMs;
   }
 
-  /** Every outbound call goes through here: refuses to issue a request during
-   *  a backoff window, and records the window when SEMS declares one. This is
-   *  what keeps the rate-limit policy contained in the adapter. */
   private async guarded<T>(call: () => Promise<T>): Promise<T> {
     if (this.isBackingOff()) {
       throw new GoodweSemsRateLimitError(this.backoffUntilMs - Date.now());
@@ -257,9 +224,8 @@ export class GoodweSemsAdapter implements EnergySourceAdapter {
     return data;
   }
 
-  /** Last good reading, with its original timestamp — restamping would record
-   *  a backoff window as a run of fresh readings. Beyond the staleness budget
-   *  the outage is real and must surface. */
+  // Keeps the original timestamp — restamping would record a backoff window as
+  // a run of fresh readings.
   private serveCached(): EnergyData {
     const age = Date.now() - this.lastGoodAtMs;
     if (!this.lastGood || age > MAX_STALE_MS) {

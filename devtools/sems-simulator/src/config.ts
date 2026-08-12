@@ -1,7 +1,3 @@
-/** Mutable control surface for the fake. Seeded from env, changed at runtime
- *  through POST /control. Everything the fake can be told to lie about lives
- *  here so a test can flip one field and re-issue the same request. */
-
 export type GridSignMode = "signed" | "magnitude";
 export type ApiBaseMode =
   | "direct"
@@ -10,24 +6,14 @@ export type ApiBaseMode =
   | "missing";
 
 export interface ControlState {
-  /** "signed": powerflow.grid already carries the sign (negative = export).
-   *  "magnitude": grid is an absolute value and gridStatus carries the sign. */
   gridSignMode: GridSignMode;
-  /** What `api` (and `region`) the login responses hand back. */
   apiBaseMode: ApiBaseMode;
-  /** Base URL the fake tells clients to use in "direct" mode. */
   publicBase: string;
-  /** Remaining requests to answer with the GY0429 rate-limit code. */
   rateLimitRequests: number;
-  /** Rate limit every request until explicitly cleared. */
   rateLimitUntilCleared: boolean;
-  /** Reject the next authenticated call as if the token went stale. */
   expireNextToken: boolean;
-  /** Invalidate every issued token immediately. */
   tokensRevoked: boolean;
-  /** Force a specific hour-of-day (0-23.999) for the solar curve. */
   hourOverride: number | null;
-  /** Reject logins, to exercise the auth-error path. */
   rejectLogin: boolean;
 }
 
@@ -68,14 +54,9 @@ export const TLS_KEY = Deno.env.get("TLS_KEY") ?? "/certs/server.key";
 
 export const ACCOUNT = Deno.env.get("SEMS_ACCOUNT") ?? "tester@example.com";
 export const PASSWORD = Deno.env.get("SEMS_PASSWORD") ?? "fake-password-123";
-/** Region label used to build gateway hosts. Point DNS for
- *  `<region>.semsportal.com` at the fake to exercise the rewrite branch. */
 export const REGION = Deno.env.get("SEMS_REGION") ?? "eu";
 
 export const state: ControlState = {
-  // "magnitude" is what real SEMS sends: `grid` is unsigned in both
-  // directions and `loadStatus` carries the direction. Confirmed against four
-  // captured payloads. "signed" is kept so the other reading stays testable.
   gridSignMode: oneOf("GRID_SIGN_MODE", ["signed", "magnitude"], "magnitude"),
   apiBaseMode: oneOf(
     "API_BASE_MODE",
@@ -109,9 +90,6 @@ export interface ControlChange {
   to: unknown;
 }
 
-/** Apply a partial control patch, ignoring unknown keys so a typo cannot
- *  silently create a field nothing reads. Returns each key applied with its
- *  old and new value, so the change can be logged. */
 export const applyControl = (
   patch: Record<string, unknown>,
 ): ControlChange[] =>

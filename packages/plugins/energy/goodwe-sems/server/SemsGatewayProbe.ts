@@ -32,9 +32,9 @@ function gatewayBase(token: SemsToken): string {
   return `https://${region}-gateway.semsportal.com/web/sems`;
 }
 
-/** X-Signature auth the SEMS+ web app sends on every gateway call:
- *  base64(sha256hex("{ms}@{uid}@{token}") + "@" + ms), recomputed per
- *  request, plus the semsPlusWeb client identity in the token header. */
+// X-Signature auth the SEMS+ web app sends on every gateway call:
+// base64(sha256hex("{ms}@{uid}@{token}") + "@" + ms), recomputed per request,
+// plus the semsPlusWeb client identity in the token header.
 async function gatewayHeaders(
   token: SemsToken,
 ): Promise<Record<string, string>> {

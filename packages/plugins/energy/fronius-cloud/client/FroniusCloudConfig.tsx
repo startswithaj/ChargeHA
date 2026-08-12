@@ -15,9 +15,9 @@ interface FroniusCloudValues {
 
 type FroniusCloudDraft = Partial<FroniusCloudValues>;
 
-/** Buffered like FroniusLocalConfig: a write per keystroke would rebuild the
- *  energy adapter against every half-typed credential (config_changed →
- *  poller). */
+// Buffered like FroniusLocalConfig: a write per keystroke would rebuild the
+// energy adapter against every half-typed credential (config_changed →
+// poller).
 function useFroniusCloudDraft(config: FroniusCloudValues | undefined) {
   const utils = trpc.useUtils();
   const configMutation = trpc.plugin.energy.fronius_cloud.setConfig.useMutation(

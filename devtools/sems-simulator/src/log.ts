@@ -1,10 +1,3 @@
-/** Console logging for the fake. Dependency-free on purpose: the whole point
- *  of this project is that it can be dropped anywhere and run.
- *
- *  Levels: silent  only the startup banner and hard errors
- *          info    one line per request, plus the powerflow line (default)
- *          debug   adds full request and response bodies (redacted) */
-
 import { LOG_LEVEL } from "./config.ts";
 
 const RANK = { silent: 0, info: 1, debug: 2 } as const;
@@ -33,10 +26,8 @@ export const colour = {
   cyan: (t: string) => paint("36", t),
 };
 
-/** HH:MM:SS.mmm — a full ISO date on every line is noise in a live tail. */
 const stamp = (): string => new Date().toISOString().slice(11, 23);
 
-/** Fixed-width tag so the message column lines up down the terminal. */
 const TAG_WIDTH = 8;
 const line = (
   tag: string,
@@ -60,14 +51,11 @@ export const warn = (tag: string, message: string) => {
   line(tag, colour.yellow, message);
 };
 
-/** Deliberately-injected behaviour (rate limit, forced expiry, rejected
- *  login). Marked loudly so nobody mistakes it for a real bug. */
 export const injected = (message: string) => {
   if (rank < RANK.info) return;
   line("INJECTED", colour.magenta, colour.magenta(message));
 };
 
-/** Hard errors survive `silent` — if the fake itself breaks you need to see it. */
 export const error = (tag: string, message: string) => {
   line(tag, colour.red, message);
 };
@@ -77,20 +65,14 @@ export const debug = (tag: string, message: string) => {
   line(tag, colour.dim, colour.dim(message));
 };
 
-/** Startup output always prints, even at `silent`: a session's behaviour has
- *  to be explained by its first few lines. */
 export const startup = (message: string) => console.log(message);
 
 const SECRET_KEYS = new Set(["pwd", "password", "pass", "passwd"]);
 const TOKEN_KEYS = new Set(["token", "authorization"]);
 
-/** Short prefix of a token, never the whole thing. */
 export const shortToken = (value: string): string =>
   value.length <= 8 ? `${value}…` : `${value.slice(0, 8)}…`;
 
-/** Deep-copy a value with passwords removed and tokens truncated. Applied to
- *  anything that goes out at `debug`, so the seeded password can never reach
- *  the terminal. */
 export const redact = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(redact);
   if (value && typeof value === "object") {
