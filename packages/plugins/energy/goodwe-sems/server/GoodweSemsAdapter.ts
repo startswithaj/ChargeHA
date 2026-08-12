@@ -19,15 +19,20 @@ const MAX_STALE_MS = 15 * 60 * 1000;
 
 const LOAD_STATUS_IMPORTING = 1;
 
+const UNIT_SCALES: Record<string, number> = { w: 1, kw: 1000, mw: 1_000_000 };
+
 export function parseSemsValue(
   raw: string | number | undefined,
 ): number | null {
   if (raw === undefined) return null;
   if (typeof raw === "number") return Number.isFinite(raw) ? raw : null;
+  // The parenthesised suffix is a unit, not decoration — "3.5(kW)" is 3500W.
+  const unit = /\(([^)]*)\)/.exec(raw)?.[1].trim().toLowerCase();
   const stripped = raw.replace(/\([^)]*\)/g, "").trim();
   if (stripped === "") return null;
   const value = Number(stripped);
-  return Number.isFinite(value) ? value : null;
+  if (!Number.isFinite(value)) return null;
+  return value * (UNIT_SCALES[unit ?? ""] ?? 1);
 }
 
 export function applyStatus(
