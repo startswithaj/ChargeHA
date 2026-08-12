@@ -1,7 +1,3 @@
-// @std/crypto rather than node:crypto: this module is reachable from the
-// client bundle through the plugin's routerType, and Vite follows type-only
-// imports when building the module graph. A node: builtin in that graph fails
-// the browser build.
 import { crypto as stdCrypto } from "@std/crypto";
 import { encodeHex } from "@std/encoding/hex";
 import { z } from "zod";
@@ -9,17 +5,10 @@ import type { Logger } from "@chargeha/server/lib/Logger";
 import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import { SemsGatewayProbe } from "./SemsGatewayProbe.ts";
 
-// SEMS has two login endpoints. The newer SEMS+ one is tried first; accounts
-// not migrated to it still work on the legacy portal endpoint.
-/** Points every SEMS call at a different origin. For testing against a local
- *  fake — unset in normal use, and never a user-facing setting. Read on each
- *  call rather than at module load: `.env` is loaded after imports evaluate,
- *  so a module-level read would always miss it. */
 function baseOverride(): string | undefined {
   return Deno.env.get("GOODWE_SEMS_BASE_URL")?.replace(/\/$/, "");
 }
 
-// Regional host first: the global one returns C0602 for some accounts.
 function newLoginUrls(): string[] {
   const base = baseOverride();
   const path = "/web/sems/sems-user/api/v1/auth/cross-login";
@@ -43,12 +32,9 @@ const LEGACY_API_FALLBACK = "https://au.semsportal.com/api";
 const STATION_DETAIL_PATH = "/v3/PowerStation/GetMonitorDetailByPowerstationId";
 const STATION_LIST_PATH = "/PowerStation/GetPowerStationIdByOwner";
 
-// The unauthenticated bootstrap header SEMS expects before a token exists.
 const BOOTSTRAP_TOKEN = '{"version":"3.1.1","client":"ios","language":"en"}';
 
 const SUCCESS_CODES: ReadonlySet<string> = new Set(["0", "00000"]);
-// 100002: legacy/gateway "authorization expired"; C0602: SEMS+ session
-// expired/abnormal.
 const STALE_TOKEN_CODES: ReadonlySet<string> = new Set(["100002", "C0602"]);
 const EMPTY_RETRY_COOLDOWN_MS = 10 * 60 * 1000;
 const RATE_LIMIT_CODE = "GY0429";
@@ -70,8 +56,6 @@ export class GoodweSemsConnectionError extends Error {
   }
 }
 
-/** Thrown when SEMS answers with its rate-limit code. Carries the backoff the
- *  adapter should honour before issuing another request. */
 export class GoodweSemsRateLimitError extends Error {
   constructor(readonly retryAfterMs: number) {
     super(`SEMS rate limited (${RATE_LIMIT_CODE})`);
@@ -79,8 +63,6 @@ export class GoodweSemsRateLimitError extends Error {
   }
 }
 
-/** The token payload SEMS returns on login. Sent back verbatim, JSON-encoded,
- *  as the `token` header on every authenticated call. */
 export interface SemsToken {
   readonly api: string;
   readonly region?: string;
@@ -94,10 +76,6 @@ export interface SemsStationSummary {
 
 const numericish = z.union([z.string(), z.number()]).optional();
 
-/** SEMS `powerflow` block. Every power field is a string carrying a unit
- *  suffix, e.g. "1234(W)". Battery fields are absent on non-battery inverters,
- *  and SEMS spells them "bettery". Unknown keys are kept so a firmware that
- *  adds fields does not fail parsing. */
 export const semsPowerflowSchema = z.object({
   pv: numericish,
   load: numericish,
@@ -111,8 +89,6 @@ export const semsPowerflowSchema = z.object({
 
 export type SemsPowerflow = z.infer<typeof semsPowerflowSchema>;
 
-/** Envelope every SEMS endpoint wraps its payload in. `data` stays unknown —
- *  each caller parses its own shape. */
 const semsEnvelopeSchema = z.object({
   code: z.union([z.string(), z.number()]).optional(),
   api: z.string().optional(),
@@ -169,8 +145,6 @@ function loginHeaders(mode: LoginMode): Record<string, string> {
   };
 }
 
-/** The api base can arrive at the envelope root or inside the token payload.
- *  SEMS+ has a known-good default; the legacy endpoint does not. */
 function resolveLoginApi(
   envelopeApi: string | undefined,
   payloadApi: string | undefined,
@@ -182,9 +156,6 @@ function resolveLoginApi(
   return null;
 }
 
-/** SEMS+ expects base64 of the lowercase hex MD5 of the password. MD5 is the
- *  protocol's choice, not ours — a transport encoding here, not a password
- *  hash at rest. WebCrypto has no MD5, so this uses @std/crypto. */
 async function encodeSemsPlusPassword(password: string): Promise<string> {
   const digest = await stdCrypto.subtle.digest(
     "MD5",
@@ -200,8 +171,6 @@ function isEmptyData(data: unknown): boolean {
   return false;
 }
 
-// A region must be a short lowercase code before it becomes a DNS label —
-// SEMS has been seen sending junk in the token's region field.
 function validRegion(region: unknown): string | null {
   if (typeof region !== "string") return null;
   const trimmed = region.trim().toLowerCase();
@@ -217,8 +186,6 @@ function extractRegion(base: string): string | null {
   return null;
 }
 
-/** The slice of the client the adapter depends on. Named separately so tests
- *  can supply a fake without reaching around the client's private state. */
 export interface GoodweSemsStationReader {
   clearSession(): void;
   getStationDetail(stationId: string): Promise<SemsStationDetail>;
@@ -230,7 +197,6 @@ export interface GoodweSemsStationReader {
 
 export class GoodweSemsClient implements GoodweSemsStationReader {
   private token: SemsToken | null = null;
-  /** Login mode that last succeeded, tried first next time. */
   private preferredMode: LoginMode | null = null;
   private readonly gatewayProbe: SemsGatewayProbe;
   private loginPromise: Promise<void> | null = null;
@@ -249,10 +215,6 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     this.token = null;
   }
 
-  /** Single-flight login gate: concurrent callers share one in-flight login
-   *  instead of each firing their own CrossLogin — SEMS rate-limits logins
-   *  hard, and overlapping polls or two browser tabs would otherwise
-   *  double-login on the same client. */
   private async ensureLoggedIn(): Promise<void> {
     if (this.token) return;
     if (!this.loginPromise) {
@@ -287,8 +249,6 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     this.token = token;
   }
 
-  /** Delegates to the self-contained shadow probe (SemsGatewayProbe.ts) —
-   *  no-op unless GOODWE_SEMS_GATEWAY_PROBE=1. */
   async probeGatewayFlow(
     stationId: string,
     legacy: SemsPowerflow | null,
@@ -297,12 +257,8 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     await this.gatewayProbe.probe(this.token, stationId, legacy);
   }
 
-  /** The reference client posts no body here; match it rather than sending
-   *  "{}" to an undocumented endpoint. */
   async getStations(): Promise<SemsStationSummary[]> {
     const data = await this.call(STATION_LIST_PATH, null);
-    // Single-station accounts get the bare station id back — the endpoint is
-    // "GetPowerStationId" (singular) — rather than a list of station objects.
     if (typeof data === "string") {
       return [{ id: data, name: data }];
     }
@@ -333,7 +289,6 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     const powerflow = data.hasPowerflow === true
       ? data.powerflow ?? null
       : null;
-    // Some stations carry SOC only at top level as soc.power (pygoodwe).
     if (
       powerflow && powerflow.soc === undefined && data.soc?.power !== undefined
     ) {
@@ -347,8 +302,6 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     };
   }
 
-  /** Issue an authenticated POST, logging in first and retrying once on a
-   *  rejected token. Rate limits propagate — they are the adapter's to absorb. */
   private async call(
     path: string,
     body: Record<string, unknown> | null,
@@ -383,9 +336,6 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
       return await this.call(path, body, true);
     }
 
-    // Still empty on a fresh token, so it was never a stale-token problem —
-    // the account genuinely has nothing here. An owner with no registered
-    // stations gets an empty list, not a connection error.
     if (SUCCESS_CODES.has(code)) return data;
 
     throw new GoodweSemsConnectionError(
@@ -393,9 +343,6 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     );
   }
 
-  // Stale-token codes always retry; empty-success retries on a cooldown
-  // (legacy stale tokens surface as empty, but a genuinely empty account must
-  // not cost two logins per poll). Other codes are real errors.
   private shouldRetryWithFreshLogin(code: string, dataEmpty: boolean): boolean {
     if (STALE_TOKEN_CODES.has(code)) return true;
     if (SUCCESS_CODES.has(code) && dataEmpty) {
@@ -407,11 +354,6 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     return false;
   }
 
-  /** One login attempt. Returns null for "this mode did not work" — including
-   *  transport failures, so a SEMS+ endpoint that 500s on a legacy-only account
-   *  still falls through to the legacy endpoint. Rate limits are not a mode
-   *  failure and propagate. */
-  /** One line to stdout per call; a plugin_logs row only when it failed. */
   private logCallOutcome(
     path: string,
     code: string,
@@ -422,8 +364,6 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     const summary = `SEMS ${path} → code ${
       code || "(none)"
     }, dataEmpty=${dataEmpty} in ${durationMs}ms${isRetry ? " (retry)" : ""}`;
-    // Every call is visible at the default log level: a user's stdout excerpt
-    // must carry the full trace without asking them to redeploy with debug on.
     if (SUCCESS_CODES.has(code) && !dataEmpty) {
       this.logger.info(summary);
       return;
@@ -501,11 +441,7 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     };
   }
 
-  /** PowerStation routes only exist on the regional portal host. A SEMS+ login
-   *  hands back a gateway base, so those calls get rewritten onto the region. */
   private resolveApiBase(token: SemsToken, path: string): string {
-    // Testing against a local fake: keep every call on that origin rather
-    // than following the regional host the login response advertises.
     const override = baseOverride();
     if (override) return `${override}/api`;
 
@@ -513,8 +449,6 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     const isStationRoute = path.startsWith("/PowerStation") ||
       path.startsWith("/v3/PowerStation");
     if (!isStationRoute) return base;
-    // Rewrite decided by the host, not a path substring — a gateway base
-    // without /web/sems still has no PowerStation routes.
     const host = base.split("//").at(-1)?.split("/")[0] ?? "";
     const isSemsPlusHost = host.endsWith("-gateway.semsportal.com") ||
       host.endsWith("semsplus.goodwe.com");
@@ -538,8 +472,6 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
       const response = await fetch(url, {
         method: "POST",
         headers,
-        // The station-list route takes no body at all — the reference client
-        // sends none, so neither do we.
         body: body === null ? undefined : JSON.stringify(body),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
