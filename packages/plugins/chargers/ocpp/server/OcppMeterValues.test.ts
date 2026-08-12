@@ -16,7 +16,8 @@ import {
   meterValues,
   phased,
 } from "./test-helpers/ocppHarness.ts";
-import type { OcppChargerHandle, OcppLiveData } from "./OcppCentralSystem.ts";
+import type { OcppChargerHandle } from "./OcppCentralSystem.ts";
+import type { OcppLiveData } from "./OcppTypes.ts";
 import { OcppChargerAdapter } from "./OcppChargerAdapter.ts";
 
 describe("OCPP MeterValues — power and energy sum over phases", () => {

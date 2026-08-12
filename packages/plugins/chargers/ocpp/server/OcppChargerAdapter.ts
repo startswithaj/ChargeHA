@@ -5,7 +5,8 @@ import type {
   ChargerStatus,
 } from "@chargeha/shared";
 import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
-import type { OcppChargerHandle, OcppLiveData } from "./OcppCentralSystem.ts";
+import type { OcppChargerHandle } from "./OcppCentralSystem.ts";
+import type { OcppLiveData } from "./OcppTypes.ts";
 import { chargingProfilePayload } from "./OcppMessages.ts";
 import type { ChargePointStatus } from "./OcppMessages.ts";
 
