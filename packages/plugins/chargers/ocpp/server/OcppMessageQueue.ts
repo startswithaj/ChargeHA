@@ -16,6 +16,7 @@ const MAX_QUEUE_DEPTH = 64;
 export class OcppMessageQueue {
   private readonly jobs: Array<() => Promise<void>> = [];
   private running = false;
+  private stopped = false;
 
   constructor(
     private readonly logger: Logger,
@@ -30,11 +31,24 @@ export class OcppMessageQueue {
     return this.jobs.length + (this.running ? 1 : 0);
   }
 
+  // Lets a refused enqueue be told apart from a full one: there is nobody
+  // left to answer on a stopped queue's socket.
+  get isStopped(): boolean {
+    return this.stopped;
+  }
+
+  // Discard the backlog and refuse more. A replaced or closed connection's
+  // queued CALLs would answer for a charger that has already hung up.
+  stop(): void {
+    this.stopped = true;
+    this.jobs.length = 0;
+  }
+
   // Queue a job. Returns false, without running or queuing it, once
   // `maxDepth` is reached — the caller decides what that means on the wire
   // (OcppCentralSystem replies with a CALLERROR rather than a silent drop).
   enqueue(job: () => Promise<void>): boolean {
-    if (this.depth >= this.maxDepth) return false;
+    if (this.stopped || this.depth >= this.maxDepth) return false;
     this.jobs.push(job);
     void this.drain();
     return true;
@@ -53,6 +67,7 @@ export class OcppMessageQueue {
   // Recursive rather than a loop — pulls one job off the front, runs it, and
   // recurses until the queue is empty.
   private async drainQueued(): Promise<void> {
+    if (this.stopped) return;
     const job = this.jobs.shift();
     if (job === undefined) return;
     await this.runWithBound(job);
