@@ -135,6 +135,7 @@ const stationListSchema = z.array(
 const stationDetailSchema = z.object({
   hasPowerflow: z.boolean().optional(),
   powerflow: semsPowerflowSchema.nullish(),
+  soc: z.object({ power: numericish }).passthrough().optional(),
   info: z.object({ stationname: z.string().optional() }).passthrough()
     .optional(),
   inverter: z.array(
@@ -329,9 +330,18 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
       );
     }
     const data = parsed.data;
+    const powerflow = data.hasPowerflow === true
+      ? data.powerflow ?? null
+      : null;
+    // Some stations carry SOC only at top level as soc.power (pygoodwe).
+    if (
+      powerflow && powerflow.soc === undefined && data.soc?.power !== undefined
+    ) {
+      powerflow.soc = data.soc.power;
+    }
     return {
       hasPowerflow: data.hasPowerflow === true,
-      powerflow: data.hasPowerflow === true ? data.powerflow ?? null : null,
+      powerflow,
       stationName: data.info?.stationname ?? null,
       inverterModel: data.inverter?.[0]?.invert_full?.model_type ?? null,
     };

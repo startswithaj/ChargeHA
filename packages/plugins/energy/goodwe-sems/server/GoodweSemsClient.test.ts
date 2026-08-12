@@ -304,6 +304,22 @@ describe("GoodweSemsClient", () => {
       expect(detail.powerflow?.pv).toBe("3000(W)");
     });
 
+    it("falls back to top-level soc.power when powerflow carries no soc", async () => {
+      mock.setPathResponse(NEW_LOGIN_PATH, loginOk("tok", GATEWAY_API));
+      mock.setPathResponse(
+        STATION_DETAIL_PATH,
+        semsOk({
+          hasPowerflow: true,
+          powerflow: { pv: "1000(W)" },
+          soc: { power: 87 },
+        }),
+      );
+
+      const detail = await makeClient().getStationDetail("station-1");
+
+      expect(detail.powerflow?.soc).toBe(87);
+    });
+
     it("drops the power flow block when hasPowerflow is false", async () => {
       mock.setPathResponse(NEW_LOGIN_PATH, loginOk("tok", GATEWAY_API));
       mock.setPathResponse(
