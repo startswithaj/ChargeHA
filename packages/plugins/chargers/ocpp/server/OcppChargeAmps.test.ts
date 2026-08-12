@@ -6,7 +6,8 @@ import { expect } from "@std/expect";
 import { Logger } from "@chargeha/server/lib/Logger";
 import { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import type { CallContext } from "@chargeha/shared";
-import type { OcppChargerHandle, OcppLiveData } from "./OcppCentralSystem.ts";
+import type { OcppChargerHandle } from "./OcppCentralSystem.ts";
+import type { OcppLiveData } from "./OcppTypes.ts";
 import { OcppChargerAdapter } from "./OcppChargerAdapter.ts";
 
 describe("OCPP adapter — setChargeAmps profiles", () => {

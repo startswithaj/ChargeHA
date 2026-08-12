@@ -1,5 +1,5 @@
 import type { meterValuesReq, SampledValue } from "./OcppMessages.ts";
-import type { OcppLiveData } from "./OcppCentralSystem.ts";
+import type { OcppLiveData } from "./OcppTypes.ts";
 
 // A 3-phase charger sends one sample per phase, so taking the first match
 // reads a third of actual. Rules follow HA's OCPP process_phases.

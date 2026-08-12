@@ -2,23 +2,7 @@ import type { Logger } from "@chargeha/server/lib/Logger";
 import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import { type OcppFrame, OcppFraming, PendingCalls } from "./OcppFraming.ts";
 import { OcppMessageQueue } from "./OcppMessageQueue.ts";
-import type { OcppLiveData } from "./OcppCentralSystem.ts";
-
-export const freshData = (): OcppLiveData => ({
-  connected: false,
-  status: null,
-  errorCode: null,
-  info: null,
-  transactionId: null,
-  meterStartWh: null,
-  powerW: null,
-  currentA: null,
-  currentSumA: null,
-  voltageV: null,
-  energyRegisterWh: null,
-  lastMeterValuesAt: null,
-  lastUpdated: new Date().toISOString(),
-});
+import { freshData, type OcppLiveData } from "./OcppTypes.ts";
 
 // One charge point's live socket and everything scoped to it. Per connection,
 // not fields on the central system, so a second charger cannot evict the first

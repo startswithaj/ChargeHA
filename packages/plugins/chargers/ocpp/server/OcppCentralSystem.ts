@@ -1,11 +1,15 @@
 import type { Logger } from "@chargeha/server/lib/Logger";
 import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import { type OcppFrame, OcppFraming } from "./OcppFraming.ts";
-import { freshData, OcppConnection } from "./OcppConnection.ts";
+import { OcppConnection } from "./OcppConnection.ts";
+import {
+  freshData,
+  type OcppChargerInfo,
+  type OcppLiveData,
+} from "./OcppTypes.ts";
 import {
   authorizeReq,
   bootNotificationReq,
-  type ChargePointStatus,
   chargingProfilePayload,
   meterValuesReq,
   startTransactionReq,
@@ -14,12 +18,6 @@ import {
 import { readMeterValueFields } from "./OcppMeterValues.ts";
 import { measurandWarningFor } from "./OcppMeasurands.ts";
 import { OcppMeasurandNegotiator } from "./OcppMeasurandNegotiator.ts";
-
-export interface OcppChargerInfo {
-  vendor: string;
-  model: string;
-  firmwareVersion: string;
-}
 
 // Several can turn up in one window (two chargers, or an old id still
 // retrying), so the user picks rather than us guessing.
@@ -39,26 +37,6 @@ export interface OcppPairingState {
   expiresAt: number | null;
   // Everything that connected during this window, newest last.
   seen: OcppSeenCharger[];
-}
-
-export interface OcppLiveData {
-  connected: boolean;
-  status: ChargePointStatus | null;
-  errorCode: string | null;
-  info: OcppChargerInfo | null;
-  transactionId: number | null;
-  // Wh register at StartTransaction — session energy baseline.
-  meterStartWh: number | null;
-  // Latest measurand readings (nulls = charger never sent them).
-  powerW: number | null;
-  currentA: number | null;
-  // Null when the charger reported one unphased current, so the adapter
-  // scales by phase count instead.
-  currentSumA: number | null;
-  voltageV: number | null;
-  energyRegisterWh: number | null;
-  lastMeterValuesAt: number | null;
-  lastUpdated: string;
 }
 
 const idlePairing = (): OcppPairingState => ({
