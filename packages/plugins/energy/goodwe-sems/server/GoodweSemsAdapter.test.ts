@@ -197,6 +197,32 @@ describe("toEnergyData", () => {
     expect(data.homeConsumptionW).toBe(0);
   });
 
+  it("derives home from grid import on the night payload where load is empty", () => {
+    // Overnight the inverter sleeps: pv/load/bettery arrive as empty strings
+    // and only the meter reports, with grid already signed.
+    const data = toEnergyData(buildPowerflow({
+      pv: "",
+      load: "",
+      bettery: "",
+      grid: "-536(W)",
+      gridStatus: "1",
+      loadStatus: "1",
+    }));
+    expect(data.solarProductionW).toBe(0);
+    expect(data.gridPowerW).toBe(536);
+    expect(data.homeConsumptionW).toBe(536);
+  });
+
+  it("derives home from solar plus grid when load is missing during the day", () => {
+    const data = toEnergyData(buildPowerflow({
+      pv: "1138(W)",
+      load: "",
+      grid: "2058(W)",
+      loadStatus: "1",
+    }));
+    expect(data.homeConsumptionW).toBe(3196);
+  });
+
   it("reads soc when the inverter has a battery", () => {
     const data = toEnergyData(buildPowerflow({
       bettery: "900(W)",

@@ -74,10 +74,18 @@ export function toBatteryPowerW(flow: SemsPowerflow): number | null {
 
 export function toEnergyData(flow: SemsPowerflow): EnergyData {
   const load = parseSemsValue(flow.load);
+  const solar = parseSemsValue(flow.pv) ?? 0;
+  const grid = toGridPowerW(flow);
   return {
-    solarProductionW: parseSemsValue(flow.pv) ?? 0,
-    gridPowerW: toGridPowerW(flow),
-    homeConsumptionW: load === null ? 0 : Math.abs(load),
+    solarProductionW: solar,
+    gridPowerW: grid,
+    // Overnight the inverter sleeps and SEMS sends load as an empty string
+    // with only the meter reporting. Home consumption is still solar + signed
+    // grid (the same balance SEMS uses to compute load), so derive it instead
+    // of showing 0W.
+    homeConsumptionW: load === null
+      ? Math.max(0, solar + grid)
+      : Math.abs(load),
     batteryPowerW: toBatteryPowerW(flow),
     batterySoc: parseSemsValue(flow.soc),
     gridVoltageV: null,
