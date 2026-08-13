@@ -53,6 +53,20 @@ import type { TrpcContext } from "../trpc/trpc.ts";
 
 const DEFAULT_DB_PATH = `${Deno.cwd()}/data/chargeha.db`;
 
+const STARTUP_ENV_VARS = [
+  "GOODWE_SEMS_GATEWAY_PROBE",
+  "GOODWE_SEMS_BASE_URL",
+  "LOG_LEVEL",
+  "PORT",
+  "TZ",
+];
+
+function formatStartupEnv(): string {
+  return STARTUP_ENV_VARS
+    .map((name) => `${name}=${Deno.env.get(name) ?? "<unset>"}`)
+    .join(" ");
+}
+
 function parseLogLevel(raw: string | undefined): LogLevel {
   if (!raw) return "info";
   if (isValidLogLevel(raw)) return raw.toLowerCase() as LogLevel;
@@ -569,6 +583,7 @@ export async function bootstrap(
   const logLevel = parseLogLevel(Deno.env.get("LOG_LEVEL"));
   const serverLogger = new Logger("Server", logLevel);
   serverLogger.info(`LOG_LEVEL=${logLevel}`);
+  serverLogger.info(`Env: ${formatStartupEnv()}`);
 
   if (reset_auth) {
     serverLogger.warn(
