@@ -4,6 +4,7 @@ import type { createFroniusCloudRouter } from "./server/router.ts";
 export type FroniusCloudAppRouter = ReturnType<
   typeof createAppRouter<
     Record<string, never>,
-    { fronius_cloud: ReturnType<typeof createFroniusCloudRouter> }
+    { fronius_cloud: ReturnType<typeof createFroniusCloudRouter> },
+    Record<string, never>
   >
 >;

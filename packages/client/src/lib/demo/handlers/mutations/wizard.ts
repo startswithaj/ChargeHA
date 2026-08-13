@@ -1,5 +1,6 @@
 import type { MutationHandlers } from "../types.ts";
 import { ALL_DAYS, updateDemoState } from "../../demoState.ts";
+import { emitDemoEvent } from "../../demoTick.ts";
 
 type WizardMutations = Pick<
   MutationHandlers,
@@ -13,14 +14,20 @@ export const wizardMutations: WizardMutations = {
   "wizard.complete": () => {
     updateDemoState((m) => ({
       ...m,
+      // Charger rows are created by the wizard's charger.ensure call when the
+      // type is selected (ensureOnSelect), not on completion — mirrors the
+      // real server.
       config: {
         ...m.config,
         wizard_completed: "true",
         wizard_step: "",
         wizard_vehicle_type: "",
         wizard_energy_type: "",
+        wizard_charger_type: "",
+        wizard_control_path: "",
       },
     }));
+    emitDemoEvent({ type: "chargers_changed", data: {} });
     return { completed: true };
   },
 
@@ -49,6 +56,7 @@ export const wizardMutations: WizardMutations = {
       schedules: [{
         id: "demo-overnight-charge",
         vehicleId: "DEMO-001",
+        chargerId: null,
         scheduleType: "charge",
         startTime: "00:00",
         endTime: "06:00",
@@ -71,18 +79,27 @@ export const wizardMutations: WizardMutations = {
   },
 
   "wizard.patchState": (input) => {
-    updateDemoState((m) => ({
-      ...m,
-      config: {
-        ...m.config,
-        ...(input.stepId !== undefined ? { wizard_step: input.stepId } : {}),
-        ...(input.vehicleType !== undefined
-          ? { wizard_vehicle_type: input.vehicleType }
-          : {}),
-        ...(input.energyType !== undefined
-          ? { wizard_energy_type: input.energyType }
-          : {}),
-      },
-    }));
+    const patch: Record<string, string | null> = {
+      ...(input.stepId !== undefined ? { wizard_step: input.stepId } : {}),
+      ...(input.vehicleType !== undefined
+        ? { wizard_vehicle_type: input.vehicleType }
+        : {}),
+      ...(input.energyType !== undefined
+        ? { wizard_energy_type: input.energyType }
+        : {}),
+      ...(input.chargerType !== undefined
+        ? { wizard_charger_type: input.chargerType }
+        : {}),
+      ...(input.controlPath !== undefined
+        ? { wizard_control_path: input.controlPath }
+        : {}),
+    };
+    updateDemoState((m) => {
+      const merged = { ...m.config, ...patch };
+      const config = Object.fromEntries(
+        Object.entries(merged).filter(([, v]) => v !== null),
+      ) as Record<string, string>;
+      return { ...m, config };
+    });
   },
 };

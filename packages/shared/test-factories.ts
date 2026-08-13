@@ -1,7 +1,5 @@
-/**
- * Shared test factories for building mock data with sensible defaults.
- * Usage: `buildVehicleChargeState({ batteryLevel: 95 })` — override only what matters for your test.
- */
+// Shared test factories for building mock data with sensible defaults.
+// Usage: `buildVehicleChargeState({ batteryLevel: 95 })` — override only what matters for your test.
 import type {
   BlockoutSchedule,
   ChargeSchedule,
@@ -58,6 +56,7 @@ export function buildChargeSchedule(
   return {
     id: "sched-charge-1",
     vehicleId: "VIN-TEST",
+    chargerId: null,
     scheduleType: "charge",
     startTime: "08:00",
     endTime: "16:00",
@@ -75,6 +74,7 @@ export function buildBlockoutSchedule(
   return {
     id: "sched-blockout-1",
     vehicleId: null,
+    chargerId: null,
     scheduleType: "blockout",
     startTime: "18:00",
     endTime: "21:00",

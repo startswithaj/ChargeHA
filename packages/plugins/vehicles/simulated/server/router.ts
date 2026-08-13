@@ -6,7 +6,7 @@ import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDepend
 import type { SimulatedVehiclePlugin } from "./index.ts";
 
 export function createSimulatedRouter(
-  plugin: SimulatedVehiclePlugin,
+  plugin: Pick<SimulatedVehiclePlugin, "getAdapter">,
   deps: PluginDependencies,
 ) {
   return router({

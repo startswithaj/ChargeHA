@@ -20,11 +20,11 @@ describe("ChargeController — edge cases", () => {
       ctx = await setupController({}, "auto");
       const db = ctx.db;
 
-      const origGetVehicles = db.getVehicles.bind(db);
+      const origGetChargers = db.getChargers.bind(db);
       let errorThrown = false;
-      db.getVehicles = () => {
+      db.getChargers = () => {
         errorThrown = true;
-        db.getVehicles = origGetVehicles;
+        db.getChargers = origGetChargers;
         throw new Error("test error");
       };
 
@@ -49,6 +49,7 @@ describe("ChargeController — edge cases", () => {
       await ctx.db.createSchedule({
         id: "disabled-blockout",
         vehicleId: null,
+        chargerId: null,
         scheduleType: "blockout",
         startTime,
         endTime,
@@ -71,6 +72,7 @@ describe("ChargeController — edge cases", () => {
       await ctx.db.createSchedule({
         id: "disabled-charge",
         vehicleId: VIN,
+        chargerId: null,
         scheduleType: "charge",
         startTime,
         endTime,

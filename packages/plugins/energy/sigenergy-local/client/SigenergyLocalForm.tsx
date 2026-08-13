@@ -1,14 +1,11 @@
 import { useMemo, useState } from "react";
 import { Button, Code, Text, TextField } from "@radix-ui/themes";
-import { Loader2, Search } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { trpc } from "./trpc.ts";
-import { Spinner } from "../../../hostUi.ts";
+import { NetworkDeviceSearch, useDefaultSubnet } from "../../../hostUi.ts";
 import { stepStyles as styles } from "../../../hostUi.ts";
-import type {
-  SigenergyDevice,
-  TestStatus,
-} from "../../InverterSetupShared.tsx";
-import { TestResultBadge } from "../../InverterSetupShared.tsx";
+import { TestResultBadge, type TestStatus } from "../../../hostUi.ts";
+import type { SigenergyDevice } from "../../InverterSetupShared.tsx";
 
 export interface SigenergyLocalFormValues {
   host: string;
@@ -88,9 +85,17 @@ function AdvancedFields(
 }
 
 function SearchSection(
-  { subnet, setSubnet, searchMutation, searchResults, onSelectDevice }: {
+  {
+    subnet,
+    setSubnet,
+    detectedSubnets,
+    searchMutation,
+    searchResults,
+    onSelectDevice,
+  }: {
     subnet: string;
     setSubnet: (v: string) => void;
+    detectedSubnets?: string[];
     searchMutation: ReturnType<
       typeof trpc.plugin.energy.sigenergy_local.discover.useMutation
     >;
@@ -100,70 +105,23 @@ function SearchSection(
 ) {
   return (
     <>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <Button
-          size="1"
-          variant="soft"
-          disabled={searchMutation.isPending}
-          onClick={() => searchMutation.mutate({ subnet: subnet || undefined })}
-        >
-          {searchMutation.isPending ? <Spinner /> : <Search size={14} />}
-          {searchMutation.isPending ? "Scanning..." : "Search Network"}
-        </Button>
-        <Text size="1" color="gray">or enter subnet:</Text>
-        <TextField.Root
-          size="1"
-          placeholder="e.g. 192.168.0"
-          value={subnet}
-          onChange={(e: { target: { value: string } }) =>
-            setSubnet(e.target.value)}
-          style={{ width: 100 }}
-          aria-label="Subnet"
-        />
-      </div>
-      {searchMutation.isPending && (
-        <Text size="1" color="gray">
-          Scanning {subnet ? `subnet ${subnet}.*` : "your local network"}{" "}
-          for Sigenergy devices...
-        </Text>
-      )}
-      {!searchMutation.isPending && searchResults.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {searchResults.map((d) => (
-            <div
-              key={d.host}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "6px 10px",
-                borderRadius: 6,
-                background: "var(--gray-a2)",
-              }}
-            >
-              <div>
-                <Text size="2" weight="medium">{d.name}</Text>
-                <Text size="1" color="gray" style={{ display: "block" }}>
-                  {d.host}
-                </Text>
-              </div>
-              <Button
-                size="1"
-                variant="soft"
-                onClick={() => onSelectDevice(d.host)}
-              >
-                Use
-              </Button>
-            </div>
-          ))}
-        </div>
-      )}
-      {searchMutation.isSuccess && searchResults.length === 0 && (
-        <Text size="2" color="orange">
-          No Sigenergy devices found. Try entering your subnet above (check your
-          router settings or run <Code size="1">ifconfig</Code>).
-        </Text>
-      )}
+      <NetworkDeviceSearch
+        deviceNoun="Sigenergy devices"
+        subnet={subnet}
+        onSubnetChange={setSubnet}
+        detectedSubnets={detectedSubnets}
+        onSearch={() => searchMutation.mutate({ subnet: subnet || undefined })}
+        isPending={searchMutation.isPending}
+        searched={searchMutation.isSuccess}
+        results={searchResults}
+        onUse={(d) => onSelectDevice(d.host)}
+        emptyMessage={
+          <>
+            No Sigenergy devices found. Try entering your subnet above (check
+            your router settings or run <Code size="1">ifconfig</Code>).
+          </>
+        }
+      />
     </>
   );
 }
@@ -204,7 +162,6 @@ type TestVariables = {
   deviceUnitId?: number;
 };
 
-/** Build the test-connection mutation input from the form's string fields. */
 function testArgs(values: SigenergyLocalFormValues) {
   return {
     host: values.host,
@@ -214,7 +171,7 @@ function testArgs(values: SigenergyLocalFormValues) {
   };
 }
 
-/** On a successful test, echo the validated values (as strings) upward. */
+// On a successful test, echo the validated values (as strings) upward.
 const onTestSuccessHandler =
   (onTestSuccess: (values: SigenergyLocalFormValues) => void) =>
   (data: { success: boolean }, variables: TestVariables) => {
@@ -256,13 +213,13 @@ export function SigenergyLocalForm(
     initial.deviceUnitId || "1",
   );
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [subnet, setSubnet] = useState(() => {
-    // Auto-detect subnet from browser hostname if it's an IP address.
-    const hostname = globalThis.location?.hostname ?? "";
-    const match = hostname.match(/^(\d+\.\d+\.\d+)\.\d+$/);
-    return match ? match[1] : "";
-  });
+  const [subnet, setSubnet] = useState("");
   const [searchResults, setSearchResults] = useState<SigenergyDevice[]>([]);
+
+  // Defaults the subnet field to where ChargeHA itself is reachable, once,
+  // while still leaving it fully editable.
+  const lanSubnets = trpc.plugin.energy.sigenergy_local.lanSubnets.useQuery();
+  useDefaultSubnet(lanSubnets.data, subnet, setSubnet);
 
   const searchMutation = trpc.plugin.energy.sigenergy_local.discover
     .useMutation({
@@ -314,6 +271,7 @@ export function SigenergyLocalForm(
       <SearchSection
         subnet={subnet}
         setSubnet={setSubnet}
+        detectedSubnets={lanSubnets.data}
         searchMutation={searchMutation}
         searchResults={searchResults}
         onSelectDevice={handleSelectDevice}

@@ -21,7 +21,7 @@ describe("ChargeController — commands + backoff", () => {
       ctx = await setupController({ isCharging: false }, "charge_now");
       ctx.adapter.startChargingResult = false;
       await ctx.runOneLoop();
-      expect(ctx.manager.isBackedOff(VIN).backedOff).toBe(true);
+      expect((await ctx.getBackoff()).backedOff).toBe(true);
 
       ctx.adapter.startChargingResult = true;
       ctx.adapter.commands = [];
@@ -47,13 +47,32 @@ describe("ChargeController — commands + backoff", () => {
     });
   });
 
+  describe("charge_now — car-limited draw", () => {
+    it("does not re-command amps when the car draws less than asked", async () => {
+      // Car appetite 16A on a 32A charger: one adjust, then quiet.
+      ctx = await setupController(
+        { isCharging: true, chargeAmps: 16, chargeAmpsMax: 32 },
+        "charge_now",
+      );
+
+      await ctx.runOneLoop();
+      const afterFirst = ctx.adapter.commands.length;
+      expect(ctx.adapter.commands).toContainEqual({ cmd: "setAmps", args: 32 });
+
+      await ctx.runOneLoop();
+      await ctx.runOneLoop();
+
+      expect(ctx.adapter.commands.length).toBe(afterFirst);
+    });
+  });
+
   describe("stopCharging — command backoff", () => {
     it("skips stop command when command backoff is active", async () => {
       ctx = await setupController({ isCharging: true }, "stop");
       ctx.adapter.stopChargingResult = false;
       await ctx.runOneLoop();
 
-      expect(ctx.manager.isBackedOff(VIN).backedOff).toBe(true);
+      expect((await ctx.getBackoff()).backedOff).toBe(true);
       ctx.adapter.commands = [];
 
       ctx.adapter.state.isCharging = true;
@@ -89,8 +108,8 @@ describe("ChargeController — commands + backoff", () => {
 
       await ctx.runOneLoop();
 
-      expect(ctx.manager.isBackedOff(VIN).backedOff).toBe(true);
-      expect(ctx.manager.isBackedOff(VIN).remainingMs).toBeGreaterThan(0);
+      expect((await ctx.getBackoff()).backedOff).toBe(true);
+      expect((await ctx.getBackoff()).remainingMs).toBeGreaterThan(0);
     });
 
     it("handles non-Error thrown objects", async () => {
@@ -102,7 +121,7 @@ describe("ChargeController — commands + backoff", () => {
 
       await ctx.runOneLoop();
 
-      expect(ctx.manager.isBackedOff(VIN).backedOff).toBe(true);
+      expect((await ctx.getBackoff()).backedOff).toBe(true);
     });
   });
 });

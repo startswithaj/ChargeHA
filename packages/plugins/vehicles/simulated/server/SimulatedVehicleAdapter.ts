@@ -5,7 +5,7 @@ import type {
   VehicleAdapter,
 } from "@chargeha/shared";
 import type { Logger } from "@chargeha/server/lib/Logger";
-import type { PluginDbLogger } from "../../../PluginDbLogger.ts";
+import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 
 export interface SimulatedVehicleConfig {
   batteryCapacityKwh?: number;
@@ -41,7 +41,6 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
   private logger: Logger;
   private dbLog: PluginDbLogger;
 
-  // Internal state
   private socPercent: number;
   private chargeLimit: number;
   private isCharging = false;
@@ -53,9 +52,6 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
   // Home location (read from DB config, or defaults)
   private homeLat: number;
   private homeLng: number;
-
-  // Callback for energy interceptor wiring
-  onPowerChange?: (watts: number) => void;
 
   constructor(
     id: string,
@@ -93,7 +89,6 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
   disconnect(): Promise<void> {
     if (this.isCharging) {
       this.isCharging = false;
-      this.onPowerChange?.(0);
     }
     return Promise.resolve();
   }
@@ -153,7 +148,6 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
     this.isCharging = true;
     this.lastUpdateTime = Date.now();
     const powerW = this.calculatePowerKw() * 1000;
-    this.onPowerChange?.(powerW);
     this.logger.info(
       `${this.config.vehicleName} started charging at ${this.chargeAmps}A (${
         Math.round(powerW)
@@ -176,7 +170,6 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
       this.updateSoc(); // Finalize SOC before stopping
     }
     this.isCharging = false;
-    this.onPowerChange?.(0);
     this.logger.info(
       `${this.config.vehicleName} stopped charging at SOC ${
         this.socPercent.toFixed(1)
@@ -206,7 +199,6 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
 
     if (this.isCharging) {
       const powerW = this.calculatePowerKw() * 1000;
-      this.onPowerChange?.(powerW);
       this.logger.debug(
         `${this.config.vehicleName} amps set to ${this.chargeAmps}A (${
           Math.round(powerW)
@@ -232,7 +224,6 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
       traceId: ctx.traceId,
     });
 
-    // Auto-stop if SOC already at or above new limit
     if (this.isCharging && this.socPercent >= this.chargeLimit) {
       await this.stopCharging(ctx);
     }
@@ -261,10 +252,8 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
       `${this.config.vehicleName} SOC set to ${this.socPercent}%`,
     );
 
-    // If SOC is now at or above charge limit, stop charging
     if (this.isCharging && this.socPercent >= this.chargeLimit) {
       this.isCharging = false;
-      this.onPowerChange?.(0);
     }
   }
 
@@ -273,7 +262,6 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
     if (!value && this.isCharging) {
       this.updateSoc();
       this.isCharging = false;
-      this.onPowerChange?.(0);
     }
   }
 
@@ -290,12 +278,9 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
     };
   }
 
-  /** Get current charge power in watts (0 if not charging). */
   getCurrentPowerW(): number {
     return this.isCharging ? this.calculatePowerKw() * 1000 : 0;
   }
-
-  // --- Private helpers ---
 
   private calculatePowerKw(): number {
     const powerKw = (this.chargeAmps * this.config.voltage *
@@ -303,7 +288,7 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
     return Math.min(powerKw, this.config.maxChargeRateKw);
   }
 
-  /** Advance battery SOC based on elapsed time and current charge power. */
+  // Advance battery SOC based on elapsed time and current charge power.
   private updateSoc(): void {
     if (!this.isCharging) return;
 
@@ -323,11 +308,9 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
     );
     this.energyAddedKwh += energyKwh;
 
-    // Auto-stop when charge limit reached
     if (this.socPercent >= this.chargeLimit) {
       this.socPercent = this.chargeLimit;
       this.isCharging = false;
-      this.onPowerChange?.(0);
       this.logger.info(
         `${this.config.vehicleName} reached charge limit ${this.chargeLimit}%`,
       );

@@ -179,34 +179,6 @@ describe("useVehicleSettings", () => {
     expect(mockDeleteMutate).toHaveBeenCalledWith({ vehicleId: "VIN1" });
   });
 
-  it("handleMovePriority swaps vehicles up via priority mutationFn", () => {
-    m.vehiclesData = {
-      vehicles: [
-        { id: "VIN1", name: "Model 3", adapterType: "tesla", priority: 1 },
-        { id: "VIN2", name: "Model Y", adapterType: "tesla", priority: 2 },
-      ],
-    };
-    const { result } = renderHook(() => useVehicleSettings());
-    result.current.handleMovePriority("VIN2", "up");
-    expect(mockPriorityMutateAsync).toHaveBeenCalled();
-  });
-
-  it.each<[string, string, "up" | "down"]>([
-    ["invalid vin", "NONEXISTENT", "up"],
-    ["first vehicle up", "VIN1", "up"],
-    ["last vehicle down", "VIN2", "down"],
-  ])("handleMovePriority ignores %s", (_label, vin, direction) => {
-    m.vehiclesData = {
-      vehicles: [
-        { id: "VIN1", name: "Model 3", adapterType: "tesla", priority: 1 },
-        { id: "VIN2", name: "Model Y", adapterType: "tesla", priority: 2 },
-      ],
-    };
-    const { result } = renderHook(() => useVehicleSettings());
-    result.current.handleMovePriority(vin, direction);
-    expect(mockPriorityMutateAsync).not.toHaveBeenCalled();
-  });
-
   it("returns loadFailed when query errors", () => {
     m.vehiclesIsError = true;
     m.vehiclesError = { message: "Network error" };

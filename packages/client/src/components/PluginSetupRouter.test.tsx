@@ -51,6 +51,7 @@ vi.mock("@chargeha/plugins/componentRegistry", () => ({
       },
     ],
   },
+  chargerPluginSteps: {},
 }));
 
 vi.mock("../hooks/usePluginOnboardingState.ts", () => ({

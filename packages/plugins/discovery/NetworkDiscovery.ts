@@ -1,0 +1,134 @@
+/// <reference lib="deno.ns" />
+import type { Logger } from "@chargeha/server/lib/Logger";
+import { detectLanSubnets } from "@chargeha/server/lib/LanInterfaces";
+import { NetworkScan } from "./networkScan.ts";
+
+const BATCH_SIZE = 30;
+
+// Shared local-network discovery pipeline: build candidate IPs (explicit
+// subnet → ARP table → interface detection → 192.168.1.* fallback), then
+// probe in sequential batches. Subclasses implement `probeHost` per protocol.
+export abstract class NetworkDiscovery<TDevice extends { host: string }> {
+  constructor(
+    protected readonly logger: Logger,
+    // Log prefix, e.g. "Fronius discovery".
+    protected readonly label: string,
+    private readonly subnet?: string,
+    // Injected so tests can supply fakes instead of patching Deno globals.
+    private readonly command: typeof Deno.Command = Deno.Command,
+    private readonly networkInterfaces: typeof Deno.networkInterfaces =
+      Deno.networkInterfaces,
+  ) {}
+
+  // Probe one host; resolve null when it is not the target device.
+  protected abstract probeHost(host: string): Promise<TDevice | null>;
+
+  // When true, discovery returns after the first batch containing a hit.
+  // ChargeHA supports a single inverter, so protocols with expensive probes
+  // (full TCP handshake per host) opt out of scanning the rest of the subnet.
+  protected abstract readonly stopAtFirstHit: boolean;
+
+  async discover(): Promise<TDevice[]> {
+    const candidates = await this.buildCandidates();
+    this.logger.info(
+      `${this.label}: probing ${candidates.length} IPs in batches of ${BATCH_SIZE}`,
+    );
+    const found = await this.probeBatchesFrom(
+      NetworkScan.chunk(candidates, BATCH_SIZE),
+      0,
+    );
+    this.logger.info(
+      `${this.label}: complete — ${found.length} device(s) found`,
+    );
+    return found;
+  }
+
+  private async buildCandidates(): Promise<string[]> {
+    if (this.subnet) {
+      const cleanSubnet = this.subnet.replace(/\.$/, "");
+      this.logger.info(`${this.label}: scanning subnet ${cleanSubnet}.*`);
+      return NetworkScan.generateSubnetIps(cleanSubnet);
+    }
+
+    const arpIps = await this.getArpIps();
+    if (arpIps.length > 0) {
+      this.logger.info(
+        `${this.label}: ARP table returned ${arpIps.length} candidate(s): ${
+          arpIps.join(", ")
+        }`,
+      );
+      const candidates = NetworkScan.expandArpToSubnets(arpIps);
+      this.logger.info(
+        `${this.label}: expanded ARP subnets [${
+          NetworkScan.extractSubnets(arpIps).join(", ")
+        }] to ${candidates.length} total candidates`,
+      );
+      return candidates;
+    }
+
+    const candidates = this.candidatesFromInterfaces();
+    this.logger.info(
+      `${this.label}: ${candidates.length} candidates from interface detection`,
+    );
+    return candidates;
+  }
+
+  private async getArpIps(): Promise<string[]> {
+    try {
+      const proc = new this.command("arp", {
+        args: ["-a"],
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const { stdout } = await proc.output();
+      return NetworkScan.parseArpOutput(new TextDecoder().decode(stdout));
+    } catch (err) {
+      this.logger.info(
+        `${this.label}: arp unavailable (${err}), falling back to interface detection`,
+      );
+      return [];
+    }
+  }
+
+  // Detect subnets from network interfaces, or fall back to 192.168.1.*.
+  // Filtering lives in the shared `detectLanSubnets`, the same helper OCPP
+  // uses to work out where it itself is reachable.
+  private candidatesFromInterfaces(): string[] {
+    try {
+      const subnets = detectLanSubnets(this.networkInterfaces);
+      if (subnets.length > 0) {
+        return subnets.flatMap(NetworkScan.generateSubnetIps);
+      }
+    } catch (err) {
+      this.logger.info(
+        `${this.label}: interface detection failed (${err}), falling back to 192.168.1.*`,
+      );
+      return NetworkScan.generateSubnetIps("192.168.1");
+    }
+    this.logger.info(
+      `${this.label}: interface detection returned nothing, falling back to 192.168.1.*`,
+    );
+    return NetworkScan.generateSubnetIps("192.168.1");
+  }
+
+  private async probeBatchesFrom(
+    batches: string[][],
+    index: number,
+  ): Promise<TDevice[]> {
+    if (index >= batches.length) return [];
+    const results = await Promise.allSettled(
+      batches[index].map((host) => this.probeHost(host)),
+    );
+    const hits = results.flatMap((r) =>
+      r.status === "fulfilled" && r.value != null ? [r.value] : []
+    );
+    hits.forEach((hit) =>
+      this.logger.info(`${this.label}: found device at ${hit.host}`)
+    );
+    if (this.stopAtFirstHit && hits.length > 0) {
+      this.logger.info(`${this.label}: stopping scan after first hit`);
+      return [hits[0]];
+    }
+    return [...hits, ...(await this.probeBatchesFrom(batches, index + 1))];
+  }
+}

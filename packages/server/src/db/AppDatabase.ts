@@ -4,12 +4,26 @@ import {
 } from "drizzle-orm/better-sqlite3";
 import type { DatabaseDriver } from "@chargeha/shared/database-driver";
 import { CompatDatabase } from "./SqliteCompat.ts";
-import type { EnergyData, VehicleMode } from "@chargeha/shared";
+import type {
+  ChargerConfigMap,
+  ChargerConfigPatch,
+  ChargerSecretsMap,
+  ChargingPointMode,
+  EnergyData,
+  VehicleMode,
+} from "@chargeha/shared";
+import { chargerConfigMapSchema } from "@chargeha/shared/schemas";
 import type { CoreConfigKey } from "@chargeha/shared/configSections";
 import { Logger } from "../lib/Logger.ts";
-import { readSecret, storeSecret } from "../lib/Encryption.ts";
+import {
+  decrypt,
+  maybeEncrypt,
+  readSecret,
+  storeSecret,
+} from "../lib/Encryption.ts";
 import type { TypedEventEmitter } from "../services/TypedEventEmitter.ts";
 import { runMigrations } from "./MigrationRunner.ts";
+import { ChargerRepository } from "./repositories/ChargerRepository.ts";
 import { ConfigRepository } from "./repositories/ConfigRepository.ts";
 import { EnergyRepository } from "./repositories/EnergyRepository.ts";
 import { LogRepository } from "./repositories/LogRepository.ts";
@@ -20,6 +34,7 @@ import { StatsRepository } from "./repositories/StatsRepository.ts";
 import { VehicleRepository } from "./repositories/VehicleRepository.ts";
 
 import type {
+  ChargerRow,
   ControllerLogInput,
   ControllerLogRow,
   CreateLocalUserInput,
@@ -34,6 +49,7 @@ import type {
   ScheduleRow,
   SessionRow,
   TariffPeriodRow,
+  UpsertChargerInput,
   UpsertOidcConfigInput,
   UpsertVehicleInput,
   VehicleChargeReadingInput,
@@ -41,19 +57,39 @@ import type {
   VehicleRow,
 } from "./types.ts";
 
+// Parse a stored config/secrets object. A row written by a previous version,
+// or hand-edited, must not take the process down — treat unparseable content
+// as "no keys" and let the caller's missing-config path handle it.
+function parseChargerMap(json: string): Record<string, string> {
+  try {
+    const parsed = chargerConfigMapSchema.safeParse(JSON.parse(json));
+    return parsed.success ? parsed.data : {};
+  } catch {
+    return {};
+  }
+}
+
+// Apply a patch: `null` removes the key, a string sets it. Never stores "".
+function applyPatch(
+  current: Record<string, string>,
+  patch: ChargerConfigPatch,
+): Record<string, string> {
+  return Object.entries(patch).reduce<Record<string, string>>(
+    (acc, [key, value]) => {
+      const { [key]: _removed, ...rest } = acc;
+      return value === null ? rest : { ...rest, [key]: value };
+    },
+    current,
+  );
+}
+
 export class AppDatabase {
   private sqlite: DatabaseDriver;
-
-  /** Low-level driver access for seed scripts and migrations.
-   *  Not for runtime use — services should go through the repositories. */
-  getDriver(): DatabaseDriver {
-    return this.sqlite;
-  }
-
   private logger: Logger;
   private readonly encryptionKey: string | null;
   private readonly eventEmitter: TypedEventEmitter | null;
   db: BetterSQLite3Database;
+  chargers: ChargerRepository;
   config: ConfigRepository;
   energy: EnergyRepository;
   logs: LogRepository;
@@ -62,6 +98,12 @@ export class AppDatabase {
   stats: StatsRepository;
   tariffs: TariffRepository;
   vehicles: VehicleRepository;
+
+  // Low-level driver access for seed scripts and migrations. Not for
+  // runtime use — services should go through the repositories.
+  getDriver(): DatabaseDriver {
+    return this.sqlite;
+  }
 
   constructor(
     pathOrDb: string | DatabaseDriver,
@@ -80,6 +122,7 @@ export class AppDatabase {
     this.sqlite.exec("PRAGMA journal_mode = WAL");
     this.sqlite.exec("PRAGMA busy_timeout = 5000");
     this.db = drizzle(this.sqlite as unknown as Parameters<typeof drizzle>[0]);
+    this.chargers = new ChargerRepository(this.db);
     this.config = new ConfigRepository(this.db);
     this.energy = new EnergyRepository(this.db);
     this.logs = new LogRepository(this.db);
@@ -125,7 +168,7 @@ export class AppDatabase {
   async getConfig(key: CoreConfigKey): Promise<string | null> {
     return await this.config.getConfig(key);
   }
-  async setConfig(key: CoreConfigKey, value: string): Promise<void> {
+  async setConfig(key: CoreConfigKey, value: string | null): Promise<void> {
     await this.config.setConfig(key, value);
     this.eventEmitter?.emit("config_changed", { key });
   }
@@ -135,7 +178,7 @@ export class AppDatabase {
   async getPluginConfig(key: string): Promise<string | null> {
     return await this.config.getConfig(key);
   }
-  async setPluginConfig(key: string, value: string): Promise<void> {
+  async setPluginConfig(key: string, value: string | null): Promise<void> {
     await this.config.setConfig(key, value);
     this.eventEmitter?.emit("config_changed", { key });
   }
@@ -154,19 +197,19 @@ export class AppDatabase {
   async hasEncryptedRows(): Promise<boolean> {
     return await this.config.hasEncryptedRows();
   }
-  /**
-   * Store a secret, encrypting it with the configured encryption key if one
-   * is set. Wraps the low-level `setSecret` so callers don't need to know
-   * about encryption.
-   */
-  async storeSecret(key: string, plaintext: string): Promise<void> {
-    await storeSecret(this, key, plaintext, this.encryptionKey);
+  // Store a secret, encrypting it with the configured encryption key if one
+  // is set. Wraps the low-level `setSecret` so callers don't need to know about encryption.
+  async storeSecret(key: string, plaintext: string | null): Promise<void> {
+    // null deletes the row
+    if (plaintext === null) {
+      await this.config.setConfig(key, null);
+    } else {
+      await storeSecret(this, key, plaintext, this.encryptionKey);
+    }
     this.eventEmitter?.emit("config_changed", { key });
   }
-  /**
-   * Read a secret, decrypting it with the configured encryption key if the
-   * stored row is marked encrypted. Wraps the low-level `getSecret`.
-   */
+  // Read a secret, decrypting it with the configured encryption key if the
+  // stored row is marked encrypted. Wraps the low-level `getSecret`.
   async readSecret(key: string): Promise<string | null> {
     return await readSecret(this, key, this.encryptionKey);
   }
@@ -205,6 +248,117 @@ export class AppDatabase {
   async pruneVehicleChargeReadings(retentionDays: number): Promise<void> {
     return await this.vehicles.pruneVehicleChargeReadings(retentionDays);
   }
+  // ---- Chargers ----
+  async getChargers(): Promise<ChargerRow[]> {
+    return await this.chargers.getChargers();
+  }
+  async getCharger(id: string): Promise<ChargerRow | null> {
+    return await this.chargers.getCharger(id);
+  }
+  async upsertCharger(input: UpsertChargerInput): Promise<void> {
+    await this.chargers.upsertCharger(input);
+  }
+  async updateChargerMode(id: string, mode: ChargingPointMode): Promise<void> {
+    await this.chargers.updateChargerMode(id, mode);
+  }
+  async updateChargerPriority(id: string, priority: number): Promise<void> {
+    await this.chargers.updateChargerPriority(id, priority);
+  }
+  async updateChargerActive(id: string, active: boolean): Promise<void> {
+    await this.chargers.updateChargerActive(id, active);
+  }
+  async updateChargerVehicleId(
+    id: string,
+    vehicleId: string | null,
+  ): Promise<void> {
+    await this.chargers.updateChargerVehicleId(id, vehicleId);
+  }
+  async deleteCharger(id: string): Promise<void> {
+    // Schedules reference a charger but have no DB-level FK, so cascade here.
+    await this.schedules.deleteSchedulesByCharger(id);
+    await this.chargers.deleteCharger(id);
+  }
+  async resequenceChargerPriorities(): Promise<void> {
+    await this.chargers.resequencePriorities();
+  }
+
+  // ---- Charger row-scoped config ----
+
+  // Non-secret config for one charger row. Returns `{}` for a row with
+  // nothing stored; throws when the row does not exist, because a caller asking for a missing charger's config has a bug it should hear about.
+  async getChargerConfig(id: string): Promise<ChargerConfigMap> {
+    const json = await this.chargers.getChargerConfigJson(id);
+    if (json === null) throw new Error(`Charger not found: ${id}`);
+    return parseChargerMap(json);
+  }
+
+  // Replace a row's non-secret config wholesale.
+  async setChargerConfig(id: string, config: ChargerConfigMap): Promise<void> {
+    await this.chargers.setChargerConfigJson(id, JSON.stringify(config));
+  }
+
+  // Set/remove individual non-secret keys, leaving the rest intact.
+  async patchChargerConfig(
+    id: string,
+    patch: ChargerConfigPatch,
+  ): Promise<void> {
+    const current = await this.getChargerConfig(id);
+    await this.setChargerConfig(id, applyPatch({ ...current }, patch));
+  }
+
+  // ---- Charger row-scoped secrets ----
+
+  // Secrets for one charger row, decrypted. Throws when the stored value is
+  // marked encrypted but ENCRYPTION_KEY is not set — the same contract as `Encryption.readSecret`. Returning the ciphertext would hand a plugin a "password" that silently fails against the device.
+  async getChargerSecrets(id: string): Promise<ChargerSecretsMap> {
+    const record = await this.chargers.getChargerSecretsRecord(id);
+    if (record === null) throw new Error(`Charger not found: ${id}`);
+    if (!record.isEncrypted) return parseChargerMap(record.value);
+    if (!this.encryptionKey) {
+      throw new Error(
+        `Cannot decrypt secrets for charger ${id}: ENCRYPTION_KEY is not set`,
+      );
+    }
+    return parseChargerMap(await decrypt(record.value, this.encryptionKey));
+  }
+
+  // Replace a row's secrets wholesale. Encrypts when a key is configured,
+  // stores plaintext with the flag at 0 when it is not — the same degradation as `Encryption.storeSecret`, so the app still runs without ENCRYPTION_KEY.
+  async setChargerSecrets(
+    id: string,
+    secrets: ChargerSecretsMap,
+  ): Promise<void> {
+    const json = JSON.stringify(secrets);
+    const { value, isEncrypted } = await maybeEncrypt(json, this.encryptionKey);
+    await this.chargers.setChargerSecretsRecord(id, value, isEncrypted);
+  }
+
+  async createChargerWithConfig(
+    input: UpsertChargerInput,
+    config: ChargerConfigMap,
+    secrets: ChargerSecretsMap,
+  ): Promise<void> {
+    const { value, isEncrypted } = await maybeEncrypt(
+      JSON.stringify(secrets),
+      this.encryptionKey,
+    );
+    await this.chargers.insertCharger({
+      ...input,
+      chargerConfig: JSON.stringify(config),
+      chargerSecrets: value,
+      chargerSecretsEncrypted: isEncrypted,
+    });
+  }
+
+  // Set/remove individual secret keys, leaving the rest intact.
+  async patchChargerSecrets(
+    id: string,
+    patch: ChargerConfigPatch,
+  ): Promise<void> {
+    const current = await this.getChargerSecrets(id);
+    await this.setChargerSecrets(id, applyPatch({ ...current }, patch));
+  }
+
   // ---- Schedules ----
   async getSchedules(): Promise<ScheduleRow[]> {
     return await this.schedules.getSchedules();

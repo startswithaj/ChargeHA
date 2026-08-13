@@ -3,6 +3,10 @@ import { expect } from "@std/expect";
 import { WizardService } from "./WizardService.ts";
 
 describe("WizardService", () => {
+  const stubChargingPoints = {
+    ensureVehicleChargingPoint: () => Promise.resolve(),
+    ensureCharger: () => Promise.resolve({}),
+  } as never;
   const mockLogger = {
     info: () => {},
     error: () => {},
@@ -59,6 +63,7 @@ describe("WizardService", () => {
     vehicleManager?: MockVehicleMgr;
     authService?: MockAuth;
     oidcService?: MockOidc;
+    chargingPoints?: unknown;
   } = {}): WizardService {
     const db = overrides.db ?? defaultDb();
     const tunnelManager = overrides.tunnelManager ?? defaultTunnel();
@@ -73,10 +78,9 @@ describe("WizardService", () => {
       vehicleManager as never,
       authService as never,
       oidcService as never,
+      (overrides.chargingPoints ?? stubChargingPoints) as never,
     );
   }
-
-  // ── getStatus ─────────────────────────────────────────────────────────
 
   describe("getStatus", () => {
     it("returns completed:true when wizard_completed is 'true'", async () => {
@@ -149,8 +153,6 @@ describe("WizardService", () => {
     });
   });
 
-  // ── complete ──────────────────────────────────────────────────────────
-
   describe("complete", () => {
     it("stops tunnel when running and clears wizard state", async () => {
       let tunnelStopped = false;
@@ -166,6 +168,7 @@ describe("WizardService", () => {
           },
         },
         db: {
+          getConfig: () => Promise.resolve(null),
           setConfig: (key: string, value: string) => {
             configSet[key] = value;
             return Promise.resolve();
@@ -177,9 +180,9 @@ describe("WizardService", () => {
 
       expect(tunnelStopped).toBe(true);
       expect(result).toEqual({ completed: true });
-      expect(configSet["wizard_step"]).toBe("");
-      expect(configSet["wizard_vehicle_type"]).toBe("");
-      expect(configSet["wizard_energy_type"]).toBe("");
+      expect(configSet["wizard_step"]).toBe(null);
+      expect(configSet["wizard_vehicle_type"]).toBe(null);
+      expect(configSet["wizard_energy_type"]).toBe(null);
       expect(configSet["wizard_oidc_pending"]).toBe("");
       expect(configSet["wizard_completed"]).toBe("true");
     });
@@ -196,6 +199,7 @@ describe("WizardService", () => {
           },
         },
         db: {
+          getConfig: () => Promise.resolve(null),
           setConfig: () => Promise.resolve(),
         },
       });
@@ -205,8 +209,6 @@ describe("WizardService", () => {
       expect(tunnelStopped).toBe(false);
     });
   });
-
-  // ── Navigation state (getState/patchState) ───────────────────────────
 
   describe("getState", () => {
     it("reads every field from its config key", async () => {
@@ -225,10 +227,12 @@ describe("WizardService", () => {
         stepId: "tesla-credentials",
         vehicleType: "tesla",
         energyType: "fronius_local",
+        chargerType: null,
+        controlPath: null,
       });
     });
 
-    it("defaults each field to empty string when db returns null", async () => {
+    it("defaults each field to null when db returns null", async () => {
       const service = makeService({
         db: {
           getConfig: () => Promise.resolve(null),
@@ -236,9 +240,11 @@ describe("WizardService", () => {
       });
 
       expect(await service.getState()).toEqual({
-        stepId: "",
-        vehicleType: "",
-        energyType: "",
+        stepId: null,
+        vehicleType: null,
+        energyType: null,
+        chargerType: null,
+        controlPath: null,
       });
     });
   });
@@ -248,6 +254,7 @@ describe("WizardService", () => {
       const configSet: Record<string, string> = {};
       const service = makeService({
         db: {
+          getConfig: () => Promise.resolve(null),
           setConfig: (key: string, value: string) => {
             configSet[key] = value;
             return Promise.resolve();
@@ -272,6 +279,7 @@ describe("WizardService", () => {
       const configSet: Record<string, string> = {};
       const service = makeService({
         db: {
+          getConfig: () => Promise.resolve(null),
           setConfig: (key: string, value: string) => {
             configSet[key] = value;
             return Promise.resolve();
@@ -288,6 +296,7 @@ describe("WizardService", () => {
       const configSet: Record<string, string> = {};
       const service = makeService({
         db: {
+          getConfig: () => Promise.resolve(null),
           setConfig: (key: string, value: string) => {
             configSet[key] = value;
             return Promise.resolve();
@@ -301,8 +310,6 @@ describe("WizardService", () => {
       expect(configSet).toEqual({ wizard_energy_type: "" });
     });
   });
-
-  // ── setAuthMode ───────────────────────────────────────────────────────
 
   describe("setAuthMode", () => {
     it("delegates to authService.changeMode with correct input", async () => {
@@ -460,8 +467,6 @@ describe("WizardService", () => {
     });
   });
 
-  // ── saveOidcConfig ────────────────────────────────────────────────────
-
   describe("saveOidcConfig", () => {
     it("tests discovery and saves config", async () => {
       let discoveryTested = false;
@@ -589,8 +594,6 @@ describe("WizardService", () => {
       expect(savedSecret).not.toBe("secret123");
     });
   });
-
-  // ── demoSetup ─────────────────────────────────────────────────────────
 
   describe("demoSetup", () => {
     it("creates simulated vehicle, sets defaults, and registers it", async () => {

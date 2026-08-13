@@ -1,11 +1,7 @@
 import type { AppDatabase } from "../AppDatabase.ts";
 
-/**
- * Demo seed profile — populates the database with realistic-looking data
- * so the dashboard, stats, and logs pages look populated.
- *
- * All timestamps are relative (last 48 hours) so data always looks fresh.
- */
+// Demo seed profile — populates the database with realistic-looking data so
+// the dashboard, stats, and logs pages look populated. All timestamps are relative (last 48 hours) so data always looks fresh.
 
 // ---- Vehicle IDs ----
 const VEHICLE_1_ID = "SIM-DEMO-001";
@@ -15,34 +11,28 @@ const VEHICLE_2_NAME = "Model Y LR";
 
 // ---- Helpers ----
 
-/** Return a UTC ISO string offset from now by `hoursAgo` hours. */
 function hoursAgo(hours: number): string {
   const d = new Date(Date.now() - hours * 3600_000);
   return d.toISOString().replace("T", " ").slice(0, 19);
 }
 
-/** Return the UTC hour (0-23) for a timestamp `hoursAgo` hours from now. */
 function utcHourAt(hoursAgoVal: number): number {
   const d = new Date(Date.now() - hoursAgoVal * 3600_000);
   return d.getUTCHours();
 }
 
-/**
- * Estimate sunrise/sunset in UTC for a southern-hemisphere location (~Sydney).
- * March: sunrise ~20:00 UTC prev day (06:00 AEDT), sunset ~08:00 UTC (18:00 AEDT).
- * We simplify to approximate values.
- */
+// Estimate sunrise/sunset in UTC for a southern-hemisphere location (~Sydney).
+// March: sunrise ~20:00 UTC prev day (06:00 AEDT), sunset ~08:00 UTC (18:00 AEDT). We simplify to approximate values.
 const SUNRISE_UTC = 20; // 06:00 AEDT = 20:00 UTC (previous day conceptually, but hour 20)
 const SUNSET_UTC = 8; // 18:00 AEDT = 08:00 UTC
 
-/** Check if a UTC hour is during daytime (handling the day boundary wrap). */
+// Check if a UTC hour is during daytime (handling the day boundary wrap).
 function isDaytime(utcHour: number, minute: number): boolean {
   const frac = utcHour + minute / 60;
   // Daytime wraps around midnight UTC: 20:00 UTC .. 08:00 UTC next day
   return frac >= SUNRISE_UTC || frac <= SUNSET_UTC;
 }
 
-/** Get solar production for a given UTC hour/minute. */
 function getSolarW(utcHour: number, minute: number): number {
   // Handle the wrap: if hour >= SUNRISE_UTC, map to 0..12; if <= SUNSET_UTC, map to 12..24
   if (!isDaytime(utcHour, minute)) return 0;
@@ -108,6 +98,7 @@ async function seedConfigAndVehicles(db: AppDatabase): Promise<void> {
   await db.createSchedule({
     id: "sched-demo-charge",
     vehicleId: VEHICLE_1_ID,
+    chargerId: null,
     scheduleType: "charge",
     startTime: "06:00",
     endTime: "18:00",
@@ -120,6 +111,7 @@ async function seedConfigAndVehicles(db: AppDatabase): Promise<void> {
   await db.createSchedule({
     id: "sched-demo-blockout",
     vehicleId: null,
+    chargerId: null,
     scheduleType: "blockout",
     startTime: "17:00",
     endTime: "21:00",

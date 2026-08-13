@@ -1,22 +1,17 @@
-import type {
-  AdapterVehicleChargeState,
-  CallContext,
-  VehicleAdapter,
-} from "@chargeha/shared";
+import type { AdapterVehicleChargeState, CallContext } from "@chargeha/shared";
 import type {
   VehicleMiddleware,
   VehicleRequestContext,
-} from "../../../types.ts";
+} from "@chargeha/shared/plugins";
+import type { SimulatedVehicleAdapter } from "./SimulatedVehicleAdapter.ts";
 
-/**
- * Middleware for simulated vehicles. Simulator calls are free and instant,
- * so there is no cost model — every request fetches fresh state and the
- * cache only exists to serve `getCachedState()`.
- */
+// Middleware for simulated vehicles. Simulator calls are free and instant,
+// so there is no cost model — every request fetches fresh state and the
+// cache only exists to serve `getCachedState()`.
 export class SimulatedVehicleMiddleware implements VehicleMiddleware {
   private cachedState: AdapterVehicleChargeState | null = null;
 
-  constructor(private readonly adapter: VehicleAdapter) {}
+  constructor(private readonly adapter: SimulatedVehicleAdapter) {}
 
   async requestState(
     context: VehicleRequestContext,

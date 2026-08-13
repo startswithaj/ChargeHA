@@ -6,9 +6,8 @@ import type {
 import { sleep } from "@chargeha/shared/async";
 import type { TeslaTokenManager } from "./TeslaTokenManager.ts";
 import type { Logger } from "@chargeha/server/lib/Logger";
-import type { PluginDbLogger } from "../../../PluginDbLogger.ts";
+import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 
-/** Execute fn, and if shouldRetry returns true, wait delayMs and try once more. */
 async function retryOn(
   fn: () => Promise<Response>,
   shouldRetry: (r: Response) => boolean,
@@ -43,7 +42,6 @@ const MIN_CHARGE_AMPS = 5;
 const WAKE_POLL_INTERVAL_MS = 15000;
 const WAKE_TIMEOUT_MS = 60000;
 
-/** Tesla Fleet API charge_state fields used by this adapter. */
 interface TeslaChargeState {
   battery_level?: number;
   charge_limit_soc?: number;
@@ -58,19 +56,16 @@ interface TeslaChargeState {
   charge_port_door_open?: boolean;
 }
 
-/** Tesla Fleet API vehicle_state fields used by this adapter. */
 interface TeslaVehicleState {
   vehicle_name?: string;
   car_type?: string;
 }
 
-/** Tesla Fleet API drive_state fields used by this adapter. */
 interface TeslaDriveState {
   latitude?: number;
   longitude?: number;
 }
 
-/** Response shape for /vehicle_data with charge_state + vehicle_state endpoints. */
 interface TeslaVehicleDataResponse {
   charge_state: TeslaChargeState;
   vehicle_state?: TeslaVehicleState;
@@ -78,20 +73,28 @@ interface TeslaVehicleDataResponse {
   state?: string;
 }
 
-/** Response shape for /vehicles list endpoint. */
 interface TeslaVehicleListItem {
   vin: string;
   state: string;
   display_name?: string;
 }
 
-/** Response shape for command endpoints. */
 interface TeslaCommandResponse {
   result: boolean;
   reason?: string;
 }
 
 export class TeslaAdapter implements VehicleAdapter {
+  // Tesla Fleet API cost schedule (effective Jan 2025)
+  // https://developer.tesla.com/docs/fleet-api/billing-and-limits
+  private static readonly API_COSTS: Array<{ pattern: RegExp; cost: number }> =
+    [
+      { pattern: /\/wake_up$/, cost: 0.02 },
+      { pattern: /\/vehicle_data/, cost: 0.002 },
+      { pattern: /\/command\//, cost: 0.001 },
+      { pattern: /\/api\/1\/vehicles$/, cost: 0 },
+    ];
+
   private vin: string;
   private tokenManager: TeslaTokenManager;
   private proxyUrl: string;
@@ -113,7 +116,6 @@ export class TeslaAdapter implements VehicleAdapter {
   }
 
   async connect(ctx: CallContext): Promise<void> {
-    // Verify we can reach the Fleet API
     try {
       await this.isVehicleOnline(ctx);
       this.logger.info(`Connected to vehicle ${this.vin}`);
@@ -235,7 +237,6 @@ export class TeslaAdapter implements VehicleAdapter {
   }
 
   async wakeVehicle(ctx: CallContext): Promise<boolean> {
-    // Check if vehicle is already online before sending wake POST
     if (await this.isVehicleOnline(ctx)) {
       this.logger.debug(`Vehicle ${this.vin} is already online, skipping wake`);
       return true;
@@ -301,25 +302,11 @@ export class TeslaAdapter implements VehicleAdapter {
     return vehicle?.state === "online";
   }
 
-  // ---- Private helpers ----
-
-  // Tesla Fleet API cost schedule (effective Jan 2025)
-  // https://developer.tesla.com/docs/fleet-api/billing-and-limits
-  private static readonly API_COSTS: Array<{ pattern: RegExp; cost: number }> =
-    [
-      { pattern: /\/wake_up$/, cost: 0.02 },
-      { pattern: /\/vehicle_data/, cost: 0.002 },
-      { pattern: /\/command\//, cost: 0.001 },
-      { pattern: /\/api\/1\/vehicles$/, cost: 0 },
-    ];
-
-  /** Look up the per-call cost for an endpoint. */
   private static endpointCost(endpoint: string): number {
     return TeslaAdapter.API_COSTS.find((c) => c.pattern.test(endpoint))?.cost ??
       0;
   }
 
-  /** Map HTTP status codes to user-friendly messages. */
   private friendlyStatus(status: number, context: string): string {
     switch (status) {
       case 401:
@@ -343,7 +330,7 @@ export class TeslaAdapter implements VehicleAdapter {
     }
   }
 
-  /** Try to extract a reason string from a Tesla API error response body. */
+  // Try to extract a reason string from a Tesla API error response body.
   private async parseErrorBody(response: Response): Promise<string | null> {
     try {
       const data = await response.json();

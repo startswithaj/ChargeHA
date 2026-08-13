@@ -13,6 +13,10 @@ import type { SimulatedVehiclePlugin } from "../packages/plugins/vehicles/simula
 import { createFroniusLocalRouter } from "../packages/plugins/energy/fronius-local/server/router.ts";
 import { createFroniusCloudRouter } from "../packages/plugins/energy/fronius-cloud/server/router.ts";
 import { createSimulatedEnergyRouter } from "../packages/plugins/energy/simulated/server/router.ts";
+import { createTapoRouter } from "../packages/plugins/chargers/tapo/server/router.ts";
+import { createOcppRouter } from "../packages/plugins/chargers/ocpp/server/router.ts";
+import type { OcppCentralSystem } from "../packages/plugins/chargers/ocpp/server/OcppCentralSystem.ts";
+import { createSimulatedChargerRouter } from "../packages/plugins/chargers/simulated/server/router.ts";
 import type { PluginDependencies } from "../packages/server/src/bootstrap/PluginDependencies.ts";
 import {
   GATED_MUTATIONS,
@@ -48,6 +52,14 @@ const realPaths = (type: "query" | "mutation"): string[] => {
       simulated_energy: createSimulatedEnergyRouter(
         stubDeps("simulated_energy"),
       ),
+    },
+    charger: {
+      tapo: createTapoRouter(stubDeps("tapo")),
+      ocpp: createOcppRouter(
+        stubDeps("ocpp"),
+        {} as unknown as OcppCentralSystem,
+      ),
+      simulated_charger: createSimulatedChargerRouter(() => []),
     },
   });
   const procedures = (merged as unknown as {

@@ -1,11 +1,9 @@
 import { StepHost } from "../../StepHost.tsx";
 import type { StepDef, StepProps, WizardAdvance } from "../../flow.ts";
 
-/**
- * Mounts one step the way the shell does — through the real StepHost, so the
- * step's Next button, its gate and its save are exercised together rather than
- * against a stand-in. Nav chrome is stubbed; everything else is production code.
- */
+// Mounts one step through the real StepHost, so its Next button, gate and
+// save are exercised together rather than against a stand-in. Nav chrome
+// is stubbed; everything else is production code.
 export function StepNextHarness(
   { def, onAdvance = () => {}, stepProps, isLastStep = false }: {
     def: StepDef;
@@ -22,6 +20,8 @@ export function StepNextHarness(
         onBack: () => {},
         onSkipTo: () => {},
         onSkipToEnd: () => {},
+        chargerId: null,
+        setChargerId: () => {},
         ...stepProps,
       }}
       nav={{

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type ComponentProps, useEffect, useState } from "react";
 import {
   BatteryCharging,
   Car,
@@ -7,6 +7,7 @@ import {
   RefreshCw,
   TriangleAlert,
   Unplug,
+  Zap,
 } from "lucide-react";
 import { Badge, Button, Callout, Card, Skeleton, Text } from "@radix-ui/themes";
 import type { VehicleChargeState, VehicleMode } from "@chargeha/shared";
@@ -14,7 +15,11 @@ import { formatRelativeTime } from "../../utils/Format.ts";
 import { StaticMap } from "../StaticMap/StaticMap.tsx";
 import { Spinner } from "../ui/Spinner.tsx";
 import { ErrorBanner } from "../ui/ErrorBanner.tsx";
-import { VehicleCardDetails } from "./VehicleCardDetails.tsx";
+import {
+  PairedChargeDetails,
+  VehicleCardDetails,
+} from "./VehicleCardDetails.tsx";
+import layout from "../ui/CardLayout.module.css";
 import styles from "./VehicleCard.module.css";
 
 interface VehicleCardProps {
@@ -42,6 +47,31 @@ interface VehicleCardProps {
   pollingSuspendReason?: string | null;
   controllerReason?: string | null;
   controllerDetail?: string | null;
+  chargerStatus?: { status: string; statusDetail: string | null } | null;
+  // Data-only vehicle: charging is owned by a smart charger, so no
+  // mode/start/stop/amps controls render.
+  readOnly?: boolean;
+  // An object rather than a bare string so the absent case (no charger of
+  // its own) is one null.
+  chargingPoint?: { name: string } | null;
+}
+
+function ChargerStatusLine(
+  { chargerStatus }: {
+    chargerStatus: { status: string; statusDetail: string | null } | null;
+  },
+) {
+  if (!chargerStatus) return null;
+  if (chargerStatus.status === "no_draw") {
+    return (
+      <Text size="2" color="gray">
+        No draw — vehicle may be absent, finished, or paused
+        {chargerStatus.statusDetail ? ` (${chargerStatus.statusDetail})` : ""}
+      </Text>
+    );
+  }
+  if (!chargerStatus.statusDetail) return null;
+  return <Text size="1" color="gray">{chargerStatus.statusDetail}</Text>;
 }
 
 const MODE_LABELS: Record<VehicleMode, string> = {
@@ -89,21 +119,55 @@ const MODE_BUTTONS: {
   { value: "charge_now", label: "CHARGE NOW", color: "green" },
 ];
 
+function ChargingPointBadge(
+  { chargingPoint }: {
+    chargingPoint: { name: string };
+  },
+) {
+  return (
+    <Badge variant="soft" size="1" title="Charging on this charger">
+      <Zap size={11} style={{ color: "var(--color-charging)" }} />
+      {chargingPoint.name}
+    </Badge>
+  );
+}
+
+// A paired card keeps the information and loses only the controls: the
+// charger card above it owns every row it measures, so repeating it here
+// would be the same fact twice.
+function ChargeDetailsSection(
+  { readOnly, ...props }:
+    & { readOnly: boolean }
+    & ComponentProps<typeof VehicleCardDetails>,
+) {
+  if (readOnly) {
+    return (
+      <PairedChargeDetails
+        state={props.state}
+        chargeLimitPercent={props.chargeLimitPercent}
+      />
+    );
+  }
+  return <VehicleCardDetails {...props} />;
+}
+
 function VehicleCardHeader(
-  { name, priority, isOnline, lastUpdatedText, onRefresh }: {
+  { name, priority, isOnline, lastUpdatedText, onRefresh, chargingPoint }: {
     name: string;
     priority: number;
     isOnline: boolean;
     lastUpdatedText: string | null;
     onRefresh?: () => Promise<unknown>;
+    chargingPoint: { name: string } | null;
   },
 ) {
   const [refreshing, setRefreshing] = useState(false);
   return (
-    <div className={styles.header}>
-      <div className={styles.headerLeft}>
+    <div className={layout.header}>
+      <div className={layout.headerLeft}>
         <Car size={20} style={{ color: "var(--color-vehicle)" }} />
         <Text size="3" weight="bold">{name}</Text>
+        {chargingPoint && <ChargingPointBadge chargingPoint={chargingPoint} />}
         <Badge variant="outline" color="gray" size="1">
           Priority {priority}
         </Badge>
@@ -214,7 +278,7 @@ function VehicleModeToggle(
 ) {
   return (
     <>
-      <div className={styles.modeToggle}>
+      <div className={layout.modeToggle}>
         {MODE_BUTTONS.map((btn) => (
           <Button
             key={btn.value}
@@ -300,10 +364,13 @@ export function VehicleCard({
   pollingSuspendReason,
   controllerReason,
   controllerDetail,
+  chargerStatus,
+  readOnly = false,
+  chargingPoint,
 }: VehicleCardProps) {
   if (loading) {
     return (
-      <Card className={styles.card}>
+      <Card className={layout.card}>
         <Skeleton width="100%" height="180px" />
       </Card>
     );
@@ -326,7 +393,7 @@ export function VehicleCard({
 
   return (
     <Card
-      className={styles.card}
+      className={layout.card}
       style={{ "--accent": "var(--color-vehicle)" } as React.CSSProperties}
     >
       <VehicleCardHeader
@@ -335,22 +402,25 @@ export function VehicleCard({
         isOnline={state.isOnline}
         lastUpdatedText={lastUpdatedText}
         onRefresh={onRefresh}
+        chargingPoint={chargingPoint ?? null}
       />
       <VehicleCardBanners
-        commandsDisabled={commandsDisabled}
+        commandsDisabled={!readOnly && commandsDisabled}
         commandsDisabledReason={commandsDisabledReason}
         onNavigateSettings={onNavigateSettings}
         vehicleError={vehicleError}
         pollingSuspended={pollingSuspended}
         pollingSuspendReason={pollingSuspendReason}
       />
-      <VehicleModeToggle
-        mode={mode}
-        disabled={disabled}
-        isPluggedIn={state.isPluggedIn}
-        pending={pending}
-        onChangeMode={onChangeMode}
-      />
+      {!readOnly && (
+        <VehicleModeToggle
+          mode={mode}
+          disabled={disabled}
+          isPluggedIn={state.isPluggedIn}
+          pending={pending}
+          onChangeMode={onChangeMode}
+        />
+      )}
       <VehicleBatterySection
         batteryPercent={batteryPercent}
         chargeLimitPercent={chargeLimitPercent}
@@ -358,29 +428,31 @@ export function VehicleCard({
       />
 
       {/* Status */}
-      <div className={styles.status}>
+      <div className={layout.status}>
         <StatusIcon state={state} />
         <Text size="2">{getStatusText(state, mode, atHome)}</Text>
       </div>
 
+      <ChargerStatusLine chargerStatus={chargerStatus ?? null} />
+
       {/* Spacer when unplugged so the card has room for the map below. */}
       {!state.isPluggedIn && <div style={{ height: 20 }} />}
 
-      {/* Charge details and controls (when plugged in) */}
       {state.isPluggedIn && (
-        <VehicleCardDetails
+        <ChargeDetailsSection
+          readOnly={readOnly}
+          chargeLimitPercent={chargeLimitPercent}
+          disabled={disabled}
+          state={state}
           allocationStatus={allocationStatus ?? null}
           controllerReason={controllerReason ?? null}
           controllerDetail={controllerDetail ?? null}
-          state={state}
-          disabled={disabled}
           commandPending={commandPending}
           onStartCharging={onStartCharging}
           onStopCharging={onStopCharging}
           onSetAmps={onSetAmps}
           solarPowerW={solarPowerW}
           gridPowerW={gridPowerW}
-          chargeLimitPercent={chargeLimitPercent}
         />
       )}
 

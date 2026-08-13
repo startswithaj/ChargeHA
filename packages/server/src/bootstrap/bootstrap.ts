@@ -35,10 +35,12 @@ import { NotificationListener } from "../services/NotificationListener.ts";
 import { ChargeController } from "../services/ChargeController.ts";
 import { Overseer } from "../services/Overseer.ts";
 import { HealthService } from "../services/HealthService.ts";
+import { ChargingPointManager } from "../services/ChargingPointManager.ts";
 
 import { VehiclePluginRegistry } from "./VehiclePluginRegistry.ts";
 import { EnergyPluginRegistry } from "./EnergyPluginRegistry.ts";
-import { registerPlugins } from "@chargeha/plugins/registerPlugins";
+import { ChargerPluginRegistry } from "./ChargerPluginRegistry.ts";
+import type { PluginDependenciesInit } from "./PluginDependencies.ts";
 
 import {
   createAuthMiddleware,
@@ -60,30 +62,25 @@ function parseLogLevel(raw: string | undefined): LogLevel {
   return "info";
 }
 
-/**
- * Construct the entire app: infrastructure, services, plugins, HTTP router.
- * Returns a `shutdown` function that stops the server, shuts down plugins,
- * closes the tunnel, and closes the DB.
- */
 function buildAuxServices(
   {
     db,
-    energyManager,
     encryptionKey,
     logLevel,
     port,
     vehicleRegistry,
     vehicleManager,
-    eventEmitter,
+    configService,
+    chargingPointManager,
   }: {
     db: AppDatabase;
-    energyManager: EnergyAdapterManager;
     encryptionKey: string | null;
     logLevel: "debug" | "info" | "warn" | "error";
     port: number;
     vehicleRegistry: VehiclePluginRegistry;
     vehicleManager: VehicleManager;
-    eventEmitter: TypedEventEmitter;
+    configService: ConfigService;
+    chargingPointManager: ChargingPointManager;
   },
 ) {
   const tariffService = new TariffService(
@@ -91,12 +88,6 @@ function buildAuxServices(
     new Logger("TariffService", logLevel),
   );
   const statsService = new StatsService(db);
-  const configService = new ConfigService(
-    db,
-    energyManager,
-    encryptionKey,
-    new Logger("ConfigService", logLevel),
-  );
   const geocodeService = new GeocodeService(new Logger("Geocode", logLevel));
   const oidcService = new OidcService(
     db,
@@ -129,27 +120,13 @@ function buildAuxServices(
     vehicleManager,
     authService,
     oidcService,
+    chargingPointManager,
   );
   const logService = new LogService(db);
-
-  new DataRecorder(
-    db,
-    vehicleManager,
-    tariffService,
-    eventEmitter,
-    new Logger("DataRecorder", logLevel),
-  );
-  const poller = new EnergyPoller(
-    energyManager,
-    eventEmitter,
-    db,
-    new Logger("EnergyPoller", logLevel),
-  );
 
   return {
     tariffService,
     statsService,
-    configService,
     geocodeService,
     oidcService,
     rateLimiter,
@@ -158,7 +135,6 @@ function buildAuxServices(
     tunnelManager,
     wizardService,
     logService,
-    poller,
   };
 }
 
@@ -180,31 +156,69 @@ function registerNotificationListeners(
   );
 }
 
-function buildServices(
+function startBackgroundServices(
+  {
+    db,
+    vehicleManager,
+    chargingPointManager,
+    poller,
+    configService,
+    tariffService,
+    eventEmitter,
+    logLevel,
+  }: {
+    db: AppDatabase;
+    vehicleManager: VehicleManager;
+    chargingPointManager: ChargingPointManager;
+    poller: EnergyPoller;
+    configService: ConfigService;
+    tariffService: TariffService;
+    eventEmitter: TypedEventEmitter;
+    logLevel: LogLevel;
+  },
+): void {
+  new DataRecorder(
+    db,
+    vehicleManager,
+    chargingPointManager,
+    tariffService,
+    eventEmitter,
+    new Logger("DataRecorder", logLevel),
+  );
+  new ChargeController(
+    vehicleManager,
+    chargingPointManager,
+    poller,
+    db,
+    configService,
+    eventEmitter,
+    new Logger("ChargeController", logLevel),
+  );
+  new Overseer(db, eventEmitter, new Logger("Overseer", logLevel));
+}
+
+// Construction order matters: energyManager → configService →
+// chargingPointManager is a dependency chain, and everything downstream
+// (vehicleService, aux services, poller) takes direct references.
+function buildManagers(
   {
     db,
     eventEmitter,
     encryptionKey,
     vehicleRegistry,
     energyRegistry,
+    chargerRegistry,
     logLevel,
-    port,
   }: {
     db: AppDatabase;
     eventEmitter: TypedEventEmitter;
     encryptionKey: string | null;
     vehicleRegistry: VehiclePluginRegistry;
     energyRegistry: EnergyPluginRegistry;
-    logLevel: "debug" | "info" | "warn" | "error";
-    port: number;
+    chargerRegistry: ChargerPluginRegistry;
+    logLevel: LogLevel;
   },
 ) {
-  const notificationService = new NotificationService(
-    db,
-    [new TelegramProvider(db)],
-    new Logger("Notifications", logLevel),
-  );
-  new VehicleFetchLogger(db, eventEmitter, new Logger("FetchLog", logLevel));
   const vehicleManager = new VehicleManager(
     db,
     eventEmitter,
@@ -216,27 +230,81 @@ function buildServices(
     energyRegistry,
     new Logger("EnergyAdapter", logLevel),
   );
+  const configService = new ConfigService(
+    db,
+    energyManager,
+    encryptionKey,
+    new Logger("ConfigService", logLevel),
+  );
+  const chargingPointManager = new ChargingPointManager(
+    db,
+    chargerRegistry,
+    vehicleManager,
+    configService,
+    eventEmitter,
+    new Logger("ChargingPointManager", logLevel),
+  );
+  return { vehicleManager, energyManager, configService, chargingPointManager };
+}
+
+function buildServices(
+  {
+    db,
+    eventEmitter,
+    encryptionKey,
+    vehicleRegistry,
+    energyRegistry,
+    chargerRegistry,
+    logLevel,
+    port,
+  }: {
+    db: AppDatabase;
+    eventEmitter: TypedEventEmitter;
+    encryptionKey: string | null;
+    vehicleRegistry: VehiclePluginRegistry;
+    energyRegistry: EnergyPluginRegistry;
+    chargerRegistry: ChargerPluginRegistry;
+    logLevel: "debug" | "info" | "warn" | "error";
+    port: number;
+  },
+) {
+  const notificationService = new NotificationService(
+    db,
+    [new TelegramProvider(db)],
+    new Logger("Notifications", logLevel),
+  );
+  new VehicleFetchLogger(db, eventEmitter, new Logger("FetchLog", logLevel));
+  const { vehicleManager, energyManager, configService, chargingPointManager } =
+    buildManagers({
+      db,
+      eventEmitter,
+      encryptionKey,
+      vehicleRegistry,
+      energyRegistry,
+      chargerRegistry,
+      logLevel,
+    });
   const vehicleService = new VehicleService(
     db,
     vehicleManager,
     vehicleRegistry,
     eventEmitter,
     new Logger("VehicleService", logLevel),
+    chargingPointManager,
   );
   const auxServices = buildAuxServices({
     db,
-    energyManager,
     encryptionKey,
     logLevel,
     port,
     vehicleRegistry,
     vehicleManager,
-    eventEmitter,
+    configService,
+    chargingPointManager,
   });
   const {
     tariffService,
     statsService,
-    configService,
     geocodeService,
     oidcService,
     rateLimiter,
@@ -245,7 +313,6 @@ function buildServices(
     tunnelManager,
     wizardService,
     logService,
-    poller,
   } = auxServices;
 
   registerNotificationListeners({
@@ -256,25 +323,36 @@ function buildServices(
     logLevel,
   });
 
+  const poller = new EnergyPoller(
+    energyManager,
+    chargingPointManager,
+    eventEmitter,
+    db,
+    new Logger("EnergyPoller", logLevel),
+  );
+
   const healthService = new HealthService(
     vehicleRegistry,
     energyRegistry,
+    chargerRegistry,
     encryptionKey,
   );
 
-  new ChargeController(
-    vehicleManager,
-    poller,
+  startBackgroundServices({
     db,
+    vehicleManager,
+    chargingPointManager,
+    poller,
     configService,
+    tariffService,
     eventEmitter,
-    new Logger("ChargeController", logLevel),
-  );
-  new Overseer(db, eventEmitter, new Logger("Overseer", logLevel));
+    logLevel,
+  });
 
   return {
     notificationService,
     vehicleManager,
+    chargingPointManager,
     energyManager,
     vehicleService,
     tariffService,
@@ -299,6 +377,7 @@ function buildHttpApp(
     services,
     vehicleRegistry,
     energyRegistry,
+    chargerRegistry,
     eventEmitter,
     encryptionKey,
     logLevel,
@@ -307,6 +386,7 @@ function buildHttpApp(
     services: ReturnType<typeof buildServices>;
     vehicleRegistry: VehiclePluginRegistry;
     energyRegistry: EnergyPluginRegistry;
+    chargerRegistry: ChargerPluginRegistry;
     eventEmitter: TypedEventEmitter;
     encryptionKey: string | null;
     logLevel: "debug" | "info" | "warn" | "error";
@@ -315,9 +395,24 @@ function buildHttpApp(
   const appRouter = createAppRouter({
     vehicle: vehicleRegistry.getPluginRouters(),
     energy: energyRegistry.getPluginRouters(),
+    charger: chargerRegistry.getPluginRouters(),
   });
 
+  const allRoutes = [
+    ...vehicleRegistry.getHttpRoutes(),
+    ...chargerRegistry.getHttpRoutes(),
+  ];
+
   const app = new Hono();
+  // Public device-facing routes mount BEFORE the browser-security and auth
+  // middleware: devices don't speak cookies or CSP, and header middleware
+  // touching a WebSocket upgrade response breaks Deno's upgrade contract
+  // ("Upgrade response was not returned from callback"), killing the serve
+  // loop. Private plugin routes mount after auth as before.
+  allRoutes
+    .filter((r) => r.public)
+    .forEach(({ fullPath, routes }) => app.route(fullPath, routes));
+
   app.use(secureHeaders({ strictTransportSecurity: false }));
   app.use(hstsMiddleware());
 
@@ -327,6 +422,7 @@ function buildHttpApp(
       authService: services.authService,
       configService: services.configService,
       logger: authLogger,
+      publicPrefixes: allRoutes.filter((r) => r.public).map((r) => r.fullPath),
     }),
   );
   app.route(
@@ -338,15 +434,15 @@ function buildHttpApp(
     }),
   );
 
-  vehicleRegistry.getAll().forEach((plugin) => {
-    const httpRoutes = plugin.getHttpRoutes();
-    if (httpRoutes) app.route(`/api/vehicle/${plugin.id}`, httpRoutes);
-  });
+  allRoutes
+    .filter((r) => !r.public)
+    .forEach(({ fullPath, routes }) => app.route(fullPath, routes));
 
   const trpcLogger = new Logger("tRPC", logLevel);
   setupTrpcEndpoint(app, appRouter, {
     db,
     vehicleManager: services.vehicleManager,
+    chargingPointManager: services.chargingPointManager,
     vehicleService: services.vehicleService,
     vehicleRegistry,
     energyRegistry,
@@ -384,6 +480,7 @@ function setupTrpcEndpoint(
   ctx: {
     db: AppDatabase;
     vehicleManager: VehicleManager;
+    chargingPointManager: ChargingPointManager;
     vehicleService: VehicleService;
     vehicleRegistry: VehiclePluginRegistry;
     energyRegistry: EnergyPluginRegistry;
@@ -415,6 +512,7 @@ function setupTrpcEndpoint(
       createContext: (): TrpcContext => ({
         db: ctx.db,
         vehicleManager: ctx.vehicleManager,
+        chargingPointManager: ctx.chargingPointManager,
         vehicleService: ctx.vehicleService,
         vehiclePlugins: ctx.vehicleRegistry,
         energyPlugins: ctx.energyRegistry,
@@ -448,7 +546,20 @@ function setupTrpcEndpoint(
   });
 }
 
-export async function bootstrap(): Promise<
+// Supplied by the entrypoint rather than imported here: naming the plugin set
+// is the composition root's job, and the host must not depend on the package that depends on it.
+export type RegisterPlugins = (
+  host: Omit<PluginDependenciesInit, "pluginId">,
+  vehicleRegistry: VehiclePluginRegistry,
+  energyRegistry: EnergyPluginRegistry,
+  chargerRegistry: ChargerPluginRegistry,
+) => void;
+
+// Construct the entire app: infrastructure, services, plugins, HTTP router.
+// Returns a `shutdown` function that stops the server, shuts down plugins, closes the tunnel, and closes the DB.
+export async function bootstrap(
+  registerPlugins: RegisterPlugins,
+): Promise<
   { shutdown: () => Promise<void> }
 > {
   // ── Infrastructure ────────────────────────────────────────────────────
@@ -485,6 +596,7 @@ export async function bootstrap(): Promise<
   // ── Empty plugin registries (populated by registerPlugins below) ──────
   const vehicleRegistry = new VehiclePluginRegistry();
   const energyRegistry = new EnergyPluginRegistry();
+  const chargerRegistry = new ChargerPluginRegistry();
 
   const services = buildServices({
     db,
@@ -492,6 +604,7 @@ export async function bootstrap(): Promise<
     encryptionKey,
     vehicleRegistry,
     energyRegistry,
+    chargerRegistry,
     logLevel,
     port,
   });
@@ -501,7 +614,7 @@ export async function bootstrap(): Promise<
     {
       db,
       vehicleManager: services.vehicleManager,
-      energyManager: services.energyManager,
+      chargingPoints: services.chargingPointManager,
       tunnel: {
         getUrl: () => services.tunnelManager.tunnelUrl,
         start: async () => ({ url: await services.tunnelManager.start() }),
@@ -513,13 +626,17 @@ export async function bootstrap(): Promise<
     },
     vehicleRegistry,
     energyRegistry,
+    chargerRegistry,
   );
+
+  await services.chargingPointManager.init();
 
   const app = buildHttpApp({
     db,
     services,
     vehicleRegistry,
     energyRegistry,
+    chargerRegistry,
     eventEmitter,
     encryptionKey,
     logLevel,
@@ -532,14 +649,23 @@ export async function bootstrap(): Promise<
 
   return {
     shutdown: async () => {
+      // Every step runs even if an earlier one throws, so one bad plugin
+      // cannot leave the tunnel up or the DB open.
+      const step = async (name: string, fn: () => Promise<void> | void) => {
+        try {
+          await fn();
+        } catch (err) {
+          serverLogger.error(`Shutdown step "${name}" failed:`, err);
+        }
+      };
       // Stop the HTTP server first so in-flight requests don't hit a closed DB.
-      await server.shutdown();
+      await step("http server", () => server.shutdown());
       // Tesla plugin's shutdown() reaps the tesla-http-proxy subprocess
-      await vehicleRegistry.shutdownAll();
-      await energyRegistry.shutdownAll();
-
-      await services.tunnelManager.stop();
-      db.close();
+      await step("vehicle plugins", () => vehicleRegistry.shutdownAll());
+      await step("energy plugins", () => energyRegistry.shutdownAll());
+      await step("charger plugins", () => chargerRegistry.shutdownAll());
+      await step("tunnel", () => services.tunnelManager.stop());
+      await step("database", () => db.close());
     },
   };
 }

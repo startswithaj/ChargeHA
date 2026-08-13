@@ -23,11 +23,26 @@ export interface DemoVehicle {
   isCharging: boolean;
   isPluggedIn: boolean;
   chargeAmps: number;
+  // Undefined means yes.
+  apiControlActive?: boolean;
+}
+
+export interface DemoCharger {
+  id: string;
+  name: string;
+  chargerAdapterType: string;
+  mode: DemoVehicleMode;
+  priority: number;
+  vehicleId: string | null;
+  // Simulated-charger dev knobs (plugged-in car and its onboard limit).
+  simPluggedIn?: boolean;
+  simCarMaxAmps?: number;
 }
 
 export interface DemoSchedule {
   id: string;
   vehicleId: string | null;
+  chargerId: string | null;
   scheduleType: string;
   startTime: string;
   endTime: string;
@@ -49,16 +64,17 @@ export interface DemoTariff {
   updatedAt: string;
 }
 
-/** Everything the user can change — persisted to sessionStorage. */
+// Persisted to sessionStorage.
 export interface DemoMutable {
   config: Record<string, string>;
   vehicles: DemoVehicle[];
+  chargers: DemoCharger[];
   schedules: DemoSchedule[];
   tariffs: DemoTariff[];
   authenticated: boolean;
 }
 
-/** Full demo state — mutable slices plus the (non-persisted) simulated series. */
+// Mutable slices plus the (non-persisted) simulated series.
 export interface DemoState extends DemoMutable {
   series: DemoSeries;
 }
@@ -74,7 +90,7 @@ export const ALL_DAYS: DayOfWeek[] = [
 ];
 const SEED_AT = "2026-01-01T00:00:00.000Z";
 
-/** Default config — lands on the first-run wizard (no adapter, no vehicles). */
+// Lands on the first-run wizard (no adapter, no vehicles).
 const defaultConfig = (): Record<string, string> => ({
   home_latitude: "-33.8688",
   home_longitude: "151.2093",
@@ -122,6 +138,7 @@ const defaultTariffs = (): DemoTariff[] => [
 const defaultMutable = (): DemoMutable => ({
   config: defaultConfig(),
   vehicles: [],
+  chargers: [],
   schedules: [],
   tariffs: defaultTariffs(),
   authenticated: false,
@@ -131,7 +148,6 @@ const defaultMutable = (): DemoMutable => ({
 // deno-lint-ignore custom-no-let/no-let
 let state: DemoState | null = null;
 
-/** Initialise demo state: build the series and hydrate persisted edits. */
 export const initDemoState = async (): Promise<DemoState> => {
   if (state) return state;
   const series = await loadDemoSeries();
@@ -150,6 +166,7 @@ export const getDemoState = (): DemoState => {
 const toMutable = (s: DemoState): DemoMutable => ({
   config: s.config,
   vehicles: s.vehicles,
+  chargers: s.chargers,
   schedules: s.schedules,
   tariffs: s.tariffs,
   authenticated: s.authenticated,
@@ -166,18 +183,17 @@ const applyUpdate = (
   return state;
 };
 
-/** Apply a change to the mutable state, persist it, and return the new state. */
 export const updateDemoState = (
   fn: (m: DemoMutable) => DemoMutable,
 ): DemoState => applyUpdate(fn, true);
 
-/** Apply a change WITHOUT persisting — for the realtime tick's live controller,
- *  which updates state every few seconds and must not spam sessionStorage. */
+// For the realtime tick's live controller, which updates state every few
+// seconds and must not spam sessionStorage.
 export const updateDemoStateLive = (
   fn: (m: DemoMutable) => DemoMutable,
 ): DemoState => applyUpdate(fn, false);
 
-/** Test-only: clear the singleton so the next init starts fresh. */
+// Test-only.
 export const resetDemoState = (): void => {
   state = null;
 };

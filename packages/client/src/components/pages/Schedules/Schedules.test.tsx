@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import {
   blockoutSchedule,
+  chargerKeyedSchedule,
   chargeSchedule,
+  makeChargerRow,
   makeSchedulesReturn,
   makeVehicle,
   makeVehiclesReturn,
@@ -27,6 +29,18 @@ vi.mock("../../../hooks/useSchedules.ts", () => ({
     toggleSchedule: vi.fn(),
     removeSchedule: vi.fn(),
   })),
+}));
+
+// Schedule sections derive from charging points, so the mock mirrors the
+// currently-mocked vehicles: one linked point per vehicle.
+const chargersHolder = vi.hoisted(
+  (): { chargers: Array<Record<string, unknown>> } => ({ chargers: [] }),
+);
+vi.mock("../../../hooks/useChargers.ts", () => ({
+  useChargers: () => ({
+    chargers: chargersHolder.chargers,
+    isLoading: false,
+  }),
 }));
 
 vi.mock("../../../hooks/useVehicles.ts", () => ({
@@ -129,7 +143,30 @@ vi.mock("../../ScheduleDialog/ScheduleDialog.tsx", () => ({
 
 describe("Schedules", () => {
   const setVehicles = (overrides: Partial<UseVehiclesReturn> = {}): void => {
-    vi.mocked(useVehicles).mockReturnValue(makeVehiclesReturn(overrides));
+    const vehiclesReturn = makeVehiclesReturn(overrides);
+    vi.mocked(useVehicles).mockReturnValue(vehiclesReturn);
+    chargersHolder.chargers = vehiclesReturn.vehicles.map((v) => ({
+      id: `cp-${v.id}`,
+      name: v.name,
+      chargerAdapterType: v.adapterType,
+      chargerConfig: "{}",
+      mode: v.mode,
+      priority: v.priority,
+      vehicleId: v.id,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      state: null,
+      // A vehicle-linked point is tied to its car by construction.
+      kind: "vehicle_api",
+      resolvedVehicleId: v.id,
+      vehicleResolution: "linked",
+    }));
+  };
+  // Replaces the charging points setVehicles derived. setVehicles REBUILDS
+  // chargersHolder from its vehicles, so a test that needs both must call
+  // setVehicles first and setChargers second, or the custom rows are lost.
+  const setChargers = (chargers: Array<Record<string, unknown>>): void => {
+    chargersHolder.chargers = chargers;
   };
   const setSchedules = (overrides: Partial<UseSchedulesReturn> = {}): void => {
     vi.mocked(useSchedules).mockReturnValue(makeSchedulesReturn(overrides));
@@ -152,8 +189,6 @@ describe("Schedules", () => {
     cleanup();
   });
 
-  // ---- Basic rendering ----
-
   it("renders Blockout Schedules section", () => {
     renderWithProviders(<Schedules />);
 
@@ -167,8 +202,6 @@ describe("Schedules", () => {
 
     expect(screen.getByText("Loading...")).toBeInTheDocument();
   });
-
-  // ---- No-vehicle empty state ----
 
   it("renders no vehicles empty state when vehicles list is empty", () => {
     setVehicles({ vehicles: [] });
@@ -202,8 +235,6 @@ describe("Schedules", () => {
     ).toBeInTheDocument();
   });
 
-  // ---- Vehicle section rendering ----
-
   it("renders vehicle name in section header", () => {
     renderWithProviders(<Schedules />);
 
@@ -216,8 +247,6 @@ describe("Schedules", () => {
     expect(screen.getByText("tesla")).toBeInTheDocument();
   });
 
-  // ---- Empty schedule state per vehicle ----
-
   it("renders empty schedule message when vehicle has no charge schedules", () => {
     renderWithProviders(<Schedules />);
 
@@ -225,8 +254,6 @@ describe("Schedules", () => {
       screen.getByText("No charge schedules for this vehicle."),
     ).toBeInTheDocument();
   });
-
-  // ---- Existing charge schedule cards ----
 
   it("renders the schedule card and hides the empty-state copy when a charge schedule exists", () => {
     setSchedules({
@@ -243,8 +270,6 @@ describe("Schedules", () => {
       screen.queryByText("No charge schedules for this vehicle."),
     ).not.toBeInTheDocument();
   });
-
-  // ---- Add Schedule button ----
 
   it("shows inline schedule form when Add Schedule is clicked", () => {
     renderWithProviders(<Schedules />);
@@ -270,8 +295,6 @@ describe("Schedules", () => {
     expect(screen.queryByTestId("schedule-form")).not.toBeInTheDocument();
     expect(screen.getByText("Add Schedule")).toBeInTheDocument();
   });
-
-  // ---- Blockout section ----
 
   it("renders empty blockout state when no blockout schedules exist", () => {
     renderWithProviders(<Schedules />);
@@ -333,8 +356,6 @@ describe("Schedules", () => {
     expect(screen.getByText("Add Blockout Period")).toBeInTheDocument();
   });
 
-  // ---- Info card / footer content ----
-
   it("renders informational footer copy", () => {
     renderWithProviders(<Schedules />);
 
@@ -353,8 +374,6 @@ describe("Schedules", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/Times shown in/)).toBeInTheDocument();
   });
-
-  // ---- Multiple vehicles ----
 
   it("renders a section header and empty state per vehicle", () => {
     setVehicles({
@@ -385,8 +404,6 @@ describe("Schedules", () => {
 
     expect(screen.getAllByText("Add Schedule")).toHaveLength(2);
   });
-
-  // ---- Edit flow for charge schedules ----
 
   it("opens edit form when Edit button is clicked on a charge schedule card", () => {
     setSchedules({
@@ -450,8 +467,6 @@ describe("Schedules", () => {
     expect(screen.getByTestId("schedule-card")).toBeInTheDocument();
   });
 
-  // ---- Edit flow for blockout schedules ----
-
   it("opens edit form when Edit button is clicked on a blockout schedule card", () => {
     setSchedules({
       schedules: [blockoutSchedule],
@@ -480,8 +495,6 @@ describe("Schedules", () => {
 
     expect(screen.queryByText("Add Blockout Period")).not.toBeInTheDocument();
   });
-
-  // ---- Delete flow ----
 
   it("calls removeSchedule when Delete button is clicked on a charge schedule", () => {
     const removeSchedule = vi.fn();
@@ -513,8 +526,6 @@ describe("Schedules", () => {
     expect(removeSchedule).toHaveBeenCalledWith("sched-blockout-1");
   });
 
-  // ---- Toggle flow ----
-
   it("calls toggleSchedule when Toggle button is clicked on a schedule", () => {
     const toggleSchedule = vi.fn();
     setSchedules({
@@ -529,8 +540,6 @@ describe("Schedules", () => {
 
     expect(toggleSchedule).toHaveBeenCalledWith("sched-1", false);
   });
-
-  // ---- handleSave routes to addSchedule for new schedules ----
 
   it("calls addSchedule when save is triggered on a create-charge form", () => {
     const addSchedule = vi.fn().mockResolvedValue(null);
@@ -556,8 +565,6 @@ describe("Schedules", () => {
     expect(addSchedule).toHaveBeenCalled();
   });
 
-  // ---- handleSave routes to updateSchedule for edit ----
-
   it("calls updateSchedule when save is triggered on an edit form", () => {
     const updateSchedule = vi.fn().mockResolvedValue(null);
     setSchedules({
@@ -574,8 +581,6 @@ describe("Schedules", () => {
     expect(updateSchedule).toHaveBeenCalledWith("sched-1", expect.anything());
   });
 
-  // ---- Both charge and blockout schedules ----
-
   it("renders both charge and blockout schedule cards", () => {
     setSchedules({
       schedules: [chargeSchedule, blockoutSchedule],
@@ -590,8 +595,6 @@ describe("Schedules", () => {
     expect(cards[0]).toHaveAttribute("data-schedule-id", "sched-1");
     expect(cards[1]).toHaveAttribute("data-schedule-id", "sched-blockout-1");
   });
-
-  // ---- Form targeting (editing hides correct Add button per section) ----
 
   it("does not hide Add Blockout Period when editing a charge schedule", () => {
     setSchedules({
@@ -619,5 +622,343 @@ describe("Schedules", () => {
     fireEvent.click(screen.getByTestId("edit-sched-blockout-1"));
 
     expect(screen.getByText("Add Schedule")).toBeInTheDocument();
+  });
+
+  describe("group heading", () => {
+    it("names the group after the charge point, so two chargers can be told apart", () => {
+      setChargers([makeChargerRow({ name: "vcp-dev-2" })]);
+
+      renderWithProviders(<Schedules />);
+
+      expect(screen.getByText("vcp-dev-2")).toBeInTheDocument();
+    });
+
+    it("drops the adapter badge when it only repeats the row name", () => {
+      setChargers([makeChargerRow()]);
+
+      renderWithProviders(<Schedules />);
+
+      // Name and badge would both read "OCPP Smart Charger" — once is enough.
+      expect(screen.getAllByText("OCPP Smart Charger")).toHaveLength(1);
+    });
+
+    it("keeps the adapter badge when it differs from the row name", () => {
+      setChargers([makeChargerRow({ name: "Garage" })]);
+
+      renderWithProviders(<Schedules />);
+
+      expect(screen.getByText("Garage")).toBeInTheDocument();
+      expect(screen.getByText("OCPP Smart Charger")).toBeInTheDocument();
+    });
+  });
+
+  describe("overlap warning", () => {
+    // The user's real case: an OCPP charger plus the car plugged into it, each
+    // with its own charging point row and its own schedule group.
+    const setOverlapPoints = (
+      chargerOverrides: Record<string, unknown> = {},
+    ): void => {
+      setChargers([
+        makeChargerRow(chargerOverrides),
+        makeChargerRow({
+          id: "cp-vin1",
+          name: "Test Car",
+          chargerAdapterType: "tesla",
+          chargerConfig: "{}",
+          kind: "vehicle_api",
+          vehicleId: "VIN1",
+          resolvedVehicleId: "VIN1",
+          vehicleResolution: "linked",
+        }),
+      ]);
+    };
+
+    const withSchedules = (
+      charger: Partial<typeof chargerKeyedSchedule>,
+      vehicle: Partial<typeof chargeSchedule>,
+    ): void => {
+      const c = { ...chargerKeyedSchedule, ...charger };
+      const v = { ...chargeSchedule, ...vehicle };
+      setSchedules({ schedules: [c, v], chargeSchedules: [c, v] });
+    };
+
+    it("warns when a charger and a vehicle schedule fully overlap", () => {
+      setOverlapPoints();
+      withSchedules({}, { chargeLimitPct: 80 });
+
+      renderWithProviders(<Schedules />);
+
+      expect(
+        screen.getByText(/Two schedules can drive OCPP Smart Charger/),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/00:00–06:00/)).toBeInTheDocument();
+      expect(screen.getByText(/sets the current \(32A\)/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/80% limit still stops the charge/),
+      ).toBeInTheDocument();
+    });
+
+    it("names the stricter limit when both schedules set one", () => {
+      setOverlapPoints();
+      withSchedules({ chargeLimitPct: 70 }, { chargeLimitPct: 80 });
+
+      renderWithProviders(<Schedules />);
+
+      expect(
+        screen.getByText(/stricter of the two limits \(70%\) stops the charge/),
+      ).toBeInTheDocument();
+    });
+
+    it("names the charger's own limit when the vehicle sets none", () => {
+      setOverlapPoints();
+      withSchedules({ chargeLimitPct: 65 }, { chargeLimitPct: null });
+
+      renderWithProviders(<Schedules />);
+
+      expect(
+        screen.getByText(/this charger's 65% limit stops the charge/),
+      ).toBeInTheDocument();
+    });
+
+    it("names only the overlapping window for a partial overlap", () => {
+      setOverlapPoints();
+      withSchedules({}, { startTime: "05:00", endTime: "08:00" });
+
+      renderWithProviders(<Schedules />);
+
+      expect(screen.getByText(/05:00–06:00/)).toBeInTheDocument();
+      expect(screen.queryByText(/00:00–06:00/)).not.toBeInTheDocument();
+    });
+
+    it("names a midnight-crossing overlap as one window", () => {
+      setOverlapPoints();
+      withSchedules(
+        { startTime: "22:00", endTime: "06:00" },
+        { startTime: "23:00", endTime: "02:00" },
+      );
+
+      renderWithProviders(<Schedules />);
+
+      expect(screen.getByText(/23:00–02:00/)).toBeInTheDocument();
+    });
+
+    it("does not warn when the two schedules run on disjoint days", () => {
+      setOverlapPoints();
+      withSchedules({ days: ["mon", "tue"] }, { days: ["sat", "sun"] });
+
+      renderWithProviders(<Schedules />);
+
+      expect(
+        screen.queryByText(/Two schedules can drive/),
+      ).not.toBeInTheDocument();
+    });
+
+    it("does not warn when the vehicle schedule is disabled", () => {
+      setOverlapPoints();
+      withSchedules({}, { enabled: false });
+
+      renderWithProviders(<Schedules />);
+
+      expect(
+        screen.queryByText(/Two schedules can drive/),
+      ).not.toBeInTheDocument();
+    });
+
+    it("does not warn when the charger resolves to a different vehicle", () => {
+      setOverlapPoints({ resolvedVehicleId: "VIN2" });
+      withSchedules({}, {});
+
+      renderWithProviders(<Schedules />);
+
+      expect(
+        screen.queryByText(/Two schedules can drive/),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("vehicle schedule reachability", () => {
+    const setSmartPoint = (overrides: Record<string, unknown> = {}): void => {
+      setChargers([
+        makeChargerRow({ vehicleId: "VIN1", ...overrides }),
+      ]);
+      setSchedules({
+        schedules: [chargeSchedule],
+        chargeSchedules: [chargeSchedule],
+      });
+    };
+
+    it("says the schedules run through the charger the vehicle resolves to", () => {
+      setSmartPoint({ resolvedVehicleId: "VIN1", vehicleResolution: "linked" });
+
+      renderWithProviders(<Schedules />);
+
+      expect(
+        screen.getByText(
+          /These schedules are running through OCPP Smart Charger/,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("warns that nothing runs when several cars are plugged in", () => {
+      setSmartPoint({
+        resolvedVehicleId: null,
+        vehicleResolution: "ambiguous",
+      });
+
+      renderWithProviders(<Schedules />);
+
+      expect(
+        screen.getByText(/These schedules are not running right now/),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/More than one vehicle is plugged into/),
+      ).toBeInTheDocument();
+    });
+
+    it("says the schedules are idle when no point resolves to the vehicle", () => {
+      setSmartPoint({ resolvedVehicleId: null, vehicleResolution: "none" });
+
+      renderWithProviders(<Schedules />);
+
+      expect(
+        screen.getByText(/These schedules are idle right now/),
+      ).toBeInTheDocument();
+    });
+
+    it("shows no notice for a group with no schedules", () => {
+      setChargers([
+        makeChargerRow({ vehicleId: "VIN1", resolvedVehicleId: null }),
+      ]);
+      setSchedules({});
+
+      renderWithProviders(<Schedules />);
+
+      expect(
+        screen.queryByText(/These schedules are/),
+      ).not.toBeInTheDocument();
+    });
+
+    it("shows no notice for a vehicle_api point, which is linked by construction", () => {
+      setChargers([makeChargerRow({
+        name: "Test Car",
+        chargerAdapterType: "tesla",
+        chargerConfig: "{}",
+        kind: "vehicle_api",
+        vehicleId: "VIN1",
+        resolvedVehicleId: "VIN1",
+        vehicleResolution: "linked",
+      })]);
+      setSchedules({
+        schedules: [chargeSchedule],
+        chargeSchedules: [chargeSchedule],
+      });
+
+      renderWithProviders(<Schedules />);
+
+      expect(
+        screen.queryByText(/These schedules are/),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("group composition", () => {
+    it("gives an assigned smart charger both a charger group and a vehicle group", () => {
+      setChargers([makeChargerRow({
+        vehicleId: "VIN1",
+        resolvedVehicleId: "VIN1",
+        vehicleResolution: "linked",
+      })]);
+      setSchedules({
+        schedules: [chargerKeyedSchedule, chargeSchedule],
+        chargeSchedules: [chargerKeyedSchedule, chargeSchedule],
+      });
+
+      renderWithProviders(<Schedules />);
+
+      // Charger group, keyed by the point, listing its charger-keyed schedule.
+      expect(screen.getByText("OCPP Smart Charger")).toBeInTheDocument();
+      expect(screen.getByTestId("delete-sched-charger-1")).toBeInTheDocument();
+      // Vehicle group, keyed by the car, listing its vehicle-keyed schedule.
+      expect(screen.getByText("Test Car")).toBeInTheDocument();
+      expect(screen.getByTestId("delete-sched-1")).toBeInTheDocument();
+    });
+
+    it("shows the overlap warning for an explicitly assigned charger", () => {
+      setChargers([makeChargerRow({
+        vehicleId: "VIN1",
+        resolvedVehicleId: "VIN1",
+        vehicleResolution: "linked",
+      })]);
+      const vehicleSched = { ...chargeSchedule, chargeLimitPct: 80 };
+      setSchedules({
+        schedules: [chargerKeyedSchedule, vehicleSched],
+        chargeSchedules: [chargerKeyedSchedule, vehicleSched],
+      });
+
+      renderWithProviders(<Schedules />);
+
+      expect(
+        screen.getByText(/Two schedules can drive OCPP Smart Charger/),
+      ).toBeInTheDocument();
+    });
+
+    it("gives one vehicle group when two points resolve to the same car", () => {
+      setChargers([
+        makeChargerRow({ id: "cp-1", vehicleId: "VIN1" }),
+        makeChargerRow({
+          id: "cp-2",
+          name: "Second Charger",
+          chargerConfig: '{"charger_id":"vcp-dev-3"}',
+          resolvedVehicleId: "VIN1",
+        }),
+      ]);
+      setSchedules({
+        schedules: [chargeSchedule],
+        chargeSchedules: [chargeSchedule],
+      });
+
+      renderWithProviders(<Schedules />);
+
+      expect(screen.getAllByText("Test Car")).toHaveLength(1);
+      // One group means the schedule is listed once, not twice.
+      expect(screen.getAllByTestId("schedule-card")).toHaveLength(1);
+    });
+
+    it("gives a vehicle_api point a vehicle group only, never a charger group", () => {
+      setChargers([makeChargerRow({
+        name: "Test Car",
+        chargerAdapterType: "tesla",
+        chargerConfig: "{}",
+        kind: "vehicle_api",
+        vehicleId: "VIN1",
+        resolvedVehicleId: "VIN1",
+        vehicleResolution: "linked",
+      })]);
+
+      renderWithProviders(<Schedules />);
+
+      expect(
+        screen.getByText("No charge schedules for this vehicle."),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText("No charge schedules for this charger."),
+      ).not.toBeInTheDocument();
+    });
+
+    it("gives no vehicle group to a car no charging point is tied to", () => {
+      // setVehicles rebuilds the charger list, so setChargers must follow it.
+      setVehicles({
+        vehicles: [
+          makeVehicle({ id: "VIN1", name: "Model 3" }),
+          makeVehicle({ id: "VIN2", name: "Orphan Car" }),
+        ],
+      });
+      setChargers([makeChargerRow({ resolvedVehicleId: "VIN1" })]);
+
+      renderWithProviders(<Schedules />);
+
+      expect(screen.getByText("Model 3")).toBeInTheDocument();
+      expect(screen.queryByText("Orphan Car")).not.toBeInTheDocument();
+    });
   });
 });

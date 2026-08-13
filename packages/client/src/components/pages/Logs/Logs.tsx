@@ -7,6 +7,7 @@ import { useVehicleUpdates } from "../../../hooks/useVehicleUpdates.ts";
 import { usePluginLogs } from "../../../hooks/usePluginLogs.ts";
 import { trpc } from "../../../trpc.ts";
 import { LogFilterBar } from "./LogFilterBar.tsx";
+import { useChargers } from "../../../hooks/useChargers.ts";
 import { LogTable } from "./LogTable.tsx";
 import { SimpleFilterBar } from "./SimpleFilterBar.tsx";
 import { EnergyReadsTable } from "./EnergyReadsTable.tsx";
@@ -51,7 +52,6 @@ export const ACTION_LABELS: Record<ActionType, string> = {
 
 export const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
 
-/** Convert ISO UTC string to `YYYY-MM-DDTHH:mm` in local time for <input type="datetime-local"> display. */
 export function isoToLocalInput(iso: string): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -62,7 +62,6 @@ export function isoToLocalInput(iso: string): string {
   }:${pad(d.getMinutes())}`;
 }
 
-/** Convert `YYYY-MM-DDTHH:mm` local-time input value to an ISO UTC string. */
 export function localInputToIso(local: string): string {
   if (!local) return "";
   const d = new Date(local);
@@ -116,7 +115,6 @@ function getPresetRange(
   }
 }
 
-/** Read filter state from current URL search params */
 function readFiltersFromUrl(): {
   tab?: LogTab;
   vehicle?: string;
@@ -159,7 +157,6 @@ function readFiltersFromUrl(): {
   return result;
 }
 
-/** Write current filters to URL search params using replaceState */
 function writeFiltersToUrl(filters: {
   tab: LogTab;
   vehicle: string;
@@ -410,6 +407,7 @@ export function Logs() {
     () => (vehiclesData?.vehicles ?? []) as VehicleWithState[],
     [vehiclesData],
   );
+  const { chargers: points } = useChargers();
 
   const cc = useChargeControlTab(initialFilters);
   const er = useEnergyReadsTab();
@@ -449,7 +447,7 @@ export function Logs() {
         </Tabs.List>
 
         <Tabs.Content value="charge-control">
-          <ChargeControlTab cc={cc} vehicles={vehicles} />
+          <ChargeControlTab cc={cc} points={points} />
         </Tabs.Content>
         <Tabs.Content value="energy-reads">
           <EnergyReadsTabContent er={er} />
@@ -466,9 +464,9 @@ export function Logs() {
 }
 
 function ChargeControlTab(
-  { cc, vehicles }: {
+  { cc, points }: {
     cc: ReturnType<typeof useChargeControlTab>;
-    vehicles: VehicleWithState[];
+    points: Array<{ id: string; name: string }>;
   },
 ) {
   return (
@@ -476,7 +474,7 @@ function ChargeControlTab(
       <LogFilterBar
         vehicleFilter={cc.vehicleFilter}
         onVehicleFilterChange={cc.setVehicleFilter}
-        vehicles={vehicles}
+        vehicles={points}
         timeRange={cc.timeRange}
         onTimeRangeChange={cc.setTimeRange}
         customFrom={cc.customFrom}

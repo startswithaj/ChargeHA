@@ -196,7 +196,6 @@ describe("StatsChart", () => {
 
   it("renders empty chart when data is null and not loading", () => {
     renderWithProviders(<StatsChart {...defaultProps} />);
-    // No chart, no loading
     expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
   });
 
@@ -228,10 +227,10 @@ describe("StatsChart", () => {
       <StatsChart {...defaultProps} data={makeStatsData()} />,
     );
     expect(screen.getByText(/Solar → Home/)).toBeInTheDocument();
-    expect(screen.getByText(/Solar → Car/)).toBeInTheDocument();
+    expect(screen.getByText(/Solar → Vehicle/)).toBeInTheDocument();
     expect(screen.getByText(/Solar → Grid/)).toBeInTheDocument();
     expect(screen.getByText(/Grid → Home/)).toBeInTheDocument();
-    expect(screen.getByText(/Grid → Car/)).toBeInTheDocument();
+    expect(screen.getByText(/Grid → Vehicle/)).toBeInTheDocument();
     expect(screen.getByText(/Solar Production/)).toBeInTheDocument();
     expect(screen.getByText(/Total Consumption/)).toBeInTheDocument();
   });
@@ -457,13 +456,11 @@ describe("CustomTooltip", () => {
         },
       }],
     });
-    // Header shows hour range
     expect(screen.getByText("10:00 – 11:00")).toBeInTheDocument();
-    // Flow rows
     expect(screen.getByText("Solar → Home")).toBeInTheDocument();
     expect(screen.getByText("1.50 kWh")).toBeInTheDocument();
     expect(screen.getByText("Grid → Home")).toBeInTheDocument();
-    expect(screen.getByText("Grid → Car")).toBeInTheDocument();
+    expect(screen.getByText("Grid → Vehicle")).toBeInTheDocument();
   });
 
   it("renders tooltip with 15m resolution header", () => {

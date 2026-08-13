@@ -1,12 +1,14 @@
 import type {
+  ChargerKind,
+  ChargingPointMode,
   ControllerAction,
   DayOfWeek,
   ScheduleType,
   VehicleAdapterType,
   VehicleMode,
 } from "@chargeha/shared";
+import type { ControllerConfig } from "@chargeha/shared/engine";
 
-/** Structure of the JSON stored in the system_alert config key. */
 export interface SystemAlert {
   message: string;
   timestamp: string;
@@ -14,16 +16,7 @@ export interface SystemAlert {
   vehicleName: string;
 }
 
-export interface VehicleRow {
-  id: string;
-  name: string;
-  adapterType: VehicleAdapterType;
-  priority: number;
-  config: string;
-  mode: VehicleMode;
-  createdAt: string;
-  updatedAt: string;
-}
+export type { ChargerRow, VehicleRow } from "@chargeha/shared";
 
 export interface UpsertVehicleInput {
   id: string;
@@ -34,9 +27,22 @@ export interface UpsertVehicleInput {
   mode: VehicleMode;
 }
 
+export interface UpsertChargerInput {
+  id: string;
+  name: string;
+  chargerAdapterType: string;
+  chargerConfig?: string;
+  mode?: ChargingPointMode;
+  priority?: number;
+  vehicleId?: string | null;
+  kind?: ChargerKind;
+  active?: boolean;
+}
+
 export interface ScheduleRow {
   id: string;
   vehicleId: string | null;
+  chargerId: string | null;
   scheduleType: ScheduleType;
   startTime: string;
   endTime: string;
@@ -51,6 +57,7 @@ export interface ScheduleRow {
 export interface CreateScheduleInput {
   id: string;
   vehicleId: string | null;
+  chargerId: string | null;
   scheduleType: ScheduleType;
   startTime: string;
   endTime: string;
@@ -242,8 +249,6 @@ export interface RecentStateChange {
   timestamp: string;
 }
 
-/** Session row. createdAt/expiresAt are epoch seconds (not ms) to avoid
- *  @db/sqlite's 32-bit integer truncation for values > 2^31. */
 export interface SessionRow {
   id: string;
   authType: string;
@@ -253,7 +258,6 @@ export interface SessionRow {
   expiresAt: number;
 }
 
-/** Create session input. createdAt/expiresAt are epoch seconds (not ms). */
 export interface CreateSessionInput {
   id: string;
   authType: string;
@@ -261,4 +265,33 @@ export interface CreateSessionInput {
   email?: string | null;
   createdAt: number;
   expiresAt: number;
+}
+
+export interface DecisionInputs {
+  energy: {
+    solarProductionW: number;
+    gridPowerW: number;
+    homeConsumptionW: number;
+    batterySoc: number | null;
+    batteryPowerW?: number | null;
+  } | null;
+  vehicleState: {
+    isPluggedIn: boolean;
+    isCharging: boolean;
+    batteryLevel: number;
+    chargeLimit: number;
+    chargeAmps: number;
+    chargeAmpsMin: number;
+    chargeAmpsMax: number;
+    chargePowerKw: number;
+    latitude: number | null;
+    longitude: number | null;
+  } | null;
+  config: ControllerConfig;
+  activeSchedules: Array<{
+    id: string;
+    type: string;
+    startTime: string;
+    endTime: string;
+  }>;
 }

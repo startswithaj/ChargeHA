@@ -2,8 +2,9 @@
 
 The charge controller is the core automation loop that decides when and how to
 charge each vehicle. It runs as a background service on a configurable timer
-(default 30 seconds, `controller_loop_seconds`) and evaluates every configured
-vehicle on each cycle.
+(default 30 seconds, `controller_loop_seconds`) and evaluates every charging
+point on each cycle — a vehicle driven by its own API, or a smart charger with
+whatever car it resolves to.
 
 ## Architecture
 
@@ -26,7 +27,7 @@ Each cycle (`ChargeController.runOnce()`):
 
 1. Load config from DB via `ConfigService` (charging, solar, battery, system)
 2. If `chargingEnabled` is `false`, the engine returns `none` for all vehicles
-3. Load all vehicles and schedules from DB
+3. Load all charging points and schedules from DB
 4. Get the latest energy snapshot from the `EnergyPoller`
 5. For each vehicle, call `VehicleManager.requestState()` with context
    (`hasSolar`, `hasSchedule`, `hasBlockout`, optional schedule charge limit) so
@@ -81,12 +82,13 @@ overrides.
 This is where the main logic lives. The checks run in priority order:
 
 1. **Blockout schedule** — If an active blockout schedule covers the current
-   time, stop charging. Blockout schedules apply to all vehicles.
+   time, stop charging. Blockout schedules apply to all charging points.
 
-2. **Charge schedule** — If an active charge schedule applies (either targeting
-   this vehicle or all vehicles), charge at the schedule's configured amps (or
-   max if not specified). If the schedule has a charge limit and the battery has
-   reached it, fall through to solar tracking instead.
+2. **Charge schedule** — If an active charge schedule applies (targeting this
+   charging point directly, its linked vehicle, or everything when untargeted),
+   charge at the schedule's configured amps (or max if not specified). If the
+   schedule has a charge limit and the battery has reached it, fall through to
+   solar tracking instead.
 
 3. **Battery priority** — If enabled and the home battery SoC is below the
    configured threshold, stop charging to let the home battery charge first.
@@ -95,6 +97,89 @@ This is where the main logic lives. The checks run in priority order:
 
 5. **Fallback** — If nothing above applied, stop charging (or do nothing if
    already stopped). Marks the vehicle as suspendable.
+
+## Schedules
+
+There are two schedule types, evaluated in this order, before solar tracking or
+battery priority:
+
+1. **Blockout schedules** checked first. If one is active, charging stops (or
+   stays stopped). Blockout always applies to every charging point — it has no
+   target field. Nothing below runs if a blockout is active.
+2. **Charge schedules** checked second, only if no blockout is active. If one is
+   active, it charges at the schedule's amps (or max amps if none set) — solar
+   tracking and battery priority are skipped entirely while it runs.
+3. If neither applies, evaluation continues to battery priority, then solar
+   tracking.
+
+### Targeting
+
+A charge schedule can target:
+
+1. A specific charging point (`chargerId` set) — applies to that charger only,
+   regardless of which vehicle is on it.
+2. A specific vehicle (`vehicleId` set, `chargerId` null) — applies to whichever
+   charging point currently resolves to that vehicle (see smart charger vehicle
+   resolution below). A vehicle schedule does nothing while no charging point
+   resolves to that car.
+3. Nothing set on either — applies to every charging point.
+
+That ranking — charger, then vehicle, then untargeted — decides which schedule
+is in charge, not which one applies. Two of them can be active on the same
+charging point at the same minute, and then they merge.
+
+### Two schedules at once
+
+A charger schedule matches the charger directly. A vehicle schedule matches the
+same charger through the car plugged into it. So both can be active on one
+charging point, and ChargeHA does not pick between them:
+
+1. The **highest-ranked** schedule supplies the window and the amps. Charger
+   beats vehicle beats untargeted.
+2. The **strictest charge limit** across every overlapping schedule still stops
+   the charge — the lowest `chargeLimitPct` of the set wins, whichever schedule
+   it came from.
+3. Only the minutes they share merge. Outside the shared window each schedule
+   runs on its own, unchanged.
+
+Example: a charger schedule set to 32A and the car's own schedule set to 32A up
+to 80%, both running 00:00–06:00. The car charges at 32A and stops at 80%.
+
+This is deliberate. A charger schedule has no battery visibility, so it can only
+ever say "how fast". A vehicle schedule knows the car, so it can say "how full".
+Letting one win would throw away the half of the answer only the other one has.
+
+Same-rank ties break by earliest start, then longest window, then id. That order
+is fixed, so the same set of schedules always produces the same result — it
+never depends on the order the database returned the rows in.
+
+### Day and time matching
+
+1. Days and times are stored as plain `HH:MM` strings in the user's configured
+   timezone — not UTC, not the server's local time.
+2. Each cycle, the current wall-clock day/time is computed in that timezone and
+   compared against the schedule's `days` list and `startTime`/`endTime`.
+3. If `startTime <= endTime`, it's a same-day range (e.g. 09:00–17:00).
+4. If `startTime > endTime`, it's treated as overnight (e.g. 22:00–06:00) —
+   active from `startTime` to midnight, and from midnight to `endTime`.
+
+### Charge limit
+
+1. A charge schedule can carry its own `chargeLimitPct`, independent of the
+   vehicle's own charge limit.
+2. If the battery is already at or above that limit while the schedule is
+   active, the schedule stops applying for that cycle.
+3. Evaluation falls through to battery priority / solar tracking instead — the
+   vehicle isn't just left alone, it goes back to normal logic.
+4. If the schedule has no `chargeLimitPct`, this check never fires.
+
+### Overlap with a blockout
+
+1. Blockout is evaluated first, unconditionally.
+2. If a blockout is active, it wins — charging stops even if a charge schedule
+   also matches the same time.
+3. Overlapping a blockout with a charge schedule is a configuration mistake; the
+   blockout always takes priority.
 
 ## Solar tracking
 
@@ -126,25 +211,27 @@ In excess mode two adjustments are applied to `-gridPowerW`:
 
 - **Battery discharge is subtracted.** Power leaving the home battery
   (`batteryPowerW > 0`) is not solar. Without this, a battery that is operating
-  in self-consumption mode and not drawing from the grid makes the vehicle's own 
-  draw reappear as available solar through the add-back below, and the car charges 
-  off the house battery - probably not what you want!. Battery _charging_ is not 
-  added back — we'll try to charge a home battery first from any solar surplus 
-  (see battery priority for SoC-based control).
+  in self-consumption mode and not drawing from the grid makes the vehicle's own
+  draw reappear as available solar through the add-back below, and the car
+  charges off the house battery - probably not what you want!. Battery
+  _charging_ is not added back — we'll try to charge a home battery first from
+  any solar surplus (see battery priority for SoC-based control).
 - **The vehicle's charge power is added back** when the energy meter includes EV
-  charging in its consumption reading (that's the most common setup), since the car's own
-  draw suppresses export. Skipped if `consumptionExcludesCharging` is enabled.
+  charging in its consumption reading (that's the most common setup), since the
+  car's own draw suppresses export. Skipped if `consumptionExcludesCharging` is
+  enabled.
 
-The result is capped at current solar production — obviously a solar surplus can never 
-exceed what the panels are making. Gross mode takes production directly and applies no
-add-back, since panel output never had the vehicle's draw subtracted from it.
+The result is capped at current solar production — obviously a solar surplus can
+never exceed what the panels are making. Gross mode takes production directly
+and applies no add-back, since panel output never had the vehicle's draw
+subtracted from it.
 
 A configurable safety margin (`solarMarginKw`) is subtracted from the result.
 
 > Note: the simulator replays recorded `solarW` / `gridW` but passes
-> `batteryPowerW: null`, so it does not simulate a home battery in self consumption mode. 
-> Simulated results with a battery are a little optimistic relative to how a real home
-> setup would behave.
+> `batteryPowerW: null`, so it does not simulate a home battery in self
+> consumption mode. Simulated results with a battery are a little optimistic
+> relative to how a real home setup would behave.
 
 ### Amps conversion
 
@@ -153,14 +240,29 @@ default 230V) and phase count (1 or 3, configurable).
 
 ### Multi-vehicle solar allocation
 
-When multiple vehicles are charging, the `SolarAllocator` distributes available
-solar amps across vehicles. Two modes:
+`SolarAllocator.allocate` splits available solar amps across vehicles when two
+or more are eligible (auto mode, plugged in, home, below charge limit).
 
-- **Equal** — split evenly across all charging vehicles
-- **Waterfall** (priority charging enabled) — allocate by vehicle priority,
-  higher-priority vehicles get their share first
-
-The allocated amps override the per-vehicle calculation.
+1. Compute total available amps from surplus solar (adds back every eligible
+   vehicle's own charge draw, not just one).
+2. Check `priorityChargingEnabled`.
+   - **Off** → `equal` split.
+   - **On** → `waterfall` split.
+3. **Equal split**: divide amps evenly across vehicles. If the split would give
+   any vehicle less than its `chargeAmpsMin`, drop the lowest-priority vehicle
+   and retry with one fewer, until every remaining vehicle gets enough. Vehicles
+   already charging only need `chargeAmpsMin` to stay in; a vehicle not yet
+   charging needs `chargeAmpsMin + 2A` headroom to be let in — this hysteresis
+   stops flapping at the boundary. Any remainder amp goes to the higher-priority
+   vehicle.
+4. **Waterfall split**: sort by priority (1 = highest). Priority 1 gets
+   `min(totalAmps, its chargeAmpsMax)`. Whatever's left goes to priority 2, then
+   priority 3, and so on. `priority` is just this sort key — it has no other
+   effect.
+5. Vehicles excluded by either split get 0A — they fall to insufficient-solar
+   handling below, same as a single vehicle with no solar.
+6. The allocated amps override the per-vehicle solar calculation for that
+   vehicle's cycle.
 
 ### Insufficient solar handling
 
@@ -211,8 +313,104 @@ check, fetch fresh data, or wake the car — based on the context flags
 model. See `data-collection.md` for the full request/cache/wake flow.
 
 A `suspendable` hint is included on each engine decision and persisted with the
-log entry, but it is not currently acted on by the controller — wake suppression
-is now the middleware's job.
+log entry. The controller does not act on it — wake suppression belongs to the
+middleware.
+
+## Smart charger vehicle resolution
+
+A vehicle-API charging point (Tesla, etc.) always knows which car it is — the
+car told it. A smart charger (a plug or wallbox that isn't vehicle-aware)
+doesn't: it only knows something is plugged in, not what.
+`ChargingPointManager.resolveVehicle` decides which vehicle's data (battery
+level, charge limit) applies to that charger:
+
+1. **Vehicle-API charging point?** Already tied to its vehicle by construction —
+   resolution is immediate, no state check needed. Steps below apply to smart
+   chargers only.
+2. **Explicit assignment set?** If the charger's row has a `vehicleId`, check
+   whether that vehicle is plugged in at home right now (`isPluggedIn` true,
+   `isHome !== false` — unknown `isHome` does not rule it out).
+   - Yes → resolved to that vehicle. Done.
+   - No (unplugged, or driven away) → fall through to inference (step 3), as if
+     no assignment existed.
+   - A vehicle that has never been polled has no cached state, so nothing says
+     it is plugged in. It is treated the same as "not plugged in" and also falls
+     through.
+3. **No assignment, or it didn't apply — infer.** Look at every vehicle that is
+   plugged in, at home, and not currently driven by its own API (a vehicle-API
+   charger already claims that car).
+   - Exactly one match → resolved to that vehicle.
+   - Zero matches → nothing to resolve.
+   - Two or more matches → **ambiguous**. The controller refuses to guess.
+
+An explicit assignment is a preference, not a lock: it means "when both cars are
+home, this one is on this charger." It only settles which car a charger belongs
+to while that car is actually there. Unplug it (or drive it away) and the
+charger falls back to inference rather than keep reading a car that's no longer
+connected.
+
+One car at home works fine with inference — no configuration needed. Two or more
+cars that can plug into the same smart charger need an explicit assignment, or
+the charger has no way to tell them apart while both are plugged in.
+
+### Setting the assignment
+
+1. Go to the charger's row in Settings.
+2. Use the dropdown next to mode/priority — lists your vehicles, plus
+   "Automatic".
+3. Pick a vehicle to assign it, or "Automatic" to clear the assignment and
+   return to inference.
+4. Takes effect on the next controller loop. No restart needed.
+
+### What happens with two cars and no assignment
+
+1. Resolution is ambiguous (step 3, two-or-more match) — no vehicle data to
+   report: no battery level, no charge limit.
+2. The charger keeps charging anyway, using the fallback `batteryLevel: 0` /
+   `chargeLimit: 100`.
+3. This is deliberate, not a bug. The car enforces its own charge limit, so the
+   worst case is charging a bit longer than strictly needed — not over-charging
+   the car. Never charging at all is the worse failure.
+4. Solar tracking, schedules, and blockouts all still apply normally. The only
+   thing lost is "stop because the battery reached its limit" — the car handles
+   that itself.
+5. The dashboard card for that charger shows a warning telling you to assign a
+   vehicle in Settings.
+6. Assigning one (or unplugging down to a single car) restores real battery data
+   on the next loop.
+
+## What the screens tell you
+
+The dashboard and the Schedules page report resolution and schedule merging as
+they stand right now, so you don't have to work either out from the logs.
+
+### Dashboard
+
+1. A smart charger's card names the car it resolved to, and says how: assigned
+   (you picked it in Settings and it is plugged in here) or detected (ChargeHA
+   found the only car plugged in). "Using", not "charging" — resolution says
+   which car is on the charger, not that it is drawing.
+2. When two cars are plugged in and none is assigned, the card warns instead of
+   naming a car: nothing gets battery-aware control until you assign one.
+3. A smart charger and the car on it render as a **pair of cards**. The charger
+   card carries the controls, because the charger is the control path. The
+   vehicle card sits alongside it read-only, showing battery and location.
+4. A car driven by its own vehicle API is one card, and it keeps its controls —
+   there the car _is_ the charging point.
+5. A car that no charging point resolves to still gets its own read-only card
+   further down. Nothing disappears from the screen.
+
+### Schedules
+
+1. When a charger schedule and a vehicle schedule can both drive one charging
+   point, the page warns and names the days and clock window they share, which
+   schedule sets the current, and that the car's percentage limit still stops
+   the charge.
+2. A vehicle schedule says whether it is running through a charging point right
+   now, idle because no point resolves to that car, or blocked because two cars
+   are plugged in and none is assigned.
+3. All of it is about this instant. Resolution changes when someone plugs a car
+   in, so these lines are a status report, not a permanent claim.
 
 ## Decision logging
 

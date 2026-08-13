@@ -13,6 +13,9 @@ import { RateLimiter } from "../../middleware/rateLimit.ts";
 import { throwingMock } from "../../test-helpers/throwingMock.ts";
 
 describe("Wizard tRPC Router", () => {
+  const stubChargingPoints = {
+    ensureVehicleChargingPoint: () => Promise.resolve(),
+  } as never;
   const createCaller = createCallerFactory(appRouter);
 
   const mockLogger = {
@@ -57,6 +60,7 @@ describe("Wizard tRPC Router", () => {
       } as never,
       authService,
       oidcService,
+      stubChargingPoints,
     );
     return createCaller(throwingMock<TrpcContext>("TrpcContext", {
       db,
@@ -99,6 +103,7 @@ describe("Wizard tRPC Router", () => {
       } as never,
       {} as never,
       {} as never,
+      stubChargingPoints,
     );
     return {
       caller: createCaller(throwingMock<TrpcContext>("TrpcContext", {
@@ -211,13 +216,11 @@ describe("Wizard tRPC Router", () => {
       const { caller: tunnelCaller, mockTunnelManager } =
         makeCallerWithActiveTunnel();
 
-      // Tunnel should be running before complete
       expect(mockTunnelManager.isRunning).toBe(true);
 
       const result = await tunnelCaller.wizard.complete();
       expect(result.completed).toBe(true);
 
-      // Tunnel should be stopped after complete
       expect(mockTunnelManager.isRunning).toBe(false);
     });
   });
@@ -355,6 +358,7 @@ describe("Wizard tRPC Router", () => {
           } as never,
           authSvc,
           oidcSvc,
+          stubChargingPoints,
         ),
         authService: authSvc,
         oidcService: oidcSvc,
@@ -376,7 +380,6 @@ describe("Wizard tRPC Router", () => {
       assertExists(setCookie);
       expect(setCookie).toContain("session_id=");
 
-      // Extract session ID and verify it's valid in the DB
       const sessionId = setCookie.split("session_id=")[1].split(";")[0];
       const authService = new AuthService(
         db,
@@ -411,9 +414,15 @@ describe("Wizard tRPC Router", () => {
   });
 
   describe("wizard.state / wizard.patchState", () => {
-    it("returns empty fields on fresh DB", async () => {
+    it("returns null fields on fresh DB", async () => {
       const state = await caller.wizard.state();
-      expect(state).toEqual({ stepId: "", vehicleType: "", energyType: "" });
+      expect(state).toEqual({
+        stepId: null,
+        vehicleType: null,
+        energyType: null,
+        chargerType: null,
+        controlPath: null,
+      });
     });
 
     it("persists and retrieves a step ID", async () => {
@@ -441,6 +450,8 @@ describe("Wizard tRPC Router", () => {
         stepId: "done",
         vehicleType: "tesla",
         energyType: "fronius_local",
+        chargerType: null,
+        controlPath: null,
       });
     });
 
@@ -454,28 +465,29 @@ describe("Wizard tRPC Router", () => {
       expect(await caller.wizard.state()).toEqual({
         stepId: "tesla-key-generation",
         vehicleType: "tesla",
-        energyType: "",
+        energyType: null,
+        chargerType: null,
+        controlPath: null,
       });
     });
   });
 
   describe("wizard.complete - clears wizard state", () => {
     it("clears wizard_step, wizard_vehicle_type, wizard_energy_type on complete", async () => {
-      // Set wizard state
       await caller.wizard.patchState({
         stepId: "home-location",
         vehicleType: "tesla",
         energyType: "fronius_local",
       });
 
-      // Complete wizard
       await caller.wizard.complete();
 
-      // All wizard state should be cleared
       expect(await caller.wizard.state()).toEqual({
-        stepId: "",
-        vehicleType: "",
-        energyType: "",
+        stepId: null,
+        vehicleType: null,
+        energyType: null,
+        chargerType: null,
+        controlPath: null,
       });
     });
   });

@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { FakeTime } from "@std/testing/time";
-import type { VehicleAdapter } from "@chargeha/shared";
 import { buildVehicleChargeState } from "@chargeha/shared/test-factories";
-import type { VehicleRequestContext } from "../../../types.ts";
+import type { VehicleRequestContext } from "@chargeha/shared/plugins";
 import { TeslaVehicleMiddleware } from "./TeslaVehicleMiddleware.ts";
 import { Logger } from "@chargeha/server/lib/Logger";
+import type { TeslaAdapter } from "./TeslaAdapter.ts";
 import { MockTeslaAdapter } from "./test-helpers/MockTeslaAdapter.ts";
 
 describe("TeslaVehicleMiddleware", () => {
@@ -32,7 +32,7 @@ describe("TeslaVehicleMiddleware", () => {
     time = new FakeTime();
     adapter = new MockTeslaAdapter();
     middleware = new TeslaVehicleMiddleware(
-      adapter as unknown as VehicleAdapter,
+      adapter as unknown as TeslaAdapter,
       testLogger,
     );
   });
@@ -111,7 +111,6 @@ describe("TeslaVehicleMiddleware", () => {
     });
 
     it("returns cache (marked offline) when vehicle is offline", async () => {
-      // Seed some state so cache exists
       middleware.seedState(
         buildVehicleChargeState({ isOnline: true, batteryLevel: 42 }),
       );
@@ -164,7 +163,6 @@ describe("TeslaVehicleMiddleware", () => {
     it("rate-limits wakes to once per hour", async () => {
       adapter.isOnline = false;
 
-      // First wake succeeds
       await middleware.requestState(ctx({ hasSchedule: true }));
       expect(adapter.wakeVehicleCalls).toBe(1);
 
@@ -237,7 +235,6 @@ describe("TeslaVehicleMiddleware", () => {
       });
 
       const state = await middleware.requestState(ctx());
-      // Probe ran, transition detected, fresh fetch happened
       expect(adapter.isVehicleOnlineCalls).toBe(1);
       expect(adapter.getChargeStateCalls).toBe(1);
       expect(state?.isPluggedIn).toBe(true);

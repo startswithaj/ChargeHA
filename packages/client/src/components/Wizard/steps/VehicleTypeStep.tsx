@@ -2,7 +2,10 @@ import { useRef } from "react";
 import { Text } from "@radix-ui/themes";
 import { Car, Monitor } from "lucide-react";
 import { useWizardState } from "../../../hooks/useWizardState.ts";
-import { vehiclePluginOptions } from "@chargeha/plugins/componentRegistry";
+import {
+  type VehiclePluginOption,
+  vehiclePluginOptions,
+} from "@chargeha/plugins/componentRegistry";
 import { trpc } from "../../../trpc.ts";
 import { demoMode } from "../../../lib/featureFlags.ts";
 import type { StepDef, WizardNext } from "../flow.ts";
@@ -14,6 +17,18 @@ const icons = {
   monitor: Monitor,
 } as const;
 
+// On the charger path the step is explicitly optional: a
+// "No vehicle" card advances with vehicleType: null.
+const skipOption: VehiclePluginOption = {
+  id: "skip", // card identity only — selecting it stores vehicleType: null
+  label: "No vehicle — skip",
+  description:
+    "Solar charging works without a vehicle connection. Adding one later " +
+    "gives battery level, charge limit and location.",
+  iconKey: "monitor",
+  demoAvailable: true,
+};
+
 export const vehicleTypeStep: StepDef = {
   id: "vehicle-type",
   label: "Vehicle Type",
@@ -23,8 +38,14 @@ export const vehicleTypeStep: StepDef = {
     const pendingIdRef = useRef<string | null>(null);
 
     const { data: vehiclesData } = trpc.vehicle.list.useQuery();
-    const existingType = vehiclesData?.vehicles?.[0]?.adapterType ?? "";
-    const selectedType = state.vehicleType || existingType;
+    const existingType = vehiclesData?.vehicles?.[0]?.adapterType ?? null;
+    // null means EITHER "skipped" or "not yet chosen"; the two are
+    // distinguished by step position: this step is only ever rendered with
+    // a stored stepId other than its own once the wizard has moved past it,
+    // so a mismatch here means the null was written by an explicit skip.
+    const skipChosen = state.vehicleType === null &&
+      state.stepId !== null && state.stepId !== "vehicle-type";
+    const selectedType = skipChosen ? null : state.vehicleType ?? existingType;
 
     // Demo setup mutation — creates a vehicle for plugins that declare demoSetup
     const demoSetupMutation = trpc.wizard.demoSetup.useMutation({
@@ -38,6 +59,10 @@ export const vehicleTypeStep: StepDef = {
     });
 
     const handleSelect = (id: string) => {
+      if (id === "skip") {
+        onAdvance({ vehicleType: null });
+        return;
+      }
       const option = vehiclePluginOptions.find((o) => o.id === id);
       // Already set up with this type — continue without recreating.
       if (option?.demoSetup && id !== selectedType) {
@@ -52,10 +77,13 @@ export const vehicleTypeStep: StepDef = {
       next: vehicleTypeNext(
         vehiclesData === undefined || isLoading,
         selectedType,
+        skipChosen,
       ),
       view: (
         <VehicleTypeCards
+          isChargerPath={state.controlPath === "charger"}
           selectedType={selectedType}
+          skipChosen={skipChosen}
           creating={demoSetupMutation.isPending}
           error={demoSetupMutation.error?.message ?? null}
           onSelect={handleSelect}
@@ -67,9 +95,12 @@ export const vehicleTypeStep: StepDef = {
 
 function vehicleTypeNext(
   loading: boolean,
-  selectedType: string,
+  selectedType: string | null,
+  skipChosen: boolean,
 ): WizardNext {
-  if (selectedType) {
+  // skipChosen carries selectedType===null forward as a real decision, not
+  // an unanswered one.
+  if (selectedType || skipChosen) {
     return {
       kind: "ready",
       hint: "Next continues with the selected vehicle type",
@@ -82,26 +113,36 @@ function vehicleTypeNext(
 }
 
 function VehicleTypeCards(
-  { selectedType, creating, error, onSelect }: {
-    selectedType: string;
+  { isChargerPath, selectedType, skipChosen, creating, error, onSelect }: {
+    isChargerPath: boolean;
+    selectedType: string | null;
+    skipChosen: boolean;
     creating: boolean;
     error: string | null;
     onSelect: (id: string) => void;
   },
 ) {
   const inDemo = demoMode.isActive();
+  const options = isChargerPath
+    ? [...vehiclePluginOptions, skipOption]
+    : vehiclePluginOptions;
 
   return (
     <div className={styles.stepContainer}>
       <Text as="p" size="3" color="gray">
-        What type of vehicle would you like to connect?
+        {isChargerPath
+          ? "Optionally connect a vehicle. ChargeHA charges via your smart charger either way — a vehicle connection adds battery level and charge limit."
+          : "What type of vehicle would you like to connect?"}
       </Text>
 
       <div className={styles.optionCards}>
-        {vehiclePluginOptions.map((option) => {
+        {options.map((option) => {
           const Icon = icons[option.iconKey];
           const demoBlocked = inDemo && !option.demoAvailable;
           const pending = !!option.demoSetup && creating;
+          const selected = option.id === "skip"
+            ? skipChosen
+            : option.id === selectedType;
           return (
             <OptionCard
               key={option.id}
@@ -110,7 +151,7 @@ function VehicleTypeCards(
               description={demoBlocked
                 ? "Not available in demo mode."
                 : option.description}
-              selected={option.id === selectedType}
+              selected={selected}
               disabled={demoBlocked || pending}
               onSelect={() => onSelect(option.id)}
             />

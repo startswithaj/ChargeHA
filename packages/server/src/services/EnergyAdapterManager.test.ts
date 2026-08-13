@@ -7,7 +7,7 @@ import type {
 } from "@chargeha/shared";
 import { EnergyAdapterManager } from "./EnergyAdapterManager.ts";
 import { EnergyPluginRegistry } from "@chargeha/server/bootstrap/EnergyPluginRegistry";
-import type { EnergyPlugin } from "@chargeha/plugins/types";
+import type { EnergyPlugin } from "@chargeha/shared/plugins";
 import { Logger } from "../lib/Logger.ts";
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import { throwingMock } from "../test-helpers/throwingMock.ts";
@@ -33,11 +33,18 @@ describe("EnergyAdapterManager", () => {
     model: "T1",
   };
 
+  const NO_LOAD = { unmeteredW: 0, meteredW: 0 };
+  // An adapter that invents its figures instead of measuring, so metered
+  // load has to be added to it too. Declared by the plugin, not its id.
+  const MEASURES_NOTHING = false;
+
   function makeMockPlugin(
     id: string,
     createAdapter: () => Promise<EnergySourceAdapter>,
+    measuresLoad = true,
   ): EnergyPlugin {
     return {
+      measuresLoad,
       id,
       displayName: id,
       vendor: "Test",
@@ -51,12 +58,11 @@ describe("EnergyAdapterManager", () => {
     };
   }
 
-  /**
-   * Create an EnergyAdapterManager wired to a mock plugin that produces a
-   * MockAdapter. Awaits initialization so the adapter is in place before the
-   * caller exercises it.
-   */
-  async function createManagerWithMock(): Promise<{
+  // Create an EnergyAdapterManager wired to a mock plugin that produces a
+  // MockAdapter. Awaits initialization so the adapter is in place before the caller exercises it.
+  async function createManagerWithMock(
+    measuresLoad = true,
+  ): Promise<{
     manager: EnergyAdapterManager;
     inner: MockEnergyAdapter;
   }> {
@@ -64,7 +70,11 @@ describe("EnergyAdapterManager", () => {
       BASE_REALTIME,
       DEVICE_INFO,
     );
-    const plugin = makeMockPlugin("test-mock", () => Promise.resolve(inner));
+    const plugin = makeMockPlugin(
+      "test-mock",
+      () => Promise.resolve(inner),
+      measuresLoad,
+    );
     const registry = new EnergyPluginRegistry();
     registry.register(plugin);
     const mockDb = throwingMock<AppDatabase>("AppDatabase", {
@@ -109,34 +119,52 @@ describe("EnergyAdapterManager", () => {
     });
   });
 
-  describe("getRealtimeData with no simulated load", () => {
-    it("returns unmodified data when simulated load is 0", async () => {
-      const data = await manager.getRealtimeData();
+  describe("getRealtimeData with no charging load", () => {
+    it("returns unmodified data when nothing is charging", async () => {
+      const data = await manager.getRealtimeData(NO_LOAD);
       expect(data).toEqual(BASE_REALTIME);
     });
   });
 
-  describe("setSimulatedLoad", () => {
-    it("adds load to homeConsumption and gridPower", async () => {
-      manager.setSimulatedLoad(2000);
-      const data = await manager.getRealtimeData();
+  // docs/simulated-load.md: a load is added only when the active adapter
+  // could not have measured it itself.
+  describe("charging load in the reading", () => {
+    it("adds unmetered load — no adapter can see a simulated car", async () => {
+      const data = await manager.getRealtimeData({
+        unmeteredW: 2000,
+        meteredW: 0,
+      });
       expect(data.homeConsumptionW).toBe(5000);
       expect(data.gridPowerW).toBe(0);
       expect(data.solarProductionW).toBe(5000);
     });
 
-    it("clamps negative watts to 0", async () => {
-      manager.setSimulatedLoad(-500);
-      const data = await manager.getRealtimeData();
-      expect(data.homeConsumptionW).toBe(3000);
-      expect(data.gridPowerW).toBe(-2000);
+    it("leaves metered load alone — a real adapter already counted it", async () => {
+      const data = await manager.getRealtimeData({
+        unmeteredW: 0,
+        meteredW: 2000,
+      });
+      expect(data).toEqual(BASE_REALTIME);
     });
 
-    it("can reset load to 0", async () => {
-      manager.setSimulatedLoad(2000);
-      manager.setSimulatedLoad(0);
-      const data = await manager.getRealtimeData();
-      expect(data).toEqual(BASE_REALTIME);
+    it("adds metered load for the simulated adapter, which measures nothing", async () => {
+      const { manager } = await createManagerWithMock(MEASURES_NOTHING);
+      const data = await manager.getRealtimeData({
+        unmeteredW: 0,
+        meteredW: 2000,
+      });
+      expect(data.homeConsumptionW).toBe(5000);
+      expect(data.gridPowerW).toBe(0);
+    });
+
+    it("adds both kinds for the simulated adapter", async () => {
+      const { manager } = await createManagerWithMock(MEASURES_NOTHING);
+      const data = await manager.getRealtimeData({
+        unmeteredW: 500,
+        meteredW: 2000,
+      });
+      expect(data.homeConsumptionW).toBe(5500);
+      expect(data.gridPowerW).toBe(500);
     });
   });
 
@@ -225,7 +253,11 @@ describe("EnergyAdapterManager", () => {
       const mockDb = throwingMock<AppDatabase>("AppDatabase", {
         getConfig: () => Promise.resolve("late-config"),
       });
-      const mgr = new EnergyAdapterManager(mockDb, registry, testLogger);
+      const mgr = new EnergyAdapterManager(
+        mockDb,
+        registry,
+        testLogger,
+      );
       // deno-lint-ignore no-explicit-any
       await (mgr as any).initializationPromise;
 
@@ -234,7 +266,7 @@ describe("EnergyAdapterManager", () => {
 
       host = "192.0.2.10"; // the wizard's setup step saves the host
       await mgr.reconfigure();
-      const data = await mgr.getRealtimeData();
+      const data = await mgr.getRealtimeData(NO_LOAD);
       expect(data.solarProductionW).toBe(5000); // real adapter, not the null one
     });
 

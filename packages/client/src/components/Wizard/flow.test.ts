@@ -17,7 +17,6 @@ describe("flow", () => {
     ...extra,
   });
 
-  /** A flow shaped like the real one: core steps with a gated plugin group. */
   const FLOW: StepDef[] = [
     step("welcome"),
     step("vehicle-type"),
@@ -29,8 +28,10 @@ describe("flow", () => {
 
   const state = (overrides: Partial<WizardNavState> = {}): WizardNavState => ({
     stepId: "welcome",
-    vehicleType: "",
-    energyType: "",
+    vehicleType: null,
+    energyType: null,
+    chargerType: null,
+    controlPath: null,
     ...overrides,
   });
 

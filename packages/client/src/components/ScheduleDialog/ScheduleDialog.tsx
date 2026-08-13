@@ -15,6 +15,7 @@ interface ScheduleFormProps {
   editingSchedule: Schedule | null;
   scheduleType: ScheduleType;
   vehicleId: string | null;
+  chargerId?: string | null;
   maxAmps?: number; // Vehicle's max amps capability, defaults to 32
   defaultStartTime?: string; // Suggested start for new schedules (HH:MM)
   defaultEndTime?: string; // Suggested end for new schedules (HH:MM)
@@ -22,9 +23,14 @@ interface ScheduleFormProps {
   onCancel: () => void;
 }
 
+// 100% never stops a charge, so it is the neutral starting point for a
+// charger-keyed schedule, whose linked car may not report battery level.
+const NO_LIMIT_PCT = 100;
+
 const DEFAULT_FORM: ScheduleFormData = {
   scheduleType: "charge",
   vehicleId: null,
+  chargerId: null,
   startTime: "00:00",
   endTime: "06:00",
   days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
@@ -36,6 +42,7 @@ function useInitForm(
   editingSchedule: Schedule | null,
   scheduleType: ScheduleType,
   vehicleId: string | null,
+  chargerId: string | null,
   defaultStartTime: string | undefined,
   defaultEndTime: string | undefined,
   setForm: (f: ScheduleFormData) => void,
@@ -47,21 +54,28 @@ function useInitForm(
       setForm({
         scheduleType: editingSchedule.scheduleType,
         vehicleId: editingSchedule.vehicleId,
+        chargerId: editingSchedule.chargerId,
         startTime: editingSchedule.startTime,
         endTime: editingSchedule.endTime,
         days: [...editingSchedule.days],
         chargeAmps: editingSchedule.scheduleType === "charge"
           ? editingSchedule.chargeAmps
           : 32,
+        // Charger schedules stored before the limit was exposed have none;
+        // 100% is the inert default the stepper starts from.
         chargeLimitPct: editingSchedule.scheduleType === "charge"
-          ? editingSchedule.chargeLimitPct
-          : 80,
+          ? editingSchedule.chargeLimitPct ?? NO_LIMIT_PCT
+          : DEFAULT_FORM.chargeLimitPct,
       });
     } else {
       setForm({
         ...DEFAULT_FORM,
         scheduleType,
         vehicleId,
+        chargerId,
+        chargeLimitPct: chargerId !== null
+          ? NO_LIMIT_PCT
+          : DEFAULT_FORM.chargeLimitPct,
         ...(defaultStartTime && { startTime: defaultStartTime }),
         ...(defaultEndTime && { endTime: defaultEndTime }),
       });
@@ -70,6 +84,7 @@ function useInitForm(
     editingSchedule,
     scheduleType,
     vehicleId,
+    chargerId,
     defaultStartTime,
     defaultEndTime,
   ]);
@@ -79,6 +94,7 @@ export function ScheduleForm({
   editingSchedule,
   scheduleType,
   vehicleId,
+  chargerId = null,
   maxAmps = 32,
   defaultStartTime,
   defaultEndTime,
@@ -93,6 +109,7 @@ export function ScheduleForm({
     editingSchedule,
     scheduleType,
     vehicleId,
+    chargerId,
     defaultStartTime,
     defaultEndTime,
     setForm,
@@ -165,7 +182,8 @@ export function ScheduleForm({
         {isCharge && (
           <ChargeSettings
             chargeAmps={form.chargeAmps}
-            chargeLimitPct={form.chargeLimitPct}
+            chargeLimitPct={form.chargeLimitPct ?? NO_LIMIT_PCT}
+            isChargerKeyed={form.chargerId !== null}
             maxAmps={maxAmps}
             updateField={updateField}
           />

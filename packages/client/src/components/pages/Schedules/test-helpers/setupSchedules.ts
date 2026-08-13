@@ -60,6 +60,7 @@ export function makeSchedulesReturn(
 export const chargeSchedule: ChargeSchedule = {
   id: "sched-1",
   vehicleId: "VIN1",
+  chargerId: null,
   scheduleType: "charge",
   startTime: "00:00",
   endTime: "06:00",
@@ -69,9 +70,47 @@ export const chargeSchedule: ChargeSchedule = {
   enabled: true,
 };
 
+// Charger-keyed schedules carry no chargeLimitPct (no battery visibility).
+export const chargerKeyedSchedule: ChargeSchedule = {
+  id: "sched-charger-1",
+  vehicleId: null,
+  chargerId: "cp-1",
+  scheduleType: "charge",
+  startTime: "00:00",
+  endTime: "06:00",
+  days: ["mon", "tue", "wed"] as DayOfWeek[],
+  chargeAmps: 32,
+  chargeLimitPct: null,
+  enabled: true,
+};
+
+// Loosely typed because the page reads a handful of fields off an
+// inferred tRPC output type.
+export function makeChargerRow(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    id: "cp-1",
+    name: "OCPP Smart Charger",
+    chargerAdapterType: "ocpp",
+    mode: "auto",
+    priority: 1,
+    kind: "smart",
+    active: true,
+    vehicleId: null,
+    resolvedVehicleId: "VIN1",
+    vehicleResolution: "inferred",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    state: null,
+    ...overrides,
+  };
+}
+
 export const blockoutSchedule: BlockoutSchedule = {
   id: "sched-blockout-1",
   vehicleId: null,
+  chargerId: null,
   scheduleType: "blockout",
   startTime: "17:00",
   endTime: "21:00",

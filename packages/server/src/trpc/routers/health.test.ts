@@ -3,11 +3,12 @@ import { expect } from "@std/expect";
 import { AppDatabase } from "../../db/AppDatabase.ts";
 import { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
 import { EnergyPluginRegistry } from "@chargeha/server/bootstrap/EnergyPluginRegistry";
+import { ChargerPluginRegistry } from "@chargeha/server/bootstrap/ChargerPluginRegistry";
 import { HealthService } from "../../services/HealthService.ts";
 import { appRouter } from "../root.ts";
 import { createCallerFactory } from "../trpc.ts";
 import type { TrpcContext } from "../trpc.ts";
-import type { VehiclePlugin } from "@chargeha/plugins/types";
+import type { VehiclePlugin } from "@chargeha/shared/plugins";
 import { throwingMock } from "../../test-helpers/throwingMock.ts";
 
 describe("Health tRPC Router", () => {
@@ -23,15 +24,15 @@ describe("Health tRPC Router", () => {
     configDef: {},
     secretKeys: [],
     settingsComponentKey: null,
-    createMiddleware: () =>
+    createVehicleMiddleware: () =>
       Promise.resolve(
-        throwingMock<ReturnType<VehiclePlugin["createMiddleware"]>>(
+        throwingMock<ReturnType<VehiclePlugin["createVehicleMiddleware"]>>(
           "VehicleMiddleware",
         ),
       ),
     shutdown: () => Promise.resolve(),
     getRouter: () => null,
-    getHttpRoutes: () => null,
+    getVehicleHttpRoutes: () => null,
     getHealthChecks: () => [],
     getCommandStatus: () =>
       Promise.resolve({ commandsDisabled: false, reason: null }),
@@ -50,6 +51,7 @@ describe("Health tRPC Router", () => {
     const healthService = new HealthService(
       vehiclePlugins,
       new EnergyPluginRegistry(),
+      new ChargerPluginRegistry(),
       encryptionKey,
     );
     return createCaller(throwingMock<TrpcContext>("TrpcContext", {
@@ -107,8 +109,31 @@ describe("Health tRPC Router", () => {
 
       const data = await caller.health.pluginWarnings();
       expect(data).toEqual([
-        { title: "Proxy Down", message: "Cannot reach proxy" },
+        { title: "Proxy Down", message: "not reachable", severity: "error" },
       ]);
+    });
+
+    it("returns a warning severity when a check reports degraded", async () => {
+      const plugin = makePlugin({
+        getHealthChecks: () => [{
+          name: "test-check",
+          warningTitle: "Reduced telemetry",
+          warningMessage: "Some readings are unavailable.",
+          run: () =>
+            Promise.resolve({
+              status: "warning" as const,
+              message: "Charging current is not being reported.",
+            }),
+        }],
+      });
+      const caller = await setupCaller(null, plugin);
+
+      const data = await caller.health.pluginWarnings();
+      expect(data).toEqual([{
+        title: "Reduced telemetry",
+        message: "Charging current is not being reported.",
+        severity: "warning",
+      }]);
     });
   });
 });

@@ -150,6 +150,7 @@ describe("AppDatabase", () => {
     const sampleSchedule: CreateScheduleInput = {
       id: "sched-1",
       vehicleId: "VIN1",
+      chargerId: null,
       scheduleType: "charge",
       startTime: "22:00",
       endTime: "06:00",
@@ -227,7 +228,6 @@ describe("AppDatabase", () => {
       expect(schedule.startTime).toBe("23:00");
       expect(schedule.chargeAmps).toBe(32);
       expect(schedule.enabled).toBe(false);
-      // Unchanged fields remain
       expect(schedule.endTime).toBe("06:00");
       expect(schedule.days).toEqual(["mon", "tue", "wed", "thu", "fri"]);
     });
@@ -274,6 +274,90 @@ describe("AppDatabase", () => {
       const schedules = await db.getSchedules();
       expect(schedules).toHaveLength(1);
       expect(schedules[0].id).toBe("sched-3");
+    });
+  });
+
+  describe("deleting a target takes its schedules with it", () => {
+    const chargerKeyed: CreateScheduleInput = {
+      id: "sched-charger",
+      vehicleId: null,
+      chargerId: "cp-1",
+      scheduleType: "charge",
+      startTime: "00:00",
+      endTime: "06:00",
+      days: ["mon"],
+      chargeAmps: 32,
+      chargeLimitPct: null,
+    };
+    const vehicleKeyed: CreateScheduleInput = {
+      ...chargerKeyed,
+      id: "sched-vehicle",
+      vehicleId: "VIN1",
+      chargerId: null,
+      chargeLimitPct: 80,
+    };
+    const blockout: CreateScheduleInput = {
+      id: "sched-blockout",
+      vehicleId: null,
+      chargerId: null,
+      scheduleType: "blockout",
+      startTime: "17:00",
+      endTime: "21:00",
+      days: ["mon"],
+      chargeAmps: null,
+      chargeLimitPct: null,
+    };
+
+    const seed = async (): Promise<void> => {
+      await db.upsertCharger({
+        id: "cp-1",
+        name: "Wallbox",
+        chargerAdapterType: "ocpp",
+        kind: "smart",
+      });
+      await db.createSchedule(chargerKeyed);
+      await db.createSchedule(vehicleKeyed);
+      await db.createSchedule(blockout);
+    };
+
+    const remainingIds = async (): Promise<string[]> =>
+      (await db.getSchedules()).map((s) => s.id).toSorted();
+
+    it("deleting a charger removes only its charger-keyed schedules", async () => {
+      await seed();
+
+      await db.deleteCharger("cp-1");
+
+      expect(await remainingIds()).toEqual(["sched-blockout", "sched-vehicle"]);
+    });
+
+    it("deleting a vehicle removes only its vehicle-keyed schedules", async () => {
+      await seed();
+
+      await db.deleteVehicle("VIN1");
+
+      expect(await remainingIds()).toEqual(["sched-blockout", "sched-charger"]);
+    });
+
+    it("leaves blockouts alone, which have no target to be deleted with", async () => {
+      await seed();
+
+      await db.deleteCharger("cp-1");
+      await db.deleteVehicle("VIN1");
+
+      expect(await remainingIds()).toEqual(["sched-blockout"]);
+    });
+
+    it("deactivating a charging point keeps its schedules", async () => {
+      await seed();
+
+      await db.updateChargerActive("cp-1", false);
+
+      expect(await remainingIds()).toEqual([
+        "sched-blockout",
+        "sched-charger",
+        "sched-vehicle",
+      ]);
     });
   });
 
@@ -502,8 +586,6 @@ describe("AppDatabase", () => {
     });
 
     it("search supports `-term` to exclude matching rows", async () => {
-      // Tesla has a high-volume `controller:online-check` polling log;
-      // users need to exclude it with `-online-check` to read other logs.
       await db.insertPluginLog({
         ...samplePluginLog,
         message: "Vehicle came online",

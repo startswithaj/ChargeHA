@@ -3,7 +3,6 @@ import styles from "./ErrorBoundary.module.css";
 
 interface Props {
   children: ReactNode;
-  /** Label shown in the modal header to identify which area crashed. */
   label?: string;
 }
 
@@ -12,12 +11,17 @@ interface State {
   errorInfo: ErrorInfo | null;
 }
 
-/**
- * Catches render errors in children and shows a modal overlay with details.
- * The page behind remains visible — similar to Next.js error overlay.
- */
+// The page behind remains visible — similar to Next.js error overlay.
 export class ErrorBoundary extends Component<Props, State> {
   override state: State = { error: null, errorInfo: null };
+
+  private handleDismiss = () => {
+    this.setState({ error: null, errorInfo: null });
+  };
+
+  private handleRetry = () => {
+    this.setState({ error: null, errorInfo: null });
+  };
 
   static getDerivedStateFromError(error: Error): Partial<State> {
     return { error };
@@ -31,14 +35,6 @@ export class ErrorBoundary extends Component<Props, State> {
       errorInfo,
     );
   }
-
-  private handleDismiss = () => {
-    this.setState({ error: null, errorInfo: null });
-  };
-
-  private handleRetry = () => {
-    this.setState({ error: null, errorInfo: null });
-  };
 
   override render() {
     const { error, errorInfo } = this.state;

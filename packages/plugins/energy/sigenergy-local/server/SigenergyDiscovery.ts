@@ -1,7 +1,7 @@
 /// <reference lib="deno.ns" />
 import { Buffer } from "node:buffer";
 import type { Logger } from "@chargeha/server/lib/Logger";
-import { NetworkDiscovery } from "../../NetworkDiscovery.ts";
+import { NetworkDiscovery } from "../../../discovery/NetworkDiscovery.ts";
 import {
   JsmodbusReader,
   type ModbusReader,
@@ -15,7 +15,7 @@ export type SigenergyDevice = {
   serial: string;
 };
 
-/** Builds a `ModbusReader` for one host — injected so tests supply a fake. */
+// Builds a `ModbusReader` for one host — injected so tests supply a fake.
 export type ReaderFactory = (
   host: string,
   port: number,
@@ -34,16 +34,14 @@ const DEFAULT_PORT = 502;
 // Short timeouts keep a /24 sweep from stalling; only silent hosts wait out the connect timeout.
 const DISCOVERY_TIMEOUTS: ModbusTimeouts = { connectMs: 1500, readMs: 1500 };
 
-/** Decode NUL-padded ASCII packed two chars per register. */
+// Decode NUL-padded ASCII packed two chars per register.
 function readAsciiString(buf: Buffer): string {
   return buf.toString("latin1").replace(/[^\x20-\x7e]/g, "").trim();
 }
 
-/**
- * Fingerprint check: is this model string a Sigenergy device? Matches the
- * `Sigen` prefix case-insensitively, covering both the `SigenStor` battery line
- * and the `Sigenergy Neo` — while excluding other Modbus vendors on port 502.
- */
+// Fingerprint check: is this model string a Sigenergy device? Matches the
+// `Sigen` prefix case-insensitively, covering `SigenStor` and `Sigenergy Neo`
+// — while excluding other Modbus vendors on port 502.
 export function isSigenergyModel(model: string): boolean {
   return /sigen/i.test(model);
 }
@@ -75,12 +73,9 @@ class SigenergyDiscovery extends NetworkDiscovery<SigenergyDevice> {
     );
   }
 
-  /**
-   * Probe one host. A device qualifies as Sigenergy only if it BOTH answers the
-   * plant PV register on unit 247 (the unusual plant unit id) AND returns a
-   * `Sigen`-prefixed model string on the device unit — so a generic Modbus
-   * device that merely has port 502 open is rejected.
-   */
+  // Probe one host. A device qualifies as Sigenergy only if it BOTH answers
+  // the plant PV register on unit 247 (the unusual plant unit id) AND
+  // returns a `Sigen`-prefixed model string on the device unit.
   protected async probeHost(host: string): Promise<SigenergyDevice | null> {
     const reader = this.readerFor(host, [
       DEFAULT_PLANT_UNIT_ID,
@@ -117,7 +112,7 @@ class SigenergyDiscovery extends NetworkDiscovery<SigenergyDevice> {
     }
   }
 
-  /** Serial is best-effort — a failure here doesn't disqualify the device. */
+  // Serial is best-effort — a failure here doesn't disqualify the device.
   private async readSerial(reader: ModbusReader): Promise<string> {
     try {
       return readAsciiString(
@@ -134,7 +129,6 @@ class SigenergyDiscovery extends NetworkDiscovery<SigenergyDevice> {
   }
 }
 
-/** Scan the local network for Sigenergy inverters/batteries over Modbus TCP. */
 export function discoverSigenergy(
   logger: Logger,
   subnet?: string,

@@ -42,6 +42,17 @@
   }
 }
 
+/* Waiting-for-a-device indicator (OCPP pairing) */
+@keyframes waitBounce {
+  0%,
+  100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
 @keyframes pulse {
   0%,
   100% {

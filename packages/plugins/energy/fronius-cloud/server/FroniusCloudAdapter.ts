@@ -6,6 +6,11 @@ import type {
 import type { Logger } from "@chargeha/server/lib/Logger";
 
 const BASE_URL = "https://api.solarweb.com/swqapi";
+// Not a leaked personal credential — this is the shared app-level key
+// Fronius's own Solar.web app uses for its free login flow (vs. the paid
+// per-account SWQAPI key). The same value is reused across independent
+// open-source Fronius integrations (e.g. drc38/Fronius_solarweb,
+// TA2k/ioBroker.fronius-solarweb) for the same reason.
 const DEFAULT_ACCESS_KEY_ID = "FKIAB4CDA71C0763413DA942DC756742318B";
 const DEFAULT_ACCESS_KEY_VALUE = "67315e19-6805-479e-994d-7193ee5f6125";
 // Refresh token if within this many seconds of expiry
@@ -33,10 +38,6 @@ export class FroniusCloudParseError extends Error {
 }
 
 export class FroniusCloudAdapter implements EnergySourceAdapter {
-  pollIntervalSeconds(): number {
-    return 30;
-  }
-
   private loginEmail: string;
   private loginPassword: string;
   private pvSystemId: string;
@@ -45,6 +46,10 @@ export class FroniusCloudAdapter implements EnergySourceAdapter {
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
   private tokenExpiresAt: number = 0; // Unix timestamp in ms
+
+  pollIntervalSeconds(): number {
+    return 30;
+  }
 
   constructor(
     loginEmail: string,
@@ -92,7 +97,6 @@ export class FroniusCloudAdapter implements EnergySourceAdapter {
     return Promise.resolve();
   }
 
-  /** Fetch realtime energy flow data from Solar.web flowdata endpoint. */
   async getRealtimeData(): Promise<EnergyData> {
     const response = await this.fetchApi(
       `/pvsystems/${this.pvSystemId}/flowdata`,
@@ -137,7 +141,6 @@ export class FroniusCloudAdapter implements EnergySourceAdapter {
     };
   }
 
-  /** Fetch device/system info from Solar.web. */
   async getDeviceInfo(): Promise<DeviceInfo> {
     const [systemRes, devicesRes] = await Promise.all([
       this.fetchApi(`/pvsystems/${this.pvSystemId}`),
@@ -164,7 +167,6 @@ export class FroniusCloudAdapter implements EnergySourceAdapter {
     };
   }
 
-  /** Authenticate with Solar.web via email/password to obtain JWT tokens. */
   async login(): Promise<void> {
     try {
       const response = await fetch(`${BASE_URL}/iam/jwt`, {
@@ -212,7 +214,6 @@ export class FroniusCloudAdapter implements EnergySourceAdapter {
     }
   }
 
-  /** Refresh the access token using the refresh token. */
   async refreshAccessToken(): Promise<void> {
     if (!this.refreshToken) {
       throw new FroniusCloudAuthError("No refresh token available");
@@ -255,7 +256,6 @@ export class FroniusCloudAdapter implements EnergySourceAdapter {
     }
   }
 
-  /** Ensure a valid access token is available — refresh or re-login as needed. */
   async ensureToken(): Promise<void> {
     if (!this.accessToken) {
       await this.login();
@@ -264,7 +264,6 @@ export class FroniusCloudAdapter implements EnergySourceAdapter {
 
     const timeUntilExpiry = this.tokenExpiresAt - Date.now();
     if (timeUntilExpiry > TOKEN_REFRESH_MARGIN_SECONDS * 1000) {
-      // Token is still valid
       return;
     }
 
@@ -277,7 +276,6 @@ export class FroniusCloudAdapter implements EnergySourceAdapter {
     }
   }
 
-  /** Make an authenticated API request to the Solar.web API. */
   async fetchApi(path: string): Promise<Response> {
     await this.ensureToken();
 

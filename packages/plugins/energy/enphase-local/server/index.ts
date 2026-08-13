@@ -1,16 +1,14 @@
 import type { AnyRouter } from "@trpc/server";
 import type { EnergySourceAdapter } from "@chargeha/shared";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
-import type { EnergyPlugin, PluginHealthCheck } from "@chargeha/plugins/types";
+import type { EnergyPlugin, PluginHealthCheck } from "@chargeha/shared/plugins";
 import { ENPHASE_LOCAL_SECRET_KEYS, enphaseLocalConfigDef } from "./config.ts";
 import { EnphaseClient } from "./EnphaseClient.ts";
 import { EnphaseLocalAdapter } from "./EnphaseLocalAdapter.ts";
 import { createEnphaseLocalRouter } from "./router.ts";
 
-/**
- * Enphase Local energy plugin — reads an Enphase Envoy / IQ Gateway
- * (firmware 7+) on the local network over its token-authenticated HTTPS API.
- */
+// Enphase Local energy plugin — reads an Enphase Envoy / IQ Gateway
+// (firmware 7+) on the local network over its token-authenticated HTTPS API.
 export class EnphaseLocalPlugin implements EnergyPlugin {
   readonly id = "enphase_local";
   readonly displayName = "Enphase (Local)";

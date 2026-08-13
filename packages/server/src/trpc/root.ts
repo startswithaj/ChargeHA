@@ -12,20 +12,23 @@ import { logsRouter } from "./routers/logs.ts";
 import { notificationsRouter } from "./routers/notifications.ts";
 import { wizardRouter } from "./routers/wizard.ts";
 import { authRouter } from "./routers/auth.ts";
-/** Plugin router records collected from registries at startup. */
+import { chargersRouter } from "./routers/chargers.ts";
+// Plugin router records collected from registries at startup.
 export interface PluginRouters<
   TVehicle extends Record<string, AnyRouter> = Record<string, AnyRouter>,
   TEnergy extends Record<string, AnyRouter> = Record<string, AnyRouter>,
+  TCharger extends Record<string, AnyRouter> = Record<string, AnyRouter>,
 > {
   vehicle: TVehicle;
   energy: TEnergy;
+  charger: TCharger;
 }
 
-/** Builds the app router with dynamically-mounted plugin routers. */
 export function createAppRouter<
   TVehicle extends Record<string, AnyRouter>,
   TEnergy extends Record<string, AnyRouter>,
->(pluginRouters: PluginRouters<TVehicle, TEnergy>) {
+  TCharger extends Record<string, AnyRouter>,
+>(pluginRouters: PluginRouters<TVehicle, TEnergy, TCharger>) {
   return router({
     auth: authRouter,
     energy: energyRouter,
@@ -39,14 +42,20 @@ export function createAppRouter<
     log: logsRouter,
     notification: notificationsRouter,
     wizard: wizardRouter,
+    charger: chargersRouter,
     plugin: router({
       vehicle: router(pluginRouters.vehicle),
       energy: router(pluginRouters.energy),
+      charger: router(pluginRouters.charger),
     }),
   });
 }
 
 // Default instance for tests and static type inference
-export const appRouter = createAppRouter({ vehicle: {}, energy: {} });
+export const appRouter = createAppRouter({
+  vehicle: {},
+  energy: {},
+  charger: {},
+});
 
 export type AppRouter = typeof appRouter;

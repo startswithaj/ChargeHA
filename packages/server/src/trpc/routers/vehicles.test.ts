@@ -1,17 +1,19 @@
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { assertExists } from "@std/assert";
-import type { VehicleAdapter, VehicleChargeState } from "@chargeha/shared";
+import type { VehicleChargeState } from "@chargeha/shared";
 import type { VehicleRow } from "../../db/types.ts";
 import { AppDatabase } from "../../db/AppDatabase.ts";
 import type { TypedEventEmitter } from "../../services/TypedEventEmitter.ts";
 import { VehicleManager } from "../../services/VehicleManager.ts";
 import { VehicleService } from "../../services/VehicleService.ts";
+import type { ChargingPointManager } from "../../services/ChargingPointManager.ts";
 import { Logger } from "../../lib/Logger.ts";
 import { appRouter } from "../root.ts";
 import { createCallerFactory } from "../trpc.ts";
 import type { TrpcContext } from "../trpc.ts";
 import { TeslaVehicleMiddleware } from "@chargeha/plugins/vehicles/tesla/server/TeslaVehicleMiddleware";
+import type { TeslaAdapter } from "@chargeha/plugins/vehicles/tesla/server/TeslaAdapter";
 import type { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
 import { throwingMock } from "../../test-helpers/throwingMock.ts";
 import { MockVehicleAdapter } from "../../test-helpers/MockVehicleAdapter.ts";
@@ -65,12 +67,12 @@ describe("Vehicles tRPC Router", () => {
       get: () =>
         ({
           id: "tesla",
-          createMiddleware: (row: VehicleRow) => {
+          createVehicleMiddleware: (row: VehicleRow) => {
             const adapter = new MockVehicleAdapter(row.id, MOCK_STATE);
             createdAdapters.push(adapter);
             return Promise.resolve(
               new TeslaVehicleMiddleware(
-                adapter as unknown as VehicleAdapter,
+                adapter as unknown as TeslaAdapter,
                 testLogger,
               ),
             );
@@ -108,6 +110,9 @@ describe("Vehicles tRPC Router", () => {
       throwingMock("ConfigService"),
       emitter,
       testLogger,
+      throwingMock<ChargingPointManager>("ChargingPointManager", {
+        ensureVehicleChargingPoint: () => Promise.resolve(),
+      }),
     );
 
     caller = createCaller(throwingMock<TrpcContext>("TrpcContext", {
@@ -193,27 +198,6 @@ describe("Vehicles tRPC Router", () => {
     });
   });
 
-  describe("vehicle.setMode", () => {
-    it("updates vehicle mode", async () => {
-      const data = await caller.vehicle.setMode({
-        vehicleId: VIN,
-        mode: "charge_now",
-      });
-      expect(data.success).toBe(true);
-      expect(data.mode).toBe("charge_now");
-
-      const vehicle = await db.getVehicle(VIN);
-      assertExists(vehicle);
-      expect(vehicle.mode).toBe("charge_now");
-    });
-
-    it("throws NOT_FOUND for unknown VIN", async () => {
-      await expect(
-        caller.vehicle.setMode({ vehicleId: "UNKNOWN", mode: "auto" }),
-      ).rejects.toThrow("Vehicle not found");
-    });
-  });
-
   describe("vehicle.setPriority", () => {
     it("updates vehicle priority", async () => {
       const data = await caller.vehicle.setPriority({
@@ -236,30 +220,6 @@ describe("Vehicles tRPC Router", () => {
   });
 
   describe("vehicle.command", () => {
-    it("starts charging and returns state", async () => {
-      const data = await caller.vehicle.command({
-        vehicleId: VIN,
-        command: "start",
-      });
-      expect(data.success).toBe(true);
-      // startChargingAt sends setChargeAmps then startCharging
-      expect(createdAdapters[0].commandCalls).toContainEqual({
-        command: "setChargeAmps",
-        args: 32,
-      });
-    });
-
-    it("stops charging", async () => {
-      const data = await caller.vehicle.command({
-        vehicleId: VIN,
-        command: "stop",
-      });
-      expect(data.success).toBe(true);
-      expect(createdAdapters[0].commandCalls).toContainEqual({
-        command: "stopCharging",
-      });
-    });
-
     it("wakes vehicle by force-refreshing state", async () => {
       const data = await caller.vehicle.command({
         vehicleId: VIN,
@@ -272,27 +232,7 @@ describe("Vehicles tRPC Router", () => {
 
     it("throws NOT_FOUND for unknown VIN", async () => {
       await expect(
-        caller.vehicle.command({ vehicleId: "UNKNOWN", command: "start" }),
-      ).rejects.toThrow("Vehicle not found");
-    });
-  });
-
-  describe("vehicle.setAmps", () => {
-    it("sets charge amps", async () => {
-      const data = await caller.vehicle.setAmps({
-        vehicleId: VIN,
-        amps: 24,
-      });
-      expect(data.success).toBe(true);
-      expect(createdAdapters[0].commandCalls).toContainEqual({
-        command: "setChargeAmps",
-        args: 24,
-      });
-    });
-
-    it("throws NOT_FOUND for unknown VIN", async () => {
-      await expect(
-        caller.vehicle.setAmps({ vehicleId: "UNKNOWN", amps: 16 }),
+        caller.vehicle.command({ vehicleId: "UNKNOWN", command: "wake" }),
       ).rejects.toThrow("Vehicle not found");
     });
   });

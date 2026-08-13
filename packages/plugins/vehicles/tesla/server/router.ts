@@ -7,12 +7,21 @@ import {
 } from "@chargeha/shared/schemas";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
-import type { TeslaVehiclePlugin } from "./index.ts";
 import { TESLA_SECRET_KEYS, teslaConfigDef } from "./config.ts";
 import { createPluginConfigProcedures } from "../../../createPluginConfigProcedures.ts";
+import type { TeslaVehiclePlugin } from "./index.ts";
+
+type TeslaRouterPlugin = Pick<
+  TeslaVehiclePlugin,
+  | "teslaTokenManager"
+  | "teslaService"
+  | "generateKeys"
+  | "importKeys"
+  | "getHealthChecks"
+>;
 
 async function collectProxyWarnings(
-  plugin: TeslaVehiclePlugin,
+  plugin: TeslaRouterPlugin,
 ): Promise<string[]> {
   const checks = plugin.getHealthChecks();
   const results = await Promise.all(checks.map(async (c) => ({
@@ -27,7 +36,7 @@ async function collectProxyWarnings(
 }
 
 export function createTeslaRouter(
-  plugin: TeslaVehiclePlugin,
+  plugin: TeslaRouterPlugin,
   deps: PluginDependencies,
 ) {
   return router({

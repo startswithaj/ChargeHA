@@ -14,7 +14,7 @@ describe("WizardShell", () => {
   const mockPatch = vi.fn();
   let currentStepId = "welcome";
 
-  /** Full 14-step flow (Tesla vehicle + inverter-setup energy step). */
+  // Tesla vehicle + inverter-setup energy step.
   const FULL_STEPS: [string, string][] = [
     ["welcome", "Welcome"],
     ["timezone", "Timezone"],
@@ -51,20 +51,23 @@ describe("WizardShell", () => {
       }),
     }));
 
-  /**
-   * The full flow, with the plugin steps gated off — the shape the real wizard
-   * has when a vehicle type without setup steps is selected. Core steps stay in
-   * the flow; only `when` decides they aren't in the list.
-   */
+  // The shape the real wizard has when a vehicle type without setup steps is
+  // selected. Core steps stay in the flow; only `when` decides presence.
   const makeCoreOnlyFlow = (): StepDef[] =>
     makeFlow().map((step) => gateOff(step, !CORE_ONLY_IDS.includes(step.id)));
 
-  /** Give a step an owner nothing has selected, so it drops out of the list. */
+  // Give a step an owner nothing has selected, so it drops out of the list.
   const gateOff = (step: StepDef, off: boolean): StepDef =>
     off ? { ...step, owner: "unpicked" } : step;
 
   const makeStore = (overrides: Partial<WizardStore> = {}): WizardStore => ({
-    state: { stepId: currentStepId, vehicleType: "", energyType: "" },
+    state: {
+      stepId: currentStepId,
+      vehicleType: "",
+      energyType: "",
+      chargerType: null,
+      controlPath: null,
+    },
     patch: mockPatch,
     isLoading: false,
     ...overrides,
@@ -82,8 +85,6 @@ describe("WizardShell", () => {
   afterEach(() => {
     cleanup();
   });
-
-  // ---- Initial render ----
 
   it("renders step indicator matching step count", () => {
     renderWithProviders(
@@ -166,8 +167,6 @@ describe("WizardShell", () => {
     expect(screen.getByText("Loading wizard...")).toBeInTheDocument();
   });
 
-  // ---- Navigation ----
-
   it("clicking Next advances to next step", async () => {
     renderWithProviders(
       <WizardShell flow={makeFlow()} store={makeStore()} basePath="/wizard" />,
@@ -219,6 +218,8 @@ describe("WizardShell", () => {
             stepId: "inverter-type",
             vehicleType: "tesla",
             energyType: "",
+            chargerType: null,
+            controlPath: null,
           },
         })}
         basePath="/wizard"
@@ -245,6 +246,8 @@ describe("WizardShell", () => {
             stepId: "tesla-credentials",
             vehicleType: "tesla",
             energyType: "",
+            chargerType: null,
+            controlPath: null,
           },
         })}
         basePath="/wizard"
@@ -272,6 +275,8 @@ describe("WizardShell", () => {
             stepId: "tesla-credentials",
             vehicleType: "tesla",
             energyType: "",
+            chargerType: null,
+            controlPath: null,
           },
         })}
         basePath="/wizard"
@@ -294,8 +299,6 @@ describe("WizardShell", () => {
     expect(screen.getByText("Step 6 of 14")).toBeInTheDocument();
     expect(screen.getByText("Tesla Credentials")).toBeInTheDocument();
   });
-
-  // ---- Resolving a step id that isn't in the list ----
 
   it("lands on the next step still in the list when the stored step is gated off", () => {
     // The user had Tesla steps, then switched to a type without them.
@@ -338,8 +341,6 @@ describe("WizardShell", () => {
     expect(screen.getByText("Step 12 of 12")).toBeInTheDocument();
   });
 
-  // ---- Step content rendering ----
-
   it("renders the step content for the current step", () => {
     renderWithProviders(
       <WizardShell flow={makeFlow()} store={makeStore()} basePath="/wizard" />,
@@ -348,8 +349,6 @@ describe("WizardShell", () => {
     expect(screen.getByTestId("step-content-0")).toBeInTheDocument();
     expect(screen.getByText("Welcome content")).toBeInTheDocument();
   });
-
-  // ---- Last step ----
 
   it("shows Finish button on last step instead of Next and Skip", () => {
     setStepId("done");
@@ -384,8 +383,6 @@ describe("WizardShell", () => {
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
   });
 
-  // ---- Step indicator ----
-
   it("marks active step dot in indicator", async () => {
     setStepId("tesla-key-generation");
 
@@ -400,20 +397,15 @@ describe("WizardShell", () => {
     const indicator = screen.getByRole("navigation", { name: "Wizard steps" });
     const dots = indicator.querySelectorAll("[class*='stepDot']");
 
-    // Steps before current should be completed
     Array.from({ length: 3 }).forEach((_, i) => {
       expect(dots[i].className).toContain("stepDotCompleted");
     });
 
-    // Current step should be active
     expect(dots[3].className).toContain("stepDotActive");
 
-    // Steps after current should be neither active nor completed
     expect(dots[4].className).not.toContain("stepDotActive");
     expect(dots[4].className).not.toContain("stepDotCompleted");
   });
-
-  // ---- Dynamic recomposition ----
 
   it("recomputes progress bar when the selections change which steps exist", () => {
     const { rerender } = renderWithProviders(
@@ -582,9 +574,53 @@ describe("WizardShell", () => {
       expect(mockPatch).not.toHaveBeenCalled();
       expect(screen.getByRole("button", { name: "Next" })).toBeEnabled();
     });
-  });
 
-  // ---- Advance ----
+    it("Enter advances while Next is enabled", async () => {
+      renderNext({ kind: "ready", hint: null, onNext: advanceOnly });
+
+      fireEvent.keyDown(document.body, { key: "Enter" });
+
+      // Enter runs the step's handler first, so the patch lands a tick later.
+      await waitFor(() =>
+        expect(mockPatch).toHaveBeenCalledWith({ stepId: "timezone" })
+      );
+    });
+
+    it("Enter does nothing while Next is blocked", async () => {
+      renderNext({ kind: "blocked", reason: "Pick something first" });
+
+      fireEvent.keyDown(document.body, { key: "Enter" });
+
+      // Nothing is queued, so a flush is enough to prove nothing advanced.
+      await waitFor(() => expect(mockPatch).not.toHaveBeenCalled());
+    });
+
+    it("Enter in a textarea is left to the textarea", async () => {
+      const withTextarea = (s: StepDef): StepDef => {
+        if (s.id !== "welcome") return s;
+        return {
+          ...s,
+          useStep: () => ({
+            next: { kind: "ready", hint: null, onNext: advanceOnly },
+            view: <textarea aria-label="notes" />,
+          }),
+        };
+      };
+
+      setStepId("welcome");
+      renderWithProviders(
+        <WizardShell
+          flow={makeFlow().map(withTextarea)}
+          store={makeStore()}
+          basePath="/wizard"
+        />,
+      );
+
+      fireEvent.keyDown(screen.getByLabelText("notes"), { key: "Enter" });
+
+      await waitFor(() => expect(mockPatch).not.toHaveBeenCalled());
+    });
+  });
 
   describe("advance", () => {
     it("writes the selection and the step it leads to in one patch", () => {

@@ -2,7 +2,7 @@ import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { FakeTime } from "@std/testing/time";
 import { buildVehicleChargeState } from "@chargeha/shared/test-factories";
-import type { VehicleRequestContext } from "../../../types.ts";
+import type { VehicleRequestContext } from "@chargeha/shared/plugins";
 import { TeslaApiStrategy } from "./TeslaApiStrategy.ts";
 
 describe("TeslaApiStrategy", () => {

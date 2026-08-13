@@ -3,6 +3,7 @@ import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { Logger } from "../lib/Logger.ts";
 import type { TunnelManager } from "./TunnelManager.ts";
 import type { VehicleManager } from "./VehicleManager.ts";
+import type { ChargingPointManager } from "./ChargingPointManager.ts";
 import type { AuthService, ChangeModeInput } from "./AuthService.ts";
 import { buildSessionCookie } from "./AuthService.ts";
 import { maybeEncrypt } from "../lib/Encryption.ts";
@@ -18,7 +19,16 @@ const NAV_CONFIG_KEYS: Record<keyof WizardNavState, CoreConfigKey> = {
   stepId: "wizard_step",
   vehicleType: "wizard_vehicle_type",
   energyType: "wizard_energy_type",
+  chargerType: "wizard_charger_type",
+  controlPath: "wizard_control_path",
 };
+
+// Narrow the stored string to the union; anything else reads as
+// unanswered rather than guessing.
+function parseControlPath(raw: string | null): "charger" | "vehicle" | null {
+  if (raw === "charger" || raw === "vehicle") return raw;
+  return null;
+}
 
 export class WizardService {
   constructor(
@@ -29,6 +39,7 @@ export class WizardService {
     private vehicleManager: VehicleManager,
     private authService: AuthService,
     private oidcService: OidcService,
+    private chargingPoints: ChargingPointManager,
   ) {}
 
   async getStatus() {
@@ -48,16 +59,19 @@ export class WizardService {
   }
 
   async complete() {
-    // Auto-stop tunnel if running
     if (this.tunnelManager.isRunning) {
       await this.tunnelManager.stop();
       this.logger.info("Tunnel stopped on wizard completion");
     }
 
-    // Clear wizard navigation state from DB
-    await this.patchState({ stepId: "", vehicleType: "", energyType: "" });
+    await this.patchState({
+      stepId: null,
+      vehicleType: null,
+      energyType: null,
+      chargerType: null,
+      controlPath: null,
+    });
 
-    // Clear OIDC pending flag if set
     await this.db.setConfig("wizard_oidc_pending", "");
 
     await this.db.setConfig("wizard_completed", "true");
@@ -68,15 +82,20 @@ export class WizardService {
   // ── Wizard navigation state (persisted to DB config keys) ────────────────
 
   async getState(): Promise<WizardNavState> {
-    const [stepId, vehicleType, energyType] = await Promise.all([
-      this.db.getConfig(NAV_CONFIG_KEYS.stepId),
-      this.db.getConfig(NAV_CONFIG_KEYS.vehicleType),
-      this.db.getConfig(NAV_CONFIG_KEYS.energyType),
-    ]);
+    const [stepId, vehicleType, energyType, chargerType, controlPath] =
+      await Promise.all([
+        this.db.getConfig(NAV_CONFIG_KEYS.stepId),
+        this.db.getConfig(NAV_CONFIG_KEYS.vehicleType),
+        this.db.getConfig(NAV_CONFIG_KEYS.energyType),
+        this.db.getConfig(NAV_CONFIG_KEYS.chargerType),
+        this.db.getConfig(NAV_CONFIG_KEYS.controlPath),
+      ]);
     return {
-      stepId: stepId ?? "",
-      vehicleType: vehicleType ?? "",
-      energyType: energyType ?? "",
+      stepId,
+      vehicleType,
+      energyType,
+      chargerType,
+      controlPath: parseControlPath(controlPath),
     };
   }
 
@@ -137,15 +156,11 @@ export class WizardService {
     return { newMode: "none" };
   }
 
-  /**
-   * Save OIDC config during wizard without activating auth mode.
-   * Tests discovery, saves config to DB, refreshes OidcService cache.
-   * The actual mode switch happens on successful OIDC callback.
-   */
+  // Save OIDC config during wizard without activating auth mode. Tests
+  // discovery, saves config to DB, refreshes OidcService cache. The actual mode switch happens on successful OIDC callback.
   async saveOidcConfig(
     input: WizardSaveOidcConfigInput,
   ): Promise<{ success: true }> {
-    // Test OIDC discovery endpoint reachability
     const result = await this.oidcService.testDiscovery(input.issuerUrl);
     if (!result.success) {
       throw new ServiceError(
@@ -154,13 +169,11 @@ export class WizardService {
       );
     }
 
-    // Encrypt client secret if encryption key available
     const { value: clientSecret, isEncrypted } = await maybeEncrypt(
       input.clientSecret,
       this.encryptionKey,
     );
 
-    // Save OIDC config to DB
     await this.db.upsertOidcConfig({
       issuerUrl: input.issuerUrl,
       clientId: input.clientId,
@@ -169,7 +182,6 @@ export class WizardService {
       baseUrl: input.baseUrl,
     });
 
-    // Mark that OIDC wizard flow is pending
     await this.db.setConfig("wizard_oidc_pending", "true");
 
     // OidcService.getState() reads the new config on next /auth/oidc/login.
@@ -201,7 +213,10 @@ export class WizardService {
       // Fetch the full persisted row (with createdAt/updatedAt) and hand
       // it to the manager so the vehicle is immediately usable.
       const row = await this.db.getVehicle("DEMO-001");
-      if (row) await this.vehicleManager.addVehicle(row);
+      if (row) {
+        await this.vehicleManager.addVehicle(row);
+        await this.chargingPoints.ensureVehicleChargingPoint(row);
+      }
 
       this.logger.info("Demo setup completed");
       return { success: true as const };

@@ -1,90 +1,12 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Code, Text, TextField } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
-import { SettingsRow } from "../../../hostUi.ts";
-
-function SearchControls(
-  { subnet, setSubnet, searchMutation }: {
-    subnet: string;
-    setSubnet: (v: string) => void;
-    searchMutation: ReturnType<
-      typeof trpc.plugin.energy.fronius_local.discover.useMutation
-    >;
-  },
-) {
-  return (
-    <>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <Button
-          size="1"
-          variant="soft"
-          disabled={searchMutation.isPending}
-          onClick={() => searchMutation.mutate({ subnet: subnet || undefined })}
-        >
-          {searchMutation.isPending ? "Scanning..." : "Search Network"}
-        </Button>
-        <Text size="1" color="gray">or enter subnet:</Text>
-        <TextField.Root
-          size="1"
-          placeholder="e.g. 192.168.0"
-          value={subnet}
-          onChange={(e: { target: { value: string } }) =>
-            setSubnet(e.target.value)}
-          style={{ width: 100 }}
-        />
-      </div>
-      {searchMutation.isPending && (
-        <Text size="1" color="gray">
-          Scanning {subnet ? `subnet ${subnet}.*` : "your local network"}{" "}
-          for Fronius inverters...
-        </Text>
-      )}
-    </>
-  );
-}
-
-function SearchResults(
-  { searchResults, onUse }: {
-    searchResults: { host: string; name: string }[];
-    onUse: (host: string) => void;
-  },
-) {
-  if (searchResults.length === 0) {
-    return (
-      <Text size="2" color="orange">
-        No Fronius inverters found. Try entering your subnet above (check your
-        router settings or run <Code size="1">ifconfig</Code>).
-      </Text>
-    );
-  }
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      {searchResults.map((d) => (
-        <div
-          key={d.host}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "6px 10px",
-            borderRadius: 6,
-            background: "var(--gray-a2)",
-          }}
-        >
-          <div>
-            <Text size="2" weight="medium">{d.name}</Text>
-            <Text size="1" color="gray" style={{ display: "block" }}>
-              {d.host}
-            </Text>
-          </div>
-          <Button size="1" variant="soft" onClick={() => onUse(d.host)}>
-            Use
-          </Button>
-        </div>
-      ))}
-    </div>
-  );
-}
+import {
+  NetworkDeviceSearch,
+  SettingsRow,
+  usePluginSettingsHost,
+  useSaveStatus,
+} from "../../../hostUi.ts";
 
 function TestSection(
   { config, testMutation, testSuccess }: {
@@ -183,16 +105,65 @@ function TestResultDisplay(
   );
 }
 
-export function FroniusLocalConfig(): JSX.Element | null {
-  const { data: config } = trpc.plugin.energy.fronius_local.getConfig
-    .useQuery();
+type FroniusDraft = Partial<
+  { froniusHost: string; froniusMeterDeviceId: string }
+>;
+
+// Buffered like EnphaseLocalConfig: a write per keystroke would rebuild the
+// energy adapter against every half-typed host (config_changed → poller).
+function useFroniusDraft(
+  config: { froniusHost: string; froniusMeterDeviceId: string } | undefined,
+) {
   const utils = trpc.useUtils();
   const configMutation = trpc.plugin.energy.fronius_local.setConfig.useMutation(
     {
       onSuccess: () => utils.plugin.energy.fronius_local.getConfig.invalidate(),
     },
   );
+  const [draft, setDraft] = useState<FroniusDraft>({});
+  const { saveStatus, onMutate, onSuccess, onError } = useSaveStatus();
+
+  const froniusHost = draft.froniusHost ?? config?.froniusHost ?? "";
+  const froniusMeterDeviceId = draft.froniusMeterDeviceId ??
+    config?.froniusMeterDeviceId ?? "";
+  const isDirty = Object.keys(draft).length > 0;
+
+  const save = useCallback(() => {
+    if (!isDirty) return;
+    onMutate();
+    configMutation.mutate({ froniusHost, froniusMeterDeviceId }, {
+      onSuccess: () => {
+        onSuccess();
+        setDraft({});
+      },
+      onError,
+    });
+  }, [
+    isDirty,
+    froniusHost,
+    froniusMeterDeviceId,
+    configMutation,
+    onMutate,
+    onSuccess,
+    onError,
+  ]);
+
+  const report = usePluginSettingsHost();
+  useEffect(() => {
+    report?.({ isDirty, save, saveStatus });
+  }, [report, isDirty, save, saveStatus]);
+  useEffect(() => () => report?.(null), [report]);
+
+  return { froniusHost, froniusMeterDeviceId, setDraft };
+}
+
+export function FroniusLocalConfig(): JSX.Element | null {
+  const { data: config } = trpc.plugin.energy.fronius_local.getConfig
+    .useQuery();
   const [subnet, setSubnet] = useState("");
+  const { froniusHost, froniusMeterDeviceId, setDraft } = useFroniusDraft(
+    config as { froniusHost: string; froniusMeterDeviceId: string } | undefined,
+  );
 
   const testMutation = trpc.plugin.energy.fronius_local.testConnection
     .useMutation();
@@ -219,32 +190,36 @@ export function FroniusLocalConfig(): JSX.Element | null {
         <TextField.Root
           size="2"
           placeholder="192.168.1.50"
-          value={config.froniusHost}
+          value={froniusHost}
           onChange={(e: { target: { value: string } }) =>
-            configMutation.mutate({ froniusHost: e.target.value })}
+            setDraft((d) => ({ ...d, froniusHost: e.target.value }))}
           style={{ width: 150 }}
         />
       </SettingsRow>
 
-      <SearchControls
+      <NetworkDeviceSearch
+        deviceNoun="Fronius inverters"
         subnet={subnet}
-        setSubnet={setSubnet}
-        searchMutation={searchMutation}
+        onSubnetChange={setSubnet}
+        onSearch={() => searchMutation.mutate({ subnet: subnet || undefined })}
+        isPending={searchMutation.isPending}
+        searched={searchDone}
+        results={searchResults}
+        onUse={(d) => {
+          setDraft((prev) => ({ ...prev, froniusHost: d.host }));
+          searchMutation.reset();
+          testMutation.mutate({
+            host: d.host,
+            meterDeviceId: parseInt(froniusMeterDeviceId || "0"),
+          });
+        }}
+        emptyMessage={
+          <>
+            No Fronius inverters found. Try entering your subnet above (check
+            your router settings or run <Code size="1">ifconfig</Code>).
+          </>
+        }
       />
-
-      {searchDone && (
-        <SearchResults
-          searchResults={searchResults}
-          onUse={(host) => {
-            configMutation.mutate({ froniusHost: host });
-            searchMutation.reset();
-            testMutation.mutate({
-              host,
-              meterDeviceId: parseInt(config.froniusMeterDeviceId || "0"),
-            });
-          }}
-        />
-      )}
 
       <SettingsRow
         label="Meter device ID"
@@ -253,15 +228,15 @@ export function FroniusLocalConfig(): JSX.Element | null {
         <TextField.Root
           size="2"
           placeholder="0"
-          value={config.froniusMeterDeviceId}
+          value={froniusMeterDeviceId}
           onChange={(e: { target: { value: string } }) =>
-            configMutation.mutate({ froniusMeterDeviceId: e.target.value })}
+            setDraft((d) => ({ ...d, froniusMeterDeviceId: e.target.value }))}
           style={{ width: 80 }}
         />
       </SettingsRow>
 
       <TestSection
-        config={config as { froniusHost: string; froniusMeterDeviceId: string }}
+        config={{ froniusHost, froniusMeterDeviceId }}
         testMutation={testMutation}
         testSuccess={testSuccess}
       />

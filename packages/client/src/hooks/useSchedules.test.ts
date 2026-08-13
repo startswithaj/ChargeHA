@@ -86,6 +86,7 @@ describe("useSchedules", () => {
     id: "sched-1",
     scheduleType: "charge" as const,
     vehicleId: "VIN123",
+    chargerId: null,
     days: ["mon", "tue", "wed"] as Array<"mon" | "tue" | "wed">,
     startTime: "22:00",
     endTime: "06:00",
@@ -98,6 +99,7 @@ describe("useSchedules", () => {
     id: "sched-2",
     scheduleType: "blockout" as const,
     vehicleId: null,
+    chargerId: null,
     days: ["sat", "sun"] as Array<"sat" | "sun">,
     startTime: "08:00",
     endTime: "18:00",
@@ -107,6 +109,7 @@ describe("useSchedules", () => {
   const baseChargeInput = {
     scheduleType: "charge" as const,
     vehicleId: "VIN123",
+    chargerId: null,
     chargeAmps: 16,
     chargeLimitPct: 80,
   };
@@ -216,7 +219,7 @@ describe("useSchedules", () => {
     const error = await addSchedule(result.current, overlappingData);
 
     expect(error).toBe(
-      "This schedule overlaps with an existing charge schedule for the same vehicle.",
+      "This schedule overlaps with an existing charge schedule for the same charging point.",
     );
     expect(hoisted.createMutation).not.toHaveBeenCalled();
   });
@@ -284,6 +287,7 @@ describe("useSchedules", () => {
     const blockoutData = {
       scheduleType: "blockout" as const,
       vehicleId: null,
+      chargerId: null,
       days: ["mon"] as Array<"mon">,
       startTime: "22:00",
       endTime: "06:00",
@@ -379,7 +383,7 @@ describe("useSchedules", () => {
     const error = await updateSchedule(result.current, "sched-3", updateData);
 
     expect(error).toBe(
-      "This schedule overlaps with an existing charge schedule for the same vehicle.",
+      "This schedule overlaps with an existing charge schedule for the same charging point.",
     );
   });
 
@@ -459,7 +463,7 @@ describe("useSchedules", () => {
     const error = await addSchedule(result.current, overlappingData);
 
     expect(error).toBe(
-      "This schedule overlaps with an existing charge schedule for the same vehicle.",
+      "This schedule overlaps with an existing charge schedule for the same charging point.",
     );
   });
 

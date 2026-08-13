@@ -14,32 +14,6 @@ import type {
 
 const VOLTAGE = 230;
 
-/** Run a full-day charge controller simulation using the pure decision engine.
- *  No database, no adapters, no service classes — just plain objects and the
- *  engine's decide() method. */
-function buildVehicleConfigs(opts: SimulationOptions): VehicleConfig[] {
-  return [
-    {
-      id: "SIM_V1",
-      name: "EV 1",
-      priority: 1,
-      batteryStart: opts.ev1Start,
-      chargeLimit: 100,
-      chargeAmpsMax: 32,
-      batteryCapacityKwh: opts.ev1CapacityKwh,
-    },
-    {
-      id: "SIM_V2",
-      name: "EV 2",
-      priority: 2,
-      batteryStart: opts.ev2Start,
-      chargeLimit: 100,
-      chargeAmpsMax: 32,
-      batteryCapacityKwh: opts.ev2CapacityKwh,
-    },
-  ].slice(0, opts.vehicleCount);
-}
-
 function buildControllerConfig(opts: SimulationOptions): ControllerConfig {
   return {
     chargingEnabled: true,
@@ -77,7 +51,7 @@ function initVehicleStates(
       isOnline: true,
       chargeAmps: 0,
       chargeAmpsMax: vc.chargeAmpsMax,
-      chargeAmpsMin: 5,
+      chargeAmpsMin: vc.chargeAmpsMin,
       chargePowerKw: 0,
       chargerVoltage: VOLTAGE,
       chargerPhases: 1,
@@ -190,9 +164,9 @@ interface BatteryTick {
   soc: number;
 }
 
-/** Self-consumption home battery: covers a deficit by discharging, absorbs a
- *  surplus by charging — capped by max rate and remaining capacity/headroom.
- *  `netW` is home + EV load minus solar production (positive = deficit). */
+// Self-consumption home battery: covers a deficit by discharging, absorbs a
+// surplus by charging — capped by max rate and remaining capacity/headroom.
+// `netW` is home + EV load minus solar production (positive = deficit).
 function stepBattery(
   netW: number,
   soc: number,
@@ -221,10 +195,12 @@ function stepBattery(
   };
 }
 
+// Run a full-day charge controller simulation using the pure decision
+// engine. No database, no adapters, no service classes — just plain objects and the engine's decide() method.
 export function runSimulation(
   opts: SimulationOptions,
 ): SimulationOutput {
-  const vehicleConfigs = buildVehicleConfigs(opts);
+  const vehicleConfigs = opts.vehicles;
   const config = buildControllerConfig(opts);
   const vehicleStates = initVehicleStates(vehicleConfigs);
   const engine = new ControllerEngine();
@@ -263,9 +239,9 @@ export function runSimulation(
     );
     batterySoc = battery.soc;
 
-    // Build engine input
     const vehicles: EngineVehicleInput[] = vehicleConfigs.map((vc) => ({
       id: vc.id,
+      vehicleId: vc.id,
       name: vc.name,
       mode: "auto" as const,
       priority: vc.priority,

@@ -22,7 +22,7 @@ describe("loadEnv", () => {
     await loadEnv(`${import.meta.dirname}/does-not-exist.env`);
   });
 
-  it("wires .env loading in main.ts before bootstrap", async () => {
+  it("wires .env loading in the entrypoint before bootstrap", async () => {
     // Guards the regression where a restructure dropped .env loading entirely,
     // leaving ENCRYPTION_KEY (which has no code default) unset.
     const src = await Deno.readTextFile(

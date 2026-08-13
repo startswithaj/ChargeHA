@@ -11,11 +11,11 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { Button, Text, Tooltip } from "@radix-ui/themes";
 import type { VehicleChargeState } from "@chargeha/shared";
-import { kwValue } from "../../utils/Format.ts";
+import { ampsRange, ampsValue, kwValue } from "../../utils/Format.ts";
 import { Spinner } from "../ui/Spinner.tsx";
+import layout from "../ui/CardLayout.module.css";
 import styles from "./VehicleCard.module.css";
 
-/** Which controller reasons warrant a visible status row. */
 const VISIBLE_REASONS = new Set([
   "schedule",
   "blockout",
@@ -40,7 +40,6 @@ const REASON_COLORS: Record<string, "blue" | "orange"> = {
   battery_priority: "orange",
 };
 
-/** User-friendly label formatters per reason. */
 const REASON_LABELS: Record<string, (detail: string) => string> = {
   schedule: (detail) => {
     const match = detail.match(/schedule (\d{2}:\d{2}-\d{2}:\d{2})/);
@@ -126,16 +125,66 @@ function ChargeButton(
   );
 }
 
-function ControllerReasonRow(
-  { reason, detail }: { reason: string; detail: string },
+// Callers that also have a fallback for unformatted reasons need to know
+// which they got.
+export const isVisibleReason = (reason: string | null): boolean =>
+  reason !== null && VISIBLE_REASONS.has(reason);
+
+// Renders nothing for a reason with no user-facing phrasing, so callers can
+// hand it whatever the controller reported without filtering first.
+export function ControllerReasonRow(
+  { reason, detail }: { reason: string | null; detail: string | null },
 ) {
+  if (reason === null || detail === null || !isVisibleReason(reason)) {
+    return null;
+  }
   const Icon = REASON_ICONS[reason];
   const label = REASON_LABELS[reason]?.(detail) ?? detail;
   const color = REASON_COLORS[reason] ?? "gray";
   return (
-    <div className={styles.detailRow}>
+    <div className={layout.detailRow}>
       {Icon && <Icon size={14} />}
       <Text size="1" color={color}>{label}</Text>
+    </div>
+  );
+}
+
+// The only charging row a charger cannot produce: `minutesToFull` and the
+// limit are the vehicle's own numbers, not anything the charger measures.
+function TimeToFullRow(
+  { state, chargeLimitPercent }: {
+    state: VehicleChargeState;
+    chargeLimitPercent: number;
+  },
+) {
+  // Gated on the estimate alone, not on the car's own isCharging flag. A car
+  // driven by a smart charger never sees its own startCharging, so that flag
+  // stays false while the charger is delivering energy; the adapter only
+  // produces a non-zero estimate when it believes it is charging anyway, so
+  // the extra condition ruled the row out without adding anything.
+  if (state.minutesToFull <= 0) return null;
+  return (
+    <div className={layout.detailRow}>
+      <Plug size={14} />
+      <Text size="1" color="gray">
+        {formatMinutes(state.minutesToFull)} to {chargeLimitPercent}%
+      </Text>
+    </div>
+  );
+}
+
+// `readOnly` used to drop this block whole, costing real information rather
+// than just the controls. Every other row is already shown on the charger
+// card above; time to full is the one row that card cannot produce.
+export function PairedChargeDetails(
+  { state, chargeLimitPercent }: {
+    state: VehicleChargeState;
+    chargeLimitPercent: number;
+  },
+) {
+  return (
+    <div className={layout.details}>
+      <TimeToFullRow state={state} chargeLimitPercent={chargeLimitPercent} />
     </div>
   );
 }
@@ -161,7 +210,7 @@ function AmpsControl(
         >
           {commandPending === "amps" ? <Spinner /> : "−"}
         </Button>
-        <Text size="2" weight="bold">{state.chargeAmps}A</Text>
+        <Text size="2" weight="bold">{ampsValue(state.chargeAmps)}</Text>
         <Button
           variant="ghost"
           size="1"
@@ -194,54 +243,45 @@ export function VehicleCardDetails({
   return (
     <>
       {/* Charge details */}
-      <div className={styles.details}>
-        <div className={styles.detailRow}>
+      <div className={layout.details}>
+        <div className={layout.detailRow}>
           <Zap size={14} />
           <Text size="1" color="gray">
             {state.isCharging
-              ? `${state.chargeAmps}A / ${state.chargeAmpsMax}A max`
+              ? ampsRange(state.chargeAmps, state.chargeAmpsMax)
               : "Not Charging"}
           </Text>
         </div>
         {allocationStatus && (
-          <div className={styles.detailRow}>
+          <div className={layout.detailRow}>
             <ArrowUpDown size={14} />
             <Text size="1" color="yellow">{allocationStatus}</Text>
           </div>
         )}
-        {controllerReason && controllerDetail &&
-          VISIBLE_REASONS.has(controllerReason) && (
-          <ControllerReasonRow
-            reason={controllerReason}
-            detail={controllerDetail}
-          />
-        )}
+        <ControllerReasonRow
+          reason={controllerReason}
+          detail={controllerDetail}
+        />
+
         {state.isCharging && (
           <>
             {(solarPowerW > 0 || gridPowerW > 0) && (
-              <div className={styles.detailRow}>
+              <div className={layout.detailRow}>
                 <Sun size={14} />
                 <Text size="1" color="gray">
                   {kwValue(solarPowerW)} solar, {kwValue(gridPowerW)} grid
                 </Text>
               </div>
             )}
-            <div className={styles.detailRow}>
+            <div className={layout.detailRow}>
               <BatteryCharging size={14} />
               <Text size="1" color="gray">
                 {state.energyAddedKwh.toFixed(1)} kWh added
               </Text>
             </div>
-            {state.minutesToFull > 0 && (
-              <div className={styles.detailRow}>
-                <Plug size={14} />
-                <Text size="1" color="gray">
-                  {formatMinutes(state.minutesToFull)} to {chargeLimitPercent}%
-                </Text>
-              </div>
-            )}
           </>
         )}
+        <TimeToFullRow state={state} chargeLimitPercent={chargeLimitPercent} />
       </div>
 
       <div className={styles.controls}>

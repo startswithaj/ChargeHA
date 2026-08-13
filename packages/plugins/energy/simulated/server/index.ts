@@ -1,15 +1,13 @@
 import type { AnyRouter } from "@trpc/server";
 import type { EnergySourceAdapter } from "@chargeha/shared";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
-import type { EnergyPlugin, PluginHealthCheck } from "@chargeha/plugins/types";
+import type { EnergyPlugin, PluginHealthCheck } from "@chargeha/shared/plugins";
 import { simulatedEnergyConfigDef } from "./config.ts";
 import { SimulatedEnergyAdapter } from "./SimulatedEnergyAdapter.ts";
 import { createSimulatedEnergyRouter } from "./router.ts";
 
-/**
- * Simulated energy plugin — generates a solar/home/grid curve with no hardware,
- * for testing and demo use.
- */
+// Simulated energy plugin — generates a solar/home/grid curve with no
+// hardware, for testing and demo use.
 export class SimulatedEnergyPlugin implements EnergyPlugin {
   readonly id = "simulated_energy";
   readonly displayName = "Simulated";
@@ -17,6 +15,9 @@ export class SimulatedEnergyPlugin implements EnergyPlugin {
   readonly settingsComponentKey = "simulated-energy-config";
   readonly configDef = simulatedEnergyConfigDef;
   readonly secretKeys: readonly string[] = [];
+  // Generates a curve rather than measuring a switchboard, so no charging
+  // of any kind shows up in it.
+  readonly measuresLoad = false;
 
   constructor(private readonly deps: PluginDependencies) {
     deps.log.info("Simulated Energy plugin initialized");

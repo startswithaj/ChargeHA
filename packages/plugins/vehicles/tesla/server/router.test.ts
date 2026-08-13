@@ -6,11 +6,11 @@ import { createAppRouter } from "../../../../server/src/trpc/root.ts";
 import { createCallerFactory } from "../../../../server/src/trpc/trpc.ts";
 import type { TrpcContext } from "../../../../server/src/trpc/trpc.ts";
 import { VehicleManager } from "@chargeha/server/services/VehicleManager";
+import type { ChargingPointManager } from "@chargeha/server/services/ChargingPointManager";
 import { TypedEventEmitter } from "../../../../server/src/services/TypedEventEmitter.ts";
 import { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
 import { EnergyPluginRegistry } from "@chargeha/server/bootstrap/EnergyPluginRegistry";
 import { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
-import type { EnergyAdapterManager } from "../../../../server/src/services/EnergyAdapterManager.ts";
 import { throwingMock } from "../../../../server/src/test-helpers/throwingMock.ts";
 import type { TeslaServiceIo } from "./TeslaService.ts";
 import { Logger } from "@chargeha/server/lib/Logger";
@@ -28,7 +28,7 @@ describe("Tesla Plugin Router", () => {
     return input.url;
   }
 
-  /** Seed tokens directly into the DB using namespaced config keys. */
+  // Seed tokens directly into the DB using namespaced config keys.
   async function seedTokens(
     db: AppDatabase,
     access: string,
@@ -46,13 +46,9 @@ describe("Tesla Plugin Router", () => {
     ),
   );
 
-  /**
-   * Build a full test context: real DB, registries, VehicleManager, and a
-   * registered TeslaVehiclePlugin. Returns a tRPC caller (fully typed — the
-   * router is built from the plugin instance) and the pieces tests need to
-   * inspect. Tests that need to mock Fleet API calls pass in a `serviceIo`,
-   * which is forwarded to the plugin's TeslaService.
-   */
+  // Build a full test context: real DB, registries, VehicleManager, and a
+  // registered TeslaVehiclePlugin. Returns a tRPC caller (fully typed) and
+  // the pieces tests need. A `serviceIo` mocks Fleet API calls when given.
   async function setupCaller(opts: {
     encryptionKey?: string | null;
     serviceIo?: TeslaServiceIo;
@@ -77,14 +73,13 @@ describe("Tesla Plugin Router", () => {
       testLogger,
       vehicleRegistry,
     );
-    const energyManager = throwingMock<EnergyAdapterManager>(
-      "EnergyAdapterManager",
-    );
-
     const deps = PluginDependencies.create({
       db,
       vehicleManager,
-      energyManager,
+      chargingPoints: throwingMock<ChargingPointManager>(
+        "ChargingPointManager",
+        { ensureVehicleChargingPoint: () => Promise.resolve() },
+      ),
       tunnel: {
         getUrl: () => null,
         start: () => Promise.reject(new Error("tunnel not mocked")),
@@ -102,6 +97,7 @@ describe("Tesla Plugin Router", () => {
     const appRouter = createAppRouter({
       vehicle: { tesla: createTeslaRouter(plugin, deps) },
       energy: {},
+      charger: {},
     });
     const createCaller = createCallerFactory(appRouter);
 

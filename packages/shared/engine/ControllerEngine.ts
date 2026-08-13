@@ -2,7 +2,11 @@ import type { EnergyData, VehicleChargeState } from "../types.ts";
 import { SolarAllocator } from "./SolarAllocator.ts";
 import { DecisionChecks } from "./DecisionChecks.ts";
 import type { DecisionCheck } from "./DecisionChecks.ts";
-import { isScheduleActiveNow } from "./Schedules.ts";
+import {
+  isScheduleActiveNow,
+  selectActiveChargeSchedule,
+} from "./Schedules.ts";
+import type { ActiveChargeSchedule } from "./Schedules.ts";
 import type {
   ControllerConfig,
   ControlStateUpdates,
@@ -18,18 +22,12 @@ import type {
 } from "./types.ts";
 import { createControlState } from "./types.ts";
 
-/** Pure decision engine for the charge controller.
- *
- *  Owns per-vehicle runtime state (grace periods, cooldowns, amp debouncing)
- *  and exposes a single `decide()` method that takes the current state of the
- *  world and returns per-vehicle decisions.
- *
- *  No I/O, no database, no adapters. The caller (ChargeController or the
- *  simulator) executes the returned decisions. */
+// Pure decision engine for the charge controller. Owns per-vehicle runtime
+// state (grace periods, cooldowns, amp debouncing) and exposes a single
+// `decide()` method. No I/O, no database, no adapters — the caller (ChargeController or the simulator) executes the returned decisions.
 export class ControllerEngine {
   private controlStates = new Map<string, VehicleControlState>();
 
-  /** Make decisions for all vehicles in a single loop iteration. */
   decide(input: EngineInput): EngineOutput {
     const { config, vehicles, schedules, energy, now, timestamp } = input;
     if (!config.chargingEnabled) {
@@ -62,7 +60,7 @@ export class ControllerEngine {
     return { decisions, controlStates: this.controlStates };
   }
 
-  /** Read a vehicle's control state (for the orchestrator's event emission). */
+  // Read a vehicle's control state (for the orchestrator's event emission).
   getControlState(vehicleId: string): VehicleControlState {
     const existing = this.controlStates.get(vehicleId);
     if (existing) return existing;
@@ -137,7 +135,8 @@ export class ControllerEngine {
     }
 
     checks.push(DecisionChecks.pluggedIn(state.isPluggedIn));
-    if (!state.isPluggedIn) {
+    // null (unknown) is treated as plugged in — only a definite false blocks.
+    if (state.isPluggedIn === false) {
       return {
         decision: {
           action: "none",
@@ -345,15 +344,17 @@ export class ControllerEngine {
     now: Date,
   ): EvalResult {
     const checks: DecisionCheck[] = [];
-    const activeCharge = schedules.find((s) =>
-      s.scheduleType === "charge" && s.enabled &&
-      (s.vehicleId === vehicle.id || s.vehicleId === null) &&
-      isScheduleActiveNow(s, now, config.timezone)
+    const active = selectActiveChargeSchedule(
+      schedules,
+      vehicle,
+      now,
+      config.timezone,
     );
-    if (!activeCharge) {
+    if (!active) {
       checks.push(DecisionChecks.chargeScheduleNone());
       return { decision: null, checks };
     }
+    const activeCharge = active.effective;
 
     const limitReached = activeCharge.chargeLimitPct !== null &&
       state.batteryLevel >= activeCharge.chargeLimitPct;
@@ -374,6 +375,7 @@ export class ControllerEngine {
     }
 
     const amps = activeCharge.chargeAmps ?? state.chargeAmpsMax;
+    const merged = mergedSuffix(active);
     const makeDecision = (
       action: PipelineDecision["action"],
       detail: string,
@@ -385,13 +387,19 @@ export class ControllerEngine {
     if (!state.isCharging) {
       return makeDecision(
         "start",
-        `Start charging at ${amps}A (schedule ${activeCharge.startTime}-${activeCharge.endTime})`,
+        `Start charging at ${amps}A (schedule ${activeCharge.startTime}-${activeCharge.endTime}${merged})`,
       );
     }
     if (state.chargeAmps !== amps) {
-      return makeDecision("adjust_amps", `Adjust to ${amps}A (schedule)`);
+      return makeDecision(
+        "adjust_amps",
+        `Adjust to ${amps}A (schedule${merged})`,
+      );
     }
-    return makeDecision("none", `Already charging at ${amps}A (schedule)`);
+    return makeDecision(
+      "none",
+      `Already charging at ${amps}A (schedule${merged})`,
+    );
   }
 
   private evaluateBatteryPriority(
@@ -498,7 +506,11 @@ export class ControllerEngine {
       return { decision: minExcess.decision, checks };
     }
 
-    const voltage = SolarAllocator.resolveVoltage(state, energy, config);
+    const voltage = SolarAllocator.resolveVoltage(
+      state.chargerVoltage,
+      energy,
+      config.gridVoltage,
+    );
     const phases = SolarAllocator.resolvePhases(state, config);
 
     const availableW = SolarAllocator.calculateAvailableSolar(
@@ -858,7 +870,14 @@ export class ControllerEngine {
     config: ControllerConfig,
     energy: EnergyData,
   ): number {
-    const voltage = SolarAllocator.resolveVoltage(state, energy, config);
+    // No early return for `consumptionExcludesCharging || !isCharging`:
+    // addBackW is already 0 in those cases, and surplusW additionally nets off
+    // battery discharge and caps at panel output.
+    const voltage = SolarAllocator.resolveVoltage(
+      state.chargerVoltage,
+      energy,
+      config.gridVoltage,
+    );
     const phases = SolarAllocator.resolvePhases(state, config);
     const addBackW = SolarAllocator.addBackW(config, state, voltage, phases);
     return SolarAllocator.surplusW(energy, addBackW) / 1000;
@@ -914,14 +933,21 @@ export class ControllerEngine {
   }
 }
 
-/** Reason text when solar production is under the configured minimum. */
+// Suffix appended to a schedule decision's detail when two or more
+// overlapping schedules were merged. Empty for the ordinary single-schedule case so existing log text is unchanged.
+function mergedSuffix(active: ActiveChargeSchedule): string {
+  if (!active.merged) return "";
+  const pct = active.effective.chargeLimitPct;
+  if (pct === null) return " merged";
+  return ` merged, limit ${pct}%`;
+}
+
 function belowMinGenerationReason(solarKw: number, minKw: number): string {
   return `solar generation below minimum (${
     solarKw.toFixed(2)
   } kW < ${minKw} kW)`;
 }
 
-/** Reason text when available solar can't sustain the vehicle's minimum amps. */
 function insufficientSolarReason(
   availableW: number,
   targetAmps: number,

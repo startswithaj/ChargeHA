@@ -1,12 +1,4 @@
-/**
- * The host UI surface plugins are allowed to consume — the client-side
- * counterpart of `PluginDependencies`. Plugin production code must import
- * main's client code through this barrel only (enforced by the
- * `no-main-trpc` lint plugin); test files may deep-import test helpers.
- *
- * Main can refactor anything in `client/src` freely as long as these
- * exports keep their contracts.
- */
+// The components from core that plugins can use. Plugins must import components via this file.
 
 // Typed tRPC client factory — plugins widen it with their own router type.
 export { widenTrpc } from "../client/src/trpc.ts";
@@ -27,6 +19,8 @@ export { SettingsRow } from "../client/src/components/pages/Settings/SettingsLay
 export {
   type PluginConfigField,
   PluginConfigForm,
+  PluginFieldInputs,
+  PluginTestRow,
 } from "../client/src/components/pages/Settings/PluginConfigForm.tsx";
 export { usePluginSettingsHost } from "../client/src/components/pages/Settings/pluginSettingsHost.ts";
 export { useSaveStatus } from "../client/src/hooks/useSectionConfig.ts";
@@ -34,6 +28,12 @@ export { useSaveStatus } from "../client/src/hooks/useSectionConfig.ts";
 // Shared UI primitives.
 export { Spinner } from "../client/src/components/ui/Spinner.tsx";
 export { ErrorBanner } from "../client/src/components/ui/ErrorBanner.tsx";
+export {
+  NetworkDeviceSearch,
+  type NetworkSearchResult,
+  useDefaultSubnet,
+} from "./NetworkDeviceSearch.tsx";
+export { TestResultBadge, type TestStatus } from "./TestResultBadge.tsx";
 export { default as dialogStyles } from "../client/src/components/ScheduleDialog/ScheduleDialog.module.css";
 
 // Hooks.

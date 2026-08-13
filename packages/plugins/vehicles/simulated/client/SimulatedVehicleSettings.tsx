@@ -1,11 +1,16 @@
 import { useState } from "react";
-import { Badge, Button, Text } from "@radix-ui/themes";
-import { FlaskConical, Pencil } from "lucide-react";
+import { Badge, IconButton, Text } from "@radix-ui/themes";
+import { FlaskConical, Pencil, X } from "lucide-react";
 import type { VehicleWithState } from "@chargeha/shared";
 import { trpc } from "./trpc.ts";
 import { SimulatedVehicleDialog } from "./SimulatedVehicleDialog.tsx";
 
-/** Wrapper that renders one SimulatedVehicleDialog per simulated vehicle. */
+export interface SimulateUpdate {
+  vehicleId: string;
+  [key: string]: unknown;
+}
+
+// Wrapper that renders one SimulatedVehicleDialog per simulated vehicle.
 export function SimulatedVehicleSettings(): JSX.Element | null {
   const vehiclesQuery = trpc.plugin.vehicle.simulated.listVehicles.useQuery(
     undefined,
@@ -17,10 +22,106 @@ export function SimulatedVehicleSettings(): JSX.Element | null {
     .useMutation({
       onSuccess: () => vehiclesQuery.refetch(),
     });
+  return (
+    <SimulatedVehicleList
+      title="Simulated Vehicle Settings"
+      vehicles={vehiclesQuery.data ?? []}
+      onSimulate={(update) => simulateMutation.mutateAsync(update)}
+    />
+  );
+}
 
+function SimulatedVehicleRow(
+  { vehicle, expanded, onToggle, onSimulate }: {
+    vehicle: VehicleWithState;
+    expanded: boolean;
+    onToggle: () => void;
+    onSimulate: (update: SimulateUpdate) => Promise<unknown>;
+  },
+) {
+  return (
+    <div style={{ borderRadius: 6, background: "var(--gray-a2)" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "8px 10px",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flex: 1,
+            flexWrap: "wrap",
+          }}
+        >
+          <Text size="2" weight="bold" style={{ minWidth: 120 }}>
+            {vehicle.name}
+          </Text>
+          {vehicle.state && (
+            <>
+              <Badge variant="outline" size="1" color="gray">
+                {vehicle.state.batteryLevel.toFixed(0)}%
+              </Badge>
+              <Badge
+                variant="soft"
+                size="1"
+                color={vehicle.state.isPluggedIn ? "green" : "gray"}
+              >
+                {vehicle.state.isPluggedIn ? "Plugged in" : "Unplugged"}
+              </Badge>
+            </>
+          )}
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexShrink: 0,
+          }}
+        >
+          <IconButton
+            variant="ghost"
+            size="1"
+            aria-label={expanded
+              ? `Close ${vehicle.name}`
+              : `Edit ${vehicle.name}`}
+            onClick={onToggle}
+          >
+            {expanded ? <X size={14} /> : <Pencil size={14} />}
+          </IconButton>
+        </div>
+      </div>
+      {expanded && (
+        <SimulatedVehicleDialog
+          vehicleState={vehicle.state}
+          lastLocation={vehicle.lastLocation ?? null}
+          onSave={async (data) => {
+            try {
+              await onSimulate({ vehicleId: vehicle.id, ...data });
+              return null;
+            } catch (e) {
+              return e instanceof Error ? e.message : "Save failed";
+            }
+          }}
+          onCancel={onToggle}
+        />
+      )}
+    </div>
+  );
+}
+
+function SimulatedVehicleList({ title, vehicles, onSimulate }: {
+  title: string;
+  vehicles: VehicleWithState[];
+  onSimulate: (update: SimulateUpdate) => Promise<unknown>;
+}): JSX.Element | null {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  const vehicles = vehiclesQuery.data ?? [];
   if (vehicles.length === 0) return null;
 
   const toggleExpanded = (id: string) =>
@@ -34,8 +135,8 @@ export function SimulatedVehicleSettings(): JSX.Element | null {
   return (
     <div
       style={{
-        marginTop: 8,
-        paddingTop: 8,
+        marginTop: 4,
+        paddingTop: 12,
         borderTop: "1px solid var(--gray-a4)",
       }}
     >
@@ -48,63 +149,19 @@ export function SimulatedVehicleSettings(): JSX.Element | null {
         }}
       >
         <FlaskConical size={14} />
-        <Text size="2" weight="medium">Simulated Vehicle Settings</Text>
+        <Text size="2" weight="bold">{title}</Text>
       </div>
-      {vehicles.map((v) => {
-        const isExpanded = expanded.has(v.id);
-        return (
-          <div key={v.id}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "8px 10px",
-                borderBottom: "1px solid var(--gray-a3)",
-                borderRadius: 6,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <Text size="2" weight="bold">{v.name}</Text>
-                {v.state && (
-                  <Badge size="1" variant="soft" color="gray">
-                    {v.state.batteryLevel.toFixed(2)}% /{" "}
-                    {v.state.isPluggedIn ? "Plugged in" : "Unplugged"}
-                  </Badge>
-                )}
-              </div>
-              <Button
-                variant="soft"
-                size="1"
-                onClick={() => toggleExpanded(v.id)}
-              >
-                <Pencil size={12} />
-                {isExpanded ? "Close" : "Edit"}
-              </Button>
-            </div>
-            {isExpanded && (
-              <div style={{ marginTop: 4 }}>
-                <SimulatedVehicleDialog
-                  vehicleState={v.state}
-                  lastLocation={v.lastLocation ?? null}
-                  onSave={async (data) => {
-                    try {
-                      await simulateMutation.mutateAsync({
-                        vehicleId: v.id,
-                        ...data,
-                      });
-                      return null;
-                    } catch (e) {
-                      return e instanceof Error ? e.message : "Save failed";
-                    }
-                  }}
-                  onCancel={() => toggleExpanded(v.id)}
-                />
-              </div>
-            )}
-          </div>
-        );
-      })}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {vehicles.map((v) => (
+          <SimulatedVehicleRow
+            key={v.id}
+            vehicle={v}
+            expanded={expanded.has(v.id)}
+            onToggle={() => toggleExpanded(v.id)}
+            onSimulate={onSimulate}
+          />
+        ))}
+      </div>
     </div>
   );
 }

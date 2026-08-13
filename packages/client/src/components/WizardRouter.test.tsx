@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@chargeha/plugins/componentRegistry", () => ({
   vehiclePluginOptions: [],
   energyPluginOptions: [],
+  chargerPluginOptions: [],
   vehiclePluginSteps: {
     tesla: [
       {
@@ -31,6 +32,7 @@ vi.mock("@chargeha/plugins/componentRegistry", () => ({
       },
     ],
   },
+  chargerPluginSteps: {},
 }));
 
 vi.mock("../trpc.ts", () => ({
@@ -51,6 +53,8 @@ vi.mock("../hooks/useWizardState.ts", () => ({
       stepId: "welcome",
       vehicleType: "tesla",
       energyType: "fronius_local",
+      chargerType: null,
+      controlPath: null,
     },
     patch: mocks.patch,
     isLoading: false,
@@ -88,8 +92,8 @@ describe("WizardRouter", () => {
   it("passes the whole flow to the shell, gating rather than composing", () => {
     render(<WizardRouter onComplete={vi.fn()} />);
 
-    // 8 core steps + 1 tesla + 1 fronius; the shell gets every step and gates via `when`.
-    expect(screen.getByTestId("flow-length")).toHaveTextContent("10");
+    // 10 core steps + 1 tesla + 1 fronius; the shell gets every step and gates via `when`.
+    expect(screen.getByTestId("flow-length")).toHaveTextContent("12");
   });
 
   it("passes the wizard state through as the shell's store", () => {

@@ -5,17 +5,17 @@ import type { DemoMutable } from "./demoState.ts";
 
 const STORAGE_KEY = "chargeha-demo-state";
 
-/** Shape-check persisted JSON so a stale/corrupt blob falls back to defaults
- *  rather than crashing downstream with a wrongly-typed cast. */
+// Shape-check persisted JSON so a stale/corrupt blob falls back to defaults
+// rather than crashing downstream with a wrongly-typed cast.
 const isDemoMutable = (v: unknown): v is DemoMutable => {
   if (typeof v !== "object" || v === null) return false;
   const m = v as Record<string, unknown>;
   return typeof m.config === "object" && m.config !== null &&
-    Array.isArray(m.vehicles) && Array.isArray(m.schedules) &&
+    Array.isArray(m.vehicles) && Array.isArray(m.chargers) &&
+    Array.isArray(m.schedules) &&
     Array.isArray(m.tariffs) && typeof m.authenticated === "boolean";
 };
 
-/** Load persisted mutable state, or null if absent/unreadable/malformed. */
 export const loadPersisted = (): DemoMutable | null => {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
@@ -30,7 +30,7 @@ export const loadPersisted = (): DemoMutable | null => {
   }
 };
 
-/** Persist mutable state. Storage failures (private mode, quota) are non-fatal. */
+// Storage failures (private mode, quota) are non-fatal.
 export const savePersisted = (mutable: DemoMutable): void => {
   try {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(mutable));
@@ -39,7 +39,6 @@ export const savePersisted = (mutable: DemoMutable): void => {
   }
 };
 
-/** Clear persisted state. */
 export const clearPersisted = (): void => {
   try {
     sessionStorage.removeItem(STORAGE_KEY);

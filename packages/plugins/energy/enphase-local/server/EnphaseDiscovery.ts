@@ -1,6 +1,6 @@
 /// <reference lib="deno.ns" />
 import type { Logger } from "@chargeha/server/lib/Logger";
-import { NetworkDiscovery } from "../../NetworkDiscovery.ts";
+import { NetworkDiscovery } from "../../../discovery/NetworkDiscovery.ts";
 import { type EnvoyHttp, makeNodeHttpsEnvoyHttp } from "./EnphaseClient.ts";
 import { INFO_PATH, isEnvoyInfo, tagValue } from "./envoyInfo.ts";
 
@@ -51,7 +51,7 @@ class EnphaseDiscovery extends NetworkDiscovery<EnphaseDevice> {
   }
 }
 
-/** Scan the local network for Enphase Envoy / IQ Gateway devices. */
+// Scan the local network for Enphase Envoy / IQ Gateway devices.
 export function discoverEnphase(
   logger: Logger,
   subnet?: string,

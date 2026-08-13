@@ -9,6 +9,7 @@ import type {
 } from "@chargeha/shared";
 import { AppDatabase } from "../db/AppDatabase.ts";
 import type { VehicleManager } from "./VehicleManager.ts";
+import type { ChargingPointManager } from "./ChargingPointManager.ts";
 import { DataRecorder } from "./DataRecorder.ts";
 import { TariffService } from "./TariffService.ts";
 import { TypedEventEmitter } from "./TypedEventEmitter.ts";
@@ -72,13 +73,40 @@ describe("DataRecorder", () => {
     dailyGridExportWh: 0,
   };
 
-  /** Emit an energy_update event to feed data into the recorder. */
+  // Charging points mirroring the mock vehicles 1:1 (Tesla parity): linked
+  // point per vehicle, charger state carrying the same measured values.
+  function mockChargingPoints(
+    vehicles: MockRecorderVehicleManager,
+  ): ChargingPointManager {
+    return {
+      getChargersWithState: () =>
+        Promise.resolve(
+          [...vehicles.getAllStates()].map(([id, state]) => ({
+            id: `cp-${id}`,
+            active: true,
+            resolvedVehicleId: id,
+            state: {
+              isCharging: state.isCharging,
+              chargePowerKw: state.chargePowerKw,
+              chargeAmps: state.chargeAmps,
+            },
+          })),
+        ),
+    } as unknown as ChargingPointManager;
+  }
+
   function feedEnergy(
     emitter: TypedEventEmitter,
     data: EnergyData,
   ): void {
     emitter.emit("energy_update", { ...data, ...CUMULATIVE_DEFAULTS });
   }
+
+  // Rows actually written to vehicle_charge_readings, oldest first.
+  const chargeReadingVehicleIds = (database: AppDatabase): string[] =>
+    (testable(database).sqlite.prepare(
+      "SELECT vehicle_id FROM vehicle_charge_readings ORDER BY id",
+    ).all() as Array<{ vehicle_id: string }>).map((r) => r.vehicle_id);
 
   let db: AppDatabase;
   let vehicleManager: MockRecorderVehicleManager;
@@ -95,6 +123,7 @@ describe("DataRecorder", () => {
     recorder = new DataRecorder(
       db,
       vehicleManager as unknown as VehicleManager,
+      mockChargingPoints(vehicleManager),
       tariffService,
       emitter,
       testLogger,
@@ -111,9 +140,24 @@ describe("DataRecorder", () => {
   });
 
   describe("energy_update subscription", () => {
-    it("stores latest realtime data from event", () => {
+    it("stores latest realtime data from event", async () => {
       feedEnergy(emitter, ENERGY_DATA);
-      // No crash — data stored internally
+      // A second event must overwrite the first: the recorder keeps the
+      // latest snapshot, not the one it happened to see first.
+      feedEnergy(emitter, { ...ENERGY_DATA, solarProductionW: 1234 });
+
+      await testable(recorder).record();
+
+      const readings = await db.getRecentReadings(10);
+      expect(readings).toHaveLength(1);
+      expect(readings[0].solarProductionW).toBe(1234);
+    });
+
+    it("records nothing until an energy_update arrives", async () => {
+      await testable(recorder).record();
+
+      const readings = await db.getRecentReadings(10);
+      expect(readings).toHaveLength(0);
     });
   });
 
@@ -371,6 +415,44 @@ describe("DataRecorder", () => {
 
       const readings = await db.getRecentReadings(10);
       expect(readings).toHaveLength(1);
+      expect(chargeReadingVehicleIds(db)).toEqual(["VIN1"]);
+    });
+
+    it("records a passive charger and the car's own point as one session", async () => {
+      vehicleManager.setVehicleState("VIN1", CHARGE_STATE);
+      const passivePair = {
+        getChargersWithState: () =>
+          Promise.resolve([
+            {
+              id: "cp-VIN1",
+              active: true,
+              resolvedVehicleId: "VIN1",
+              passiveForVehicleId: null,
+              state: { isCharging: true, chargePowerKw: 7, chargeAmps: 30 },
+            },
+            {
+              id: "charger-row-1",
+              active: true,
+              resolvedVehicleId: null,
+              passiveForVehicleId: "VIN1",
+              state: { isCharging: true, chargePowerKw: 7, chargeAmps: 30 },
+            },
+          ]),
+      } as unknown as ChargingPointManager;
+      const r = new DataRecorder(
+        db,
+        vehicleManager as unknown as VehicleManager,
+        passivePair,
+        tariffService,
+        emitter,
+        testLogger,
+      );
+      await r.stop();
+      feedEnergy(emitter, ENERGY_DATA);
+
+      await testable(r).record();
+
+      expect(chargeReadingVehicleIds(db)).toEqual(["VIN1"]);
     });
 
     it("does not record vehicle charge data for non-charging vehicles", async () => {
@@ -386,6 +468,8 @@ describe("DataRecorder", () => {
 
       const readings = await db.getRecentReadings(10);
       expect(readings).toHaveLength(1);
+      // The energy reading is still written; the charge table must stay empty.
+      expect(chargeReadingVehicleIds(db)).toEqual([]);
     });
 
     it("handles multiple charging vehicles with solar attribution", async () => {
@@ -428,7 +512,6 @@ describe("DataRecorder", () => {
       feedEnergy(emitter, ENERGY_DATA);
       await testable(recorder).record();
 
-      // Query the energy reading directly to check rate_per_kwh
       // deno-lint-ignore no-explicit-any
       const rows = (db as any).sqlite.prepare(
         "SELECT rate_per_kwh FROM energy_readings ORDER BY id DESC LIMIT 1",
@@ -461,7 +544,7 @@ describe("DataRecorder", () => {
       await testable(recorder).record();
     });
 
-    it("logs error when recordVehicleCharges throws", async () => {
+    it("logs error when recordChargeReadings throws", async () => {
       feedEnergy(emitter, ENERGY_DATA);
       vehicleManager.setVehicleState("VIN1", CHARGE_STATE);
 
@@ -474,22 +557,21 @@ describe("DataRecorder", () => {
     });
   });
 
-  describe("recordVehicleCharges", () => {
+  describe("recordChargeReadings", () => {
     it("returns early when latestRealtime is null", async () => {
       // Don't call updateData — latestRealtime stays null
       vehicleManager.setVehicleState("VIN1", CHARGE_STATE);
 
-      // Call recordVehicleCharges directly — should return early
-      await testable(recorder).recordVehicleCharges(25);
+      await testable(recorder).recordChargeReadings(25);
     });
 
     it("returns early when no vehicles have state", async () => {
       feedEnergy(emitter, ENERGY_DATA);
       // No vehicle states set — allStates.size === 0
-      await testable(recorder).recordVehicleCharges(25);
+      await testable(recorder).recordChargeReadings(25);
     });
 
-    it("skips vehicles that are charging=true but chargePowerKw=0", async () => {
+    it("records a zero-power reading when charging with no measured draw", async () => {
       feedEnergy(emitter, ENERGY_DATA);
       vehicleManager.setVehicleState("VIN1", {
         ...CHARGE_STATE,
@@ -503,9 +585,10 @@ describe("DataRecorder", () => {
         return Promise.resolve();
       };
 
-      await testable(recorder).recordVehicleCharges(25);
-      // chargePowerKw === 0 → isNowCharging = false → no insert
-      expect(insertCalled).toBe(false);
+      await testable(recorder).recordChargeReadings(25);
+      // isCharging with no measured draw still records — zero power is an
+      // honest gap, never a skipped session.
+      expect(insertCalled).toBe(true);
     });
 
     it("skips vehicles that are not charging", async () => {
@@ -522,7 +605,7 @@ describe("DataRecorder", () => {
         return Promise.resolve();
       };
 
-      await testable(recorder).recordVehicleCharges(25);
+      await testable(recorder).recordChargeReadings(25);
       // isCharging === false → isNowCharging = false → no insert
       expect(insertCalled).toBe(false);
     });
@@ -541,7 +624,7 @@ describe("DataRecorder", () => {
         return originalInsert(reading);
       };
 
-      await testable(recorder).recordVehicleCharges(25);
+      await testable(recorder).recordChargeReadings(25);
       expect(capturedReading).not.toBeNull();
       expect(capturedReading.isHome).toBe(true);
       expect(capturedReading.solarContributionW).toBeGreaterThan(0);
@@ -564,7 +647,7 @@ describe("DataRecorder", () => {
         return originalInsert(reading);
       };
 
-      await testable(recorder).recordVehicleCharges(25);
+      await testable(recorder).recordChargeReadings(25);
       expect(capturedReading.isHome).toBe(true);
       expect(capturedReading.solarContributionW).toBeGreaterThan(0);
     });
@@ -588,7 +671,7 @@ describe("DataRecorder", () => {
         return originalInsert(reading);
       };
 
-      await testable(recorder).recordVehicleCharges(25);
+      await testable(recorder).recordChargeReadings(25);
       expect(capturedReading.isHome).toBe(true);
       expect(capturedReading.solarContributionW).toBe(3700);
       expect(capturedReading.gridContributionW).toBe(0);
@@ -611,7 +694,7 @@ describe("DataRecorder", () => {
         return originalInsert(reading);
       };
 
-      await testable(recorder).recordVehicleCharges(25);
+      await testable(recorder).recordChargeReadings(25);
       expect(capturedReading.isHome).toBe(false);
       expect(capturedReading.solarContributionW).toBe(0);
       expect(capturedReading.gridContributionW).toBe(0);
@@ -643,7 +726,7 @@ describe("DataRecorder", () => {
         return originalInsert(reading);
       };
 
-      await testable(recorder).recordVehicleCharges(null);
+      await testable(recorder).recordChargeReadings(null);
       expect(capturedReadings).toHaveLength(2);
       expect(capturedReadings[0].solarContributionW).toBeCloseTo(3245.6, 0);
       expect(capturedReadings[0].gridContributionW).toBeCloseTo(454.4, 0);
@@ -654,7 +737,6 @@ describe("DataRecorder", () => {
       const totalGrid = capturedReadings[0].gridContributionW +
         capturedReadings[1].gridContributionW;
       expect(totalSolar + totalGrid).toBe(3700 + 2000);
-      // ratePerKwh should be null
       expect(capturedReadings[0].ratePerKwh).toBeNull();
     });
 
@@ -682,7 +764,7 @@ describe("DataRecorder", () => {
         return originalInsert(reading);
       };
 
-      await testable(recorder).recordVehicleCharges(25);
+      await testable(recorder).recordChargeReadings(25);
       expect(capturedReading.solarContributionW).toBe(500);
       expect(capturedReading.gridContributionW).toBe(3200);
     });
@@ -710,7 +792,7 @@ describe("DataRecorder", () => {
         return originalInsert(reading);
       };
 
-      await testable(recorder).recordVehicleCharges(25);
+      await testable(recorder).recordChargeReadings(25);
       expect(capturedReading.solarContributionW).toBe(0);
       expect(capturedReading.gridContributionW).toBe(3700);
     });
@@ -742,7 +824,7 @@ describe("DataRecorder", () => {
         return originalInsert(reading);
       };
 
-      await testable(recorder).recordVehicleCharges(25);
+      await testable(recorder).recordChargeReadings(25);
       // Solar attribution must never exceed actual solar production
       expect(capturedReading.solarContributionW).toBeLessThanOrEqual(114);
       // The remainder is grid
@@ -773,24 +855,97 @@ describe("DataRecorder", () => {
         return originalInsert(reading);
       };
 
-      await testable(recorder).recordVehicleCharges(25);
+      await testable(recorder).recordChargeReadings(25);
       expect(capturedReading.solarContributionW).toBe(0);
       expect(capturedReading.gridContributionW).toBe(3700);
     });
   });
 
   describe("pruning logic", () => {
+    // Drives the recorder's own prune tick (every 100th) and reports the
+    // retention day counts it passed to each prune call.
+    const pruneDaysOnTick = async (): Promise<{
+      energy: number[];
+      charge: number[];
+      pollLogs: number[];
+      pluginLogs: number[];
+    }> => {
+      const calls = {
+        energy: [] as number[],
+        charge: [] as number[],
+        pollLogs: [] as number[],
+        pluginLogs: [] as number[],
+      };
+      const stubs = [
+        stub(db, "pruneEnergyReadings", (d: number) => {
+          calls.energy.push(d);
+          return Promise.resolve();
+        }),
+        stub(db, "pruneVehicleChargeReadings", (d: number) => {
+          calls.charge.push(d);
+          return Promise.resolve();
+        }),
+        stub(db, "pruneVehiclePollLogs", (d: number) => {
+          calls.pollLogs.push(d);
+          return Promise.resolve();
+        }),
+        stub(db, "prunePluginLogs", (d: number) => {
+          calls.pluginLogs.push(d);
+          return Promise.resolve();
+        }),
+      ];
+      try {
+        // 99 ticks already elapsed, so this one is the pruning tick.
+        testable(recorder).tickCount = 99;
+        await testable(recorder).tick();
+      } finally {
+        stubs.forEach((s) => s.restore());
+        await recorder.stop();
+      }
+      return calls;
+    };
+
     it("prunes old data based on retention days", async () => {
       feedEnergy(emitter, ENERGY_DATA);
-      await db.setConfig("data_retention_days", "730");
+      // Deliberately not the 730 default, so a hardcoded fallback fails here.
+      await db.setConfig("data_retention_days", "365");
+      await db.setConfig("log_retention_days", "3");
 
-      // Directly test pruning logic
-      const val = await db.getConfig("data_retention_days");
-      const days = parseInt(val ?? "730", 10) || 730;
-      await db.pruneEnergyReadings(days);
-      await db.pruneVehicleChargeReadings(days);
+      const calls = await pruneDaysOnTick();
 
-      // Should not crash
+      expect(calls.energy).toEqual([365]);
+      expect(calls.charge).toEqual([365]);
+      expect(calls.pollLogs).toEqual([365]);
+      // Plugin logs use the separate, shorter log retention.
+      expect(calls.pluginLogs).toEqual([3]);
+    });
+
+    it("falls back to default retention when config is unset", async () => {
+      feedEnergy(emitter, ENERGY_DATA);
+
+      const calls = await pruneDaysOnTick();
+
+      expect(calls.energy).toEqual([730]);
+      expect(calls.charge).toEqual([730]);
+      expect(calls.pollLogs).toEqual([730]);
+      expect(calls.pluginLogs).toEqual([30]);
+    });
+
+    it("does not prune on a non-hundredth tick", async () => {
+      feedEnergy(emitter, ENERGY_DATA);
+      const pruned: number[] = [];
+      const s = stub(db, "pruneEnergyReadings", (d: number) => {
+        pruned.push(d);
+        return Promise.resolve();
+      });
+      try {
+        testable(recorder).tickCount = 0;
+        await testable(recorder).tick();
+      } finally {
+        s.restore();
+        await recorder.stop();
+      }
+      expect(pruned).toEqual([]);
     });
   });
 });

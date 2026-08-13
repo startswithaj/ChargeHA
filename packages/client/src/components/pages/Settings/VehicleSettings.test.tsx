@@ -21,7 +21,6 @@ const { makeHookReturn, hookRef } = vi.hoisted(() => {
     error: null as string | null,
     recentlyAddedVins: new Set<string>(),
     handleDelete: vi.fn(),
-    handleMovePriority: vi.fn(),
     handleAddSimulatedVehicle: vi.fn(),
     vehiclePlugins: [] as Array<{
       id: string;
@@ -40,6 +39,10 @@ const { makeHookReturn, hookRef } = vi.hoisted(() => {
 
 vi.mock("./useVehicleSettings.ts", () => ({
   useVehicleSettings: () => hookRef.current,
+}));
+
+vi.mock("./VehicleControlToggle.tsx", () => ({
+  VehicleControlToggle: () => <div data-testid="vehicle-control-toggle" />,
 }));
 
 vi.mock("./SettingsLayout.tsx", () => ({
@@ -91,7 +94,6 @@ describe("VehicleSettings", () => {
 
   afterEach(() => {
     cleanup();
-    // Reset plugin registries
     Object.keys(pluginSettingsComponents).forEach((key) => {
       delete (pluginSettingsComponents as Record<string, unknown>)[key];
     });
@@ -137,31 +139,6 @@ describe("VehicleSettings", () => {
     expect(screen.getByText("tesla")).toBeInTheDocument();
   });
 
-  it("renders priority controls when multiple vehicles", () => {
-    hookRef.current = makeHookReturn({
-      vehicles: [
-        { id: "VIN1", name: "Model 3", adapterType: "tesla", priority: 1 },
-        { id: "VIN2", name: "Model Y", adapterType: "tesla", priority: 2 },
-      ],
-    });
-    renderWithProviders(<VehicleSettings />);
-    expect(screen.getByText("Priority 1")).toBeInTheDocument();
-    expect(screen.getByText("Priority 2")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Priority determines which vehicle/),
-    ).toBeInTheDocument();
-  });
-
-  it("does not render priority controls for single vehicle", () => {
-    hookRef.current = makeHookReturn({
-      vehicles: [
-        { id: "VIN1", name: "Model 3", adapterType: "tesla", priority: 1 },
-      ],
-    });
-    renderWithProviders(<VehicleSettings />);
-    expect(screen.queryByText("Priority 1")).not.toBeInTheDocument();
-  });
-
   it("calls handleDelete when delete button clicked", () => {
     const handleDelete = vi.fn();
     hookRef.current = makeHookReturn({
@@ -171,33 +148,10 @@ describe("VehicleSettings", () => {
       handleDelete,
     });
     renderWithProviders(<VehicleSettings />);
-    // Find and click the delete button (the ghost red button)
     const buttons = screen.getAllByRole("button");
     // The delete button is just before the "Add Simulated Vehicle" button
     fireEvent.click(buttons[buttons.length - 2]);
-  });
-
-  it("calls handleMovePriority when priority buttons clicked", () => {
-    const handleMovePriority = vi.fn();
-    hookRef.current = makeHookReturn({
-      vehicles: [
-        { id: "VIN1", name: "Model 3", adapterType: "tesla", priority: 1 },
-        { id: "VIN2", name: "Model Y", adapterType: "tesla", priority: 2 },
-      ],
-      handleMovePriority,
-    });
-    renderWithProviders(<VehicleSettings />);
-    // Find the down arrow buttons (enabled ones)
-    const buttons = screen.getAllByRole("button");
-    // The priority section has ArrowUp and ArrowDown for each vehicle
-    // First vehicle: up disabled, down enabled
-    // Second vehicle: up enabled, down disabled
-    // Let's click the first enabled down button
-    const enabledButtons = buttons.filter((b) => !b.hasAttribute("disabled"));
-    // Click one of the priority buttons
-    if (enabledButtons.length > 0) {
-      fireEvent.click(enabledButtons[0]);
-    }
+    expect(handleDelete).toHaveBeenCalledWith("VIN1");
   });
 
   it("calls handleAddSimulatedVehicle when add sim button clicked", () => {

@@ -1,14 +1,6 @@
-/**
- * Typed test wrappers for accessing private class members without `as any` casts.
- *
- * Each Testable* interface explicitly lists the private members exposed for testing.
- * The overloaded testable() function returns `PublicOf<T> & TestableInterface` so both
- * public and exposed private members are accessible with full type safety.
- *
- * PublicOf<T> is a mapped type that strips private/protected members (keyof T only
- * includes public members), avoiding the TypeScript limitation where intersecting a
- * class with private members and an interface re-declaring those members yields `never`.
- */
+// Typed test wrappers for accessing private class members without `as any` casts. Each Testable* interface explicitly lists the private members
+// exposed for testing. The overloaded testable() function returns `PublicOf<T> & TestableInterface` so both public and exposed private members
+// are accessible with full type safety. PublicOf<T> is a mapped type that strips private/protected members (keyof T only includes public members), avoiding the TypeScript limitation where intersecting a class with private members and an interface re-declaring those members yields `never`.
 
 import type { DatabaseDriver as Database } from "@chargeha/shared/database-driver";
 import type { EnergyPoller } from "../services/EnergyPoller.ts";
@@ -61,7 +53,7 @@ export interface TestableDataRecorder {
   tick(): Promise<void>;
   tickCount: number;
   scheduleNext(): void;
-  recordVehicleCharges(ratePerKwh: number | null): Promise<void>;
+  recordChargeReadings(ratePerKwh: number | null): Promise<void>;
 }
 
 export interface TestableOverseer {

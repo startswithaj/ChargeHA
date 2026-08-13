@@ -2,7 +2,6 @@ import { Text } from "@radix-ui/themes";
 import styles from "./steps.module.css";
 import type { ReactNode } from "react";
 
-/** A selectable card on a wizard selection step. */
 export function OptionCard(
   { icon, title, description, selected, disabled, onSelect }: {
     icon: ReactNode;
@@ -28,7 +27,15 @@ export function OptionCard(
       style={disabled ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
       onClick={select}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") select();
+        if (e.key !== "Enter" && e.key !== " ") return;
+        // Already the chosen card? Let Enter through to the wizard, which
+        // advances. Clicking a card leaves focus on it, so re-selecting would
+        // be a keypress that visibly does nothing. Space still only selects.
+        if (selected && e.key === "Enter") return;
+        // Claim the key otherwise, so the same press cannot both pick a card
+        // and move off the step.
+        e.preventDefault();
+        select();
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>

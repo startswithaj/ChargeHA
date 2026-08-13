@@ -88,6 +88,27 @@
   width: 100%;
 }
 
+.chargingPoints {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chargingPoint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  background: var(--color-panel-solid);
+  border: 1px solid var(--gray-4);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.chargingPointName {
+  width: 110px;
+}
+
 .eventsSection {
   display: flex;
   flex-direction: column;

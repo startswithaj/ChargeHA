@@ -1,9 +1,12 @@
 import {
+  chargerPluginSteps,
   energyPluginSteps,
   vehiclePluginSteps,
 } from "@chargeha/plugins/componentRegistry";
 import { welcomeStep } from "./steps/WelcomeStep.tsx";
 import { timezoneStep } from "./steps/TimezoneStep.tsx";
+import { smartChargerStep } from "./steps/SmartChargerStep.tsx";
+import { chargerTypeStep } from "./steps/ChargerTypeStep.tsx";
 import { vehicleTypeStep } from "./steps/VehicleTypeStep.tsx";
 import { inverterTypeStep } from "./steps/InverterTypeStep.tsx";
 import { authStep } from "./steps/AuthStep.tsx";
@@ -12,26 +15,23 @@ import { gridVoltageStep } from "./steps/GridVoltageStep.tsx";
 import { doneStep } from "./steps/DoneStep.tsx";
 import type { PluginStepDef, StepDef } from "./flow.ts";
 
-/**
- * Stamp each plugin's steps with the plugin they belong to. The registry key
- * is the only place ownership is written down — a plugin author declares steps,
- * not when they apply.
- */
+// The registry key is the only place ownership is written down — a plugin
+// author declares steps, not when they apply.
 function ownedSteps(registry: Record<string, PluginStepDef[]>): StepDef[] {
   return Object.entries(registry).flatMap(([owner, steps]) =>
     steps.map((step) => ({ ...step, owner }))
   );
 }
 
-/**
- * The setup wizard, in order. Position here is the order the user sees; `owner`
- * decides presence. Adding, removing or reordering a step is an edit to this
- * array alone — no step names another, so nothing else has to change.
- */
+// Position here is the order the user sees; `owner` decides presence.
+// Adding, removing or reordering a step is an edit to this array alone.
 export const wizardFlow: StepDef[] = [
   welcomeStep,
   authStep,
   timezoneStep,
+  smartChargerStep,
+  chargerTypeStep,
+  ...ownedSteps(chargerPluginSteps),
   vehicleTypeStep,
   ...ownedSteps(vehiclePluginSteps),
   inverterTypeStep,

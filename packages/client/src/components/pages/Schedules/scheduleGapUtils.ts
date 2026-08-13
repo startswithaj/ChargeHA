@@ -1,8 +1,6 @@
 import type { Schedule, ScheduleType } from "@chargeha/shared";
 
-// ---- Gap-finding helpers ----
-
-/** 96 quarter-hour slots per day (00:00 = slot 0, 23:45 = slot 95) */
+// Quarter-hour slots: 00:00 = slot 0, 23:45 = slot 95.
 export const SLOTS = 96;
 export const MAX_GAP_SLOTS = 24; // 6 hours cap
 
@@ -18,18 +16,18 @@ export function slotToTime(slot: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-/**
- * Find the largest free time window among existing schedules of the same type/vehicle.
- * Returns suggested start/end times for a new schedule, capped at 6 hours.
- */
+// The largest free window among existing schedules of the same type and
+// target, capped at 6 hours (MAX_GAP_SLOTS).
 export function findNextGap(
   schedules: Schedule[],
   scheduleType: ScheduleType,
-  vehicleId: string | null,
+  target: { vehicleId: string | null; chargerId: string | null },
 ): { startTime: string; endTime: string } {
   const relevant = schedules.filter((s) => {
     if (scheduleType === "charge") {
-      return s.scheduleType === "charge" && s.vehicleId === vehicleId;
+      return s.scheduleType === "charge" &&
+        s.vehicleId === target.vehicleId &&
+        s.chargerId === target.chargerId;
     }
     return s.scheduleType === "blockout";
   });

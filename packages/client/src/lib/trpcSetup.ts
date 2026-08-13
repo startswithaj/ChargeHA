@@ -16,7 +16,6 @@ import { demoLink } from "./demo/demoLink.ts";
 // real production build. A `demoMode.isActive()` call can't be tree-shaken.
 const isDemoBuild = import.meta.env.VITE_DEMO_MODE === "1";
 
-/** Check whether a tRPC error indicates an UNAUTHORIZED response. */
 export function isUnauthorizedError(error: unknown): boolean {
   if (!(error instanceof TRPCClientError)) return false;
   // tRPC procedure-level UNAUTHORIZED
@@ -27,24 +26,23 @@ export function isUnauthorizedError(error: unknown): boolean {
   return false;
 }
 
-/** Retry predicate for tanstack-query — never retry UNAUTHORIZED, retry once otherwise. */
 export function shouldRetry(failureCount: number, error: unknown): boolean {
   // Never retry UNAUTHORIZED — redirect to login instead
   if (isUnauthorizedError(error)) return false;
   return failureCount < 1;
 }
 
-/** Clears the query client when the given error is an auth error. */
 export function handleAuthError(error: unknown): void {
   if (isUnauthorizedError(error)) {
     queryClient.clear();
   }
 }
 
-/** Auto-invalidate config cache after any mutation succeeds,
- * so subsequent steps always see fresh config values. */
-export function invalidateConfigOnMutation(): void {
-  queryClient.invalidateQueries({ queryKey: [["config", "getAll"]] });
+// Blanket invalidation because relying on the server's `*_changed` SSE
+// event left the mutating client's own correctness dependent on a network
+// round-trip — a dropped/reconnecting SSE connection left the UI stale.
+export function invalidateAllOnMutation(): void {
+  queryClient.invalidateQueries();
 }
 
 export const queryClient = new QueryClient({
@@ -60,12 +58,17 @@ export const queryClient = new QueryClient({
   }),
   mutationCache: new MutationCache({
     onError: handleAuthError,
-    onSuccess: invalidateConfigOnMutation,
+    onSuccess: invalidateAllOnMutation,
   }),
 });
 
 // vehicle.list is cheap and read by both main and plugin UIs, so keep it always-fresh.
 queryClient.setQueryDefaults([["vehicle", "list"]], {
+  staleTime: 0,
+  refetchOnMount: "always",
+});
+
+queryClient.setQueryDefaults([["charger", "list"]], {
   staleTime: 0,
   refetchOnMount: "always",
 });

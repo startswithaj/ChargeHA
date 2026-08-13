@@ -82,6 +82,10 @@ vi.mock("../../../trpc.ts", () => ({
   },
 }));
 
+vi.mock("../../../hooks/useChargers.ts", () => ({
+  useChargers: () => ({ chargers: [], isLoading: false }),
+}));
+
 vi.mock("../../../hooks/useToast.tsx", async (importOriginal) => ({
   ...await importOriginal<typeof import("../../../hooks/useToast.tsx")>(),
   useToast: vi.fn(() => ({
@@ -119,7 +123,6 @@ describe("Logs", () => {
     };
   };
 
-  /** Full log entry with all input sections populated. */
   const fullLogEntry = makeLogEntry({
     checks: [
       { check: "solar_available", result: "pass" },
@@ -171,7 +174,6 @@ describe("Logs", () => {
     };
   };
 
-  /** Sets the next return value of the mocked useControllerLogs hook. */
   const setLogs = (overrides: Record<string, unknown> = {}): void => {
     vi.mocked(useControllerLogs).mockReturnValue(
       makeLogsReturn(overrides) as never,
@@ -180,15 +182,12 @@ describe("Logs", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // Reset URL search params between tests
     globalThis.history.replaceState(null, "", "/logs");
   });
 
   afterEach(() => {
     cleanup();
   });
-
-  // ---- Basic rendering ----
 
   it("renders Logs heading", () => {
     renderWithProviders(<Logs />);
@@ -210,8 +209,6 @@ describe("Logs", () => {
     ).toBeInTheDocument();
   });
 
-  // ---- Loading state ----
-
   it("renders loading state when loading and no logs", () => {
     setLogs({ loading: true });
 
@@ -219,8 +216,6 @@ describe("Logs", () => {
 
     expect(screen.getByText("Loading...")).toBeInTheDocument();
   });
-
-  // ---- Log entry rendering ----
 
   it("renders log entries when logs exist", () => {
     setLogs({ logs: [makeLogEntry()], total: 1 });
@@ -289,8 +284,6 @@ describe("Logs", () => {
     expect(screen.getByText("unknown_action")).toBeInTheDocument();
   });
 
-  // ---- Expanded log entry details ----
-
   it("expands the card and shows all populated input sections", () => {
     setLogs({ logs: [fullLogEntry], total: 1 });
 
@@ -300,13 +293,11 @@ describe("Logs", () => {
 
     fireEvent.click(screen.getByText("Test Car"));
 
-    // Checks
     expect(screen.getByText("Checks")).toBeInTheDocument();
     expect(screen.getByText("solar_available:")).toBeInTheDocument();
     expect(screen.getAllByText("pass").length).toBeGreaterThan(0);
     expect(screen.getByText("battery_ok:")).toBeInTheDocument();
 
-    // Energy
     expect(screen.getByText("Energy")).toBeInTheDocument();
     expect(screen.getByText("Solar")).toBeInTheDocument();
     expect(screen.getByText("3501W")).toBeInTheDocument();
@@ -317,7 +308,6 @@ describe("Logs", () => {
     expect(screen.getAllByText("Battery").length).toBeGreaterThan(0);
     expect(screen.getAllByText("72%").length).toBeGreaterThan(0);
 
-    // Vehicle State
     expect(screen.getByText("Vehicle State")).toBeInTheDocument();
     expect(screen.getByText("Plugged in")).toBeInTheDocument();
     expect(screen.getByText("Charging")).toBeInTheDocument();
@@ -325,7 +315,6 @@ describe("Logs", () => {
     expect(screen.getByText("16A (5-32A)")).toBeInTheDocument();
     expect(screen.getByText("3.7 kW")).toBeInTheDocument();
 
-    // Active Schedules
     expect(screen.getByText("Active Schedules")).toBeInTheDocument();
     expect(screen.getByText("charge: 08:00 - 10:00")).toBeInTheDocument();
   });
@@ -341,8 +330,6 @@ describe("Logs", () => {
     expect(screen.queryByText("Vehicle State")).not.toBeInTheDocument();
     expect(screen.queryByText("Active Schedules")).not.toBeInTheDocument();
   });
-
-  // ---- Pagination ----
 
   it("shows pagination when logs exist", () => {
     setLogs({ logs: [makeLogEntry()], total: 120 });
@@ -400,8 +387,6 @@ describe("Logs", () => {
     expect(nextButton).toBeDisabled();
   });
 
-  // ---- Timestamp rendering ----
-
   it("shows formatted timestamp on a log entry", () => {
     setLogs({
       logs: [makeLogEntry({ actionDetail: "Started", targetAmps: null })],
@@ -413,8 +398,6 @@ describe("Logs", () => {
     const container = document.body;
     expect(container.textContent).toMatch(/Mar/);
   });
-
-  // ---- Edge cases ----
 
   it("does not render Battery row when batterySoc is null", () => {
     setLogs({
@@ -445,8 +428,6 @@ describe("Logs", () => {
     expect(screen.getByText("Solar")).toBeInTheDocument();
     expect(screen.queryByText("Battery")).not.toBeInTheDocument();
   });
-
-  // ---- Time range filter tests ----
 
   it("time range dropdown renders with all preset options", () => {
     renderWithProviders(<Logs />);
@@ -499,8 +480,6 @@ describe("Logs", () => {
     expect(screen.getByTestId("custom-from")).toBeInTheDocument();
     expect(screen.getByTestId("custom-to")).toBeInTheDocument();
   });
-
-  // ---- Action type filter tests ----
 
   it("action type multi-select renders all 4 options", () => {
     renderWithProviders(<Logs />);
@@ -568,8 +547,6 @@ describe("Logs", () => {
     // Should show 2: timeRange is non-default, actions are non-default
     expect(badge.textContent).toBe("2");
   });
-
-  // ---- URL sync ----
 
   it("filters are synced to URL search params", () => {
     renderWithProviders(<Logs />);

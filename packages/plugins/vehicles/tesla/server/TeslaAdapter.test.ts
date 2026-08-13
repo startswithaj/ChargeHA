@@ -6,7 +6,7 @@ import type { TeslaTokenManager } from "./TeslaTokenManager.ts";
 import { TeslaAdapter, TeslaApiError } from "./TeslaAdapter.ts";
 import { Logger } from "@chargeha/server/lib/Logger";
 import type { CallContext } from "@chargeha/shared";
-import { PluginDbLogger } from "../../../PluginDbLogger.ts";
+import { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import { MockTokenManager } from "./test-helpers/MockTokenManager.ts";
 
 describe("TeslaAdapter", () => {
@@ -14,7 +14,6 @@ describe("TeslaAdapter", () => {
 
   const c = (origin: string): CallContext => ({ origin, traceId: "test" });
 
-  // Fake HTTP server to simulate Tesla Fleet API responses
   let server: Deno.HttpServer;
   let baseUrl: string;
   let mockTokenManager: MockTokenManager;
@@ -68,7 +67,6 @@ describe("TeslaAdapter", () => {
         authorization: req.headers.get("Authorization"),
       });
 
-      // Check for response overrides
       const override = responseOverrides.get(url.pathname);
       if (override) {
         return new Response(JSON.stringify(override.body), {
@@ -77,7 +75,6 @@ describe("TeslaAdapter", () => {
         });
       }
 
-      // Default routes
       if (url.pathname === `/api/1/vehicles/${VIN}/vehicle_data`) {
         return Response.json(MOCK_VEHICLE_DATA);
       }
@@ -286,7 +283,6 @@ describe("TeslaAdapter", () => {
     it("sends wake_up command when vehicle is asleep", async () => {
       using fakeTime = new FakeTime();
 
-      // Set vehicle as asleep initially
       responseOverrides.set("/api/1/vehicles", {
         status: 200,
         body: {
@@ -329,7 +325,6 @@ describe("TeslaAdapter", () => {
     it("retries once on 408 and succeeds", async () => {
       using fakeTime = new FakeTime();
 
-      // First call returns 408
       responseOverrides.set(`/api/1/vehicles/${VIN}/vehicle_data`, {
         status: 408,
         body: { error: "timeout" },

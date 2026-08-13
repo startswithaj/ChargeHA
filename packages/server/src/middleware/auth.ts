@@ -3,34 +3,32 @@ import type { AuthService } from "../services/AuthService.ts";
 import type { ConfigService } from "../services/ConfigService.ts";
 import type { Logger } from "../lib/Logger.ts";
 
-/** Dependencies for the auth middleware. */
 export interface AuthMiddlewareDeps {
   authService: AuthService;
   configService: ConfigService;
   logger: Logger;
+  // Plugin-declared device endpoints that bypass session auth.
+  publicPrefixes?: string[];
 }
 
-/** Paths that bypass auth checks entirely. */
 const EXEMPT_PREFIXES = [
   "GET /auth/oidc/",
   "GET /.well-known/",
   "GET /health",
 ] as const;
 
-/** Exact paths that bypass auth: the SPA shell and the login page — without
- *  these an unauthenticated browser can never reach the login form. */
+// Exact paths that bypass auth: the SPA shell and the login page — without
+// these an unauthenticated browser can never reach the login form.
 const EXEMPT_EXACT = [
   "GET /",
   "GET /login",
 ] as const;
 
-/** tRPC procedure paths that bypass auth. */
 const EXEMPT_TRPC_PATHS = [
   "/trpc/auth.login",
   "/trpc/auth.session",
 ] as const;
 
-/** Static asset extensions that bypass auth. */
 const STATIC_EXTENSIONS = [
   ".js",
   ".css",
@@ -47,10 +45,8 @@ const STATIC_EXTENSIONS = [
   ".map",
 ] as const;
 
-/**
- * Detect whether the incoming request arrived over HTTPS.
- * Checks X-Forwarded-Proto header first (reverse proxy), then URL scheme.
- */
+// Detect whether the incoming request arrived over HTTPS. Checks
+// X-Forwarded-Proto header first (reverse proxy), then URL scheme.
 export function isHttps(req: Request): boolean {
   const forwarded = req.headers.get("x-forwarded-proto");
   if (forwarded === "https") return true;
@@ -58,7 +54,6 @@ export function isHttps(req: Request): boolean {
   return proto === "https:";
 }
 
-/** Check whether a path is exempt from auth. */
 function isExemptPath(method: string, path: string): boolean {
   if (EXEMPT_EXACT.some((exact) => exact === `${method} ${path}`)) {
     return true;
@@ -85,10 +80,8 @@ function isExemptPath(method: string, path: string): boolean {
   return false;
 }
 
-/**
- * Hono middleware that adds Strict-Transport-Security header
- * only when the request arrived over HTTPS.
- */
+// Hono middleware that adds Strict-Transport-Security header only when the
+// request arrived over HTTPS.
 export function hstsMiddleware(): MiddlewareHandler {
   return async function hsts(c, next) {
     await next();
@@ -102,20 +95,13 @@ export function hstsMiddleware(): MiddlewareHandler {
   };
 }
 
-/**
- * Create the session-based auth middleware.
- *
- * Check order:
- * 1. auth_mode === "none" → skip
- * 2. RESET_AUTH env var → skip + X-Auth-Warning header
- * 3. exempt path → skip
- * 4. valid session cookie → attach to context, continue
- * 5. otherwise → 401
- */
+// Create the session-based auth middleware. Check order: 1. auth_mode ===
+// "none" → skip; 2. RESET_AUTH env var → skip + X-Auth-Warning header; 3.
+// exempt path → skip; 4. valid session cookie → attach to context, continue; 5. otherwise → 401
 export function createAuthMiddleware(
   deps: AuthMiddlewareDeps,
 ): MiddlewareHandler {
-  const { authService, configService, logger } = deps;
+  const { authService, configService, logger, publicPrefixes = [] } = deps;
 
   return async function authMiddleware(c, next) {
     // 1. Check auth_mode
@@ -137,7 +123,12 @@ export function createAuthMiddleware(
     // 3. Check exempt paths
     const method = c.req.method;
     const path = new URL(c.req.url).pathname;
-    if (isExemptPath(method, path)) {
+    if (
+      isExemptPath(method, path) ||
+      publicPrefixes.some((prefix) =>
+        path === prefix || path.startsWith(`${prefix}/`)
+      )
+    ) {
       return next();
     }
 
@@ -166,7 +157,6 @@ export function createAuthMiddleware(
   };
 }
 
-/** Parse a single cookie value from a Cookie header string. */
 function parseCookieValue(
   cookieHeader: string | undefined,
   name: string,

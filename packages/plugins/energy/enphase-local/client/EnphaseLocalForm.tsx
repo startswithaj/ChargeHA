@@ -7,12 +7,12 @@ import {
   Text,
   TextField,
 } from "@radix-ui/themes";
-import { Loader2, Search } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { trpc } from "./trpc.ts";
-import { Spinner } from "../../../hostUi.ts";
+import { NetworkDeviceSearch, useDefaultSubnet } from "../../../hostUi.ts";
 import { stepStyles as styles } from "../../../hostUi.ts";
-import type { EnphaseDevice, TestStatus } from "../../InverterSetupShared.tsx";
-import { TestResultBadge } from "../../InverterSetupShared.tsx";
+import { TestResultBadge, type TestStatus } from "../../../hostUi.ts";
+import type { EnphaseDevice } from "../../InverterSetupShared.tsx";
 
 export interface EnphaseLocalFormValues {
   host: string;
@@ -54,9 +54,17 @@ function LabelledField(
 }
 
 function SearchSection(
-  { subnet, setSubnet, searchMutation, searchResults, onSelectDevice }: {
+  {
+    subnet,
+    setSubnet,
+    detectedSubnets,
+    searchMutation,
+    searchResults,
+    onSelectDevice,
+  }: {
     subnet: string;
     setSubnet: (v: string) => void;
+    detectedSubnets?: string[];
     searchMutation: ReturnType<
       typeof trpc.plugin.energy.enphase_local.discover.useMutation
     >;
@@ -66,64 +74,23 @@ function SearchSection(
 ) {
   return (
     <>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <Button
-          size="1"
-          variant="soft"
-          disabled={searchMutation.isPending}
-          onClick={() => searchMutation.mutate({ subnet: subnet || undefined })}
-        >
-          {searchMutation.isPending ? <Spinner /> : <Search size={14} />}
-          {searchMutation.isPending ? "Scanning..." : "Search Network"}
-        </Button>
-        <Text size="1" color="gray">or enter subnet:</Text>
-        <TextField.Root
-          size="1"
-          placeholder="e.g. 192.168.0"
-          value={subnet}
-          onChange={(e: { target: { value: string } }) =>
-            setSubnet(e.target.value)}
-          style={{ width: 100 }}
-          aria-label="Subnet"
-        />
-      </div>
-      {!searchMutation.isPending && searchResults.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {searchResults.map((d) => (
-            <div
-              key={d.host}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "6px 10px",
-                borderRadius: 6,
-                background: "var(--gray-a2)",
-              }}
-            >
-              <div>
-                <Text size="2" weight="medium">{d.name}</Text>
-                <Text size="1" color="gray" style={{ display: "block" }}>
-                  {d.host}
-                </Text>
-              </div>
-              <Button
-                size="1"
-                variant="soft"
-                onClick={() => onSelectDevice(d)}
-              >
-                Use
-              </Button>
-            </div>
-          ))}
-        </div>
-      )}
-      {searchMutation.isSuccess && searchResults.length === 0 && (
-        <Text size="2" color="orange">
-          No Envoy found. Try entering your subnet above (check your router
-          settings or run <Code size="1">ifconfig</Code>).
-        </Text>
-      )}
+      <NetworkDeviceSearch
+        deviceNoun="Envoy gateways"
+        subnet={subnet}
+        onSubnetChange={setSubnet}
+        detectedSubnets={detectedSubnets}
+        onSearch={() => searchMutation.mutate({ subnet: subnet || undefined })}
+        isPending={searchMutation.isPending}
+        searched={searchMutation.isSuccess}
+        results={searchResults}
+        onUse={onSelectDevice}
+        emptyMessage={
+          <>
+            No Envoy found. Try entering your subnet above (check your router
+            settings or run <Code size="1">ifconfig</Code>).
+          </>
+        }
+      />
     </>
   );
 }
@@ -258,6 +225,33 @@ function TestConnectionRow(
   );
 }
 
+// Search state + the subnet default, split out to keep EnphaseLocalForm
+// under the function-length limit.
+function useEnphaseSearch() {
+  const [subnet, setSubnet] = useState("");
+  const [searchResults, setSearchResults] = useState<EnphaseDevice[]>([]);
+
+  // Defaults the subnet field to where ChargeHA itself is reachable, once,
+  // while still leaving it fully editable.
+  const lanSubnets = trpc.plugin.energy.enphase_local.lanSubnets.useQuery();
+  useDefaultSubnet(lanSubnets.data, subnet, setSubnet);
+
+  const searchMutation = trpc.plugin.energy.enphase_local.discover.useMutation({
+    onSuccess: (result: { found: EnphaseDevice[] }) =>
+      setSearchResults(result.found),
+    onError: () => setSearchResults([]),
+  });
+
+  return {
+    subnet,
+    setSubnet,
+    lanSubnets,
+    searchMutation,
+    searchResults,
+    setSearchResults,
+  };
+}
+
 export function EnphaseLocalForm(
   { initial, onTestSuccess }: EnphaseLocalFormProps,
 ): JSX.Element {
@@ -268,16 +262,16 @@ export function EnphaseLocalForm(
   const [method, setMethod] = useState<AuthMethod>(
     initial.token && !initial.email ? "token" : "credentials",
   );
-  const [subnet, setSubnet] = useState("");
-  const [searchResults, setSearchResults] = useState<EnphaseDevice[]>([]);
+  const {
+    subnet,
+    setSubnet,
+    lanSubnets,
+    searchMutation,
+    searchResults,
+    setSearchResults,
+  } = useEnphaseSearch();
   // Read from the device's /info — shown for confirmation, never typed or stored.
   const [detectedSerial, setDetectedSerial] = useState("");
-
-  const searchMutation = trpc.plugin.energy.enphase_local.discover.useMutation({
-    onSuccess: (result: { found: EnphaseDevice[] }) =>
-      setSearchResults(result.found),
-    onError: () => setSearchResults([]),
-  });
 
   // Only the selected method's values are sent, so the other method can't shadow it.
   const active = method === "credentials"
@@ -333,6 +327,7 @@ export function EnphaseLocalForm(
       <SearchSection
         subnet={subnet}
         setSubnet={setSubnet}
+        detectedSubnets={lanSubnets.data}
         searchMutation={searchMutation}
         searchResults={searchResults}
         onSelectDevice={handleSelectDevice}

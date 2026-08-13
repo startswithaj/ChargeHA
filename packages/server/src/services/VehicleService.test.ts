@@ -7,12 +7,15 @@ import { Logger } from "../lib/Logger.ts";
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { VehicleRow } from "../db/types.ts";
 import type { VehicleManager } from "./VehicleManager.ts";
-import type { CommandResult } from "./VehicleManager.ts";
+import type { ChargingPointManager } from "./ChargingPointManager.ts";
 import type { VehiclePluginRegistry } from "@chargeha/server/bootstrap/VehiclePluginRegistry";
 import type { VehicleChargeState } from "@chargeha/shared";
 
 describe("VehicleService", () => {
   const testLogger = new Logger("VehicleServiceTest", "error");
+  const stubChargingPoints = {
+    ensureVehicleChargingPoint: () => Promise.resolve(),
+  } as unknown as ChargingPointManager;
 
   const VEHICLE_ROW: VehicleRow = {
     id: "v1",
@@ -48,10 +51,6 @@ describe("VehicleService", () => {
     isHome: null,
   };
 
-  // ---------------------------------------------------------------------------
-  // Mock factories
-  // ---------------------------------------------------------------------------
-
   function makeMockDb(
     overrides: Partial<AppDatabase> = {},
     vehicles: VehicleRow[] = [],
@@ -81,15 +80,6 @@ describe("VehicleService", () => {
       removeVehicle: () => Promise.resolve(),
       deleteVehicle: () => Promise.resolve(),
       requestState: () => Promise.resolve(CHARGE_STATE),
-      startChargingAt: () =>
-        Promise.resolve(
-          { success: true, state: CHARGE_STATE } as CommandResult,
-        ),
-      stopCharging: () =>
-        Promise.resolve(
-          { success: true, state: CHARGE_STATE } as CommandResult,
-        ),
-      isBackedOff: () => ({ backedOff: false }),
       isVehicleAwake: () => true,
       ...overrides,
     } as unknown as VehicleManager;
@@ -114,10 +104,6 @@ describe("VehicleService", () => {
     } as unknown as VehiclePluginRegistry;
   }
 
-  // ---------------------------------------------------------------------------
-  // Tests
-  // ---------------------------------------------------------------------------
-
   let service: VehicleService;
   let db: AppDatabase;
   let mgr: VehicleManager;
@@ -133,12 +119,9 @@ describe("VehicleService", () => {
       registry,
       new TypedEventEmitter(),
       testLogger,
+      stubChargingPoints,
     );
   });
-
-  // =========================================================================
-  // getPluginSummaries
-  // =========================================================================
 
   describe("getPluginSummaries", () => {
     it("returns configured=true when a vehicle matches the plugin id", async () => {
@@ -155,6 +138,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        stubChargingPoints,
       );
 
       const result = await service.getPluginSummaries();
@@ -182,6 +166,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        stubChargingPoints,
       );
 
       const result = await service.getPluginSummaries();
@@ -210,6 +195,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        stubChargingPoints,
       );
 
       const result = await service.getPluginSummaries();
@@ -220,10 +206,6 @@ describe("VehicleService", () => {
     });
   });
 
-  // =========================================================================
-  // getCommandStatus
-  // =========================================================================
-
   describe("getCommandStatus", () => {
     it("returns default when vehicle not found", async () => {
       db = makeMockDb({}, []);
@@ -233,6 +215,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        stubChargingPoints,
       );
 
       const result = await service.getCommandStatus("UNKNOWN");
@@ -260,6 +243,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        stubChargingPoints,
       );
 
       const result = await service.getCommandStatus("v1");
@@ -269,10 +253,6 @@ describe("VehicleService", () => {
       });
     });
   });
-
-  // =========================================================================
-  // getVehicleOrThrow
-  // =========================================================================
 
   describe("getVehicleOrThrow", () => {
     it("returns vehicle when found", async () => {
@@ -291,10 +271,6 @@ describe("VehicleService", () => {
     });
   });
 
-  // =========================================================================
-  // listVehicles
-  // =========================================================================
-
   describe("listVehicles", () => {
     it("returns vehicles with state, location, and no error", async () => {
       const stateWithLocation = {
@@ -312,6 +288,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        stubChargingPoints,
       );
 
       const result = await service.listVehicles();
@@ -333,6 +310,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        stubChargingPoints,
       );
 
       const result = await service.listVehicles();
@@ -351,6 +329,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        stubChargingPoints,
       );
 
       const result = await service.listVehicles();
@@ -358,10 +337,6 @@ describe("VehicleService", () => {
       expect(result[0].lastErrorAt).toBe(errorAt);
     });
   });
-
-  // =========================================================================
-  // createVehicle
-  // =========================================================================
 
   describe("createVehicle", () => {
     it("creates vehicle with defaults and registers with manager", async () => {
@@ -386,6 +361,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        stubChargingPoints,
       );
 
       const result = await service.createVehicle({
@@ -415,6 +391,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        stubChargingPoints,
       );
 
       const result = await service.createVehicle({
@@ -463,6 +440,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         warnLogger,
+        stubChargingPoints,
       );
 
       const result = await service.createVehicle({
@@ -490,6 +468,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        stubChargingPoints,
       );
 
       const result = await service.createVehicle({
@@ -501,10 +480,6 @@ describe("VehicleService", () => {
       expect(addCalled).toBe(false);
     });
   });
-
-  // =========================================================================
-  // deleteVehicle
-  // =========================================================================
 
   describe("deleteVehicle", () => {
     it("deletes vehicle and all related data", async () => {
@@ -521,6 +496,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        stubChargingPoints,
       );
 
       const result = await service.deleteVehicle("v1");
@@ -539,88 +515,6 @@ describe("VehicleService", () => {
     });
   });
 
-  // =========================================================================
-  // setMode
-  // =========================================================================
-
-  describe("setMode", () => {
-    it("updates mode", async () => {
-      let modeSet: string | undefined;
-      db.updateVehicleMode = (_id: string, mode: string) => {
-        modeSet = mode;
-        return Promise.resolve();
-      };
-      service = new VehicleService(
-        db,
-        mgr,
-        registry,
-        new TypedEventEmitter(),
-        testLogger,
-      );
-
-      const result = await service.setMode("v1", "auto");
-      expect(result).toEqual({ success: true, mode: "auto" });
-      expect(modeSet).toBe("auto");
-    });
-
-    it("charge_now immediately starts charging at max amps", async () => {
-      let startedAt:
-        | { vehicleId: string; amps: number; origin: string }
-        | undefined;
-      mgr = makeMockVehicleManager({
-        getState: () => Promise.resolve(CHARGE_STATE),
-        startChargingAt: (
-          vehicleId: string,
-          amps: number,
-          ctx: { origin: string },
-        ) => {
-          startedAt = { vehicleId, amps, origin: ctx.origin };
-          return Promise.resolve({ success: true });
-        },
-      });
-      service = new VehicleService(
-        db,
-        mgr,
-        registry,
-        new TypedEventEmitter(),
-        testLogger,
-      );
-
-      const result = await service.setMode("v1", "charge_now");
-      expect(result).toEqual({ success: true, mode: "charge_now" });
-      expect(startedAt).toBeDefined();
-      expect(startedAt?.vehicleId).toBe("v1");
-      expect(startedAt?.amps).toBe(CHARGE_STATE.chargeAmpsMax);
-      expect(startedAt?.origin).toBe("user:charge-now");
-    });
-
-    it("charge_now skips immediate start when no state available", async () => {
-      let startCalled = false;
-      mgr = makeMockVehicleManager({
-        getState: () => Promise.resolve(null),
-        startChargingAt: () => {
-          startCalled = true;
-          return Promise.resolve({ success: true });
-        },
-      });
-      service = new VehicleService(
-        db,
-        mgr,
-        registry,
-        new TypedEventEmitter(),
-        testLogger,
-      );
-
-      const result = await service.setMode("v1", "charge_now");
-      expect(result).toEqual({ success: true, mode: "charge_now" });
-      expect(startCalled).toBe(false);
-    });
-  });
-
-  // =========================================================================
-  // setPriority
-  // =========================================================================
-
   describe("setPriority", () => {
     it("updates priority", async () => {
       let prioritySet: number | undefined;
@@ -634,6 +528,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        stubChargingPoints,
       );
 
       const result = await service.setPriority("v1", 3);
@@ -642,68 +537,7 @@ describe("VehicleService", () => {
     });
   });
 
-  // =========================================================================
-  // executeCommand
-  // =========================================================================
-
   describe("executeCommand", () => {
-    it("executes start command via vehicleManager.startChargingAt", async () => {
-      let startCalled = false;
-      mgr = makeMockVehicleManager({
-        getState: () => Promise.resolve(CHARGE_STATE),
-        startChargingAt: (
-          _id: string,
-          _amps: number,
-          _ctx: { origin: string },
-        ) => {
-          startCalled = true;
-          return Promise.resolve({ success: true, state: CHARGE_STATE });
-        },
-      });
-      service = new VehicleService(
-        db,
-        mgr,
-        registry,
-        new TypedEventEmitter(),
-        testLogger,
-      );
-
-      const result = await service.executeCommand("v1", "start");
-      expect(result.success).toBe(true);
-      expect(result.state).toBe(CHARGE_STATE);
-      expect(startCalled).toBe(true);
-    });
-
-    it("executes stop command and sets mode to stop", async () => {
-      let stopCalled = false;
-      let modeSet: string | null = null;
-      mgr = makeMockVehicleManager({
-        getState: () => Promise.resolve(CHARGE_STATE),
-        stopCharging: () => {
-          stopCalled = true;
-          return Promise.resolve({ success: true, state: CHARGE_STATE });
-        },
-      });
-      db = makeMockDb({
-        updateVehicleMode: (_id: string, mode: string) => {
-          modeSet = mode;
-          return Promise.resolve();
-        },
-      }, [VEHICLE_ROW]);
-      service = new VehicleService(
-        db,
-        mgr,
-        registry,
-        new TypedEventEmitter(),
-        testLogger,
-      );
-
-      const result = await service.executeCommand("v1", "stop");
-      expect(result.success).toBe(true);
-      expect(stopCalled).toBe(true);
-      expect(modeSet).toBe("stop");
-    });
-
     it("executes wake command via vehicleManager.requestState with forceRefresh", async () => {
       let wakeContext: { forceRefresh?: boolean } | undefined;
       mgr = makeMockVehicleManager({
@@ -718,130 +552,13 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        stubChargingPoints,
       );
 
       const result = await service.executeCommand("v1", "wake");
       expect(result.success).toBe(true);
       expect(result.state).toBe(CHARGE_STATE);
       expect(wakeContext?.forceRefresh).toBe(true);
-    });
-
-    it("wraps Error in ServiceError on command failure", async () => {
-      mgr = makeMockVehicleManager({
-        getState: () => Promise.resolve(CHARGE_STATE),
-        startChargingAt: () => Promise.reject(new Error("API error")),
-      });
-      service = new VehicleService(
-        db,
-        mgr,
-        registry,
-        new TypedEventEmitter(),
-        testLogger,
-      );
-
-      try {
-        await service.executeCommand("v1", "start");
-        expect(true).toBe(false);
-      } catch (err) {
-        expect(err).toBeInstanceOf(ServiceError);
-        expect((err as ServiceError).code).toBe("INTERNAL_SERVER_ERROR");
-        expect((err as ServiceError).message).toBe("API error");
-      }
-    });
-
-    it("wraps non-Error in ServiceError with 'Command failed'", async () => {
-      mgr = makeMockVehicleManager({
-        getState: () => Promise.resolve(CHARGE_STATE),
-        startChargingAt: () => Promise.reject("string error"),
-      });
-      service = new VehicleService(
-        db,
-        mgr,
-        registry,
-        new TypedEventEmitter(),
-        testLogger,
-      );
-
-      try {
-        await service.executeCommand("v1", "start");
-        expect(true).toBe(false);
-      } catch (err) {
-        expect(err).toBeInstanceOf(ServiceError);
-        expect((err as ServiceError).message).toBe("Command failed");
-      }
-    });
-  });
-
-  // =========================================================================
-  // setAmps
-  // =========================================================================
-
-  describe("setAmps", () => {
-    it("sets amps via vehicleManager.startChargingAt", async () => {
-      let ampsSet: number | undefined;
-      mgr = makeMockVehicleManager({
-        getState: () => Promise.resolve(CHARGE_STATE),
-        startChargingAt: (_id: string, amps: number) => {
-          ampsSet = amps;
-          return Promise.resolve({ success: true, state: CHARGE_STATE });
-        },
-      });
-      service = new VehicleService(
-        db,
-        mgr,
-        registry,
-        new TypedEventEmitter(),
-        testLogger,
-      );
-
-      const result = await service.setAmps("v1", 10);
-      expect(result.success).toBe(true);
-      expect(result.state).toBe(CHARGE_STATE);
-      expect(ampsSet).toBe(10);
-    });
-
-    it("wraps Error in ServiceError on failure", async () => {
-      mgr = makeMockVehicleManager({
-        getState: () => Promise.resolve(CHARGE_STATE),
-        startChargingAt: () => Promise.reject(new Error("amps error")),
-      });
-      service = new VehicleService(
-        db,
-        mgr,
-        registry,
-        new TypedEventEmitter(),
-        testLogger,
-      );
-
-      try {
-        await service.setAmps("v1", 10);
-        expect(true).toBe(false);
-      } catch (err) {
-        expect(err).toBeInstanceOf(ServiceError);
-        expect((err as ServiceError).message).toBe("amps error");
-      }
-    });
-
-    it("wraps non-Error in ServiceError with 'Command failed'", async () => {
-      mgr = makeMockVehicleManager({
-        getState: () => Promise.resolve(CHARGE_STATE),
-        startChargingAt: () => Promise.reject(42),
-      });
-      service = new VehicleService(
-        db,
-        mgr,
-        registry,
-        new TypedEventEmitter(),
-        testLogger,
-      );
-
-      try {
-        await service.setAmps("v1", 10);
-        expect(true).toBe(false);
-      } catch (err) {
-        expect(err).toBeInstanceOf(ServiceError);
-        expect((err as ServiceError).message).toBe("Command failed");
-      }
     });
   });
 
@@ -860,6 +577,7 @@ describe("VehicleService", () => {
         registry,
         new TypedEventEmitter(),
         testLogger,
+        stubChargingPoints,
       );
 
       const result = await service.refreshState("v1");

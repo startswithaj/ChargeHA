@@ -48,6 +48,12 @@ function ChecksGroup({ checks }: { checks: ControllerLogEntry["checks"] }) {
   );
 }
 
+// Sign convention matches EnergyData.batteryPowerW: positive=discharge,
+// negative=charge (same as the Dashboard's energy flow diagram/overview).
+function batteryDirection(batteryPowerW: number): "charging" | "discharging" {
+  return batteryPowerW < 0 ? "charging" : "discharging";
+}
+
 function EnergyGroup({ energy }: { energy: NonNullable<Inputs["energy"]> }) {
   return (
     <div className={styles.detailGroup}>
@@ -69,6 +75,19 @@ function EnergyGroup({ energy }: { energy: NonNullable<Inputs["energy"]> }) {
           <>
             <span className={styles.dataKey}>Battery</span>
             <span className={styles.dataValue}>{energy.batterySoc}%</span>
+          </>
+        )}
+        {
+          /* Absent on log rows written before this field existed, and on
+         *  systems with no home battery — both cases render nothing. */
+        }
+        {energy.batteryPowerW != null && (
+          <>
+            <span className={styles.dataKey}>Battery power</span>
+            <span className={styles.dataValue}>
+              {Math.round(Math.abs(energy.batteryPowerW))}W{" "}
+              {batteryDirection(energy.batteryPowerW)}
+            </span>
           </>
         )}
       </div>

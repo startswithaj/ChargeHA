@@ -14,7 +14,12 @@ export class ConfigRepository {
     return result[0].value;
   }
 
-  async setConfig(key: string, value: string): Promise<void> {
+  async setConfig(key: string, value: string | null): Promise<void> {
+    // null deletes the row
+    if (value === null) {
+      await this.db.delete(configTable).where(eq(configTable.key, key));
+      return;
+    }
     await this.db
       .insert(configTable)
       .values({ key, value, isEncrypted: 0 })

@@ -3,8 +3,7 @@ import { Button, Text, TextField } from "@radix-ui/themes";
 import { Loader2 } from "lucide-react";
 import { trpc } from "./trpc.ts";
 import { stepStyles as styles } from "../../../hostUi.ts";
-import type { TestStatus } from "../../InverterSetupShared.tsx";
-import { TestResultBadge } from "../../InverterSetupShared.tsx";
+import { TestResultBadge, type TestStatus } from "../../../hostUi.ts";
 
 interface FroniusCloudFormProps {
   initialEmail: string;

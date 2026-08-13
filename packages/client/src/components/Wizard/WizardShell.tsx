@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button, Text } from "@radix-ui/themes";
 import { X } from "lucide-react";
 import { useRouter } from "../../hooks/useRouter.ts";
@@ -20,14 +20,13 @@ import styles from "./WizardShell.module.css";
 interface WizardShellProps {
   flow: StepDef[];
   store: WizardStore;
-  /** Steps are addressed as `${basePath}/${stepId}`. */
+  // Steps are addressed as `${basePath}/${stepId}`.
   basePath: string;
   onComplete?: () => void;
-  /** When set, an "Exit setup" button is shown that abandons the wizard —
-   *  provided only when the wizard was previously completed. */
+  // Shown only when the wizard was previously completed.
   onExit?: () => void;
-  /** Called when Back is pressed on the first step. Without it, Back is
-   *  disabled there. */
+  // Called when Back is pressed on the first step. Without it, Back is
+  // disabled there.
   onBackOut?: () => void;
 }
 
@@ -121,6 +120,12 @@ export function WizardShell(
   const currentStep = resolveStepIndex(flow, store.state);
   const stepConfig = active[currentStep];
 
+  // Not persisted: a charger plugin step's save reports its row id here so a
+  // later step in the same run (e.g. a verify step) can address it. Lost on
+  // reload between save and that later step — the step blocks with a message
+  // rather than silently acting on the wrong row.
+  const [chargerId, setChargerId] = useState<string | null>(null);
+
   const {
     goToStep,
     handleBack,
@@ -156,6 +161,8 @@ export function WizardShell(
     onBack: handleBack,
     onSkipTo: goToStep,
     onSkipToEnd: handleSkipToEnd,
+    chargerId,
+    setChargerId,
   };
 
   const isFirstStep = currentStep === 0;
@@ -170,7 +177,6 @@ export function WizardShell(
         labels={active.map((s) => s.label)}
       />
 
-      {/* Step header */}
       <div className={styles.stepHeader}>
         <Text size="1" color="gray">
           Step {currentStep + 1} of {active.length}

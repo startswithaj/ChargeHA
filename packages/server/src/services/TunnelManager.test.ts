@@ -3,11 +3,9 @@ import { expect } from "@std/expect";
 import { assertExists } from "@std/assert";
 import { FakeTime } from "@std/testing/time";
 import { PINGGY_PROVIDER, TunnelManager } from "./TunnelManager.ts";
-import type { PluginTunnelRoute } from "@chargeha/plugins/types";
+import type { PluginTunnelRoute } from "@chargeha/shared/plugins";
 
 describe("TunnelManager", () => {
-  // ── Test Helpers ────────────────────────────────────────────────────────────
-
   const mockLogger = {
     info: () => {},
     error: () => {},
@@ -15,7 +13,6 @@ describe("TunnelManager", () => {
     debug: () => {},
   };
 
-  /** Create a ReadableStream from string chunks. */
   function createReadableStream(chunks: string[]): ReadableStream<Uint8Array> {
     const encoder = new TextEncoder();
     return new ReadableStream({
@@ -28,7 +25,6 @@ describe("TunnelManager", () => {
     });
   }
 
-  /** Create a ReadableStream that never provides data (hangs on read). */
   function createHangingStream(): ReadableStream<Uint8Array> {
     return new ReadableStream({
       pull() {
@@ -37,7 +33,6 @@ describe("TunnelManager", () => {
     });
   }
 
-  /** Create a mock ChildProcess with controllable stderr and status. */
   function createMockProcess(options: {
     stderrChunks?: string[];
     hangingStderr?: boolean;
@@ -85,8 +80,6 @@ describe("TunnelManager", () => {
     return { process, resolveStatus };
   }
 
-  // ── Stubs ───────────────────────────────────────────────────────────────────
-
   interface MockCommandOptions {
     mockProcess: Deno.ChildProcess;
     throwOnSpawn?: Error;
@@ -132,7 +125,7 @@ describe("TunnelManager", () => {
     return new commandHolder.factory(path, options);
   } as unknown as typeof Deno.Command;
 
-  /** Reset the captured middleware-server state between tests. */
+  // Reset the captured middleware-server state between tests.
   function stubDenoServe(): void {
     mockServerShutdownCalled = false;
     capturedMiddlewareHandler = null;
@@ -149,10 +142,10 @@ describe("TunnelManager", () => {
     } as unknown as typeof Deno.Command;
   }
 
-  /** Routes returned by the injected provider — tests mutate between calls. */
+  // Routes returned by the injected provider — tests mutate between calls.
   const routesHolder: { routes: PluginTunnelRoute[] } = { routes: [] };
 
-  /** Provider matching the mock process output used across these tests. */
+  // Provider matching the mock process output used across these tests.
   const testProvider = {
     name: "test-tunnel",
     path: "test-tunnel-bin",
@@ -162,7 +155,6 @@ describe("TunnelManager", () => {
     expiryMinutes: null,
   };
 
-  /** Construct a TunnelManager with the fake serve + command injected. */
   const makeTunnelManager = (
     logger: unknown = mockLogger,
     middlewarePort = 4040,
@@ -178,8 +170,6 @@ describe("TunnelManager", () => {
       lazyCommand,
     );
   };
-
-  // ── Tests ───────────────────────────────────────────────────────────────────
 
   describe("PINGGY_PROVIDER", () => {
     it("matches free.pinggy.net URLs but not the tesla-rejected alias", () => {
@@ -234,7 +224,6 @@ describe("TunnelManager", () => {
 
       await tm.start();
 
-      // Verify handler route works via captured middleware handler
       assertExists(capturedMiddlewareHandler);
       const resp = await capturedMiddlewareHandler(
         new Request("http://localhost:4040/test"),
@@ -536,7 +525,6 @@ describe("TunnelManager", () => {
       await tm.start();
       expect(tm.isRunning).toBe(true);
 
-      // Simulate the tunnel process exiting
       resolveStatus(
         { success: false, code: 1, signal: null } as Deno.CommandStatus,
       );
@@ -864,7 +852,6 @@ describe("TunnelManager", () => {
       // Allow pipeStderr to process remaining chunks
       await new Promise((r) => setTimeout(r, 50));
 
-      // pipeStderr should have logged the remaining chunks
       const tunnelLogs = debugCalls.filter((m) =>
         m.startsWith("[test-tunnel]")
       );

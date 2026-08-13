@@ -1,27 +1,23 @@
 /// <reference lib="deno.ns" />
 import type { Logger } from "../lib/Logger.ts";
-import type { PluginTunnelRoute } from "@chargeha/plugins/types";
+import type { PluginTunnelRoute } from "@chargeha/shared/plugins";
 
-/** How a tunnel process is spawned and its public URL recognised. */
+// How a tunnel process is spawned and its public URL recognised.
 export interface TunnelProvider {
   name: string;
   path: string;
-  /** `{port}` is replaced with the middleware port. */
+  // `{port}` is replaced with the middleware port.
   args: string[];
-  /** Matches the public https URL in the process output. */
+  // Matches the public https URL in the process output.
   urlPattern: RegExp;
-  /** Which stream the provider prints the URL to. */
   urlStream: "stdout" | "stderr";
-  /** Free-tier session limit surfaced to the user, if any. */
+  // Free-tier session limit surfaced to the user, if any.
   expiryMinutes: number | null;
 }
 
-/** Pinggy over plain ssh. As of 2026-07 it is the only tested tunnel whose
- *  domain Tesla's developer portal accepts in BOTH the Allowed Origin and
- *  Redirect URI fields — trycloudflare.com, serveousercontent.com,
- *  tunnelmole.net, loca.lt, and Pinggy's own pinggy-free.link alias are all
- *  rejected in at least one (see docs/tesla.md). Free tunnels expire after
- *  60 minutes and embed the user's public IP in the URL. */
+// Pinggy over plain ssh. As of 2026-07 it is the only tested tunnel whose domain Tesla's developer portal accepts in BOTH the Allowed Origin and
+// Redirect URI fields — trycloudflare.com, serveousercontent.com, tunnelmole.net, loca.lt, and Pinggy's own pinggy-free.link alias are all
+// rejected in at least one (see docs/tesla.md). Free tunnels expire after 60 minutes and embed the user's public IP in the URL.
 export const PINGGY_PROVIDER: TunnelProvider = {
   name: "pinggy",
   path: "ssh",
@@ -43,12 +39,9 @@ export const PINGGY_PROVIDER: TunnelProvider = {
   expiryMinutes: 60,
 };
 
-/**
- * Manages a tunnel process + middleware server for LAN users.
- * Plugin-provided routes come from the injected `getRoutes` provider at
- * `start()` time — TunnelManager itself does not hold a plugin reference.
- * The tunnel provides a temporary public https URL.
- */
+// Manages a tunnel process + middleware server for LAN users. Plugin-provided
+// routes come from the injected `getRoutes` provider at `start()` time —
+// TunnelManager itself does not hold a plugin reference. The tunnel provides a temporary public https URL.
 export class TunnelManager {
   private process: Deno.ChildProcess | null = null;
   private middlewareServer: Deno.HttpServer | null = null;
@@ -66,16 +59,13 @@ export class TunnelManager {
     private command: typeof Deno.Command = Deno.Command,
   ) {}
 
-  /** Free-tier session limit of the active provider, if any. */
+  // Free-tier session limit of the active provider, if any.
   get expiryMinutes(): number | null {
     return this.provider.expiryMinutes;
   }
 
-  /**
-   * Merge new routes into the live route set, deduping by path.
-   * First registration wins; later collisions are warned and skipped so
-   * callers can tell their route was dropped.
-   */
+  // Merge new routes into the live route set, deduping by path. First
+  // registration wins; later collisions are warned and skipped so callers can tell their route was dropped.
   private mergeRoutes(incoming: PluginTunnelRoute[]): void {
     incoming.forEach((route) => {
       if (this.routes.some((r) => r.path === route.path)) {
@@ -96,11 +86,8 @@ export class TunnelManager {
     return this._tunnelUrl;
   }
 
-  /**
-   * Start the middleware server and tunnel process.
-   * Returns the public tunnel URL. Plugin-provided routes come from the
-   * injected provider (backed by the plugin registry).
-   */
+  // Start the middleware server and tunnel process. Returns the public
+  // tunnel URL. Plugin-provided routes come from the injected provider (backed by the plugin registry).
   async start(): Promise<string> {
     const routes = this.getRoutes();
     if (this.isRunning && this._tunnelUrl) {
@@ -203,7 +190,6 @@ export class TunnelManager {
     }
   }
 
-  /** Clear tunnel state when the process exits, expectedly or otherwise. */
   private monitorExit(process: Deno.ChildProcess): void {
     process.status.then((status: Deno.CommandStatus) => {
       this.logger.warn(
@@ -216,7 +202,6 @@ export class TunnelManager {
     });
   }
 
-  /** Stop the tunnel process and middleware server. */
   async stop(): Promise<void> {
     if (this.process) {
       try {
@@ -235,10 +220,7 @@ export class TunnelManager {
     this.routes = [];
   }
 
-  /**
-   * Parse the provider's URL stream for the public tunnel URL.
-   * Waits up to 15 seconds.
-   */
+  // Parse the provider's URL stream for the public tunnel URL. Waits up to 15 seconds.
   private parseTunnelUrl(process: Deno.ChildProcess): Promise<string> {
     return new Promise((resolve, reject) => {
       const decoder = new TextDecoder();
@@ -282,7 +264,6 @@ export class TunnelManager {
     });
   }
 
-  /** Pipe the rest of the URL stream to the logger after parsing. */
   private async pipeUrlStream(process: Deno.ChildProcess): Promise<void> {
     const decoder = new TextDecoder();
     const reader = process[this.provider.urlStream].getReader();

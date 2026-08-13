@@ -149,13 +149,78 @@ vi.mock("../../../trpc.ts", () => ({
           fetch: mockLocationFetch,
         },
       },
+      charger: {
+        list: {
+          invalidate: vi.fn(),
+        },
+      },
     })),
     vehicle: {
       list: {
+        // The mock bypasses useQuery's `select`, so this must already be in
+        // the post-select shape (an array) that useVehicles expects on
+        // `.data` — not the raw `{ vehicles: [] }` server response.
         useQuery: vi.fn(() => ({
-          data: { vehicles: [] },
+          data: [],
           isLoading: false,
           error: null,
+        })),
+      },
+    },
+    charger: {
+      list: {
+        useQuery: vi.fn(() => ({
+          data: [],
+          isLoading: false,
+          error: null,
+        })),
+      },
+      remove: {
+        useMutation: vi.fn((_opts?: { onSuccess?: () => void }) => ({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn(),
+          isPending: false,
+          isSuccess: false,
+          isError: false,
+          error: null,
+          data: undefined,
+          reset: vi.fn(),
+        })),
+      },
+      reorder: {
+        useMutation: vi.fn((_opts?: { onSuccess?: () => void }) => ({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn(),
+          isPending: false,
+          isSuccess: false,
+          isError: false,
+          error: null,
+          data: undefined,
+          reset: vi.fn(),
+        })),
+      },
+      create: {
+        useMutation: vi.fn((_opts?: { onSuccess?: () => void }) => ({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn(),
+          isPending: false,
+          isSuccess: false,
+          isError: false,
+          error: null,
+          data: undefined,
+          reset: vi.fn(),
+        })),
+      },
+      setVehicleId: {
+        useMutation: vi.fn((_opts?: { onSuccess?: () => void }) => ({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn(),
+          isPending: false,
+          isSuccess: false,
+          isError: false,
+          error: null,
+          data: undefined,
+          reset: vi.fn(),
         })),
       },
     },
@@ -240,7 +305,6 @@ describe("Settings", () => {
     }));
     Element.prototype.scrollIntoView = vi.fn();
 
-    // Reset mockAc to defaults
     mockAc.query = "";
     mockAc.suggestions = [];
     mockAc.open = false;
@@ -249,7 +313,6 @@ describe("Settings", () => {
     mockAc.setOpen.mockClear();
     mockAc.clear.mockClear();
 
-    // Reset to defaults
     mockConfigGetAllUseQuery.mockReturnValue({
       data: { ...defaultConfig },
       isLoading: false,

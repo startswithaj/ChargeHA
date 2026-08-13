@@ -59,10 +59,10 @@ const FLOW_COLORS: Record<string, string> = {
 
 const TOOLTIP_NAMES: Record<string, string> = {
   solarToHome: "Solar \u2192 Home",
-  solarToCar: "Solar \u2192 Car",
+  solarToCar: "Solar \u2192 Vehicle",
   solarToGrid: "Solar \u2192 Grid",
   gridToHome: "Grid \u2192 Home",
-  gridToCar: "Grid \u2192 Car",
+  gridToCar: "Grid \u2192 Vehicle",
   solarProduction: "Solar Production",
   totalConsumption: "Total Consumption",
 };
@@ -76,7 +76,6 @@ const FLOW_KEYS = [
   "gridToCar",
 ] as const;
 
-/** Build a time-range header label for the tooltip. */
 function buildHeaderLabel(
   label: string,
   period: StatsPeriod,
@@ -155,7 +154,6 @@ function CustomTooltip({
     gridToCar: datum.gridToCarCostCents,
   };
 
-  // Show cost column when there's cost data for the dataset
   const showCost = hasCostData;
 
   return (
@@ -335,7 +333,7 @@ function ChartLegend() {
           className={styles.legendSwatch}
           style={{ backgroundColor: "var(--color-solar-car)" }}
         />
-        Solar → Car
+        Solar → Vehicle
       </span>
       <span className={styles.legendItem}>
         <span
@@ -356,7 +354,7 @@ function ChartLegend() {
           className={styles.legendSwatch}
           style={{ backgroundColor: "var(--color-grid-car)" }}
         />
-        Grid → Car
+        Grid → Vehicle
       </span>
       <span className={styles.legendItem}>
         <span
@@ -376,11 +374,9 @@ function ChartLegend() {
   );
 }
 
-/** Returns the recharts Bar/Line elements for ComposedChart. Called as a
- *  function (not JSX) so the fragment lands directly in ComposedChart's
- *  children — recharts walks `Children.map` to find Bar/Line by displayName,
- *  and a wrapper component (e.g. `<ChartBars />`) hides them and the chart
- *  renders blank. */
+// Called as a function (not JSX) so the fragment lands directly in
+// ComposedChart's children — recharts walks `Children.map` to find Bar/Line
+// by displayName, and a wrapper component would hide them, rendering blank.
 function chartBars() {
   return (
     <>

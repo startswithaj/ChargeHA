@@ -54,14 +54,14 @@ vi.mock("../../../trpc.ts", () => ({
   },
 }));
 
-// ---- Tests ----
-
 describe("WelcomeStep", () => {
   const makeStepProps = (overrides: Partial<StepProps> = {}): StepProps => ({
     onAdvance: vi.fn(),
     onBack: vi.fn(),
     onSkipTo: vi.fn(),
     onSkipToEnd: vi.fn(),
+    chargerId: null,
+    setChargerId: vi.fn(),
     ...overrides,
   });
 
@@ -83,8 +83,6 @@ describe("WelcomeStep", () => {
     cleanup();
   });
 
-  // ---- Initial render ----
-
   it("renders welcome content: logo, copy, both buttons, both descriptions", () => {
     renderWithProviders(
       <StepNextHarness def={welcomeStep} stepProps={makeStepProps()} />,
@@ -103,8 +101,6 @@ describe("WelcomeStep", () => {
       .toBeInTheDocument();
   });
 
-  // ---- User interactions ----
-
   it("clicking 'Full Setup' calls onAdvance callback", () => {
     const onAdvance = vi.fn();
     renderWithProviders(
@@ -118,8 +114,6 @@ describe("WelcomeStep", () => {
 
     expect(onAdvance).toHaveBeenCalledTimes(1);
   });
-
-  // ---- API calls ----
 
   it("clicking 'Demo Mode' calls demo setup then complete then onSkipToEnd", async () => {
     const onSkipToEnd = vi.fn();

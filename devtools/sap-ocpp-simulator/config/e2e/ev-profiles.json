@@ -1,0 +1,19 @@
+{
+  "profiles": [
+    {
+      "id": "chargeha-e2e-ev-60kWh",
+      "weight": 1,
+      "batteryCapacityWh": 60000,
+      "maxPowerW": 11000,
+      "initialSocPercentMin": 20,
+      "initialSocPercentMax": 40,
+      "powerFactor": 0.98,
+      "chargingCurve": [
+        { "socPercent": 0, "powerFraction": 1.0 },
+        { "socPercent": 80, "powerFraction": 1.0 },
+        { "socPercent": 90, "powerFraction": 0.5 },
+        { "socPercent": 100, "powerFraction": 0.1 }
+      ]
+    }
+  ]
+}

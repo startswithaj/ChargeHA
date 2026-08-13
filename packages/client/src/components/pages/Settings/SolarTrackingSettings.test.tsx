@@ -17,6 +17,7 @@ const { mockSolarMutate, st } = vi.hoisted(() => ({
   st: {
     solarConfigData: null as Record<string, unknown> | null,
     batteryConfigData: null as Record<string, unknown> | null,
+    chargingConfigData: null as Record<string, unknown> | null,
     energyData: undefined as
       | { realtime: Record<string, unknown> | null }
       | undefined,
@@ -29,6 +30,7 @@ const { mockSolarMutate, st } = vi.hoisted(() => ({
 vi.mock("../../../hooks/useSectionConfig.ts", () => ({
   useSolarConfig: () => ({ data: st.solarConfigData }),
   useBatteryConfig: () => ({ data: st.batteryConfigData }),
+  useChargingConfig: () => ({ data: st.chargingConfigData }),
   useSolarConfigMutation: () => ({
     mutate: mockSolarMutate,
     saveStatus: { state: "idle", tick: 0 },
@@ -122,6 +124,10 @@ describe("SolarTrackingSettings", () => {
     st.batteryConfigData = {
       batteryPriorityEnabled: false,
       batteryPriorityLimit: 80,
+    };
+    st.chargingConfigData = {
+      chargingEnabled: true,
+      priorityChargingEnabled: false,
     };
     st.energyData = undefined;
     st.vehiclesData = undefined;

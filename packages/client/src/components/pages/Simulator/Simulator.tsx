@@ -1,11 +1,14 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Button, Heading, Text, Tooltip } from "@radix-ui/themes";
+import { X } from "lucide-react";
 import {
   type ControllerEvent,
   DEFAULT_SOLAR_CONFIG,
+  makeDefaultVehicleConfig,
   runSimulation,
   type SimResult,
   type SimulationOutput,
+  type VehicleConfig,
 } from "@chargeha/shared/simulation";
 import styles from "./Simulator.module.css";
 
@@ -35,7 +38,7 @@ function loadChartJs(): Promise<ChartJs> {
 
 interface SimConfig {
   seed: number;
-  vehicleCount: number;
+  vehicles: VehicleConfig[];
   waterfall: boolean;
   minGenKw: string;
   graceMin: string;
@@ -47,10 +50,6 @@ interface SimConfig {
   homeLoad: number;
   sunrise: number;
   sunset: number;
-  ev1Start: number;
-  ev2Start: number;
-  ev1CapacityKwh: number;
-  ev2CapacityKwh: number;
   batteryCapacityKwh: number;
   batteryMaxRateKw: number;
   batteryStartSoc: number;
@@ -58,9 +57,24 @@ interface SimConfig {
   batteryPriorityLimit: number;
 }
 
+const DEFAULT_VEHICLES: VehicleConfig[] = [
+  makeDefaultVehicleConfig({
+    id: "SIM_V1",
+    name: "EV 1",
+    priority: 1,
+    batteryStart: 40,
+  }),
+  makeDefaultVehicleConfig({
+    id: "SIM_V2",
+    name: "EV 2",
+    priority: 2,
+    batteryStart: 60,
+  }),
+];
+
 const DEFAULTS: SimConfig = {
   seed: DEFAULT_SOLAR_CONFIG.seed,
-  vehicleCount: 2,
+  vehicles: DEFAULT_VEHICLES,
   waterfall: false,
   minGenKw: "1",
   graceMin: "6",
@@ -72,10 +86,6 @@ const DEFAULTS: SimConfig = {
   homeLoad: DEFAULT_SOLAR_CONFIG.homeBaseW,
   sunrise: DEFAULT_SOLAR_CONFIG.sunrise,
   sunset: DEFAULT_SOLAR_CONFIG.sunset,
-  ev1Start: 40,
-  ev2Start: 60,
-  ev1CapacityKwh: 75,
-  ev2CapacityKwh: 75,
   batteryCapacityKwh: 0,
   batteryMaxRateKw: 5,
   batteryStartSoc: 50,
@@ -85,6 +95,35 @@ const DEFAULTS: SimConfig = {
 
 const VOLTAGE = 230;
 
+const VEHICLE_COLORS = [
+  "#8b5cf6",
+  "#06b6d4",
+  "#f97316",
+  "#ec4899",
+  "#84cc16",
+];
+const VEHICLE_BG = [
+  "rgba(139,92,246,0.15)",
+  "rgba(6,182,212,0.15)",
+  "rgba(249,115,22,0.15)",
+  "rgba(236,72,153,0.15)",
+  "rgba(132,204,22,0.15)",
+];
+const BATTERY_COLORS = [
+  "#10b981",
+  "#0891b2",
+  "#ea580c",
+  "#db2777",
+  "#65a30d",
+];
+const BATTERY_BG = [
+  "rgba(16,185,129,0.1)",
+  "rgba(8,145,178,0.1)",
+  "rgba(234,88,12,0.1)",
+  "rgba(219,39,119,0.1)",
+  "rgba(101,163,13,0.1)",
+];
+
 type ChartInstanceRef = React.MutableRefObject<
   InstanceType<typeof import("chart.js").Chart> | null
 >;
@@ -93,7 +132,7 @@ function renderSimCharts(
   {
     chartJs,
     results,
-    vehicleCount,
+    vehicleNames,
     showHomeBattery,
     powerChartRef,
     batteryChartRef,
@@ -102,7 +141,7 @@ function renderSimCharts(
   }: {
     chartJs: ChartJs;
     results: SimResult[];
-    vehicleCount: number;
+    vehicleNames: string[];
     showHomeBattery: boolean;
     powerChartRef: React.RefObject<HTMLCanvasElement>;
     batteryChartRef: React.RefObject<HTMLCanvasElement>;
@@ -111,7 +150,6 @@ function renderSimCharts(
   },
 ) {
   const { Chart: ChartCtor } = chartJs;
-  const vehicleNames = vehicleCount === 1 ? ["EV 1"] : ["EV 1", "EV 2"];
 
   if (powerChartInstance.current) powerChartInstance.current.destroy();
   const powerCtx = powerChartRef.current?.getContext("2d");
@@ -209,10 +247,116 @@ async function runAndCollect(
   }
 }
 
+function useChargingPoints(
+  setConfig: React.Dispatch<React.SetStateAction<SimConfig>>,
+) {
+  const addChargingPoint = useCallback(() => {
+    setConfig((prev) => {
+      const n = prev.vehicles.length + 1;
+      return {
+        ...prev,
+        vehicles: [
+          ...prev.vehicles,
+          makeDefaultVehicleConfig({
+            id: `SIM_V${n}_${Date.now()}`,
+            name: `EV ${n}`,
+            priority: n,
+            batteryStart: 50,
+          }),
+        ],
+      };
+    });
+  }, [setConfig]);
+
+  const removeChargingPoint = useCallback((id: string) => {
+    setConfig((prev) => ({
+      ...prev,
+      vehicles: prev.vehicles.filter((v) => v.id !== id),
+    }));
+  }, [setConfig]);
+
+  const updateChargingPoint = useCallback(
+    <K extends keyof VehicleConfig>(
+      id: string,
+      key: K,
+      value: VehicleConfig[K],
+    ) => {
+      setConfig((prev) => ({
+        ...prev,
+        vehicles: prev.vehicles.map((v) =>
+          v.id === id ? { ...v, [key]: value } : v
+        ),
+      }));
+    },
+    [setConfig],
+  );
+
+  return { addChargingPoint, removeChargingPoint, updateChargingPoint };
+}
+
+function useSimRun(config: SimConfig, setConfig: (c: SimConfig) => void) {
+  const [running, setRunning] = useState(false);
+  const [output, setOutput] = useState<SimulationOutput | null>(null);
+  const [elapsed, setElapsed] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const {
+    powerChartRef,
+    batteryChartRef,
+    powerChartInstance,
+    batteryChartInstance,
+    chartJsRef,
+  } = useChartRefs();
+
+  const handleRun = useCallback(async (configOverride?: Partial<SimConfig>) => {
+    const runConfig = configOverride
+      ? { ...config, ...configOverride }
+      : config;
+    if (configOverride) setConfig(runConfig);
+    await runAndCollect({
+      runConfig,
+      chartJsRef,
+      setRunning,
+      setError,
+      setOutput,
+      setElapsed,
+    });
+  }, [config, setConfig, chartJsRef]);
+
+  const randomSeed = useCallback(() => {
+    handleRun({ seed: Math.floor(Math.random() * 10000) });
+  }, [handleRun]);
+
+  const vehicleNames = config.vehicles.map((v) => v.name);
+
+  useRenderSimCharts({
+    output,
+    vehicleNames,
+    batteryCapacityKwh: config.batteryCapacityKwh,
+    chartJsRef,
+    powerChartRef,
+    batteryChartRef,
+    powerChartInstance,
+    batteryChartInstance,
+  });
+
+  return {
+    running,
+    output,
+    elapsed,
+    error,
+    handleRun,
+    randomSeed,
+    vehicleNames,
+    powerChartRef,
+    batteryChartRef,
+  };
+}
+
 function useRenderSimCharts(
-  { output, vehicleCount, batteryCapacityKwh, chartJsRef, ...refs }: {
+  { output, vehicleNames, batteryCapacityKwh, chartJsRef, ...refs }: {
     output: SimulationOutput | null;
-    vehicleCount: number;
+    vehicleNames: string[];
     batteryCapacityKwh: number;
     chartJsRef: React.MutableRefObject<ChartJs | null>;
     powerChartRef: React.RefObject<HTMLCanvasElement>;
@@ -227,11 +371,15 @@ function useRenderSimCharts(
     renderSimCharts({
       chartJs: chartJsRef.current,
       results: output.results,
-      vehicleCount,
+      vehicleNames,
       showHomeBattery: batteryCapacityKwh > 0,
       ...refs,
     });
-  }, [output, vehicleCount, batteryCapacityKwh]);
+    // vehicleNames is derived fresh each render from config.vehicles; compare by
+    // its joined value so reordering/renaming re-renders without an extra ref.
+    // Refs (chartJsRef, powerChartRef, etc.) are intentionally omitted — they
+    // are stable across renders and reading .current in the effect is safe.
+  }, [output, vehicleNames.join(","), batteryCapacityKwh]);
 }
 
 function useChartRefs() {
@@ -254,14 +402,12 @@ function useChartRefs() {
 }
 
 function buildNoteLines(config: SimConfig): string {
-  const maxChargeW = 32 * VOLTAGE;
-  const ev1Rate = (maxChargeW / config.ev1CapacityKwh / 10).toFixed(1);
-  const ev2Rate = (maxChargeW / config.ev2CapacityKwh / 10).toFixed(1);
-  return [
-    `Max charge rate: ${maxChargeW}W (32A x ${VOLTAGE}V, 1 phase)`,
-    `EV 1: ${ev1Rate}%/hr at max`,
-    config.vehicleCount > 1 ? `EV 2: ${ev2Rate}%/hr at max` : null,
-  ].filter(Boolean).join(" · ");
+  const rateLines = config.vehicles.map((v) => {
+    const maxChargeW = v.chargeAmpsMax * VOLTAGE;
+    const rate = (maxChargeW / v.batteryCapacityKwh / 10).toFixed(1);
+    return `${v.name}: ${maxChargeW}W max, ${rate}%/hr at max`;
+  });
+  return rateLines.join(" · ");
 }
 
 function ActionRow(
@@ -326,8 +472,6 @@ function buildPowerChartData(
   showHomeBattery: boolean,
 ) {
   const labels = results.map((r) => r.time);
-  const VEHICLE_COLORS = ["#8b5cf6", "#06b6d4"];
-  const VEHICLE_BG = ["rgba(139,92,246,0.15)", "rgba(6,182,212,0.15)"];
   return {
     labels,
     datasets: [
@@ -343,8 +487,8 @@ function buildPowerChartData(
       ...vehicleNames.map((name, i) => ({
         label: `${name} Power (W)`,
         data: results.map((r) => r.vehicles[i]?.chargePowerW ?? 0),
-        borderColor: VEHICLE_COLORS[i],
-        backgroundColor: VEHICLE_BG[i],
+        borderColor: VEHICLE_COLORS[i % VEHICLE_COLORS.length],
+        backgroundColor: VEHICLE_BG[i % VEHICLE_BG.length],
         fill: true,
         pointRadius: 0,
         borderWidth: 2,
@@ -377,16 +521,14 @@ function buildBatteryChartData(
   showHomeBattery: boolean,
 ) {
   const labels = results.map((r) => r.time);
-  const BATTERY_COLORS = ["#10b981", "#0891b2"];
-  const BATTERY_BG = ["rgba(16,185,129,0.1)", "rgba(8,145,178,0.1)"];
   return {
     labels,
     datasets: [
       ...vehicleNames.map((name, i) => ({
         label: `${name} Battery %`,
         data: results.map((r) => r.vehicles[i]?.batteryLevel ?? 0),
-        borderColor: BATTERY_COLORS[i],
-        backgroundColor: BATTERY_BG[i],
+        borderColor: BATTERY_COLORS[i % BATTERY_COLORS.length],
+        backgroundColor: BATTERY_BG[i % BATTERY_BG.length],
         fill: true,
         pointRadius: 0,
         borderWidth: 2,
@@ -398,18 +540,6 @@ function buildBatteryChartData(
 
 export function Simulator() {
   const [config, setConfig] = useState<SimConfig>(DEFAULTS);
-  const [running, setRunning] = useState(false);
-  const [output, setOutput] = useState<SimulationOutput | null>(null);
-  const [elapsed, setElapsed] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const {
-    powerChartRef,
-    batteryChartRef,
-    powerChartInstance,
-    batteryChartInstance,
-    chartJsRef,
-  } = useChartRefs();
 
   const set = useCallback(
     <K extends keyof SimConfig>(key: K, value: SimConfig[K]) => {
@@ -418,35 +548,20 @@ export function Simulator() {
     [],
   );
 
-  const handleRun = useCallback(async (configOverride?: Partial<SimConfig>) => {
-    const runConfig = configOverride
-      ? { ...config, ...configOverride }
-      : config;
-    if (configOverride) setConfig(runConfig);
-    await runAndCollect({
-      runConfig,
-      chartJsRef,
-      setRunning,
-      setError,
-      setOutput,
-      setElapsed,
-    });
-  }, [config]);
+  const { addChargingPoint, removeChargingPoint, updateChargingPoint } =
+    useChargingPoints(setConfig);
 
-  const randomSeed = useCallback(() => {
-    handleRun({ seed: Math.floor(Math.random() * 10000) });
-  }, [handleRun]);
-
-  useRenderSimCharts({
+  const {
+    running,
     output,
-    vehicleCount: config.vehicleCount,
-    batteryCapacityKwh: config.batteryCapacityKwh,
-    chartJsRef,
+    elapsed,
+    error,
+    handleRun,
+    randomSeed,
+    vehicleNames,
     powerChartRef,
     batteryChartRef,
-    powerChartInstance,
-    batteryChartInstance,
-  });
+  } = useSimRun(config, setConfig);
 
   const noteLines = output ? buildNoteLines(config) : null;
 
@@ -459,7 +574,13 @@ export function Simulator() {
         the configured solar profile and vehicle setup.
       </Text>
 
-      <SimControls config={config} set={set} />
+      <SimControls
+        config={config}
+        set={set}
+        addChargingPoint={addChargingPoint}
+        removeChargingPoint={removeChargingPoint}
+        updateChargingPoint={updateChargingPoint}
+      />
 
       <ActionRow
         running={running}
@@ -473,7 +594,7 @@ export function Simulator() {
       {noteLines && <div className={styles.simNote}>{noteLines}</div>}
 
       {output && (
-        <SimStats results={output.results} vehicleCount={config.vehicleCount} />
+        <SimStats results={output.results} vehicleNames={vehicleNames} />
       )}
 
       {output && (
@@ -486,8 +607,6 @@ export function Simulator() {
     </div>
   );
 }
-
-// ---- Sub-components ----
 
 function SolarProfileSection(
   { config, set }: {
@@ -550,53 +669,125 @@ function SolarProfileSection(
   );
 }
 
-function VehiclesSection(
-  { config, set }: {
-    config: SimConfig;
-    set: <K extends keyof SimConfig>(key: K, value: SimConfig[K]) => void;
+function ChargingPointRow(
+  { vehicle, canRemove, update, remove }: {
+    vehicle: VehicleConfig;
+    canRemove: boolean;
+    update: <K extends keyof VehicleConfig>(
+      key: K,
+      value: VehicleConfig[K],
+    ) => void;
+    remove: () => void;
+  },
+) {
+  return (
+    <div className={styles.chargingPoint}>
+      <div className={styles.control}>
+        <label>Name</label>
+        <input
+          className={styles.chargingPointName}
+          type="text"
+          aria-label="Name"
+          value={vehicle.name}
+          onChange={(e) => update("name", e.target.value)}
+        />
+      </div>
+      <NumInput
+        label="Priority"
+        value={vehicle.priority}
+        onChange={(v) => update("priority", v)}
+        step={1}
+        min={1}
+      />
+      <NumInput
+        label="Battery Start %"
+        value={vehicle.batteryStart}
+        onChange={(v) => update("batteryStart", v)}
+        step={5}
+        min={0}
+        max={100}
+      />
+      <NumInput
+        label="Charge Limit %"
+        value={vehicle.chargeLimit}
+        onChange={(v) => update("chargeLimit", v)}
+        step={5}
+        min={1}
+        max={100}
+      />
+      <NumInput
+        label="Battery (kWh)"
+        value={vehicle.batteryCapacityKwh}
+        onChange={(v) => update("batteryCapacityKwh", v)}
+        step={5}
+        min={10}
+        max={200}
+      />
+      <NumInput
+        label="Min Amps"
+        value={vehicle.chargeAmpsMin}
+        onChange={(v) => update("chargeAmpsMin", v)}
+        step={1}
+        min={1}
+        max={32}
+      />
+      <NumInput
+        label="Max Amps"
+        value={vehicle.chargeAmpsMax}
+        onChange={(v) => update("chargeAmpsMax", v)}
+        step={1}
+        min={1}
+        max={32}
+      />
+      <Tooltip
+        content={canRemove
+          ? "Remove charging point"
+          : "At least one charging point is required"}
+      >
+        <Button
+          size="1"
+          variant="soft"
+          color="red"
+          disabled={!canRemove}
+          onClick={remove}
+          aria-label={`Remove ${vehicle.name}`}
+        >
+          <X size={14} />
+        </Button>
+      </Tooltip>
+    </div>
+  );
+}
+
+function ChargingPointsSection(
+  { vehicles, addChargingPoint, removeChargingPoint, updateChargingPoint }: {
+    vehicles: VehicleConfig[];
+    addChargingPoint: () => void;
+    removeChargingPoint: (id: string) => void;
+    updateChargingPoint: <K extends keyof VehicleConfig>(
+      id: string,
+      key: K,
+      value: VehicleConfig[K],
+    ) => void;
   },
 ) {
   return (
     <>
-      <div className={styles.sectionLabel}>Vehicles</div>
-      <div className={styles.controls}>
-        <NumInput
-          label="EV 1 Start %"
-          value={config.ev1Start}
-          onChange={(v) => set("ev1Start", v)}
-          step={5}
-          min={0}
-          max={100}
-        />
-        <NumInput
-          label="EV 1 Battery (kWh)"
-          value={config.ev1CapacityKwh}
-          onChange={(v) => set("ev1CapacityKwh", v)}
-          step={5}
-          min={10}
-          max={200}
-        />
-        {config.vehicleCount > 1 && (
-          <>
-            <NumInput
-              label="EV 2 Start %"
-              value={config.ev2Start}
-              onChange={(v) => set("ev2Start", v)}
-              step={5}
-              min={0}
-              max={100}
-            />
-            <NumInput
-              label="EV 2 Battery (kWh)"
-              value={config.ev2CapacityKwh}
-              onChange={(v) => set("ev2CapacityKwh", v)}
-              step={5}
-              min={10}
-              max={200}
-            />
-          </>
-        )}
+      <div className={styles.sectionLabel}>Charging Points</div>
+      <div className={styles.chargingPoints}>
+        {vehicles.map((v) => (
+          <ChargingPointRow
+            key={v.id}
+            vehicle={v}
+            canRemove={vehicles.length > 1}
+            update={(key, value) => updateChargingPoint(v.id, key, value)}
+            remove={() => removeChargingPoint(v.id)}
+          />
+        ))}
       </div>
+      <Button size="1" variant="soft" onClick={addChargingPoint}>
+        + Add Charging Point
+      </Button>
     </>
   );
 }
@@ -665,9 +856,19 @@ function HomeBatterySection(
 function SimControls({
   config,
   set,
+  addChargingPoint,
+  removeChargingPoint,
+  updateChargingPoint,
 }: {
   config: SimConfig;
   set: <K extends keyof SimConfig>(key: K, value: SimConfig[K]) => void;
+  addChargingPoint: () => void;
+  removeChargingPoint: (id: string) => void;
+  updateChargingPoint: <K extends keyof VehicleConfig>(
+    id: string,
+    key: K,
+    value: VehicleConfig[K],
+  ) => void;
 }) {
   return (
     <>
@@ -678,16 +879,6 @@ function SimControls({
           onChange={(v) => set("seed", v)}
           step={1}
         />
-        <div className={styles.control}>
-          <label>Vehicles</label>
-          <select
-            value={config.vehicleCount}
-            onChange={(e) => set("vehicleCount", Number(e.target.value))}
-          >
-            <option value={1}>1</option>
-            <option value={2}>2</option>
-          </select>
-        </div>
         <div className={styles.control}>
           <label>Allocation</label>
           <select
@@ -726,7 +917,12 @@ function SimControls({
       </div>
 
       <SolarProfileSection config={config} set={set} />
-      <VehiclesSection config={config} set={set} />
+      <ChargingPointsSection
+        vehicles={config.vehicles}
+        addChargingPoint={addChargingPoint}
+        removeChargingPoint={removeChargingPoint}
+        updateChargingPoint={updateChargingPoint}
+      />
       <HomeBatterySection config={config} set={set} />
     </>
   );
@@ -810,13 +1006,11 @@ function StrInput({
 
 function SimStats({
   results,
-  vehicleCount,
+  vehicleNames,
 }: {
   results: SimResult[];
-  vehicleCount: number;
+  vehicleNames: string[];
 }) {
-  const vehicleNames = vehicleCount === 1 ? ["EV 1"] : ["EV 1", "EV 2"];
-
   return (
     <div className={styles.statsRow}>
       {vehicleNames.map((name, i) => {

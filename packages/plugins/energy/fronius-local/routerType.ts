@@ -4,6 +4,7 @@ import type { createFroniusLocalRouter } from "./server/router.ts";
 export type FroniusLocalAppRouter = ReturnType<
   typeof createAppRouter<
     Record<string, never>,
-    { fronius_local: ReturnType<typeof createFroniusLocalRouter> }
+    { fronius_local: ReturnType<typeof createFroniusLocalRouter> },
+    Record<string, never>
   >
 >;

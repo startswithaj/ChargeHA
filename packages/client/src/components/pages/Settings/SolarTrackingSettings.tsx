@@ -2,8 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, FlaskConical, Sun } from "lucide-react";
 import { Button, Select, Slider, Switch, Text } from "@radix-ui/themes";
 import type { VehicleWithState } from "@chargeha/shared";
+import type { ControllerConfig } from "@chargeha/shared/engine";
 import {
   useBatteryConfig,
+  useChargingConfig,
   useSolarConfig,
   useSolarConfigMutation,
 } from "../../../hooks/useSectionConfig.ts";
@@ -32,32 +34,43 @@ type SetSolarField = <K extends keyof SolarFields>(
   v: SolarFields[K],
 ) => void;
 
-function buildLegacyConfig(
+// The same shape ChargeController builds from the database, so the preview
+// runs the exact engine the live controller runs.
+function buildControllerConfig(
   fields: SolarFields,
   batteryConfig: {
     batteryPriorityEnabled?: boolean;
     batteryPriorityLimit?: number;
   } | undefined,
-): Record<string, string> {
+  chargingConfig: {
+    chargingEnabled?: boolean;
+    priorityChargingEnabled?: boolean;
+  } | undefined,
+): ControllerConfig {
   return {
-    solar_tracking_enabled: fields.solarTrackingEnabled ? "true" : "false",
-    solar_tracking_mode: fields.solarTrackingMode,
-    solar_reference: fields.solarReference,
-    solar_margin_kw: String(fields.solarMarginKw),
-    min_solar_generation_kw: String(fields.minSolarGenerationKw),
-    min_excess_solar_kw: fields.minExcessSolarKw != null
-      ? String(fields.minExcessSolarKw)
-      : "",
-    three_phase_charger: fields.threePhaseCharger ? "true" : "false",
-    consumption_excludes_charging: fields.consumptionExcludesCharging
-      ? "true"
-      : "false",
-    grace_period_minutes: String(fields.gracePeriodMinutes),
-    cooldown_period_minutes: String(fields.cooldownPeriodMinutes),
-    battery_priority_enabled: batteryConfig?.batteryPriorityEnabled
-      ? "true"
-      : "false",
-    battery_priority_limit: String(batteryConfig?.batteryPriorityLimit ?? 80),
+    chargingEnabled: chargingConfig?.chargingEnabled ?? true,
+    // Not read by decide() — the preview isn't looping — but required by
+    // the type the real engine expects.
+    controllerLoopSeconds: 60,
+    solarTrackingEnabled: fields.solarTrackingEnabled,
+    solarTrackingMode: fields.solarTrackingMode,
+    solarReference: fields.solarReference,
+    solarMarginKw: fields.solarMarginKw,
+    minSolarGenerationKw: fields.minSolarGenerationKw,
+    minExcessSolarKw: fields.minExcessSolarKw,
+    gridVoltage: fields.gridVoltage,
+    threePhaseCharger: fields.threePhaseCharger,
+    consumptionExcludesCharging: fields.consumptionExcludesCharging,
+    gracePeriodMinutes: fields.gracePeriodMinutes,
+    cooldownPeriodMinutes: fields.cooldownPeriodMinutes,
+    ampDebounceThreshold: fields.ampDebounceThreshold,
+    ampDebounceSettleMinutes: fields.ampDebounceSettleMinutes,
+    batteryPriorityEnabled: batteryConfig?.batteryPriorityEnabled ?? false,
+    batteryPriorityLimit: batteryConfig?.batteryPriorityLimit ?? 80,
+    priorityChargingEnabled: chargingConfig?.priorityChargingEnabled ?? false,
+    // The preview picks its own simulated day/time directly rather than
+    // reading the browser's real clock in a configured zone.
+    timezone: "",
   };
 }
 
@@ -114,7 +127,7 @@ function SolarMainRows(
       </SettingsRow>
       <SettingsRow
         label="Solar margin"
-        help="Reserve solar for your household before allocating to the car. Positive values keep a buffer for home use. Negative values allow a small amount of grid import."
+        help="Reserve solar for your household before allocating to the vehicle. Positive values keep a buffer for home use. Negative values allow a small amount of grid import."
       >
         <div
           style={{
@@ -257,7 +270,7 @@ function SolarHardwareRows(
       </SettingsRow>
       <SettingsRow
         label="Three-phase charger"
-        help="Enable if your charger is wired for 3-phase power. The solar algorithm divides available watts by voltage x phases to calculate amps — if the car misreports phases as 1, the controller will overshoot by 3x without this setting."
+        help="Enable if your charger is wired for 3-phase power. The solar algorithm divides available watts by voltage x phases to calculate amps — if the vehicle misreports phases as 1, the controller will overshoot by 3x without this setting."
       >
         <Switch
           size="2"
@@ -315,6 +328,7 @@ function AdvancedRows(
 export function SolarTrackingSettings() {
   const { data: config } = useSolarConfig();
   const { data: batteryConfig } = useBatteryConfig();
+  const { data: chargingConfig } = useChargingConfig();
   const mutation = useSolarConfigMutation();
   const { fields, setField, isDirty, save, saveStatus } = useDraftConfig(
     config,
@@ -346,7 +360,11 @@ export function SolarTrackingSettings() {
 
   if (!fields) return null;
 
-  const legacyConfig = buildLegacyConfig(fields, batteryConfig);
+  const controllerConfig = buildControllerConfig(
+    fields,
+    batteryConfig,
+    chargingConfig,
+  );
 
   return (
     <>
@@ -405,7 +423,7 @@ export function SolarTrackingSettings() {
       {showSimulation && (
         <div ref={simulationRef}>
           <SolarSimulation
-            config={legacyConfig}
+            config={controllerConfig}
             vehicles={vehicles}
             currentEnergy={currentEnergy}
             schedules={schedules}

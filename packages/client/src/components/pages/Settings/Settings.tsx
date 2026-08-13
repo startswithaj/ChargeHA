@@ -11,6 +11,7 @@ import { SettingsRow, SettingsSection } from "./SettingsLayout.tsx";
 import { AuthSettings } from "./AuthSettings.tsx";
 import { InverterSettings } from "./InverterSettings.tsx";
 import { VehicleSettings } from "./VehicleSettings.tsx";
+import { ChargersSection } from "./ChargersSection.tsx";
 import { SolarTrackingSettings } from "./SolarTrackingSettings.tsx";
 import { BatterySettings } from "./BatterySettings.tsx";
 import { TariffSettings } from "./TariffSettings.tsx";
@@ -51,8 +52,6 @@ function VersionFooter() {
     </Text>
   );
 }
-
-// ── Main Settings Component ──
 
 export function Settings() {
   const { data: charging, isLoading: chargingLoading } = useChargingConfig();
@@ -116,6 +115,9 @@ export function Settings() {
 
       {/* ═══ Vehicles ═══ */}
       <VehicleSettings />
+
+      {/* ═══ Chargers ═══ */}
+      <ChargersSection />
 
       {/* ═══ Solar Tracking ═══ */}
       <SolarTrackingSettings />

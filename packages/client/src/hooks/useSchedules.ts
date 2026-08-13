@@ -8,10 +8,7 @@ import type {
 } from "@chargeha/shared";
 import { trpc } from "../trpc.ts";
 
-/**
- * Check whether two time ranges on the same day overlap.
- * Handles overnight ranges (e.g. 23:00–06:00).
- */
+// Handles overnight ranges (e.g. 23:00–06:00).
 export function timeRangesOverlap(
   aStart: string,
   aEnd: string,
@@ -45,10 +42,6 @@ export function daysOverlap(a: DayOfWeek[], b: DayOfWeek[]): boolean {
   return a.some((d) => b.includes(d));
 }
 
-/**
- * Validate that a schedule doesn't overlap with existing same-vehicle charge
- * schedules. Returns error message or null.
- */
 export function validateScheduleOverlap(
   data: ScheduleFormData,
   schedules: Schedule[],
@@ -60,7 +53,8 @@ export function validateScheduleOverlap(
     (s) =>
       s.id !== excludeId &&
       s.scheduleType === "charge" &&
-      s.vehicleId === data.vehicleId,
+      s.vehicleId === data.vehicleId &&
+      s.chargerId === data.chargerId,
   );
 
   const overlapping = siblings.find((existing) =>
@@ -73,7 +67,7 @@ export function validateScheduleOverlap(
     )
   );
   return overlapping
-    ? "This schedule overlaps with an existing charge schedule for the same vehicle."
+    ? "This schedule overlaps with an existing charge schedule for the same charging point."
     : null;
 }
 
@@ -157,10 +151,7 @@ function useDeleteScheduleMutation() {
   });
 }
 
-/**
- * Schedule management backed by tRPC with TanStack Query.
- * Client-side overlap validation is kept for immediate UX feedback.
- */
+// Client-side overlap validation is kept for immediate UX feedback.
 export function useSchedules() {
   const { data: scheduleData, isLoading: loading } = trpc.schedule.list
     .useQuery();
@@ -178,8 +169,6 @@ export function useSchedules() {
   const toggleMutation = useToggleScheduleMutation();
   const deleteMutation = useDeleteScheduleMutation();
 
-  // --- Stable callbacks matching the original API ---
-
   const addSchedule = useMemo(
     () => async (data: ScheduleFormData): Promise<string | null> => {
       const err = validateScheduleOverlap(data, schedules);
@@ -188,6 +177,7 @@ export function useSchedules() {
       try {
         await createMutation.mutateAsync({
           ...data,
+          chargeLimitPct: data.chargeLimitPct ?? undefined,
           days: data.days as [DayOfWeek, ...DayOfWeek[]],
         });
         return null;
@@ -215,6 +205,7 @@ export function useSchedules() {
         await updateMutation.mutateAsync({
           id,
           ...data,
+          chargeLimitPct: data.chargeLimitPct ?? undefined,
           days: data.days as [DayOfWeek, ...DayOfWeek[]],
         });
         return null;

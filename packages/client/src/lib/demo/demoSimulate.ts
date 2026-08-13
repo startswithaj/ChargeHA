@@ -4,6 +4,7 @@
 
 import {
   DEFAULT_SOLAR_CONFIG,
+  makeDefaultVehicleConfig,
   runSimulation,
 } from "@chargeha/shared/simulation";
 import type { SimulationOptions } from "@chargeha/shared/simulation";
@@ -43,7 +44,6 @@ interface DayProfile {
   storms: number;
   homeLoad: number;
   ev1Start: number;
-  ev2Start: number;
   away: boolean[];
 }
 
@@ -51,10 +51,8 @@ interface DayProfile {
 const rand = (offset: number, salt: number): number =>
   hash01(offset * 131 + salt);
 
-/**
- * Per-day weather + vehicle presence so no two days look alike: clear days,
- * overcast days, the occasional storm, and days a car is away (no charging).
- */
+// Per-day weather + vehicle presence so no two days look alike: clear
+// days, overcast days, the occasional storm, and days a car is away.
 const dayProfile = (offset: number): DayProfile => {
   const stormy = rand(offset, 2) < 0.12;
   return {
@@ -67,14 +65,22 @@ const dayProfile = (offset: number): DayProfile => {
     // Vary the daily start SoC so charging amount differs day-to-day: a nearly
     // full car barely charges, a low one pulls from grid when solar is short.
     ev1Start: Math.round(35 + rand(offset, 5) * 55),
-    ev2Start: Math.round(30 + rand(offset, 6) * 60),
     away: DEMO_VEHICLES.map((_, i) => rand(offset, 10 + i) < 0.18),
   };
 };
 
 const simOptions = (profile: DayProfile): SimulationOptions => ({
   seed: profile.seed,
-  vehicleCount: 1,
+  vehicles: [
+    makeDefaultVehicleConfig({
+      id: "SIM_V1",
+      name: DEMO_VEHICLES[0].name,
+      priority: DEMO_VEHICLES[0].priority,
+      batteryStart: profile.ev1Start,
+      chargeLimit: DEMO_VEHICLES[0].limit,
+      batteryCapacityKwh: DEMO_VEHICLES[0].capacityKwh,
+    }),
+  ],
   waterfall: false,
   minGenKw: "1",
   graceMin: "6",
@@ -86,11 +92,7 @@ const simOptions = (profile: DayProfile): SimulationOptions => ({
   homeLoad: profile.homeLoad,
   sunrise: DEFAULT_SOLAR_CONFIG.sunrise,
   sunset: DEFAULT_SOLAR_CONFIG.sunset,
-  ev1Start: profile.ev1Start,
-  ev2Start: profile.ev2Start,
-  ev1CapacityKwh: DEMO_VEHICLES[0].capacityKwh,
-  // Unused at vehicleCount 1 (the engine slices to SIM_V1) but type-required.
-  ev2CapacityKwh: DEMO_VEHICLES[0].capacityKwh,
+  // The demo day models solar and EV charging only — no home battery.
   batteryCapacityKwh: 0,
   batteryMaxRateKw: 5,
   batteryStartSoc: 50,
@@ -105,7 +107,6 @@ interface ChargingVehicle {
   soc: number;
 }
 
-/** Split available solar excess across charging vehicles, in priority order. */
 const allocateSolar = (
   charging: ChargingVehicle[],
   excessW: number,
@@ -173,10 +174,8 @@ const buildDay = (offset: number): DemoDay => {
   return { offset, readings, logs };
 };
 
-/**
- * Build the full demo series. Today (offset 0) is truncated to the current
- * time-of-day so it reads as a day in progress rather than a finished day.
- */
+// Today (offset 0) is truncated to the current time-of-day so it reads as
+// a day in progress rather than a finished day.
 export const buildDemoSeries = (now: Date = new Date()): DemoSeries => {
   const nowMinutes = minuteOfDay(now);
   const days = Array.from({ length: DEMO_DAYS }, (_, offset) => {

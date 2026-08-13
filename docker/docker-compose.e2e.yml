@@ -1,0 +1,70 @@
+# E2E stack: real app + fake devices on a fixed subnet so discovery tests
+# can scan deterministically.
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    environment:
+      - PORT=8000
+      - DB_PATH=/tmp/e2e-chargeha.db # inside the container, discarded on exit
+      - RESET_AUTH=true # exact string — the code checks === "true", not truthiness
+      - LOG_LEVEL=debug
+    # The image's HEALTHCHECK polls every 30s — too slow for test startup.
+    # Same probe, fast cadence; `up --wait` blocks until healthy.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "deno",
+          "run",
+          "--allow-net",
+          "packages/server/src/healthcheck.ts",
+        ]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+    ports:
+      - "18000:8000"
+    networks:
+      e2e:
+        ipv4_address: 172.30.99.10
+
+  tapo-simulator:
+    build:
+      context: ..
+      dockerfile: devtools/tapo-simulator/Dockerfile
+    ports:
+      - "18081:8081" # control API for the test runner
+    networks:
+      e2e:
+        ipv4_address: 172.30.99.50
+
+  ocpp-sap:
+    # Only the ocpp suites start the charger simulator — a tapo run must never
+    # build or crash-loop it. Two stations come out of this one container:
+    # sap-test reports every measurand ChargeHA asks for, sap-basic only the
+    # energy register, so measurand negotiation has something to negotiate.
+    profiles: ["ocpp"]
+    build:
+      context: ..
+      dockerfile: devtools/sap-ocpp-simulator/Dockerfile
+      args:
+        # Same image as the dev simulator; the config set is what differs.
+        CONFIG_SET: e2e
+    ports:
+      - "19998:8080" # UI server (ws, admin/admin) for the test runner
+    depends_on:
+      app:
+        condition: service_healthy # start only once the app probe passes
+    restart: on-failure
+    networks:
+      e2e:
+        ipv4_address: 172.30.99.61
+
+networks:
+  e2e:
+    ipam:
+      config:
+        - subnet: 172.30.99.0/24

@@ -2,17 +2,23 @@
   "name": "@chargeha/server",
   "version": "0.0.1",
   "exports": {
-    ".": "./src/main.ts",
+    ".": "./src/bootstrap/bootstrap.ts",
+    "./bootstrap": "./src/bootstrap/bootstrap.ts",
+    "./lib/loadEnv": "./src/lib/loadEnv.ts",
     "./db": "./src/db/AppDatabase.ts",
     "./db/types": "./src/db/types.ts",
     "./db/Serialization": "./src/db/Serialization.ts",
     "./lib/Logger": "./src/lib/Logger.ts",
+    "./lib/LanInterfaces": "./src/lib/LanInterfaces.ts",
+    "./lib/PluginDbLogger": "./src/lib/PluginDbLogger.ts",
     "./lib/Encryption": "./src/lib/Encryption.ts",
     "./services/VehicleManager": "./src/services/VehicleManager.ts",
+    "./services/ChargingPointManager": "./src/services/ChargingPointManager.ts",
     "./services/EnergyAdapterManager": "./src/services/EnergyAdapterManager.ts",
     "./bootstrap/PluginDependencies": "./src/bootstrap/PluginDependencies.ts",
     "./bootstrap/VehiclePluginRegistry": "./src/bootstrap/VehiclePluginRegistry.ts",
-    "./bootstrap/EnergyPluginRegistry": "./src/bootstrap/EnergyPluginRegistry.ts"
+    "./bootstrap/EnergyPluginRegistry": "./src/bootstrap/EnergyPluginRegistry.ts",
+    "./bootstrap/ChargerPluginRegistry": "./src/bootstrap/ChargerPluginRegistry.ts"
   },
   "imports": {
     "hono": "jsr:@hono/hono@^4",

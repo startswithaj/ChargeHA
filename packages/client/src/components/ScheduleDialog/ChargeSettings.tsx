@@ -5,6 +5,7 @@ import styles from "./ScheduleDialog.module.css";
 interface ChargeSettingsProps {
   chargeAmps: number;
   chargeLimitPct: number;
+  isChargerKeyed: boolean;
   maxAmps: number;
   updateField: <K extends keyof ScheduleFormData>(
     key: K,
@@ -12,10 +13,11 @@ interface ChargeSettingsProps {
   ) => void;
 }
 
-/** Charge amps + charge limit steppers (charge schedules only) */
+// Charge schedules only.
 export function ChargeSettings({
   chargeAmps,
   chargeLimitPct,
+  isChargerKeyed,
   maxAmps,
   updateField,
 }: ChargeSettingsProps) {
@@ -98,6 +100,13 @@ export function ChargeSettings({
             +
           </Button>
         </div>
+        {isChargerKeyed && (
+          <Text size="1" color="gray">
+            Only applies when a car linked to this charger reports its battery
+            level (SOC) through its API. Otherwise the schedule charges for the
+            full window.
+          </Text>
+        )}
       </div>
     </>
   );

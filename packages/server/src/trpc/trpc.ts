@@ -2,6 +2,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { EnergyPoller } from "../services/EnergyPoller.ts";
 import type { VehicleManager } from "../services/VehicleManager.ts";
+import type { ChargingPointManager } from "../services/ChargingPointManager.ts";
 import type { NotificationService } from "../services/NotificationService.ts";
 import type { EnergyAdapterManager } from "../services/EnergyAdapterManager.ts";
 import type { TypedEventEmitter } from "../services/TypedEventEmitter.ts";
@@ -27,6 +28,7 @@ import { ServiceError } from "../lib/ServiceError.ts";
 export interface TrpcContext {
   db: AppDatabase;
   vehicleManager: VehicleManager;
+  chargingPointManager: ChargingPointManager;
   vehicleService: VehicleService;
   vehiclePlugins: VehiclePluginRegistry;
   energyPlugins: EnergyPluginRegistry;
@@ -62,14 +64,8 @@ const t = initTRPC.context<TrpcContext>().create({
   },
 });
 
-/**
- * Middleware that maps domain errors to TRPCErrors so routers don't
- * need try/catch blocks and services stay transport-agnostic.
- *
- * In tRPC v11, next() returns a result object instead of throwing.
- * When result.ok is false, the original domain error is in
- * result.error.cause — we inspect it and throw the mapped TRPCError.
- */
+// Middleware that maps domain errors to TRPCErrors so routers don't need
+// try/catch blocks and services stay transport-agnostic. In tRPC v11, next() returns a result object instead of throwing. When result.ok is false, the original domain error is in result.error.cause — we inspect it and throw the mapped TRPCError.
 const errorMiddleware = t.middleware(async ({ next }) => {
   const result = await next();
   if (!result.ok) {

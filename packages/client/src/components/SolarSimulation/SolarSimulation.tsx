@@ -12,18 +12,18 @@ import { RotateCcw } from "lucide-react";
 import { useRouter } from "../../hooks/useRouter.ts";
 import type { DayOfWeek, EnergyData, Schedule } from "@chargeha/shared";
 import type { VehicleWithState } from "@chargeha/shared";
+import type { ControllerConfig } from "@chargeha/shared/engine";
 import {
-  parseConfigToSolarConfig,
-  simulateSolarAllocation,
-  type SimulationResult,
-  type SimVehicle,
-  type VehicleAllocation,
-} from "../../lib/simulateSolarAllocation.ts";
+  previewSolarAllocation,
+  type PreviewVehicle,
+  type PreviewVehicleResult,
+  type SolarPreviewResult,
+} from "@chargeha/shared/solarPreview";
 import { TimePicker } from "../TimePicker/TimePicker.tsx";
 import styles from "./SolarSimulation.module.css";
 
 interface SolarSimulationProps {
-  config: Record<string, string>;
+  config: ControllerConfig;
   vehicles: VehicleWithState[];
   currentEnergy: EnergyData | null;
   schedules: Schedule[];
@@ -135,7 +135,7 @@ function DayPickerRow(
   );
 }
 
-function AllocationBadge({ allocation }: { allocation: VehicleAllocation }) {
+function AllocationBadge({ allocation }: { allocation: PreviewVehicleResult }) {
   if (allocation.action === "charging") {
     return (
       <>
@@ -164,8 +164,8 @@ function AllocationBadge({ allocation }: { allocation: VehicleAllocation }) {
 
 function VehicleSimRow(
   { v, allocation, setVehicleOverride }: {
-    v: SimVehicle;
-    allocation: VehicleAllocation;
+    v: PreviewVehicle;
+    allocation: PreviewVehicleResult;
     setVehicleOverride: SetOverride;
   },
 ) {
@@ -228,8 +228,8 @@ function VehicleSimRow(
 
 function VehicleList(
   { simVehicles, result, setVehicleOverride }: {
-    simVehicles: SimVehicle[];
-    result: SimulationResult;
+    simVehicles: PreviewVehicle[];
+    result: SolarPreviewResult;
     setVehicleOverride: SetOverride;
   },
 ) {
@@ -264,7 +264,7 @@ function SummaryBar(
   { solarKw, consumptionKw, result }: {
     solarKw: number;
     consumptionKw: number;
-    result: SimulationResult;
+    result: SolarPreviewResult;
   },
 ) {
   return (
@@ -309,15 +309,6 @@ function SummaryBar(
           {result.gridExportKw.toFixed(1)} kW
         </Text>
       </div>
-      {!result.meetsMinSolarGeneration && (
-        <Badge color="red" size="1" variant="soft">Below min solar</Badge>
-      )}
-      {!result.meetsMinExcessSolar && (
-        <Badge color="red" size="1" variant="soft">Below min excess</Badge>
-      )}
-      {result.batteryPriorityBlocking && (
-        <Badge color="orange" size="1" variant="soft">Battery priority</Badge>
-      )}
       {result.blockoutActive && (
         <Badge color="red" size="1" variant="soft">Blockout active</Badge>
       )}
@@ -333,6 +324,8 @@ function InputControls(
     setConsumptionKw,
     batterySoc,
     setBatterySoc,
+    batteryPowerKw,
+    setBatteryPowerKw,
     simulatedTime,
     setSimulatedTime,
     simulatedDay,
@@ -345,6 +338,8 @@ function InputControls(
     setConsumptionKw: (v: number) => void;
     batterySoc: number | null;
     setBatterySoc: (v: number | null) => void;
+    batteryPowerKw: number;
+    setBatteryPowerKw: (v: number) => void;
     simulatedTime: string;
     setSimulatedTime: (v: string) => void;
     simulatedDay: DayOfWeek;
@@ -383,6 +378,19 @@ function InputControls(
           onChange={(v) => setBatterySoc(v)}
         />
       )}
+      {hasBattery && (
+        <SliderRow
+          // Sign convention matches EnergyData.batteryPowerW and the
+          // Dashboard: positive = discharging, negative = charging.
+          label="Battery Power"
+          value={batteryPowerKw}
+          min={-5}
+          max={5}
+          step={0.1}
+          unit="kW"
+          onChange={setBatteryPowerKw}
+        />
+      )}
       <div
         style={{
           display: "flex",
@@ -402,23 +410,68 @@ function InputControls(
   );
 }
 
+interface SimDefaults {
+  solarKw: number;
+  consumptionKw: number;
+  batterySoc: number | null;
+  batteryPowerKw: number;
+}
+
+function computeSimDefaults(currentEnergy: EnergyData | null): SimDefaults {
+  return {
+    solarKw: currentEnergy ? currentEnergy.solarProductionW / 1000 : 5,
+    consumptionKw: currentEnergy ? currentEnergy.homeConsumptionW / 1000 : 1.5,
+    batterySoc: currentEnergy?.batterySoc ?? null,
+    batteryPowerKw: currentEnergy?.batteryPowerW != null
+      ? currentEnergy.batteryPowerW / 1000
+      : 0,
+  };
+}
+
+function buildPreviewVehicles(
+  vehicles: VehicleWithState[],
+  vehicleOverrides: Record<
+    string,
+    { batteryLevel?: number; mode?: VehicleMode }
+  >,
+  threePhaseCharger: boolean,
+): PreviewVehicle[] {
+  return vehicles.map((v) => {
+    const overrides = vehicleOverrides[v.id] ?? {};
+    const s = v.state;
+    return {
+      id: v.id,
+      name: v.name,
+      priority: v.priority,
+      mode: (overrides.mode ?? v.mode ?? "auto") as VehicleMode,
+      batteryLevel: overrides.batteryLevel ?? s?.batteryLevel ?? 50,
+      chargeLimit: s?.chargeLimit ?? 80,
+      chargeAmpsMin: s?.chargeAmpsMin || 5,
+      chargeAmpsMax: s?.chargeAmpsMax || 16,
+      chargerVoltage: s?.chargerVoltage || 230,
+      chargerPhases: threePhaseCharger ? 3 : (s?.chargerPhases ?? 1),
+      isCharging: s?.isCharging ?? false,
+      chargeAmps: s?.chargeAmps ?? 0,
+    };
+  });
+}
+
 function useSolarSimState(
   { config, vehicles, currentEnergy, schedules }: SolarSimulationProps,
 ) {
-  const defaultSolar = currentEnergy
-    ? currentEnergy.solarProductionW / 1000
-    : 5;
-  const defaultConsumption = currentEnergy
-    ? currentEnergy.homeConsumptionW / 1000
-    : 1.5;
-  const defaultBatterySoc = currentEnergy?.batterySoc ?? null;
+  const defaults = computeSimDefaults(currentEnergy);
 
-  const [solarKw, setSolarKw] = useState(Math.round(defaultSolar * 10) / 10);
+  const [solarKw, setSolarKw] = useState(
+    Math.round(defaults.solarKw * 10) / 10,
+  );
   const [consumptionKw, setConsumptionKw] = useState(
-    Math.round(defaultConsumption * 10) / 10,
+    Math.round(defaults.consumptionKw * 10) / 10,
   );
   const [batterySoc, setBatterySoc] = useState<number | null>(
-    defaultBatterySoc,
+    defaults.batterySoc,
+  );
+  const [batteryPowerKw, setBatteryPowerKw] = useState(
+    Math.round(defaults.batteryPowerKw * 10) / 10,
   );
   const [simulatedTime, setSimulatedTime] = useState(getCurrentTime);
   const [simulatedDay, setSimulatedDay] = useState<DayOfWeek>(getCurrentDay);
@@ -426,44 +479,37 @@ function useSolarSimState(
     Record<string, { batteryLevel?: number; mode?: VehicleMode }>
   >({});
 
-  const solarConfig = useMemo(() => parseConfigToSolarConfig(config), [config]);
+  const simVehicles: PreviewVehicle[] = useMemo(
+    () =>
+      buildPreviewVehicles(
+        vehicles,
+        vehicleOverrides,
+        config.threePhaseCharger,
+      ),
+    [vehicles, vehicleOverrides, config.threePhaseCharger],
+  );
 
-  const simVehicles: SimVehicle[] = useMemo(() => {
-    return vehicles.map((v) => {
-      const overrides = vehicleOverrides[v.id] ?? {};
-      const s = v.state;
-      return {
-        id: v.id,
-        name: v.name,
-        priority: v.priority,
-        mode: (overrides.mode ?? v.mode ?? "auto") as VehicleMode,
-        batteryLevel: overrides.batteryLevel ?? s?.batteryLevel ?? 50,
-        chargeLimit: s?.chargeLimit ?? 80,
-        chargeAmpsMin: s?.chargeAmpsMin || 5,
-        chargeAmpsMax: s?.chargeAmpsMax || 16,
-        chargerVoltage: s?.chargerVoltage || 230,
-        chargerPhases: solarConfig.threePhaseCharger
-          ? 3
-          : (s?.chargerPhases ?? 1),
-      };
-    });
-  }, [vehicles, vehicleOverrides, solarConfig.threePhaseCharger]);
+  const hasBattery = config.batteryPriorityEnabled ||
+    (currentEnergy != null && currentEnergy.batterySoc !== null);
 
   const result = useMemo(
     () =>
-      simulateSolarAllocation(solarConfig, simVehicles, {
+      previewSolarAllocation(config, simVehicles, {
         solarProductionKw: solarKw,
         homeConsumptionKw: consumptionKw,
+        batteryPowerKw: hasBattery ? batteryPowerKw : null,
         batterySoc,
         schedules,
         simulatedTime,
         simulatedDay,
       }),
     [
-      solarConfig,
+      config,
       simVehicles,
       solarKw,
       consumptionKw,
+      batteryPowerKw,
+      hasBattery,
       batterySoc,
       schedules,
       simulatedTime,
@@ -472,9 +518,10 @@ function useSolarSimState(
   );
 
   const handleReset = () => {
-    setSolarKw(Math.round(defaultSolar * 10) / 10);
-    setConsumptionKw(Math.round(defaultConsumption * 10) / 10);
-    setBatterySoc(defaultBatterySoc);
+    setSolarKw(Math.round(defaults.solarKw * 10) / 10);
+    setConsumptionKw(Math.round(defaults.consumptionKw * 10) / 10);
+    setBatterySoc(defaults.batterySoc);
+    setBatteryPowerKw(Math.round(defaults.batteryPowerKw * 10) / 10);
     setVehicleOverrides({});
     setSimulatedTime(getCurrentTime());
     setSimulatedDay(getCurrentDay());
@@ -487,9 +534,6 @@ function useSolarSimState(
     }));
   };
 
-  const hasBattery = solarConfig.batteryPriorityEnabled ||
-    currentEnergy?.batterySoc !== null;
-
   return {
     solarKw,
     setSolarKw,
@@ -497,6 +541,8 @@ function useSolarSimState(
     setConsumptionKw,
     batterySoc,
     setBatterySoc,
+    batteryPowerKw,
+    setBatteryPowerKw,
     simulatedTime,
     setSimulatedTime,
     simulatedDay,
@@ -518,6 +564,8 @@ export function SolarSimulation(props: SolarSimulationProps) {
     setConsumptionKw,
     batterySoc,
     setBatterySoc,
+    batteryPowerKw,
+    setBatteryPowerKw,
     simulatedTime,
     setSimulatedTime,
     simulatedDay,
@@ -551,9 +599,9 @@ export function SolarSimulation(props: SolarSimulationProps) {
           </Button>
         </div>
         <Text size="1" color="gray">
-          Preview how your settings would affect charging — adjusting these
-          knobs has no real effect, it's only for understanding the settings.
-          For a full day-by-day simulation, visit the{" "}
+          Preview how your settings would affect charging — adjusting the
+          controls below lets you simulate a range of conditions. For a full
+          day-by-day simulation, visit the{" "}
           <Link
             onClick={() => navigate({ type: "app", page: "simulator" })}
             style={{ cursor: "pointer" }}
@@ -568,6 +616,8 @@ export function SolarSimulation(props: SolarSimulationProps) {
           setConsumptionKw={setConsumptionKw}
           batterySoc={batterySoc}
           setBatterySoc={setBatterySoc}
+          batteryPowerKw={batteryPowerKw}
+          setBatteryPowerKw={setBatteryPowerKw}
           simulatedTime={simulatedTime}
           setSimulatedTime={setSimulatedTime}
           simulatedDay={simulatedDay}

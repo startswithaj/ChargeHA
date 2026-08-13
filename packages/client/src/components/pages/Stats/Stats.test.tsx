@@ -52,6 +52,16 @@ vi.mock("../../../trpc.ts", () => ({
   widenTrpc: vi.fn(),
   trpc: {
     useQueries: vi.fn(() => []),
+    charger: {
+      list: {
+        useQuery: vi.fn(() => ({
+          data: [],
+          isLoading: false,
+          isPending: false,
+          error: null,
+        })),
+      },
+    },
     vehicle: {
       list: {
         useQuery: vi.fn(() => ({
@@ -156,8 +166,6 @@ describe("Stats", () => {
     cleanup();
   });
 
-  // ---- Basic rendering ----
-
   it("renders period selector buttons", () => {
     renderStats();
 
@@ -188,8 +196,6 @@ describe("Stats", () => {
     expect(screen.getByText("Self Powered")).toBeInTheDocument();
   });
 
-  // ---- Loading state ----
-
   it("shows — in summary cards when loading is true", () => {
     setStats({ loading: true });
 
@@ -207,8 +213,6 @@ describe("Stats", () => {
 
     expect(screen.getByText("Loading…")).toBeInTheDocument();
   });
-
-  // ---- Data rendering (folds L214 + L280) ----
 
   it(
     "renders summary cards and Energy Sources values from data " +
@@ -233,8 +237,6 @@ describe("Stats", () => {
     expect(screen.getByTestId("chart")).toBeInTheDocument();
   });
 
-  // ---- Resolution toggle ----
-
   it("shows resolution toggle (1h / 15m) when period is day", () => {
     setStats();
 
@@ -258,8 +260,6 @@ describe("Stats", () => {
     },
   );
 
-  // ---- Energy source breakdown ----
-
   it("renders Energy Sources breakdown card", () => {
     renderStats();
 
@@ -267,8 +267,6 @@ describe("Stats", () => {
     expect(screen.getByText("From Solar")).toBeInTheDocument();
     expect(screen.getByText("From Grid")).toBeInTheDocument();
   });
-
-  // ---- Vehicle charging section ----
 
   it("does not show Vehicle Charging section when totalChargedWh is 0", () => {
     setStats({
@@ -303,8 +301,6 @@ describe("Stats", () => {
     },
   );
 
-  // ---- Away charging row ----
-
   it("does not show Away row when totalAwayWh is 0", () => {
     setStats({ isAtPresent: false, data: mockStatsData });
 
@@ -329,8 +325,6 @@ describe("Stats", () => {
     // awayPercent = round(500/2200 * 100) = round(22.7) = 23
     expect(screen.getByText("23%")).toBeInTheDocument();
   });
-
-  // ---- Navigation callbacks (folds L381/L395/L409) ----
 
   it.each<
     [
@@ -357,20 +351,16 @@ describe("Stats", () => {
     expect(callback).toHaveBeenCalledOnce();
   });
 
-  // ---- Chart legend ----
-
   it("renders chart legend labels", () => {
     renderStats();
 
     expect(screen.getByText("Solar → Home")).toBeInTheDocument();
-    expect(screen.getByText("Solar → Car")).toBeInTheDocument();
+    expect(screen.getByText("Solar → Vehicle")).toBeInTheDocument();
     expect(screen.getByText("Solar → Grid")).toBeInTheDocument();
     expect(screen.getByText("Grid → Home")).toBeInTheDocument();
-    expect(screen.getByText("Grid → Car")).toBeInTheDocument();
+    expect(screen.getByText("Grid → Vehicle")).toBeInTheDocument();
     expect(screen.getByText("Solar Production")).toBeInTheDocument();
   });
-
-  // ---- Edge cases (honest retitle per audit) ----
 
   it(
     "still renders Vehicle Charging when totalSolar+totalGrid totals are 0",
@@ -407,8 +397,6 @@ describe("Stats", () => {
     // Component renders without error; gridPercent collapses to 0%.
     expect(screen.getByText("Energy Sources")).toBeInTheDocument();
   });
-
-  // ---- Cost cards ----
 
   it("shows Grid Cost and Solar Savings cards when tariff data exists", () => {
     setStats({

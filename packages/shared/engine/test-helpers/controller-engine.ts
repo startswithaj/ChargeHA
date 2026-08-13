@@ -76,6 +76,7 @@ export const makeVehicle = (
   const state = buildState();
   return {
     id,
+    vehicleId: id,
     name,
     mode: "auto",
     priority: 1,

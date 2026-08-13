@@ -4,10 +4,11 @@ import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
 import { discoverFronius } from "./FroniusDiscovery.ts";
 import { FroniusLocalAdapter } from "./FroniusLocalAdapter.ts";
 import { froniusLocalConfigDef } from "./config.ts";
-import { createPluginConfigProcedures } from "../../../createPluginConfigProcedures.ts";
+import {
+  createNetworkDiscoveryProcedures,
+  createPluginConfigProcedures,
+} from "../../../createPluginConfigProcedures.ts";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
-
-// ── Typed Zod schemas for Fronius Local plugin procedures ───────────────────
 
 const discoverInput = z.object({
   subnet: z.string().optional(),
@@ -18,8 +19,6 @@ const testConnectionInput = z.object({
   meterDeviceId: z.number().optional(),
 });
 
-// ── Fronius Local plugin tRPC router ────────────────────────────────────────
-
 export function createFroniusLocalRouter(deps: PluginDependencies) {
   return router({
     ...createPluginConfigProcedures(
@@ -27,6 +26,7 @@ export function createFroniusLocalRouter(deps: PluginDependencies) {
       froniusLocalConfigDef,
       [],
     ),
+    ...createNetworkDiscoveryProcedures(deps),
 
     discover: publicProcedure
       .input(discoverInput)

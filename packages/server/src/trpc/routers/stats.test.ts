@@ -27,9 +27,8 @@ describe("Stats tRPC Router", () => {
     db.close();
   });
 
-  // R1 (audit-flagged): insertReading / insertEnergyReading back-date rows via
-  // (db as any).sqlite. Skipped pending public AppDatabase
-  // `insert*WithTimestamp` helpers — see progress.txt US-047 notes.
+  // insertReading / insertEnergyReading back-date rows via a sqlite
+  // reach-in, pending public AppDatabase `insert*WithTimestamp` helpers.
   const insertReading = async (
     db: AppDatabase,
     opts: {
@@ -351,7 +350,6 @@ describe("Stats tRPC Router", () => {
   });
 
   describe("Vehicle SoC in day stats", () => {
-    /** Insert a vehicle poll log at a specific UTC timestamp. */
     async function insertPollLog(
       db: AppDatabase,
       opts: {

@@ -1,13 +1,10 @@
-import type {
-  AdapterVehicleChargeState,
-  CallContext,
-  VehicleAdapter,
-} from "@chargeha/shared";
+import type { AdapterVehicleChargeState, CallContext } from "@chargeha/shared";
 import type {
   VehicleMiddleware,
   VehicleRequestContext,
-} from "../../../types.ts";
+} from "@chargeha/shared/plugins";
 import type { Logger } from "@chargeha/server/lib/Logger";
+import type { TeslaAdapter } from "./TeslaAdapter.ts";
 import { TeslaApiStrategy } from "./TeslaApiStrategy.ts";
 
 // Rate-limit floor for the free /vehicles probe in the polling path.
@@ -16,13 +13,11 @@ import { TeslaApiStrategy } from "./TeslaApiStrategy.ts";
 // Bypassed for forceRefresh (user-initiated) and command paths.
 const ONLINE_CHECK_DEBOUNCE_MS = 60_000;
 
-/**
- * Tesla-specific vehicle middleware. Wraps the adapter with caching and
- * cost-aware API decisions. All wake/fetch/staleness logic is delegated
- * to TeslaApiStrategy — this class only handles I/O execution.
- */
+// Tesla-specific vehicle middleware. Wraps the adapter with caching and
+// cost-aware API decisions. All wake/fetch/staleness logic is delegated
+// to TeslaApiStrategy — this class only handles I/O execution.
 export class TeslaVehicleMiddleware implements VehicleMiddleware {
-  private readonly adapter: VehicleAdapter;
+  private readonly adapter: TeslaAdapter;
   private readonly logger: Logger;
   private readonly strategy: TeslaApiStrategy;
 
@@ -36,13 +31,11 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
   private lastWakeAtMs = 0;
   private lastOnlineCheckAtMs = 0;
 
-  constructor(adapter: VehicleAdapter, logger: Logger) {
+  constructor(adapter: TeslaAdapter, logger: Logger) {
     this.adapter = adapter;
     this.logger = logger;
     this.strategy = new TeslaApiStrategy();
   }
-
-  // ── Public: data ──────────────────────────────────────────────────────
 
   get online(): boolean {
     return this.lastKnownOnline;
@@ -137,8 +130,6 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
     return this.getCachedState();
   }
 
-  // ── Public: commands ──────────────────────────────────────────────────
-
   async startCharging(ctx: CallContext): Promise<boolean> {
     this.logger.debug(`startCharging origin=${ctx.origin}`);
     await this.ensureOnline(withSuffix(ctx, "pre"));
@@ -192,10 +183,9 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
     return ok;
   }
 
-  /** Command was rejected by the vehicle (e.g. `is_charging` on charge_start).
-   *  Cached state is out of sync with reality — pull fresh vehicle_data so the
-   *  next decision loop sees the truth and doesn't retry the same command.
-   *  Costs $0.002 per rejection, bounded by VehicleManager's command backoff. */
+  // Command was rejected by the vehicle (e.g. `is_charging` on charge_start).
+  // Cached state is out of sync with reality — pull fresh vehicle_data so the
+  // next loop sees the truth. Costs $0.002, bounded by the command backoff.
   private async refreshCacheAfterRejection(ctx: CallContext): Promise<void> {
     try {
       await this.fetchAndCache(ctx);
@@ -207,13 +197,9 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
     }
   }
 
-  /** Ensure the vehicle is online before sending a command. Always does a
-   *  cheap online check (free) — `lastKnownOnline` can be minutes stale for
-   *  dashboard-initiated commands, so we can't trust it. If the check says
-   *  offline, wake and retry. Commands are user-initiated (charge_now,
-   *  dashboard buttons), so there's no wake-cooldown — we pay the wake cost
-   *  when the user asks for action. Throws if wake fails so the caller can
-   *  apply backoff and surface the error. */
+  // Ensure the vehicle is online before sending a command. Always does a
+  // cheap online check first — `lastKnownOnline` can be minutes stale for
+  // dashboard commands. No wake-cooldown here: user-initiated, throws on wake failure.
   private async ensureOnline(ctx: CallContext): Promise<void> {
     const isOnline = await this.adapter.isVehicleOnline(ctx);
     if (isOnline) {
@@ -229,12 +215,9 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
     this.lastKnownOnline = true;
   }
 
-  // ── Private: I/O ──────────────────────────────────────────────────────
-
-  /** Free online check via /vehicles endpoint ($0). Debounced for the
-   *  polling path so high-frequency callers don't burn Tesla rate-limit
-   *  quota. Pass `force=true` for user-initiated refreshes that need
-   *  truth immediately (commands bypass this method entirely). */
+  // Free online check via /vehicles endpoint ($0). Debounced for the polling
+  // path so high-frequency callers don't burn Tesla rate-limit quota. Pass
+  // `force=true` for user-initiated refreshes that need truth immediately.
   private async checkVehicleOnline(
     ctx: CallContext,
     force: boolean,
@@ -252,7 +235,7 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
     return isOnline;
   }
 
-  /** Fetch vehicle data from the adapter and update the cache ($0.002). */
+  // Fetch vehicle data from the adapter and update the cache ($0.002).
   private async fetchAndCache(
     ctx: CallContext,
   ): Promise<AdapterVehicleChargeState | null> {
@@ -267,7 +250,7 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
     return this.getCachedState();
   }
 
-  /** Wake the vehicle ($0.02), then fetch fresh state. */
+  // Wake the vehicle ($0.02), then fetch fresh state.
   private async wakeAndFetch(
     ctx: CallContext,
   ): Promise<AdapterVehicleChargeState | null> {

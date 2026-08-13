@@ -87,7 +87,7 @@ describe("usePluginOnboardingState", () => {
     );
     // Its steps carry owner "tesla"; an empty selection would gate them all out.
     expect(result.current.state.vehicleType).toBe("tesla");
-    expect(result.current.state.energyType).toBe("");
+    expect(result.current.state.energyType).toBe(null);
     expect(result.current.isLoading).toBe(false);
   });
 
@@ -96,7 +96,7 @@ describe("usePluginOnboardingState", () => {
       usePluginOnboardingState("fronius_local", "setup", "energy")
     );
     expect(result.current.state.energyType).toBe("fronius_local");
-    expect(result.current.state.vehicleType).toBe("");
+    expect(result.current.state.vehicleType).toBe(null);
   });
 
   describe("patch", () => {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Card, Switch, Text } from "@radix-ui/themes";
+import { Button, Switch, Text } from "@radix-ui/themes";
 import type { VehicleChargeState } from "@chargeha/shared";
 import { LocationField } from "./LocationField.tsx";
 import { dialogStyles as styles } from "../../../hostUi.ts";
@@ -17,7 +17,6 @@ export interface SimulatedVehicleDialogProps {
   onCancel: () => void;
 }
 
-/** Validate lat/lng strings and return parsed values or an error message. */
 function parseLocation(
   lat: string,
   lng: string,
@@ -161,17 +160,13 @@ export function SimulatedVehicleDialog({
     setBatteryLevel((prev) => Math.max(0, Math.min(100, prev + delta)));
 
   return (
-    <Card
-      className={styles.formCard}
-      style={{ "--accent": "var(--purple-9)" } as React.CSSProperties}
-    >
+    <div style={{ padding: "0 10px 10px" }}>
       <form onSubmit={handleSubmit} className={styles.form}>
         <Text size="1" color="gray">
           Override runtime state for this simulated vehicle. Changes take effect
           immediately on the dashboard.
         </Text>
 
-        {/* Plugged In */}
         <div className={styles.field}>
           <Text size="2" weight="medium">Plugged In</Text>
           <Switch
@@ -191,7 +186,6 @@ export function SimulatedVehicleDialog({
           hint="Sets the battery state of charge. Step: 5%."
         />
 
-        {/* Location */}
         <LocationField
           lat={lat}
           setLat={setLat}
@@ -209,14 +203,12 @@ export function SimulatedVehicleDialog({
           onStep={stepLimit}
         />
 
-        {/* Validation error */}
         {error && (
           <div className={styles.error}>
             <Text size="2" color="red">{error}</Text>
           </div>
         )}
 
-        {/* Actions */}
         <div className={styles.footer} style={{ marginTop: 0 }}>
           <Button type="button" variant="soft" color="gray" onClick={onCancel}>
             Cancel
@@ -226,6 +218,6 @@ export function SimulatedVehicleDialog({
           </Button>
         </div>
       </form>
-    </Card>
+    </div>
   );
 }

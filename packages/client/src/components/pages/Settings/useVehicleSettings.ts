@@ -18,7 +18,16 @@ const nextDemoNumber = (vehicles: VehicleWithState[]): number =>
   }, 0) + 1;
 
 function useAddSimulatedVehicleMutation(
-  { utils, vehicles, homeConfig, setRecentlyAddedVins }: {
+  {
+    utils,
+    vehicles,
+    homeConfig,
+    setRecentlyAddedVins,
+    adapterType,
+    namePrefix,
+  }: {
+    adapterType: string | undefined;
+    namePrefix: string;
     utils: ReturnType<typeof trpc.useUtils>;
     vehicles: VehicleWithState[];
     homeConfig:
@@ -29,7 +38,9 @@ function useAddSimulatedVehicleMutation(
 ) {
   return useMutation({
     mutationFn: async () => {
-      if (!demoPlugin) throw new Error("No demo plugin available");
+      if (!demoPlugin || !adapterType) {
+        throw new Error("No demo plugin available");
+      }
       const n = nextDemoNumber(vehicles);
       const id = `DEMO-${String(n).padStart(3, "0")}`;
       const homeLat = homeConfig?.homeLatitude ?? NaN;
@@ -41,107 +52,56 @@ function useAddSimulatedVehicleMutation(
         simConfig.homeLat = homeLat;
         simConfig.homeLng = homeLng;
       }
-      const name = n === 1 ? "Demo EV" : `Demo EV ${n}`;
+      const name = n === 1 ? namePrefix : `${namePrefix} ${n}`;
       await utils.client.vehicle.create.mutate({
         id,
         name,
-        adapterType: demoPlugin.id,
+        adapterType,
         config: JSON.stringify(simConfig),
       });
       return id;
     },
     onSuccess: (id) => {
-      // Cache refresh is driven by the server's vehicles_changed event in RealtimeSync.
+      // Cache refresh is handled centrally by the MutationCache in trpcSetup.
       setRecentlyAddedVins(new Set([id]));
       setTimeout(() => setRecentlyAddedVins(new Set()), 4000);
     },
   });
 }
 
-function usePriorityMutation(utils: ReturnType<typeof trpc.useUtils>) {
-  const priorityMutationRaw = trpc.vehicle.setPriority.useMutation();
-  return useMutation({
-    mutationFn: async (updates: Array<{ id: string; priority: number }>) => {
-      await Promise.all(
-        updates.map(({ id, priority }) =>
-          priorityMutationRaw.mutateAsync({ vehicleId: id, priority })
-        ),
-      );
-    },
-    onSuccess: () => {
-      utils.vehicle.list.invalidate();
-    },
-  });
-}
-
-function computePriorityUpdates(
-  vehicles: VehicleWithState[],
-  vin: string,
-  direction: "up" | "down",
-) {
-  const sorted = [...vehicles].sort((a, b) => a.priority - b.priority);
-  const idx = sorted.findIndex((v) => v.id === vin);
-  if (idx < 0) return null;
-  const swapIdx = direction === "up" ? idx - 1 : idx + 1;
-  if (swapIdx < 0 || swapIdx >= sorted.length) return null;
-
-  // Swap positions in the sorted array
-  const temp = sorted[idx];
-  sorted[idx] = sorted[swapIdx];
-  sorted[swapIdx] = temp;
-
-  // Assign sequential priorities based on new order
-  // (handles duplicate priority values that would make a value-swap a no-op)
-  return sorted
-    .map((v, i) => ({ id: v.id, priority: i + 1 }))
-    .filter((u, i) => sorted[i].priority !== u.priority);
-}
-
 export function useVehicleSettings() {
   const { navigate } = useRouter();
   const { data: homeConfig } = useHomeConfig();
 
-  // --- Queries (read side) ---
   const utils = trpc.useUtils();
   const vehiclesQuery = trpc.vehicle.list.useQuery(undefined, {
     select: (data) => data.vehicles as VehicleWithState[],
   });
 
-  // --- Derived values from queries ---
   const vehicles = vehiclesQuery.data ?? [];
 
-  // --- Local UI state ---
   const [recentlyAddedVins, setRecentlyAddedVins] = useState<Set<string>>(
     new Set(),
   );
 
-  // --- Mutations ---
-
-  // No onSuccess cache work: RealtimeSync handles vehicles_changed invalidation.
+  // No onSuccess cache work: the MutationCache in trpcSetup invalidates on
+  // every successful mutation, so the vehicle list refetches without waiting
+  // for the server's vehicles_changed SSE round-trip.
   const deleteMutation = trpc.vehicle.delete.useMutation();
 
-  const priorityMutation = usePriorityMutation(utils);
   const addSimMutation = useAddSimulatedVehicleMutation({
     utils,
     vehicles,
     homeConfig,
     setRecentlyAddedVins,
+    adapterType: demoPlugin?.id,
+    namePrefix: "Demo EV",
   });
-
-  // --- Mutation handlers ---
 
   const handleDelete = (vin: string) =>
     deleteMutation.mutate({ vehicleId: vin });
 
-  const handleMovePriority = (vin: string, direction: "up" | "down") => {
-    const updates = computePriorityUpdates(vehicles, vin, direction);
-    if (!updates || updates.length === 0) return;
-    priorityMutation.mutate(updates);
-  };
-
   const handleAddSimulatedVehicle = () => addSimMutation.mutate();
-
-  // --- Plugin onboarding ---
 
   const vehiclePluginsQuery = trpc.vehicle.getPlugins.useQuery();
   const vehiclePlugins = vehiclePluginsQuery.data ?? [];
@@ -152,8 +112,10 @@ export function useVehicleSettings() {
     navigate({ type: "pluginSetup", pluginId });
   }, []);
 
-  // Combine query and mutation errors for display
-  const mutations = [deleteMutation, priorityMutation, addSimMutation];
+  const mutations = [
+    deleteMutation,
+    addSimMutation,
+  ];
   const displayError = vehiclesQuery.error?.message ??
     mutations.find((m) => m.error)?.error?.message ?? null;
 
@@ -164,7 +126,6 @@ export function useVehicleSettings() {
     error: displayError,
     recentlyAddedVins,
     handleDelete,
-    handleMovePriority,
     handleAddSimulatedVehicle,
     vehiclePlugins,
     handleStartOnboarding,

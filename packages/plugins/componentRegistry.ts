@@ -1,24 +1,31 @@
 import type { ComponentType } from "react";
 import type { PluginStepDef } from "./hostUi.ts";
+import type {
+  ChargerPluginOption,
+  EnergyPluginOption,
+  PluginScheduleNote,
+  PluginSettingsProps,
+  VehiclePluginOption,
+} from "./pluginOptions.ts";
 
-// Simulated energy settings component
+export type {
+  ChargerPluginOption,
+  EnergyPluginOption,
+  PluginScheduleNote,
+  PluginSettingsProps,
+  VehiclePluginOption,
+};
+
 import { SimulatedEnergyConfig } from "./energy/simulated/client/SimulatedEnergyConfig.tsx";
-
-// Tesla settings component
 import { TeslaSettings } from "./vehicles/tesla/client/TeslaSettings.tsx";
-
-// Simulated vehicle settings component
 import { SimulatedVehicleSettings } from "./vehicles/simulated/client/SimulatedVehicleSettings.tsx";
-
-// Fronius settings components
 import { FroniusCloudConfig } from "./energy/fronius-cloud/client/FroniusCloudConfig.tsx";
 import { FroniusLocalConfig } from "./energy/fronius-local/client/FroniusLocalConfig.tsx";
-
-// Sigenergy settings component
 import { SigenergyLocalConfig } from "./energy/sigenergy-local/client/SigenergyLocalConfig.tsx";
-
-// Enphase settings component
 import { EnphaseLocalConfig } from "./energy/enphase-local/client/EnphaseLocalConfig.tsx";
+import { TapoSettings } from "./chargers/tapo/client/TapoSettings.tsx";
+import { OcppSettings } from "./chargers/ocpp/client/OcppSettings.tsx";
+import { SimulatedChargerSettings } from "./chargers/simulated/client/SimulatedChargerSettings.tsx";
 
 // Plugin wizard step definitions — imported from each plugin's client folder
 import {
@@ -46,18 +53,19 @@ import {
   teslaVehicleOption,
   teslaWizardSteps,
 } from "./vehicles/tesla/client/wizardSteps.ts";
+import {
+  tapoChargerOption,
+  tapoWizardSteps,
+} from "./chargers/tapo/client/wizardSteps.ts";
+import {
+  ocppChargerOption,
+  ocppWizardSteps,
+} from "./chargers/ocpp/client/wizardSteps.ts";
+import {
+  simulatedChargerOption,
+  simulatedChargerWizardSteps,
+} from "./chargers/simulated/client/wizardSteps.ts";
 
-/** Metadata for an energy plugin option shown on the inverter type selection step. */
-export interface EnergyPluginOption {
-  id: string;
-  label: string;
-  description: string;
-  iconKey: "server" | "cloud" | "monitor";
-  /** When true, this option is selectable in demo mode; others are disabled. */
-  demoAvailable?: boolean;
-}
-
-/** Energy plugin options for the inverter type selection step. */
 export const energyPluginOptions: EnergyPluginOption[] = [
   froniusLocalOption,
   froniusCloudOption,
@@ -66,27 +74,6 @@ export const energyPluginOptions: EnergyPluginOption[] = [
   simulatedEnergyOption,
 ];
 
-/** A schedule-related note contributed by a vehicle plugin. */
-export interface PluginScheduleNote {
-  adapterType: string;
-  text: string;
-}
-
-/** Metadata for a vehicle plugin option shown on the vehicle type selection step. */
-export interface VehiclePluginOption {
-  id: string;
-  label: string;
-  description: string;
-  iconKey: "car" | "monitor";
-  /** When true, this option is selectable in demo mode; others are disabled. */
-  demoAvailable?: boolean;
-  /** When true, selecting this option triggers the demo setup flow instead of plugin wizard steps. */
-  demoSetup?: boolean;
-  /** Default config for creating a new vehicle of this type from the settings page. */
-  defaultVehicleConfig?: Record<string, unknown>;
-}
-
-/** Vehicle plugin options for the vehicle type selection step. */
 export const vehiclePluginOptions: VehiclePluginOption[] = [
   teslaVehicleOption,
   {
@@ -105,18 +92,15 @@ export const vehiclePluginOptions: VehiclePluginOption[] = [
   },
 ];
 
-/** Schedule notes from vehicle plugins, shown on the Schedules page. */
 export const vehicleScheduleNotes: PluginScheduleNote[] = [
   teslaScheduleNote,
 ];
 
-/** Vehicle plugin wizard steps, keyed by VehicleAdapterType. */
 export const vehiclePluginSteps: Record<string, PluginStepDef[]> = {
   tesla: teslaWizardSteps,
   simulated: [],
 };
 
-/** Energy plugin wizard steps, keyed by energy adapter type. */
 export const energyPluginSteps: Record<string, PluginStepDef[]> = {
   fronius_local: froniusLocalWizardSteps,
   fronius_cloud: froniusCloudWizardSteps,
@@ -125,11 +109,22 @@ export const energyPluginSteps: Record<string, PluginStepDef[]> = {
   simulated_energy: simulatedEnergyWizardSteps,
 };
 
-/**
- * Maps settingsComponentKey strings (from EnergyPlugin) to React components.
- * Used by the settings page to render plugin-provided config forms dynamically.
- */
-export const pluginSettingsComponents: Record<string, ComponentType> = {
+export const chargerPluginOptions: ChargerPluginOption[] = [
+  tapoChargerOption,
+  ocppChargerOption,
+  simulatedChargerOption,
+];
+
+export const chargerPluginSteps: Record<string, PluginStepDef[]> = {
+  tapo: tapoWizardSteps,
+  ocpp: ocppWizardSteps,
+  simulated_charger: simulatedChargerWizardSteps,
+};
+
+export const pluginSettingsComponents: Record<
+  string,
+  ComponentType<PluginSettingsProps>
+> = {
   "tesla-settings": TeslaSettings,
   "simulated-settings": SimulatedVehicleSettings,
   "fronius-local-config": FroniusLocalConfig,
@@ -137,4 +132,7 @@ export const pluginSettingsComponents: Record<string, ComponentType> = {
   "sigenergy-local-config": SigenergyLocalConfig,
   "enphase-local-config": EnphaseLocalConfig,
   "simulated-energy-config": SimulatedEnergyConfig,
+  "tapo-settings": TapoSettings,
+  "ocpp-settings": OcppSettings,
+  "simulated_charger-settings": SimulatedChargerSettings,
 };

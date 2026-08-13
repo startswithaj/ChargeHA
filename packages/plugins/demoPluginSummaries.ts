@@ -46,3 +46,15 @@ export const demoEnergyPluginSummaries: DemoEnergyPluginSummary[] = [
     settingsComponentKey: "simulated-energy-config",
   },
 ];
+
+// Vehicle adapters whose plugin also has the charger role.
+export const chargerCapableVehicleAdapters: readonly string[] = [
+  "tesla",
+  "simulated",
+];
+
+export const demoChargerDisplayNames: Record<string, string> = {
+  simulated_charger: "Simulated Charger",
+  tapo: "Tapo P110/115 Smart Plug",
+  ocpp: "OCPP Charger",
+};

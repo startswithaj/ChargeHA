@@ -116,7 +116,7 @@ describe("ChargeController — grace + command rejection", () => {
         ctx.adapter[rejectField] = false;
         await ctx.runOneLoop();
 
-        expect(ctx.manager.isBackedOff(VIN).backedOff).toBe(true);
+        expect((await ctx.getBackoff()).backedOff).toBe(true);
       });
     });
   });

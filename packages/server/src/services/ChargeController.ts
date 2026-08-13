@@ -1,14 +1,19 @@
 import {
+  type CallContext,
+  type ChargerState,
   type ControllerAction,
   createTraceId,
   type EnergyData,
   type VehicleChargeState,
   type VehicleMode,
 } from "@chargeha/shared";
+import type { VehicleRequestContext } from "@chargeha/shared/plugins";
 import {
   ControllerEngine,
   DecisionChecks,
   isScheduleActiveNow,
+  scheduleTargets,
+  selectActiveChargeSchedule,
 } from "@chargeha/shared/engine";
 import type {
   ControllerConfig,
@@ -20,10 +25,12 @@ import type {
 } from "@chargeha/shared/engine";
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import type {
+  ChargerRow,
   ControllerLogInput,
+  DecisionInputs,
   ScheduleRow,
-  VehicleRow,
 } from "../db/types.ts";
+import type { ChargingPointManager } from "./ChargingPointManager.ts";
 import type { VehicleManager } from "./VehicleManager.ts";
 import type { EnergyPoller } from "./EnergyPoller.ts";
 import type { TypedEventEmitter } from "./TypedEventEmitter.ts";
@@ -36,36 +43,7 @@ const DEFAULT_LOOP_MS = 30_000;
 // Prune old log entries every N loops
 const PRUNE_EVERY_N_LOOPS = 100;
 
-/** Structured inputs snapshot captured each decision cycle. */
-export interface DecisionInputs {
-  energy: {
-    solarProductionW: number;
-    gridPowerW: number;
-    homeConsumptionW: number;
-    batterySoc: number | null;
-  } | null;
-  vehicleState: {
-    isPluggedIn: boolean;
-    isCharging: boolean;
-    batteryLevel: number;
-    chargeLimit: number;
-    chargeAmps: number;
-    chargeAmpsMin: number;
-    chargeAmpsMax: number;
-    chargePowerKw: number;
-    latitude: number | null;
-    longitude: number | null;
-  } | null;
-  config: ControllerConfig;
-  activeSchedules: Array<{
-    id: string;
-    type: string;
-    startTime: string;
-    endTime: string;
-  }>;
-}
-
-/** Decision log entry built per vehicle per loop iteration. */
+// Decision log entry built per vehicle per loop iteration.
 interface DecisionLogEntry {
   vehicleId: string;
   vehicleName: string;
@@ -76,14 +54,32 @@ interface DecisionLogEntry {
   reason: DecisionReason;
   actionDetail: string;
   targetAmps: number | null;
-  /** When true, polling can be suspended for this vehicle. */
   suspendable?: boolean;
-  /** Set when a charge schedule's limit was reached and the decision fell through. */
+  // Set when a charge schedule's limit was reached and the decision fell through.
   scheduleLimitContext?: { scheduleLimitPct: number; batteryLevel: number };
+}
+
+// One controllable unit for the loop: a charging point.
+interface ControlTarget {
+  id: string;
+  // Vehicle linked to this charging point — schedules are keyed by it.
+  vehicleId: string | null;
+  name: string;
+  mode: VehicleMode;
+  priority: number;
+  requestState(ctx: VehicleRequestContext): Promise<unknown>;
+  getState(): Promise<VehicleChargeState | null>;
+  start(
+    amps: number,
+    ctx: CallContext,
+    state: VehicleChargeState,
+  ): Promise<unknown>;
+  stop(ctx: CallContext, state: VehicleChargeState): Promise<unknown>;
 }
 
 export class ChargeController {
   private readonly vehicleManager: VehicleManager;
+  private readonly chargingPointManager: ChargingPointManager;
   private readonly poller: EnergyPoller;
   private readonly db: AppDatabase;
   private readonly configService: ConfigService;
@@ -95,6 +91,7 @@ export class ChargeController {
 
   constructor(
     vehicleManager: VehicleManager,
+    chargingPointManager: ChargingPointManager,
     poller: EnergyPoller,
     db: AppDatabase,
     configService: ConfigService,
@@ -102,6 +99,7 @@ export class ChargeController {
     logger: Logger,
   ) {
     this.vehicleManager = vehicleManager;
+    this.chargingPointManager = chargingPointManager;
     this.poller = poller;
     this.db = db;
     this.configService = configService;
@@ -129,14 +127,14 @@ export class ChargeController {
     }, delayMs);
   }
 
-  /** Run a single iteration of the control loop without scheduling the next.
-   *  Used by the simulator to step the controller one tick at a time.
-   *  Returns the loaded config so the loop scheduler can read controllerLoopSeconds
-   *  without a redundant DB round-trip. */
+  // Run a single iteration of the control loop without scheduling the next.
+  // Used by the simulator to step the controller one tick at a time. Returns
+  // the loaded config so the loop scheduler can read controllerLoopSeconds without a redundant DB round-trip.
   async runOnce(): Promise<ControllerConfig> {
     const traceId = createTraceId();
     const config = await this.loadConfig();
-    const vehicles = await this.db.getVehicles();
+    const { self, passive } = await this.splitByControlPath();
+    const targets = this.buildChargerTargets(self);
     const schedules = await this.db.getSchedules();
     const energySnapshot = this.poller.tryGetRealtimeSnapshot();
     const now = new Date();
@@ -145,45 +143,48 @@ export class ChargeController {
     const gridW = energy && Math.round(energy.gridPowerW);
     const energySummary = energy ? `solar=${solarW}W grid=${gridW}W` : "none";
     this.logger.debug(
-      `Loop: ${vehicles.length} vehicles, ${schedules.length} schedules, energy=${energySummary}`,
+      `Loop: ${targets.length} charging points (${passive.length} passive), ${schedules.length} schedules, energy=${energySummary}`,
     );
 
-    // Compute context for middleware requests
     const hasSolar = energy !== null &&
       energy.solarProductionW >= config.minSolarGenerationKw * 1000;
     const hasBlockout = schedules.some(
       (s) => this.isActiveBlockout(s, now, config.timezone),
     );
 
-    // Request fresh state for each vehicle via middleware
+    // Request fresh state for each target via its middleware
     const engineVehicles: EngineVehicleInput[] = await Promise.all(
-      vehicles.map(async (v) => {
-        const applicable = schedules.filter((s) =>
-          this.isScheduleApplicable(s, v.id, now, config.timezone)
+      targets.map(async (target) => {
+        const activeCharge = selectActiveChargeSchedule(
+          schedules,
+          target,
+          now,
+          config.timezone,
         );
-        const activeChargeSchedule = applicable.find(
-          (s) => s.scheduleType === "charge",
-        );
-        await this.vehicleManager.requestState(v.id, {
+        await target.requestState({
           origin: "controller",
           traceId,
           hasSolar,
-          hasSchedule: applicable.length > 0,
+          hasSchedule: activeCharge !== null || hasBlockout,
           hasBlockout,
-          scheduleChargeLimitPct: activeChargeSchedule?.chargeLimitPct ?? null,
+          scheduleChargeLimitPct: activeCharge?.effective.chargeLimitPct ??
+            null,
         });
-        const state = await this.vehicleManager.getState(v.id);
+        const state = await target.getState();
         return {
-          id: v.id,
-          name: v.name,
-          mode: v.mode,
-          priority: v.priority,
+          id: target.id,
+          vehicleId: target.vehicleId,
+          name: target.name,
+          mode: target.mode,
+          priority: target.priority,
           state,
         };
       }),
     );
 
-    // Run the pure decision engine
+    await this.refreshUnlinkedVehicles(targets, traceId, hasSolar, hasBlockout);
+    await this.refreshPassiveChargers(passive, traceId);
+
     const output = this.engine.decide({
       config,
       vehicles: engineVehicles,
@@ -193,14 +194,13 @@ export class ChargeController {
       timestamp: Date.now(),
     });
 
-    // Execute decisions, build log entries, emit events
-    const logEntries: ControllerLogInput[] = await vehicles.reduce(
-      async (prevPromise, vehicle) => {
+    const logEntries: ControllerLogInput[] = await targets.reduce(
+      async (prevPromise, target) => {
         const acc = await prevPromise;
-        const decision = output.decisions.get(vehicle.id);
+        const decision = output.decisions.get(target.id);
         if (!decision) return acc;
-        const logInput = await this.processVehicleDecision(
-          vehicle,
+        const logInput = await this.processTargetDecision(
+          target,
           decision,
           output,
           config,
@@ -214,12 +214,10 @@ export class ChargeController {
       Promise.resolve([] as ControllerLogInput[]),
     );
 
-    // Batch-insert log entries
     if (logEntries.length > 0) {
       await this.db.insertControllerLogEntries(logEntries);
     }
 
-    // Periodic pruning
     this.loopCount++;
     if (this.loopCount % PRUNE_EVERY_N_LOOPS === 0) {
       const system = await this.configService.getSystem();
@@ -229,9 +227,8 @@ export class ChargeController {
     return config;
   }
 
-  /** Execute a decision by issuing the appropriate adapter command. */
   private async executeDecision(
-    vehicleId: string,
+    target: ControlTarget,
     decision: VehicleDecision,
     state: VehicleChargeState | null,
     traceId: string,
@@ -243,29 +240,186 @@ export class ChargeController {
       case "start":
       case "adjust_amps":
         if (decision.targetAmps !== null) {
-          await this.vehicleManager.startChargingAt(
-            vehicleId,
-            decision.targetAmps,
-            ctx,
-            state,
-          );
+          await target.start(decision.targetAmps, ctx, state);
         }
         break;
       case "stop":
-        await this.vehicleManager.stopCharging(
-          vehicleId,
-          ctx,
-          state,
-        );
+        await target.stop(ctx, state);
         break;
     }
   }
 
-  /** Execute a single vehicle's decision and produce its log entry.
-   *  Handles: adapter commands, polling suspension, event emission,
-   *  transition tracking. */
-  private async processVehicleDecision(
-    vehicle: VehicleRow,
+  // Vehicles with no charging point (data-only) still need fresh state
+  // for display, inference, and stop-at-limit.
+  private async refreshUnlinkedVehicles(
+    targets: ControlTarget[],
+    traceId: string,
+    hasSolar: boolean,
+    hasBlockout: boolean,
+  ): Promise<void> {
+    const linked = new Set(
+      targets.map((t) => t.vehicleId).filter((id) => id !== null),
+    );
+    const vehicles = await this.db.getVehicles();
+    await Promise.all(
+      vehicles
+        .filter((v) => !linked.has(v.id))
+        .map((v) =>
+          this.vehicleManager.requestState(v.id, {
+            origin: "controller",
+            traceId,
+            hasSolar,
+            // Deliberately false, not an oversight: while a smart charger has
+            // control, a schedule doesn't need the car awake — the charger
+            // supplies power and the car wakes itself on the Control Pilot
+            // signal. Waking it via the Tesla API just to check whether it's
+            // already at the schedule's target costs a paid wake (~$0.02) to
+            // avoid a minute or two of unnecessary charging, and the free
+            // /vehicles online probe picks up real state of charge within
+            // about a minute of the car waking anyway. Passing true here
+            // would cost money to fix something that self-corrects.
+            hasSchedule: false,
+            hasBlockout,
+          })
+        ),
+    );
+  }
+
+  // Split active, controllable charging points into the ones this loop decides for and the ones a vehicle's own API owns. A passive point is
+  // not a decision target: no mode, no schedules, no solar allocation, no commands. Its draw is not lost — the same physical session appears in
+  // the allocator through that car's own, active, charging point. The self-driven set is computed once for the whole pass; deriving it per charger would cost two DB reads per charger per loop.
+  private async splitByControlPath(): Promise<
+    { self: ChargerRow[]; passive: ChargerRow[] }
+  > {
+    const [allRows, selfDriven] = await Promise.all([
+      this.db.getChargers(),
+      this.chargingPointManager.getSelfDrivenVehicles(),
+    ]);
+    const rows = allRows.filter((r) =>
+      r.active && this.chargingPointManager.isControllable(r.id)
+    );
+    const paths = await Promise.all(
+      rows.map(async (row) => ({
+        row,
+        owner:
+          (await this.chargingPointManager.getControlPath(row.id, selfDriven))
+            .owner,
+      })),
+    );
+    return {
+      self: paths.filter((p) => p.owner === "self").map((p) => p.row),
+      passive: paths.filter((p) => p.owner === "vehicle_api").map((p) => p.row),
+    };
+  }
+
+  // Passive chargers are still polled — the dashboard card and the energy adapter's charging-load figure both read their cached state — and still
+  // held open, or the car's own API has no path to draw current through. They get no decision, no mode, no schedule and no allocation. No
+  // solar/schedule hints are passed: those exist so a cost-aware VEHICLE middleware can decide whether a paid wake is worth it, and a passive point acts on neither. The car itself is refreshed through its own vehicle_api target, which is active by definition here.
+  private async refreshPassiveChargers(
+    rows: ChargerRow[],
+    traceId: string,
+  ): Promise<void> {
+    const ctx = { origin: "controller:passive", traceId };
+    await Promise.all(rows.map(async (row) => {
+      await this.chargingPointManager.requestState(row.id, ctx);
+      await this.chargingPointManager.holdOpen(row.id, ctx);
+    }));
+  }
+
+  private buildChargerTargets(rows: ChargerRow[]): ControlTarget[] {
+    return rows.map((row) => ({
+      id: row.id,
+      vehicleId: row.vehicleId,
+      name: row.name,
+      mode: row.mode,
+      priority: row.priority,
+      requestState: async (ctx) => {
+        await this.chargingPointManager.requestState(row.id, ctx);
+        const vehicleId = await this.chargingPointManager.resolveVehicleId(
+          row.id,
+        );
+        if (vehicleId !== null) {
+          await this.vehicleManager.requestState(vehicleId, ctx);
+        }
+      },
+      getState: () => this.mergedChargerState(row),
+      // Deliberately no guard on ambiguous vehicle resolution. Not knowing
+      // which car is on the charger is not a reason to refuse to charge it:
+      // the car enforces its own charge limit, so the worst case is charging
+      // when we could have stopped early, and a car that silently never
+      // charges is worse than one that charges more than it needed to.
+      // mergedChargerState's batteryLevel 0 / chargeLimit 100 fallback keeps
+      // solar tracking and schedules working; only "battery full" is lost,
+      // and the car handles that itself. The dashboard card warns so the
+      // user can assign a vehicle and get the real numbers back.
+      start: (amps, ctx) => {
+        const chargerState = this.chargingPointManager.getState(row.id);
+        if (!chargerState) return Promise.resolve();
+        return this.chargingPointManager.startChargingAt(
+          row.id,
+          amps,
+          ctx,
+          chargerState,
+        );
+      },
+      stop: (ctx) => {
+        const chargerState = this.chargingPointManager.getState(row.id);
+        if (!chargerState) return Promise.resolve();
+        return this.chargingPointManager.stopCharging(
+          row.id,
+          ctx,
+          chargerState,
+        );
+      },
+    }));
+  }
+
+  private async mergedChargerState(
+    row: ChargerRow,
+  ): Promise<VehicleChargeState | null> {
+    const charger = this.chargingPointManager.getState(row.id);
+    if (!charger) return null;
+    const vehicleId = await this.chargingPointManager.resolveVehicleId(row.id);
+    const vehicle = vehicleId !== null
+      ? await this.vehicleManager.getState(vehicleId)
+      : null;
+    return this.mergeChargingPointState(charger, vehicle, row.name);
+  }
+
+  // Fallbacks are the "don't block charging on missing data" choice.
+  private mergeChargingPointState(
+    charger: ChargerState,
+    vehicle: VehicleChargeState | null,
+    name: string,
+  ): VehicleChargeState {
+    return {
+      vehicleId: charger.chargerId,
+      batteryLevel: vehicle?.batteryLevel ?? 0,
+      chargeLimit: vehicle?.chargeLimit ?? 100,
+      isCharging: charger.isCharging,
+      isPluggedIn: charger.isPluggedIn ?? vehicle?.isPluggedIn ?? true,
+      isOnline: true,
+      chargeAmps: charger.chargeAmps ?? 0,
+      chargeAmpsMax: charger.chargeAmpsMax,
+      chargeAmpsMin: charger.chargeAmpsMin,
+      chargePowerKw: charger.chargePowerKw ?? 0,
+      chargerVoltage: charger.chargerVoltage ?? 0,
+      chargerPhases: charger.chargerPhases,
+      energyAddedKwh: charger.energyAddedKwh,
+      minutesToFull: vehicle?.minutesToFull ?? 0,
+      chargePortOpen: vehicle?.chargePortOpen ?? false,
+      vehicleName: name,
+      lastUpdated: charger.lastUpdated,
+      latitude: vehicle?.latitude ?? null,
+      longitude: vehicle?.longitude ?? null,
+      isHome: vehicle?.isHome ?? null,
+    };
+  }
+
+  // Execute a single target's decision and produce its log entry. Handles:
+  // commands, polling suspension, event emission, transition tracking.
+  private async processTargetDecision(
+    target: ControlTarget,
     decision: VehicleDecision,
     output: EngineOutput,
     config: ControllerConfig,
@@ -274,10 +428,10 @@ export class ChargeController {
     now: Date,
     traceId: string,
   ): Promise<ControllerLogInput> {
-    const state = await this.vehicleManager.getState(vehicle.id);
+    const state = await target.getState();
     const preState = state;
 
-    await this.executeDecision(vehicle.id, decision, state, traceId);
+    await this.executeDecision(target, decision, state, traceId);
 
     const inputs = this.buildInputsSnapshot(
       state,
@@ -287,7 +441,7 @@ export class ChargeController {
       now,
     );
     const checks = [...decision.checks];
-    const cs = this.engine.getControlState(vehicle.id);
+    const cs = this.engine.getControlState(target.id);
 
     // Add allocation check when multi-vehicle allocation is active
     if (cs.allocatedAmps !== null) {
@@ -299,14 +453,14 @@ export class ChargeController {
         cs.allocatedAmps,
         totalAmps,
         mode,
-        vehicle.priority,
+        target.priority,
       ));
     }
 
     const entry: DecisionLogEntry = {
-      vehicleId: vehicle.id,
-      vehicleName: vehicle.name,
-      mode: vehicle.mode,
+      vehicleId: target.id,
+      vehicleName: target.name,
+      mode: target.mode,
       inputs,
       checks,
       action: decision.action,
@@ -317,23 +471,23 @@ export class ChargeController {
       scheduleLimitContext: decision.scheduleLimitContext,
     };
 
-    this.emitControllerStatus(vehicle.id, entry);
+    this.emitControllerStatus(target.id, entry);
 
     // Post-command state (may differ from preState after commands)
-    const postState = await this.vehicleManager.getState(vehicle.id);
+    const postState = await target.getState();
 
     if (!cs.initialized) {
       cs.initialized = true;
       cs.lastActiveScheduleIds = new Set(
         schedules
           .filter((s) =>
-            this.isScheduleApplicable(s, vehicle.id, now, config.timezone)
+            this.isScheduleApplicable(s, target, now, config.timezone)
           )
           .map((s) => s.id),
       );
     } else {
       this.emitControllerEvents(
-        vehicle,
+        target,
         preState,
         postState,
         entry,
@@ -369,7 +523,7 @@ export class ChargeController {
     this.scheduleNext(nextIntervalMs);
   }
 
-  /** Push the latest controller decision to the frontend via SSE. */
+  // Push the latest controller decision to the frontend via SSE.
   private emitControllerStatus(
     vehicleId: string,
     entry: DecisionLogEntry,
@@ -384,11 +538,11 @@ export class ChargeController {
     }, vehicleId);
   }
 
-  /** Detect state transitions and emit controller events.
-   *  @param preState   — polled state at the start of this loop (before commands)
-   *  @param postState  — state after commands (may differ from preState) */
+  // Detect state transitions and emit controller events.
+  // preState — polled state at the start of this loop (before commands)
+  // postState — state after commands (may differ from preState)
   private emitControllerEvents(
-    vehicle: VehicleRow,
+    target: ControlTarget,
     preState: VehicleChargeState | null,
     postState: VehicleChargeState | null,
     entry: DecisionLogEntry,
@@ -397,7 +551,7 @@ export class ChargeController {
     timezone: string,
     gracePeriodMinutes: number,
   ): void {
-    const controlState = this.engine.getControlState(vehicle.id);
+    const controlState = this.engine.getControlState(target.id);
     const prevState = controlState.prevState;
 
     const wasCharging = prevState?.isCharging ?? false;
@@ -411,16 +565,16 @@ export class ChargeController {
     // happy with the existing charge (charge_now/adjust_amps/none).
     if (isPolledCharging && !wasCharging && entry.action === "stop") {
       this.eventEmitter.emit("controller_external_charge", {
-        vehicleId: vehicle.id,
-        vehicleName: vehicle.name,
+        vehicleId: target.id,
+        vehicleName: target.name,
       });
     }
 
     // Controller started charging: not charging at start → charging after commands
     if (isNowCharging && !isPolledCharging && entry.action === "start") {
       this.eventEmitter.emit("controller_charge_started", {
-        vehicleId: vehicle.id,
-        vehicleName: vehicle.name,
+        vehicleId: target.id,
+        vehicleName: target.name,
         actionDetail: entry.actionDetail,
         reason: entry.reason,
       });
@@ -439,8 +593,8 @@ export class ChargeController {
     const justHitLimit = nowAtLimit && !wasAtLimit;
     if (entry.action === "stop" || justHitLimit) {
       this.eventEmitter.emit("controller_charge_stopped", {
-        vehicleId: vehicle.id,
-        vehicleName: vehicle.name,
+        vehicleId: target.id,
+        vehicleName: target.name,
         actionDetail: entry.actionDetail,
         reason: justHitLimit ? "battery_at_limit" : entry.reason,
         batteryLevel: preState?.batteryLevel,
@@ -453,8 +607,8 @@ export class ChargeController {
     if (controlState.graceStartedAt !== null && !controlState.graceNotified) {
       controlState.graceNotified = true;
       this.eventEmitter.emit("controller_low_solar", {
-        vehicleId: vehicle.id,
-        vehicleName: vehicle.name,
+        vehicleId: target.id,
+        vehicleName: target.name,
         gracePeriodMinutes,
       });
     }
@@ -462,7 +616,7 @@ export class ChargeController {
     // Schedule activation: new schedule IDs not active last cycle
     const activeScheduleIds = new Set<string>(
       schedules
-        .filter((s) => this.isScheduleApplicable(s, vehicle.id, now, timezone))
+        .filter((s) => this.isScheduleApplicable(s, target, now, timezone))
         .map((s) => s.id),
     );
     const newlyActiveSchedules = [...activeScheduleIds]
@@ -473,8 +627,8 @@ export class ChargeController {
     if (newlyActiveSchedules.length > 0) {
       newlyActiveSchedules.forEach((sched) => {
         this.eventEmitter.emit("controller_schedule_activated", {
-          vehicleId: vehicle.id,
-          vehicleName: vehicle.name,
+          vehicleId: target.id,
+          vehicleName: target.name,
           scheduleType: sched.scheduleType,
           startTime: sched.startTime,
           endTime: sched.endTime,
@@ -519,6 +673,7 @@ export class ChargeController {
       gridPowerW: energy.gridPowerW,
       homeConsumptionW: energy.homeConsumptionW,
       batterySoc: energy.batterySoc,
+      batteryPowerW: energy.batteryPowerW,
     };
   }
 
@@ -540,15 +695,17 @@ export class ChargeController {
     };
   }
 
+  // Blockouts are always global. Charge schedules match the charging point
+  // directly (chargerId), via its linked vehicle (vehicleId), or everywhere when untargeted.
   private isScheduleApplicable(
     s: ScheduleRow,
-    vehicleId: string,
+    target: { id: string; vehicleId: string | null },
     now: Date,
     timezone: string,
   ): boolean {
     if (!s.enabled || !isScheduleActiveNow(s, now, timezone)) return false;
-    return s.scheduleType === "blockout" || s.vehicleId === vehicleId ||
-      s.vehicleId === null;
+    if (s.scheduleType === "blockout") return true;
+    return scheduleTargets(s, target);
   }
 
   private isActiveBlockout(

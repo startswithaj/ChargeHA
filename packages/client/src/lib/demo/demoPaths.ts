@@ -16,7 +16,7 @@
 
 import type { MutationPath, QueryPath } from "./queryPaths.ts";
 
-/** Queries deliberately unreachable in demo (disabled plugins / features). */
+// Queries deliberately unreachable in demo (disabled plugins / features).
 export const GATED_QUERIES: readonly string[] = [
   // Tesla — disabled in the wizard, no tesla vehicle ever exists.
   "plugin.vehicle.tesla.encryptionStatus",
@@ -30,13 +30,23 @@ export const GATED_QUERIES: readonly string[] = [
   "plugin.energy.fronius_cloud.getConfig",
   // Setup tunnel — Tesla-only setup step, never reached.
   "plugin.vehicle.tesla.tunnelStatus",
+  // Real charger hardware — disabled in the demo charger dropdown.
+  "plugin.charger.tapo.getConfig",
+  "plugin.charger.tapo.status",
+  "plugin.charger.ocpp.getConfig",
+  "plugin.charger.ocpp.status",
+  // Enumerates the server's own network interfaces — nothing to report in a
+  // browser-only demo.
+  "plugin.charger.ocpp.pairingStatus",
+  "plugin.charger.tapo.lanSubnets",
+  "plugin.energy.fronius_local.lanSubnets",
 ] as const satisfies readonly QueryPath[];
 
-/** Queries known to exist but not yet implemented. Empty — all are handled. */
+// Queries known to exist but not yet implemented. Empty — all are handled.
 export const PENDING_QUERIES: readonly string[] =
   [] as const satisfies readonly QueryPath[];
 
-/** Mutations deliberately unreachable in demo (disabled plugins / features). */
+// Mutations deliberately unreachable in demo (disabled plugins / features).
 export const GATED_MUTATIONS = [
   // Tesla — disabled in the wizard, no tesla vehicle ever exists.
   "plugin.vehicle.tesla.checkKeyPairing",
@@ -61,15 +71,21 @@ export const GATED_MUTATIONS = [
   // Setup tunnel — Tesla-only setup step, never reached.
   "plugin.vehicle.tesla.startTunnel",
   "plugin.vehicle.tesla.stopTunnel",
+  // Real charger hardware — disabled in the demo charger dropdown.
+  "plugin.charger.tapo.setConfig",
+  "plugin.charger.tapo.discover",
+  "plugin.charger.tapo.testConnection",
+  "plugin.charger.tapo.setPower",
+  "plugin.charger.ocpp.setConfig",
+  "plugin.charger.ocpp.testConnection",
+  // Pairing drives a real websocket handshake from real hardware.
+  "plugin.charger.ocpp.beginPairing",
+  "plugin.charger.ocpp.cancelPairing",
 ] as const satisfies readonly MutationPath[];
 
-/** The gated mutation paths as a literal union. */
 export type GatedMutationPath = typeof GATED_MUTATIONS[number];
 
-/**
- * Mutations the demo MUST handle: every router mutation except the gated ones.
- * The handler map (handlers/mutations) is typed total over this, so a missing
- * handler — or a new router mutation that is neither gated nor handled — is a
- * compile error. There is deliberately no "pending" escape hatch.
- */
+// The handler map (handlers/mutations) is typed total over this, so a
+// missing handler — or a new mutation neither gated nor handled — is a
+// compile error. Deliberately no "pending" escape hatch.
 export type RequiredMutationPath = Exclude<MutationPath, GatedMutationPath>;

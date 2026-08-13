@@ -13,6 +13,7 @@ describe("ScheduleCard", () => {
   const chargeSchedule: ChargeSchedule = {
     id: "sched-1",
     vehicleId: "v1",
+    chargerId: null,
     scheduleType: "charge",
     startTime: "22:00",
     endTime: "06:00",
@@ -25,6 +26,7 @@ describe("ScheduleCard", () => {
   const blockoutSchedule: BlockoutSchedule = {
     id: "sched-2",
     vehicleId: null,
+    chargerId: null,
     scheduleType: "blockout",
     startTime: "14:00",
     endTime: "18:00",
@@ -47,9 +49,7 @@ describe("ScheduleCard", () => {
       // Formatted times: 10:00 PM – 6:00 AM
       expect(screen.getByText(/10:00 PM/)).toBeInTheDocument();
       expect(screen.getByText(/6:00 AM/)).toBeInTheDocument();
-      // Days should show "Weekdays"
       expect(screen.getByText("Weekdays")).toBeInTheDocument();
-      // Detail text for charge schedule
       expect(screen.getByText(/Charge at 16A to 80%/)).toBeInTheDocument();
     });
 
@@ -61,9 +61,7 @@ describe("ScheduleCard", () => {
       // Formatted times: 2:00 PM – 6:00 PM
       expect(screen.getByText(/2:00 PM/)).toBeInTheDocument();
       expect(screen.getByText(/6:00 PM/)).toBeInTheDocument();
-      // Days should show "Weekends"
       expect(screen.getByText("Weekends")).toBeInTheDocument();
-      // Blockout detail text
       expect(screen.getByText("Stop all charging")).toBeInTheDocument();
     });
   });
