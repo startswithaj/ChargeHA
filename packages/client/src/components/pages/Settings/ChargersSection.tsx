@@ -19,6 +19,7 @@ import {
   isSmartCharger,
 } from "../../../hooks/useChargers.ts";
 import { CHARGERS_ANCHOR_ID } from "../../../lib/settingsAnchors.ts";
+import { FormError } from "../../ui/FormError.tsx";
 
 const labelFor = (typeId: string) =>
   chargerPluginOptions.find((o) => o.id === typeId)?.label ?? typeId;
@@ -138,9 +139,7 @@ function ChargerList(
         </div>
       )}
 
-      {settings.error && editing === null && (
-        <Text size="2" color="red">{settings.error}</Text>
-      )}
+      {editing === null && <FormError message={settings.error} />}
     </>
   );
 }

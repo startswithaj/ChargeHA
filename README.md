@@ -506,6 +506,11 @@ the same type. Local test rigs live in `devtools/sap-ocpp-simulator/` and
 ### Before you open a PR
 
 - Read [docs/code.md](docs/code.md) for conventions and project layout
+- When running the app in dev, there is a style guide at `/components` that
+  renders every shipped UI component from static fixtures. Use it to see the
+  building blocks before writing plugin client components, and add your new
+  components to it so they stay consistent — see
+  [docs/settings-ui.md](docs/settings-ui.md) for the rules
 - Add tests for your adapter (see the `test-helpers/` folders in existing
   plugins)
 - Run `deno task check:all` — formatting, lint, types, plugin refs, and tests

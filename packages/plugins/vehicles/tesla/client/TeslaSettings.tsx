@@ -109,7 +109,7 @@ function ResetBlock(
           <div
             style={{
               display: "flex",
-              gap: 12,
+              gap: 8,
               marginTop: 16,
               justifyContent: "flex-end",
             }}

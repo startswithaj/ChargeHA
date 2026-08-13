@@ -10,6 +10,7 @@ import {
 } from "../../../hooks/useSectionConfig.ts";
 import { useDraftConfig } from "../../../hooks/useDraftConfig.ts";
 import { SettingsRow, SettingsSection } from "./SettingsLayout.tsx";
+import { FormError } from "../../ui/FormError.tsx";
 
 // ---- Provider field type from API ----
 
@@ -159,11 +160,11 @@ function EventToggles(
           <TestButtonContent testMutation={testMutation} />
         </Button>
         {testMutation.isError && (
-          <Text size="2" color="red">
-            {testMutation.error instanceof Error
+          <FormError
+            message={testMutation.error instanceof Error
               ? testMutation.error.message
               : "Failed to send"}
-          </Text>
+          />
         )}
       </div>
     </>

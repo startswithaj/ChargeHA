@@ -23,6 +23,7 @@ import {
 } from "./HostingMethodCards.tsx";
 import { DirectHostingSection } from "./DirectHostingSection.tsx";
 import { stepStyles as styles } from "../../../hostUi.ts";
+import { FormError } from "../../../hostUi.ts";
 
 type HostingChoice = null | "yes" | "no";
 
@@ -168,9 +169,9 @@ function TunnelHostingSection(
         </Button>
       </div>
       {startTunnelMutation.error && (
-        <Text as="p" size="2" color="red" style={{ marginTop: "0.5rem" }}>
-          {startTunnelMutation.error.message}
-        </Text>
+        <div style={{ marginTop: "0.5rem" }}>
+          <FormError message={startTunnelMutation.error.message} size="2" />
+        </div>
       )}
     </div>
   );

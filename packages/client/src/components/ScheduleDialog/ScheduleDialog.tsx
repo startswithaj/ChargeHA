@@ -10,6 +10,7 @@ import { DayPicker } from "../DayPicker/DayPicker.tsx";
 import { TimePicker } from "../TimePicker/TimePicker.tsx";
 import { ChargeSettings } from "./ChargeSettings.tsx";
 import styles from "./ScheduleDialog.module.css";
+import { FormError } from "../ui/FormError.tsx";
 
 interface ScheduleFormProps {
   editingSchedule: Schedule | null;
@@ -190,11 +191,7 @@ export function ScheduleForm({
         )}
 
         {/* Validation error */}
-        {error && (
-          <div className={styles.error}>
-            <Text size="2" color="red">{error}</Text>
-          </div>
-        )}
+        <FormError message={error} />
 
         {/* Actions */}
         <div className={styles.footer}>

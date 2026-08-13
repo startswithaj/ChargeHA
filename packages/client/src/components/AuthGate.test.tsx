@@ -69,10 +69,6 @@ vi.mock("./Login/LoginPage.tsx", () => ({
   ),
 }));
 
-vi.mock("./ui/Spinner.tsx", () => ({
-  Spinner: () => <div data-testid="spinner">Loading...</div>,
-}));
-
 vi.mock("../hooks/useRouter.ts", () => ({
   useRouter: () => ({
     route: { type: "app", page: "dashboard" },
@@ -140,14 +136,15 @@ describe("AuthGate", () => {
     mockChildren.mockClear();
   });
 
-  it("shows spinner while auth session is pending", () => {
+  it("shows the waiting indicator while auth session is pending", () => {
     setAuthPending();
 
     render(
       <AuthGate>{mockChildren}</AuthGate>,
     );
 
-    expect(screen.getByTestId("spinner")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Waiting" }))
+      .toBeInTheDocument();
     expect(screen.queryByText("Authenticated Content")).not.toBeInTheDocument();
     expect(screen.queryByText("Login Page")).not.toBeInTheDocument();
   });

@@ -7,6 +7,7 @@ import {
   useSaveStatus,
 } from "../../../hostUi.ts";
 import { type StationOption, StationPicker } from "./StationPicker.tsx";
+import { FormError } from "../../../hostUi.ts";
 
 type ListStationsMutation = ReturnType<
   typeof trpc.plugin.energy.goodwe_sems.listStations.useMutation
@@ -119,7 +120,7 @@ function StationSection(
         >
           {stationsMutation.isPending ? "Loading..." : "Load Stations"}
         </Button>
-        {error && <Text size="2" color="red">{error}</Text>}
+        <FormError message={error} />
       </div>
 
       <StationPicker
@@ -160,12 +161,10 @@ function TestConnectionRow(
         </Badge>
       )}
       {testMutation.isError && (
-        <Text size="2" color="red">{testMutation.error.message}</Text>
+        <FormError message={testMutation.error.message} />
       )}
       {testMutation.isSuccess && !testMutation.data.success && (
-        <Text size="2" color="red">
-          {testMutation.data.error ?? "Connection failed"}
-        </Text>
+        <FormError message={testMutation.data.error ?? "Connection failed"} />
       )}
     </div>
   );

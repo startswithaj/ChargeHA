@@ -14,6 +14,7 @@ import {
   gapToFormData,
   type PeriodFormData,
 } from "./tariffUtils.ts";
+import { FormError } from "../../ui/FormError.tsx";
 
 export type TariffPeriod = RouterOutputs["tariff"]["list"]["periods"][number];
 
@@ -470,7 +471,7 @@ function TariffSettingsView(
       title="Electricity Tariffs"
       description="Configure your electricity rates to track charging costs and solar savings."
     >
-      {displayError && <Text size="2" color="red">{displayError}</Text>}
+      <FormError message={displayError} />
 
       <CurrencyConfig
         localSymbol={localSymbol}

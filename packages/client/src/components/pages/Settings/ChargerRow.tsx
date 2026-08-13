@@ -90,6 +90,8 @@ export function ChargerRow(
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
+        // Without this a full row butts the Select into the edit button.
+        gap: 8,
         padding: "8px 10px",
         opacity: charger.active ? 1 : 0.5,
       }}

@@ -10,6 +10,7 @@ import {
   PluginSettingsHostProvider,
   type PluginSettingsState,
 } from "./pluginSettingsHost.ts";
+import { FormError } from "../../ui/FormError.tsx";
 
 function FormFields(
   { Panel, chargerId, onReport, autoFocus }: {
@@ -111,9 +112,7 @@ export function ChargerEditForm(
         autoFocus={autoFocus === true}
       />
 
-      {(error ?? panelError) && (
-        <Text size="2" color="red">{error ?? panelError}</Text>
-      )}
+      <FormError message={error ?? panelError} />
 
       <div
         style={{
