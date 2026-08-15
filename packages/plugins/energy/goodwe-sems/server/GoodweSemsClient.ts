@@ -208,7 +208,7 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     private readonly logger: Logger,
     private readonly dbLog: PluginDbLogger,
   ) {
-    this.gatewayProbe = new SemsGatewayProbe(logger, dbLog);
+    this.gatewayProbe = new SemsGatewayProbe(account, password, logger, dbLog);
   }
 
   clearSession(): void {
