@@ -25,7 +25,11 @@ const WAKE_COOLDOWN_MS = 60 * 60 * 1000;
 
 /** Why a wake was triggered. Surfaces in plugin log origins so wakes can be
  *  attributed to their cause when investigating cost or behavior. */
-export type WakeReason = "schedule" | "solar" | "force_refresh";
+export type WakeReason =
+  | "schedule"
+  | "solar"
+  | "free_tariff"
+  | "force_refresh";
 
 /** Pure decision logic for Tesla Fleet API usage. No I/O — takes state,
  *  returns decisions. Keeps all cost-aware reasoning in one testable place. */
@@ -43,7 +47,7 @@ export class TeslaApiStrategy {
 
   /** Whether a wake call ($0.02) is justified given the current context.
    *  - Always wakes for user-initiated forceRefresh
-   *  - Allowed for schedules or solar (not blockouts)
+   *  - Allowed for schedules, solar, or a free tariff window (not blockouts)
    *  - Skipped when cached state shows the car isn't plugged in
    *    (Tesla wakes itself on plug-in, so the free /vehicles online check will
    *    catch it — no reason to spend $0.02 waking an unplugged car)
@@ -59,7 +63,9 @@ export class TeslaApiStrategy {
     if (context.forceRefresh) return "force_refresh";
     // Blockout active — vehicle can't charge anyway, don't pay $0.02 to wake.
     if (context.hasBlockout) return null;
-    if (!context.hasSchedule && !context.hasSolar) return null;
+    if (!context.hasSchedule && !context.hasSolar && !context.hasFreeTariff) {
+      return null;
+    }
     // Not plugged in — Tesla wakes itself on plug-in, free /vehicles check catches it
     if (cachedState && !cachedState.isPluggedIn) return null;
     // Effective limit = min(vehicle chargeLimit, active schedule's
@@ -73,8 +79,9 @@ export class TeslaApiStrategy {
       if (cachedState.batteryLevel >= effectiveLimit) return null;
     }
     if ((Date.now() - lastWakeAtMs) < WAKE_COOLDOWN_MS) return null;
-    // Schedule takes precedence in the reason label when both are active
+    // Most specific cause wins in the reason label when several are active
     if (context.hasSchedule) return "schedule";
+    if (context.hasFreeTariff) return "free_tariff";
     return "solar";
   }
 
@@ -88,7 +95,9 @@ export class TeslaApiStrategy {
     if (cachedState.isOnline && !cachedState.isPluggedIn) {
       return ONLINE_UNPLUGGED_MS;
     }
-    if (context.hasSolar || context.hasSchedule) return CAN_CHARGE_MS;
+    if (context.hasSolar || context.hasSchedule || context.hasFreeTariff) {
+      return CAN_CHARGE_MS;
+    }
     return CANT_CHARGE_MS;
   }
 }

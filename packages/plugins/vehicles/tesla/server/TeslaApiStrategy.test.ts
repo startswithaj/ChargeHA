@@ -16,6 +16,7 @@ describe("TeslaApiStrategy", () => {
     hasSolar: false,
     hasSchedule: false,
     hasBlockout: false,
+    hasFreeTariff: false,
     ...overrides,
   });
 
@@ -27,6 +28,7 @@ describe("TeslaApiStrategy", () => {
     ([
       ["solar", { hasSolar: true }],
       ["schedule", { hasSchedule: true }],
+      ["free tariff", { hasFreeTariff: true }],
     ] as const).forEach(([label, overrides]) => {
       it(`returns 10 min when ${label} is active`, () => {
         const state = buildVehicleChargeState();
@@ -116,13 +118,24 @@ describe("TeslaApiStrategy", () => {
       ).toBeNull();
     });
 
-    it("returns null when no schedule and no solar", () => {
+    it("returns null when no schedule, no solar, and no free tariff", () => {
       expect(strategy.shouldWake(ctx(), null, 0)).toBeNull();
+    });
+
+    it("prefers the schedule label over a concurrent free tariff", () => {
+      expect(
+        strategy.shouldWake(
+          ctx({ hasSchedule: true, hasFreeTariff: true }),
+          null,
+          0,
+        ),
+      ).toBe("schedule");
     });
 
     ([
       ["schedule", { hasSchedule: true }],
       ["solar", { hasSolar: true }],
+      ["free_tariff", { hasFreeTariff: true }],
     ] as const).forEach(([label, overrides]) => {
       it(`returns ${label} when cooldown expired`, () => {
         using time = new FakeTime();

@@ -246,6 +246,7 @@ export class VehicleService {
               hasSolar: false,
               hasSchedule: false,
               hasBlockout: false,
+              hasFreeTariff: false,
               forceRefresh: true,
             },
           );
@@ -298,6 +299,7 @@ export class VehicleService {
         hasSolar: false,
         hasSchedule: false,
         hasBlockout: false,
+        hasFreeTariff: false,
         forceRefresh: true,
       },
     );

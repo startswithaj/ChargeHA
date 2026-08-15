@@ -161,7 +161,10 @@ const PRESETS: Record<string, CreateTariffPeriodInput[]> = {
   ],
 };
 
-const TARIFF_CACHE_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
+// Kept short because the charge controller resolves the rate on every loop
+// (default 30s) to decide free-tariff charging — a longer cache would let it
+// run past a tariff boundary, or start late, by up to the cache lifetime.
+const TARIFF_CACHE_REFRESH_MS = 60 * 1000; // 1 minute
 
 export class TariffService {
   private cachedTariffPeriods: TariffPeriodRow[] = [];

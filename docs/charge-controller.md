@@ -91,10 +91,64 @@ This is where the main logic lives. The checks run in priority order:
 3. **Battery priority** — If enabled and the home battery SoC is below the
    configured threshold, stop charging to let the home battery charge first.
 
-4. **Solar tracking** — The main solar-following logic (see below).
+4. **Free tariff** — If enabled and the active tariff rate is at or below
+   `free_tariff_max_rate_per_kwh`, charge from the grid at maximum amps
+   regardless of solar (see below).
 
-5. **Fallback** — If nothing above applied, stop charging (or do nothing if
+5. **Solar tracking** — The main solar-following logic (see below).
+
+6. **Fallback** — If nothing above applied, stop charging (or do nothing if
    already stopped). Marks the vehicle as suspendable.
+
+## Free tariff charging
+
+When `free_tariff_charging_enabled` is set, the controller charges from the grid
+during any period where electricity is free — typically an overnight or
+utility-sponsored free window. The target SoC is the vehicle's own charge limit,
+which the pre-checks already enforce, so no separate target is configured.
+
+The rate is resolved each loop by `TariffService.resolveCurrentRate()` and
+passed into the engine as `currentRatePerKwh`. The engine itself stays pure — it
+never reads the tariff tables.
+
+### Placement in the pipeline
+
+The step sits deliberately **after battery priority and before solar tracking**:
+
+- **After battery priority** so the home battery still wins. Battery priority
+  short-circuits with its own decision when the home battery is below its limit,
+  so the free-tariff step is never reached in that case.
+- **Before solar tracking**, because solar tracking terminates with a decision
+  once production hits zero (see _Min solar generation_ below). Anything placed
+  after it would be unreachable at night — exactly when free windows fall.
+
+### Safety rules
+
+- **A null rate is not free.** `resolveCurrentRate()` returns `null` when no
+  tariff periods are configured, which means _unknown_, never zero. The engine
+  never starts a grid charge on an unresolved rate. Note this also means a free
+  window cannot be expressed through the default rate alone — configure a tariff
+  period with a rate of `0`.
+- **Unverifiable home battery means hold.** If battery priority is enabled but
+  there is no energy snapshot, or the inverter reports no SoC, the battery
+  priority check never actually ran. Rather than charge against an unknown
+  battery state, the free-tariff step holds (and stops an in-progress charge).
+- **Negative rates count as free**, since the default threshold is `0` and the
+  comparison is `rate <= threshold`.
+
+### Cheap-rate windows
+
+Raising `free_tariff_max_rate_per_kwh` above `0` turns the feature into "charge
+whenever the grid is cheap" — useful for an off-peak EV tariff where charging is
+worth doing even though it isn't literally free.
+
+### Waking the vehicle
+
+A free window at night has no solar and no schedule, which is precisely the
+condition under which cost-aware middleware keeps a sleeping car asleep. The
+controller therefore passes a `hasFreeTariff` flag in the middleware request
+context, and the Tesla strategy treats it like a schedule for both wake
+eligibility and cache staleness.
 
 ## Solar tracking
 
@@ -237,7 +291,7 @@ for the notification system:
 
 | Event                           | Trigger                                                                                                                                                                |
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `controller_charge_started`     | Vehicle was not charging → now charging (by controller)                                                                                                                |
+| `controller_charge_started`     | Vehicle was not charging → now charging (by controller). A `free_tariff` reason drives the "Free Grid Charging Started" notification                                   |
 | `controller_charge_stopped`     | Vehicle was charging → now stopped. Carries a `reason` field; `battery_at_limit` drives the "charge complete" notification, all other reasons drive "charging stopped" |
 | `controller_external_charge`    | Vehicle started charging outside the controller                                                                                                                        |
 | `controller_low_solar`          | Grace period started (solar dropped)                                                                                                                                   |
@@ -290,3 +344,5 @@ and debounce state will simply reset.
 | `battery_priority_enabled`      | `false`      | Whether to prioritize home battery charging          |
 | `battery_priority_limit`        | `80`         | Home battery SoC threshold (%)                       |
 | `priority_charging_enabled`     | `false`      | Use waterfall allocation instead of equal split      |
+| `free_tariff_charging_enabled`  | `false`      | Charge from the grid while the tariff rate is free   |
+| `free_tariff_max_rate_per_kwh`  | `0`          | Rate at or below which the grid counts as "free"     |

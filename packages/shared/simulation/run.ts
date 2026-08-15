@@ -60,6 +60,10 @@ function buildControllerConfig(opts: SimulationOptions): ControllerConfig {
     batteryPriorityEnabled: opts.batteryPriorityEnabled,
     batteryPriorityLimit: opts.batteryPriorityLimit,
     priorityChargingEnabled: opts.waterfall,
+    // The simulator replays a solar day, not a tariff schedule — free-tariff
+    // charging stays off so simulated results reflect solar behaviour only.
+    freeTariffChargingEnabled: false,
+    freeTariffMaxRatePerKwh: 0,
     timezone: "",
   };
 }
@@ -290,6 +294,7 @@ export function runSimulation(
       },
       now: new Date(simTimestamp),
       timestamp: simTimestamp,
+      currentRatePerKwh: null,
     });
 
     events.push(

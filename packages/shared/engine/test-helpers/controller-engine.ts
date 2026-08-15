@@ -24,6 +24,8 @@ export const makeConfig = (
   batteryPriorityEnabled: false,
   batteryPriorityLimit: 0,
   priorityChargingEnabled: false,
+  freeTariffChargingEnabled: false,
+  freeTariffMaxRatePerKwh: 0,
   timezone: "",
   ampDebounceThreshold: 2,
   ampDebounceSettleMinutes: 3,
@@ -115,6 +117,7 @@ export const makeInput = (
     energy: makeEnergy(energyOverrides),
     now: new Date("2026-01-01T12:00:00Z"),
     timestamp: Date.now(),
+    currentRatePerKwh: null,
     ...inputOverrides,
   };
 };

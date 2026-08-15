@@ -58,6 +58,7 @@ describe("Vehicles tRPC Router", () => {
     hasSolar: false,
     hasSchedule: false,
     hasBlockout: false,
+    hasFreeTariff: false,
   } as const;
 
   const makeRegistry = (): VehiclePluginRegistry =>

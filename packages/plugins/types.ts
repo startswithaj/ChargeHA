@@ -84,6 +84,9 @@ export interface VehicleRequestContext extends CallContext {
   hasSolar: boolean;
   hasSchedule: boolean;
   hasBlockout: boolean;
+  /** The active tariff is free (or under the configured cheap threshold), so
+   *  the vehicle can charge right now even with no sun and no schedule. */
+  hasFreeTariff: boolean;
   scheduleChargeLimitPct?: number | null;
   /** When true, skip cache and wake if needed. Used for user-initiated
    *  refresh/wake commands from the dashboard. */

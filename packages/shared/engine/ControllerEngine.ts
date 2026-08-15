@@ -32,6 +32,7 @@ export class ControllerEngine {
   /** Make decisions for all vehicles in a single loop iteration. */
   decide(input: EngineInput): EngineOutput {
     const { config, vehicles, schedules, energy, now, timestamp } = input;
+    const { currentRatePerKwh } = input;
     if (!config.chargingEnabled) {
       const decisions = new Map(
         vehicles.map((vehicle): [string, VehicleDecision] => [vehicle.id, {
@@ -55,7 +56,15 @@ export class ControllerEngine {
     const decisions = new Map(
       vehicles.map((vehicle): [string, VehicleDecision] => [
         vehicle.id,
-        this.decideVehicle(vehicle, config, schedules, energy, now, timestamp),
+        this.decideVehicle(
+          vehicle,
+          config,
+          schedules,
+          energy,
+          now,
+          timestamp,
+          currentRatePerKwh,
+        ),
       ]),
     );
 
@@ -80,6 +89,7 @@ export class ControllerEngine {
     energy: EnergyData | null,
     now: Date,
     timestamp: number,
+    currentRatePerKwh: number | null,
   ): VehicleDecision {
     const precondition = this.checkPreconditions(vehicle);
     if (precondition.decision) {
@@ -111,6 +121,7 @@ export class ControllerEngine {
           now,
           timestamp,
           checks,
+          currentRatePerKwh,
         );
     }
   }
@@ -250,6 +261,7 @@ export class ControllerEngine {
     now: Date,
     timestamp: number,
     outerChecks: DecisionCheck[],
+    currentRatePerKwh: number | null,
   ): VehicleDecision {
     const cs = this.getControlState(vehicle.id);
     const allChecks = [...outerChecks];
@@ -283,6 +295,25 @@ export class ControllerEngine {
     allChecks.push(...battery.checks);
     if (battery.decision) {
       return { ...battery.decision, checks: allChecks, scheduleLimitContext };
+    }
+
+    // Free-tariff charging sits after battery priority (so the home battery
+    // still wins) and before solar tracking — solar tracking terminates with
+    // a decision once production hits zero, which would make this step
+    // unreachable at night, exactly when free windows usually fall.
+    const freeTariff = this.evaluateFreeTariff(
+      state,
+      config,
+      energy,
+      currentRatePerKwh,
+    );
+    allChecks.push(...freeTariff.checks);
+    if (freeTariff.decision) {
+      return {
+        ...freeTariff.decision,
+        checks: allChecks,
+        scheduleLimitContext,
+      };
     }
 
     const solar = this.evaluateSolarTracking(
@@ -427,6 +458,98 @@ export class ControllerEngine {
         targetAmps: null,
       },
       checks,
+    };
+  }
+
+  /** Charge from the grid while the active tariff is free (or under the
+   *  configured cheap-rate threshold). The vehicle's own charge limit is the
+   *  target SoC — preconditions already stop the charge once it's reached. */
+  private evaluateFreeTariff(
+    state: VehicleChargeState,
+    config: ControllerConfig,
+    energy: EnergyData | null,
+    currentRatePerKwh: number | null,
+  ): EvalResult {
+    if (!config.freeTariffChargingEnabled || currentRatePerKwh === null) {
+      // A null rate means the tariff couldn't be resolved, not that it's
+      // free — never start a grid charge on an unknown rate.
+      return {
+        decision: null,
+        checks: [
+          DecisionChecks.freeTariffSkip(config.freeTariffChargingEnabled),
+        ],
+      };
+    }
+
+    const isFree = currentRatePerKwh <= config.freeTariffMaxRatePerKwh;
+    const checks: DecisionCheck[] = [
+      DecisionChecks.freeTariff(
+        currentRatePerKwh,
+        config.freeTariffMaxRatePerKwh,
+        isFree,
+      ),
+    ];
+    // Not free — fall through to solar tracking.
+    if (!isFree) return { decision: null, checks };
+
+    // Battery priority is enabled but evaluateBatteryPriority couldn't run
+    // (no energy snapshot, or the inverter reports no SoC), so its limit was
+    // never actually checked. Hold rather than charge on an unverified battery.
+    if (
+      config.batteryPriorityEnabled &&
+      (energy === null || energy.batterySoc === null)
+    ) {
+      checks.push(DecisionChecks.freeTariffBatteryUnknown());
+      return {
+        decision: {
+          action: state.isCharging ? "stop" : "none",
+          reason: "free_tariff",
+          detail: state.isCharging
+            ? "Stop — grid is free but home battery SoC is unknown"
+            : "Waiting — grid is free but home battery SoC is unknown",
+          targetAmps: null,
+        },
+        checks,
+      };
+    }
+
+    return {
+      decision: this.freeTariffCharge(state, currentRatePerKwh),
+      checks,
+    };
+  }
+
+  /** Start/adjust/hold a free-tariff charge at the vehicle's maximum amps. */
+  private freeTariffCharge(
+    state: VehicleChargeState,
+    ratePerKwh: number,
+  ): PipelineDecision {
+    const amps = state.chargeAmpsMax;
+    const suffix = ratePerKwh <= 0
+      ? "grid is free"
+      : `grid rate is ${ratePerKwh}/kWh`;
+
+    if (!state.isCharging) {
+      return {
+        action: "start",
+        reason: "free_tariff",
+        detail: `Start charging at ${amps}A — ${suffix}`,
+        targetAmps: amps,
+      };
+    }
+    if (state.chargeAmps !== amps) {
+      return {
+        action: "adjust_amps",
+        reason: "free_tariff",
+        detail: `Adjust to ${amps}A — ${suffix}`,
+        targetAmps: amps,
+      };
+    }
+    return {
+      action: "none",
+      reason: "free_tariff",
+      detail: `Already charging at ${amps}A — ${suffix}`,
+      targetAmps: amps,
     };
   }
 

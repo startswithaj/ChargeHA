@@ -3,6 +3,7 @@ import {
   BatteryCharging,
   Calendar,
   CloudSun,
+  Gift,
   Plug,
   ShieldBan,
   Sun,
@@ -22,6 +23,7 @@ const VISIBLE_REASONS = new Set([
   "grace_period",
   "cooldown",
   "battery_priority",
+  "free_tariff",
 ]);
 
 const REASON_ICONS: Record<string, LucideIcon> = {
@@ -30,14 +32,16 @@ const REASON_ICONS: Record<string, LucideIcon> = {
   grace_period: CloudSun,
   cooldown: CloudSun,
   battery_priority: BatteryCharging,
+  free_tariff: Gift,
 };
 
-const REASON_COLORS: Record<string, "blue" | "orange"> = {
+const REASON_COLORS: Record<string, "blue" | "orange" | "green"> = {
   schedule: "blue",
   blockout: "orange",
   grace_period: "orange",
   cooldown: "orange",
   battery_priority: "orange",
+  free_tariff: "green",
 };
 
 /** User-friendly label formatters per reason. */
@@ -65,6 +69,10 @@ const REASON_LABELS: Record<string, (detail: string) => string> = {
       ? `Home battery priority (${match[1]}% < ${match[2]}%)`
       : "Waiting for home battery";
   },
+  free_tariff: (detail) =>
+    detail.includes("home battery")
+      ? "Grid is free — waiting for home battery"
+      : "Charging while the grid is free",
 };
 
 interface VehicleCardDetailsProps {

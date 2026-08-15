@@ -19,6 +19,7 @@ describe("TeslaVehicleMiddleware", () => {
     hasSolar: false,
     hasSchedule: false,
     hasBlockout: false,
+    hasFreeTariff: false,
     ...overrides,
   });
 

@@ -75,6 +75,7 @@ describe("VehicleManager", () => {
     hasSolar: false,
     hasSchedule: false,
     hasBlockout: false,
+    hasFreeTariff: false,
   };
 
   const CMD_CTX = { origin: "test", traceId: "test" };

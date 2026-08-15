@@ -54,6 +54,9 @@ ChargeHA is not affiliated with, endorsed by, or associated with ChargeHQ.
   solar is insufficient, instead of stopping entirely
 - **Home battery priority** — hold EV charging until your home battery reaches a
   configured state-of-charge threshold
+- **Free grid charging** — charge from the grid whenever your tariff is free (or
+  under a cheap-rate threshold you set), independent of solar, while still
+  respecting home battery priority
 - **Charge scheduling** — time-based schedules with day-of-week selection,
   per-vehicle amperage, and target charge limits
 - **Blockout schedules** — prevent charging during peak tariff windows

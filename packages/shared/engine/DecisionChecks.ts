@@ -6,6 +6,7 @@ export type CheckName =
   | "location"
   | "battery_at_limit"
   | "battery_priority"
+  | "free_tariff"
   | "solar_tracking"
   | "blockout_schedule"
   | "charge_schedule"
@@ -96,6 +97,35 @@ export class DecisionChecks {
       };
     }
     return { check: "battery_priority", result: "no battery data" };
+  }
+
+  static freeTariffSkip(enabled: boolean): DecisionCheck {
+    const result = enabled ? "skip (rate unknown)" : "skip (disabled)";
+    return { check: "free_tariff", result };
+  }
+
+  /** Rate is known — record whether it clears the "free" threshold. */
+  static freeTariff(
+    ratePerKwh: number,
+    maxRatePerKwh: number,
+    isFree: boolean,
+  ): DecisionCheck {
+    const comparison = isFree ? "<=" : ">";
+    return {
+      check: "free_tariff",
+      result: `${
+        isFree ? "free" : "not free"
+      } (${ratePerKwh} ${comparison} ${maxRatePerKwh}/kWh)`,
+    };
+  }
+
+  /** Grid is free but the home battery's SoC can't be read, so the battery
+   *  priority limit can't be honoured — hold rather than guess. */
+  static freeTariffBatteryUnknown(): DecisionCheck {
+    return {
+      check: "free_tariff",
+      result: "hold (battery priority on, home battery SoC unknown)",
+    };
   }
 
   static solarTrackingSkip(enabled: boolean): DecisionCheck {

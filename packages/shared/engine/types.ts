@@ -32,6 +32,12 @@ export interface ControllerConfig {
   batteryPriorityEnabled: boolean;
   batteryPriorityLimit: number;
   priorityChargingEnabled: boolean;
+  /** Charge from the grid whenever the active tariff rate is free (or cheap
+   *  enough — see freeTariffMaxRatePerKwh), regardless of solar. */
+  freeTariffChargingEnabled: boolean;
+  /** Rate at or below which the grid counts as "free". Default 0, so only a
+   *  genuinely zero (or negative) rate qualifies. */
+  freeTariffMaxRatePerKwh: number;
   timezone: string;
   ampDebounceThreshold: number;
   ampDebounceSettleMinutes: number;
@@ -73,6 +79,9 @@ export interface EngineInput {
   now: Date;
   /** Monotonic timestamp in ms (replaces Date.now() calls inside the engine). */
   timestamp: number;
+  /** The active tariff rate in currency/kWh, or null when it can't be
+   *  resolved (no tariffs configured). Null means *unknown*, never free. */
+  currentRatePerKwh: number | null;
 }
 
 // ---- Per-vehicle runtime state ----
@@ -115,6 +124,7 @@ export type DecisionReason =
   | "charge_now"
   | "mode_stop"
   | "battery_priority"
+  | "free_tariff"
   | "grace_period"
   | "cooldown"
   | "no_solar"

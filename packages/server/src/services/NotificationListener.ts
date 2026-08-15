@@ -345,6 +345,7 @@ function modeNotification(
 function chargeStartTitle(reason: DecisionReason): string {
   if (reason === "schedule") return "Scheduled Charging Started";
   if (reason === "solar_tracking") return "Solar Charging Started";
+  if (reason === "free_tariff") return "Free Grid Charging Started";
   return "Charging Started";
 }
 

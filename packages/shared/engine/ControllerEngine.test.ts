@@ -489,6 +489,7 @@ describe("ControllerEngine", () => {
         energy: makeEnergy({ gridPowerW: -5000 }),
         now: new Date("2026-01-01T12:00:00Z"),
         timestamp: Date.now(),
+        currentRatePerKwh: null,
       });
       const d1 = output.decisions.get("V1");
       const d2 = output.decisions.get("V2");
@@ -511,6 +512,7 @@ describe("ControllerEngine", () => {
         energy: makeEnergy({ gridPowerW: -2000 }),
         now: new Date("2026-01-01T12:00:00Z"),
         timestamp: Date.now(),
+        currentRatePerKwh: null,
       });
       const d1 = output.decisions.get("V1");
       const d2 = output.decisions.get("V2");
@@ -798,6 +800,7 @@ describe("ControllerEngine", () => {
         energy: makeEnergy({ solarProductionW: 5000, gridPowerW: 500 }),
         now: new Date("2026-01-01T12:00:00Z"),
         timestamp: Date.now(),
+        currentRatePerKwh: null,
       });
       expect(output.decisions.get("V1")?.action).toBe("start");
     });

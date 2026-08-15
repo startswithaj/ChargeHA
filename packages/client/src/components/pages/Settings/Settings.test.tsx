@@ -50,6 +50,10 @@ vi.mock("./TariffSettings.tsx", () => ({
   TariffSettings: () => <div data-testid="tariff-settings" />,
 }));
 
+vi.mock("./FreeTariffSettings.tsx", () => ({
+  FreeTariffSettings: () => <div data-testid="free-tariff-settings" />,
+}));
+
 vi.mock("./VehicleSettings.tsx", () => ({
   VehicleSettings: () => <div data-testid="vehicle-settings" />,
 }));

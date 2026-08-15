@@ -14,6 +14,7 @@ import { VehicleSettings } from "./VehicleSettings.tsx";
 import { SolarTrackingSettings } from "./SolarTrackingSettings.tsx";
 import { BatterySettings } from "./BatterySettings.tsx";
 import { TariffSettings } from "./TariffSettings.tsx";
+import { FreeTariffSettings } from "./FreeTariffSettings.tsx";
 import { GeneralSettings } from "./GeneralSettings.tsx";
 import { NotificationSettings } from "./NotificationSettings.tsx";
 
@@ -122,6 +123,9 @@ export function Settings() {
 
       {/* ═══ Electricity Tariffs ═══ */}
       <TariffSettings />
+
+      {/* ═══ Free Grid Charging ═══ */}
+      <FreeTariffSettings />
 
       {/* ═══ Battery ═══ */}
       <BatterySettings />

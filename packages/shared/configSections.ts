@@ -40,6 +40,16 @@ export const chargingConfigDef = defineSection({
     schema: z.boolean(),
     default: false,
   },
+  freeTariffChargingEnabled: {
+    key: "free_tariff_charging_enabled",
+    schema: z.boolean(),
+    default: false,
+  },
+  freeTariffMaxRatePerKwh: {
+    key: "free_tariff_max_rate_per_kwh",
+    schema: z.number(),
+    default: 0,
+  },
 });
 export type ChargingConfig = SectionType<typeof chargingConfigDef>;
 

@@ -55,6 +55,8 @@ describe("SolarAllocator", () => {
     batteryPriorityEnabled: false,
     batteryPriorityLimit: 0,
     priorityChargingEnabled: true,
+    freeTariffChargingEnabled: false,
+    freeTariffMaxRatePerKwh: 0,
     timezone: "",
     ampDebounceThreshold: 2,
     ampDebounceSettleMinutes: 3,

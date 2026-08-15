@@ -68,6 +68,7 @@ export function createSimulatedRouter(
           hasSolar: false,
           hasSchedule: false,
           hasBlockout: false,
+          hasFreeTariff: false,
           forceRefresh: true,
         });
         return { success: true, state };

@@ -29,6 +29,7 @@ import type { EnergyPoller } from "../services/EnergyPoller.ts";
 import { ChargeController } from "../services/ChargeController.ts";
 import { ConfigService } from "../services/ConfigService.ts";
 import { ScheduleService } from "../services/ScheduleService.ts";
+import { TariffService } from "../services/TariffService.ts";
 import type { EnergyAdapterManager } from "../services/EnergyAdapterManager.ts";
 import { Logger } from "../lib/Logger.ts";
 import { testable } from "./Testable.ts";
@@ -96,6 +97,7 @@ export const REQUEST_CONTEXT = {
   hasSolar: false,
   hasSchedule: false,
   hasBlockout: false,
+  hasFreeTariff: false,
   forceRefresh: true,
 } as const;
 
@@ -132,6 +134,7 @@ const SETUP_REQUEST_CONTEXT = {
   hasSolar: false,
   hasSchedule: false,
   hasBlockout: false,
+  hasFreeTariff: false,
 };
 
 const testVehicleManagerLogger = new Logger("VehicleManager", "error");
@@ -238,6 +241,7 @@ async function buildControllerStack(
     db,
     configService,
     new ScheduleService(db, new Logger("ScheduleService", "error")),
+    new TariffService(db, new Logger("TariffService", "error")),
     trackingEmitter,
     testControllerLogger,
   );

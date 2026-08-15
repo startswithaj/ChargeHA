@@ -268,6 +268,7 @@ function buildServices(
     db,
     configService,
     scheduleService,
+    tariffService,
     eventEmitter,
     new Logger("ChargeController", logLevel),
   );

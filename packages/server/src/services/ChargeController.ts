@@ -29,6 +29,7 @@ import type { EnergyPoller } from "./EnergyPoller.ts";
 import type { TypedEventEmitter } from "./TypedEventEmitter.ts";
 import type { ConfigService } from "./ConfigService.ts";
 import type { ScheduleService } from "./ScheduleService.ts";
+import type { TariffService } from "./TariffService.ts";
 import type { Logger } from "../lib/Logger.ts";
 
 // Default loop interval (overridden by config)
@@ -89,6 +90,7 @@ export class ChargeController {
   private readonly db: AppDatabase;
   private readonly configService: ConfigService;
   private readonly scheduleService: ScheduleService;
+  private readonly tariffService: TariffService;
   private readonly eventEmitter: TypedEventEmitter;
   private readonly logger: Logger;
   private readonly engine = new ControllerEngine();
@@ -101,6 +103,7 @@ export class ChargeController {
     db: AppDatabase,
     configService: ConfigService,
     scheduleService: ScheduleService,
+    tariffService: TariffService,
     eventEmitter: TypedEventEmitter,
     logger: Logger,
   ) {
@@ -109,6 +112,7 @@ export class ChargeController {
     this.db = db;
     this.configService = configService;
     this.scheduleService = scheduleService;
+    this.tariffService = tariffService;
     this.eventEmitter = eventEmitter;
     this.logger = logger;
     this.start();
@@ -161,39 +165,27 @@ export class ChargeController {
       `Loop: ${vehicles.length} vehicles, ${schedules.length} schedules, energy=${energySummary}`,
     );
 
+    const currentRatePerKwh = await this.resolveCurrentRate(config);
+
     // Compute context for middleware requests
     const hasSolar = energy !== null &&
       energy.solarProductionW >= config.minSolarGenerationKw * 1000;
     const hasBlockout = schedules.some(
       (s) => this.isActiveBlockout(s, now, config.timezone),
     );
+    // Tells the per-plugin middleware the vehicle can charge right now even
+    // with no sun and no schedule — otherwise it keeps a sleeping car asleep
+    // and the free window passes unused.
+    const hasFreeTariff = this.isFreeTariff(config, currentRatePerKwh);
 
     // Request fresh state for each vehicle via middleware
-    const engineVehicles: EngineVehicleInput[] = await Promise.all(
-      vehicles.map(async (v) => {
-        const applicable = schedules.filter((s) =>
-          this.isScheduleApplicable(s, v.id, now, config.timezone)
-        );
-        const activeChargeSchedule = applicable.find(
-          (s) => s.scheduleType === "charge",
-        );
-        await this.vehicleManager.requestState(v.id, {
-          origin: "controller",
-          traceId,
-          hasSolar,
-          hasSchedule: applicable.length > 0,
-          hasBlockout,
-          scheduleChargeLimitPct: activeChargeSchedule?.chargeLimitPct ?? null,
-        });
-        const state = await this.vehicleManager.getState(v.id);
-        return {
-          id: v.id,
-          name: v.name,
-          mode: v.mode,
-          priority: v.priority,
-          state,
-        };
-      }),
+    const engineVehicles = await this.requestVehicleStates(
+      vehicles,
+      schedules,
+      config,
+      now,
+      traceId,
+      { hasSolar, hasBlockout, hasFreeTariff },
     );
 
     // Run the pure decision engine
@@ -204,6 +196,7 @@ export class ChargeController {
       energy,
       now,
       timestamp: Date.now(),
+      currentRatePerKwh,
     });
 
     // Execute decisions, build log entries, emit events
@@ -564,6 +557,68 @@ export class ChargeController {
       s.vehicleId === null;
   }
 
+  /** Ask the middleware for fresh state for every vehicle, passing the
+   *  loop-wide context flags plus each vehicle's own schedule situation so it
+   *  can make cost-aware fetch / cache / wake decisions. */
+  private requestVehicleStates(
+    vehicles: VehicleRow[],
+    schedules: ScheduleRow[],
+    config: ControllerConfig,
+    now: Date,
+    traceId: string,
+    flags: {
+      hasSolar: boolean;
+      hasBlockout: boolean;
+      hasFreeTariff: boolean;
+    },
+  ): Promise<EngineVehicleInput[]> {
+    return Promise.all(
+      vehicles.map(async (v) => {
+        const applicable = schedules.filter((s) =>
+          this.isScheduleApplicable(s, v.id, now, config.timezone)
+        );
+        const activeChargeSchedule = applicable.find(
+          (s) => s.scheduleType === "charge",
+        );
+        await this.vehicleManager.requestState(v.id, {
+          origin: "controller",
+          traceId,
+          ...flags,
+          hasSchedule: applicable.length > 0,
+          scheduleChargeLimitPct: activeChargeSchedule?.chargeLimitPct ?? null,
+        });
+        const state = await this.vehicleManager.getState(v.id);
+        return {
+          id: v.id,
+          name: v.name,
+          mode: v.mode,
+          priority: v.priority,
+          state,
+        };
+      }),
+    );
+  }
+
+  /** Resolve the active tariff rate for this cycle. Only needed when
+   *  free-tariff charging is on, so the lookup is skipped otherwise.
+   *  Returns null when the rate can't be resolved — which the engine treats
+   *  as "unknown", never as free. */
+  private async resolveCurrentRate(
+    config: ControllerConfig,
+  ): Promise<number | null> {
+    if (!config.freeTariffChargingEnabled) return null;
+    return await this.tariffService.resolveCurrentRate();
+  }
+
+  /** Whether the resolved rate clears the configured "free" threshold. */
+  private isFreeTariff(
+    config: ControllerConfig,
+    ratePerKwh: number | null,
+  ): boolean {
+    if (!config.freeTariffChargingEnabled || ratePerKwh === null) return false;
+    return ratePerKwh <= config.freeTariffMaxRatePerKwh;
+  }
+
   private isActiveBlockout(
     s: ScheduleRow,
     now: Date,
@@ -600,6 +655,8 @@ export class ChargeController {
       batteryPriorityEnabled: battery.batteryPriorityEnabled,
       batteryPriorityLimit: battery.batteryPriorityLimit,
       priorityChargingEnabled: charging.priorityChargingEnabled,
+      freeTariffChargingEnabled: charging.freeTariffChargingEnabled,
+      freeTariffMaxRatePerKwh: charging.freeTariffMaxRatePerKwh,
       timezone: system.timezone,
     };
   }
