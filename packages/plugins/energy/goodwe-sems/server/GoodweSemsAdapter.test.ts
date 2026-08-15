@@ -4,6 +4,7 @@ import { assertExists } from "@std/assert";
 import { FakeTime } from "@std/testing/time";
 import {
   applyStatus,
+  isImpossibleExport,
   parseSemsValue,
   resetSemsBackoffForTests,
   toBatteryPowerW,
@@ -21,6 +22,7 @@ import {
 import {
   buildPowerflow,
   buildStationDetail,
+  glitchFlow,
   makeAdapter,
   makeFakeClient,
   MAX_STALE_MS,
@@ -245,6 +247,71 @@ describe("toEnergyData", () => {
   });
 });
 
+describe("isImpossibleExport", () => {
+  it("flags an export exceeding solar on a battery-free station", () => {
+    expect(isImpossibleExport(toEnergyData(glitchFlow()))).toBe(true);
+  });
+
+  it("flags the second glitch class where load looks plausible", () => {
+    const flow = buildPowerflow({
+      pv: "3240(W)",
+      load: "1467(W)",
+      grid: "3368(W)",
+      gridStatus: "-1",
+      loadStatus: "-1",
+    });
+    expect(isImpossibleExport(toEnergyData(flow))).toBe(true);
+  });
+
+  it("catches the tightest observed margin (43W above solar)", () => {
+    const flow = buildPowerflow({
+      pv: "1226(W)",
+      load: "0(W)",
+      grid: "1269(W)",
+      loadStatus: "-1",
+    });
+    expect(isImpossibleExport(toEnergyData(flow))).toBe(true);
+  });
+
+  it("passes a legitimate export", () => {
+    expect(isImpossibleExport(toEnergyData(buildPowerflow()))).toBe(false);
+  });
+
+  it("passes an import larger than solar", () => {
+    const flow = buildPowerflow({
+      pv: "1138(W)",
+      load: "3196(W)",
+      grid: "2058(W)",
+      loadStatus: "1",
+    });
+    expect(isImpossibleExport(toEnergyData(flow))).toBe(false);
+  });
+
+  it("passes the night payload importing with no solar", () => {
+    const flow = buildPowerflow({
+      pv: "",
+      load: "",
+      bettery: "",
+      grid: "-536(W)",
+      gridStatus: "1",
+      loadStatus: "1",
+    });
+    expect(isImpossibleExport(toEnergyData(flow))).toBe(false);
+  });
+
+  it("passes a hybrid exporting from its battery", () => {
+    const flow = buildPowerflow({
+      pv: "0(W)",
+      load: "100(W)",
+      grid: "2900(W)",
+      loadStatus: "-1",
+      bettery: "3000(W)",
+      betteryStatus: "-1",
+    });
+    expect(isImpossibleExport(toEnergyData(flow))).toBe(false);
+  });
+});
+
 describe("GoodweSemsAdapter", () => {
   describe("pollIntervalSeconds", () => {
     it("is 60 seconds — SEMS actively rate limits", () => {
@@ -279,6 +346,21 @@ describe("GoodweSemsAdapter", () => {
 
       expect(data.solarProductionW).toBe(3000);
       expect(data.gridPowerW).toBe(-1800);
+    });
+
+    it("does not seed the cache from a glitch sample", async () => {
+      const client = makeFakeClient(
+        buildStationDetail({ powerflow: glitchFlow() }),
+      );
+      const adapter = makeAdapter(client);
+      await adapter.connect();
+
+      // With no seed, a rate limit on the first poll surfaces the outage
+      // instead of serving the poisoned reading.
+      client.setResult(rateLimit());
+      await expect(adapter.getRealtimeData()).rejects.toBeInstanceOf(
+        GoodweSemsConnectionError,
+      );
     });
 
     it("sets the backoff when it is rate limited, blocking the next poll", async () => {
@@ -341,6 +423,43 @@ describe("GoodweSemsAdapter", () => {
       } finally {
         time.restore();
       }
+    });
+
+    it("discards a glitch sample and serves the last good reading", async () => {
+      const client = makeFakeClient();
+      const adapter = makeAdapter(client);
+      const live = await adapter.getRealtimeData();
+
+      client.setResult(buildStationDetail({ powerflow: glitchFlow() }));
+      const served = await adapter.getRealtimeData();
+
+      expect(served.solarProductionW).toBe(live.solarProductionW);
+      expect(served.gridPowerW).toBe(live.gridPowerW);
+      expect(served.homeConsumptionW).toBe(live.homeConsumptionW);
+    });
+
+    it("serves a glitch sample with grid zeroed when no cache exists", async () => {
+      const client = makeFakeClient(
+        buildStationDetail({ powerflow: glitchFlow() }),
+      );
+      const data = await makeAdapter(client).getRealtimeData();
+
+      expect(data.gridPowerW).toBe(0);
+      expect(data.solarProductionW).toBe(2551);
+    });
+
+    it("recovers to live data on the first coherent sample after a glitch", async () => {
+      const client = makeFakeClient();
+      const adapter = makeAdapter(client);
+      await adapter.getRealtimeData();
+
+      client.setResult(buildStationDetail({ powerflow: glitchFlow() }));
+      await adapter.getRealtimeData();
+
+      client.setResult(buildStationDetail());
+      const data = await adapter.getRealtimeData();
+      expect(data.solarProductionW).toBe(3000);
+      expect(data.gridPowerW).toBe(-1800);
     });
 
     it("keeps the original lastUpdated on a cached reading", async () => {

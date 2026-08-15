@@ -186,6 +186,18 @@ export const buildStationDetail = (
   ...overrides,
 });
 
+// Real glitch shape from the AU captures: SEMS composed a stale inverter
+// upload with a fresh meter reading, publishing an export above solar and a
+// clamped load of 0.
+export const glitchFlow = (): SemsPowerflow =>
+  buildPowerflow({
+    pv: "2551(W)",
+    load: "0(W)",
+    grid: "3997(W)",
+    gridStatus: "1",
+    loadStatus: "-1",
+  });
+
 export interface FakeStationClient extends GoodweSemsStationReader {
   // Station ids passed to getStationDetail, one entry per HTTP-equivalent
   // call. Assert on `.length` to prove no request was issued.

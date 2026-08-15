@@ -72,6 +72,23 @@ export function toBatteryPowerW(flow: SemsPowerflow): number | null {
   return applyStatus(Math.abs(magnitude), flow.betteryStatus);
 }
 
+const EXPORT_TOLERANCE_W = 40;
+
+// SEMS sometimes reports a grid export that exceeds the solar production
+// // plus battery output. The export is signed by `loadStatus` but the solar and
+//   10:27:57  solar=3218W  grid=-3827W  home=0W  (raw load=0(W) gridStatus=1)   ← exporting 609W more than solar
+//   10:47:57  solar=2551W  grid=-3997W  home=0W  (raw load=0(W) gridStatus=1)   ← 1446W over
+//   10:49–51  solar=3911W  grid=-6392…-6440W  home=0W                            ← 2.5kW over, 3-poll window
+//   10:58:56  solar=2680W  grid=-6176W  home=0W                                  ← 3.5kW over — the worst
+//   11:00:03  solar=4954W  grid=-7252W  home=0W
+//   11:14:58  solar=4835W  grid=-5335W  home=0W
+export function isImpossibleExport(data: EnergyData): boolean {
+  const exportW = -data.gridPowerW;
+  if (exportW <= 0) return false;
+  const batteryW = Math.abs(data.batteryPowerW ?? 0);
+  return exportW > data.solarProductionW + batteryW + EXPORT_TOLERANCE_W;
+}
+
 export function toEnergyData(flow: SemsPowerflow): EnergyData {
   const load = parseSemsValue(flow.load);
   const solar = parseSemsValue(flow.pv) ?? 0;
@@ -138,8 +155,14 @@ export class GoodweSemsAdapter implements EnergySourceAdapter {
     const flow = detail.powerflow;
     if (flow) {
       // Seed the cache so a rate limit on the first poll serves data instead
-      // of throwing.
-      this.remember(toEnergyData(flow));
+      // of throwing — but never seed from a glitch sample, or every discard
+      // would serve the poisoned reading for up to MAX_STALE_MS.
+      const seed = toEnergyData(flow);
+      if (isImpossibleExport(seed)) {
+        this.logGlitch(seed, flow);
+      } else {
+        this.remember(seed);
+      }
       this.logger.info(
         `SEMS raw flow — grid=${flow.grid} gridStatus=${flow.gridStatus} ` +
           `loadStatus=${flow.loadStatus} pv=${flow.pv} load=${flow.load}`,
@@ -191,9 +214,14 @@ export class GoodweSemsAdapter implements EnergySourceAdapter {
           "SEMS response carried no power flow block",
         );
       }
-      const data = this.remember(toEnergyData(detail.powerflow));
+      const parsed = toEnergyData(detail.powerflow);
       this.trackGridDirection(detail.powerflow);
       void this.client.probeGatewayFlow?.(this.stationId, detail.powerflow);
+      if (isImpossibleExport(parsed)) {
+        this.logGlitch(parsed, detail.powerflow);
+        return this.lastGoodOrSanitized(parsed);
+      }
+      const data = this.remember(parsed);
       this.logger.info(
         `SEMS poll: solar=${data.solarProductionW}W grid=${data.gridPowerW}W home=${data.homeConsumptionW}W battery=${data.batteryPowerW}W soc=${data.batterySoc} (raw pv=${detail.powerflow.pv} grid=${detail.powerflow.grid} load=${detail.powerflow.load} bettery=${detail.powerflow.bettery} gridStatus=${detail.powerflow.gridStatus})`,
       );
@@ -244,6 +272,25 @@ export class GoodweSemsAdapter implements EnergySourceAdapter {
       }
       throw error;
     }
+  }
+
+  private logGlitch(data: EnergyData, flow: SemsPowerflow): void {
+    const message = `SEMS glitch sample discarded — export ${-data
+      .gridPowerW}W exceeds solar ${data.solarProductionW}W (raw pv=${flow.pv} grid=${flow.grid} load=${flow.load} bettery=${flow.bettery} gridStatus=${flow.gridStatus} loadStatus=${flow.loadStatus})`;
+    this.logger.warn(message);
+    this.dbLog.warn("SEMS glitch sample discarded", {
+      payload: { powerflow: flow },
+    });
+  }
+
+  // Fallback when a glitch sample must be discarded but no fresh cached
+  // reading exists: serve the sample with grid forced to 0 — the corrupted
+  // field is the grid figure, and phantom export must never start a charge.
+  private lastGoodOrSanitized(parsed: EnergyData): EnergyData {
+    if (this.lastGood && Date.now() - this.lastGoodAtMs <= MAX_STALE_MS) {
+      return { ...this.lastGood };
+    }
+    return { ...parsed, gridPowerW: 0 };
   }
 
   private remember(data: EnergyData): EnergyData {
