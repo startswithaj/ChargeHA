@@ -259,6 +259,7 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
 
   async getStations(): Promise<SemsStationSummary[]> {
     const data = await this.call(STATION_LIST_PATH, null);
+    this.logger.debug(`SEMS raw station list: ${JSON.stringify(data)}`);
     if (typeof data === "string") {
       return [{ id: data, name: data }];
     }
@@ -277,9 +278,13 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
   }
 
   async getStationDetail(stationId: string): Promise<SemsStationDetail> {
-    const parsed = stationDetailSchema.safeParse(
-      await this.call(STATION_DETAIL_PATH, { powerStationId: stationId }),
-    );
+    const raw = await this.call(STATION_DETAIL_PATH, {
+      powerStationId: stationId,
+    });
+    // The full payload, not the parsed subset — glitch forensics and the
+    // SEMS+ migration both need fields our schema does not yet read.
+    this.logger.debug(`SEMS raw station detail: ${JSON.stringify(raw)}`);
+    const parsed = stationDetailSchema.safeParse(raw);
     if (!parsed.success) {
       throw new GoodweSemsConnectionError(
         "SEMS returned a station payload in an unrecognised shape",
