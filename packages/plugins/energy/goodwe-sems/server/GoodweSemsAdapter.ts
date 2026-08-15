@@ -11,6 +11,7 @@ import {
   GoodweSemsRateLimitError,
   type GoodweSemsStationReader,
   type SemsPowerflow,
+  type SemsStationDetail,
 } from "./GoodweSemsClient.ts";
 
 const POLL_INTERVAL_SECONDS = 60;
@@ -110,6 +111,18 @@ export function toEnergyData(flow: SemsPowerflow): EnergyData {
   };
 }
 
+export function toEnergyDataFromDetail(
+  detail: Pick<SemsStationDetail, "sourceUpdatedAtMs">,
+  flow: SemsPowerflow,
+): EnergyData {
+  return {
+    ...toEnergyData(flow),
+    sourceUpdatedAt: detail.sourceUpdatedAtMs !== null
+      ? new Date(detail.sourceUpdatedAtMs).toISOString()
+      : null,
+  };
+}
+
 export class GoodweSemsAdapter implements EnergySourceAdapter {
   private lastGood: EnergyData | null = null;
   private lastGoodAtMs = 0;
@@ -157,7 +170,7 @@ export class GoodweSemsAdapter implements EnergySourceAdapter {
       // Seed the cache so a rate limit on the first poll serves data instead
       // of throwing — but never seed from a glitch sample, or every discard
       // would serve the poisoned reading for up to MAX_STALE_MS.
-      const seed = toEnergyData(flow);
+      const seed = toEnergyDataFromDetail(detail, flow);
       if (isImpossibleExport(seed)) {
         this.logGlitch(seed, flow);
       } else {
@@ -214,7 +227,7 @@ export class GoodweSemsAdapter implements EnergySourceAdapter {
           "SEMS response carried no power flow block",
         );
       }
-      const parsed = toEnergyData(detail.powerflow);
+      const parsed = toEnergyDataFromDetail(detail, detail.powerflow);
       this.trackGridDirection(detail.powerflow);
       void this.client.probeGatewayFlow?.(this.stationId, detail.powerflow);
       if (isImpossibleExport(parsed)) {

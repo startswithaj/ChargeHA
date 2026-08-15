@@ -24,6 +24,15 @@ export function Dashboard({ onNavigateSettings }: DashboardProps) {
   const { addToast } = useToast();
   const { data: energyData } = useEnergyData();
   const lastUpdated = energyData?.lastUpdated ?? null;
+  const sourceUpdatedAt = energyData?.realtime.sourceUpdatedAt ?? null;
+  // Only worth surfacing when the backend's collection time meaningfully lags
+  // the fetch — local plugins omit it and a healthy cloud lag stays quiet.
+  const measuredLagsMs = lastUpdated && sourceUpdatedAt
+    ? lastUpdated.getTime() - new Date(sourceUpdatedAt).getTime()
+    : 0;
+  const measured = measuredLagsMs > 90_000
+    ? formatRelativeTime(new Date(sourceUpdatedAt as string))
+    : null;
   const utils = trpc.useUtils();
 
   // Re-render every 10s to keep relative time fresh when SSE stops
@@ -101,6 +110,7 @@ export function Dashboard({ onNavigateSettings }: DashboardProps) {
       {lastUpdated && (
         <Text size="1" color="gray" className={styles.lastUpdated}>
           Updated {formatRelativeTime(lastUpdated)}
+          {measured && ` · measured ${measured}`}
         </Text>
       )}
     </div>

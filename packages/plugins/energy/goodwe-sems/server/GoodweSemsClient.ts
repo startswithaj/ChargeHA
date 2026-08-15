@@ -116,7 +116,10 @@ const stationDetailSchema = z.object({
     .optional(),
   inverter: z.array(
     z.object({
-      invert_full: z.object({ model_type: z.string().optional() })
+      invert_full: z.object({
+        model_type: z.string().optional(),
+        last_time: z.number().optional(),
+      })
         .passthrough().optional(),
     }).passthrough(),
   ).optional(),
@@ -127,6 +130,7 @@ export interface SemsStationDetail {
   powerflow: SemsPowerflow | null;
   stationName: string | null;
   inverterModel: string | null;
+  sourceUpdatedAtMs: number | null;
 }
 
 type LoginMode = "new" | "legacy";
@@ -299,11 +303,15 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     ) {
       powerflow.soc = data.soc.power;
     }
+    const uploadTimes = (data.inverter ?? [])
+      .map((entry) => entry.invert_full?.last_time)
+      .filter((time): time is number => Number.isFinite(time));
     return {
       hasPowerflow: data.hasPowerflow === true,
       powerflow,
       stationName: data.info?.stationname ?? null,
       inverterModel: data.inverter?.[0]?.invert_full?.model_type ?? null,
+      sourceUpdatedAtMs: uploadTimes.length ? Math.max(...uploadTimes) : null,
     };
   }
 

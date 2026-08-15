@@ -425,6 +425,21 @@ describe("GoodweSemsAdapter", () => {
       }
     });
 
+    it("stamps sourceUpdatedAt from the station detail upload time", async () => {
+      const client = makeFakeClient(
+        buildStationDetail({ sourceUpdatedAtMs: 1755130060000 }),
+      );
+      const data = await makeAdapter(client).getRealtimeData();
+      expect(data.sourceUpdatedAt).toBe(
+        new Date(1755130060000).toISOString(),
+      );
+    });
+
+    it("reports null sourceUpdatedAt when the backend supplies no upload time", async () => {
+      const data = await makeAdapter(makeFakeClient()).getRealtimeData();
+      expect(data.sourceUpdatedAt).toBeNull();
+    });
+
     it("discards a glitch sample and serves the last good reading", async () => {
       const client = makeFakeClient();
       const adapter = makeAdapter(client);

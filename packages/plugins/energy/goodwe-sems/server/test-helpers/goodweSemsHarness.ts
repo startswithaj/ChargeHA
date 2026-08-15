@@ -183,6 +183,7 @@ export const buildStationDetail = (
   powerflow: buildPowerflow(),
   stationName: "Test Station",
   inverterModel: "GW10KAU-DT",
+  sourceUpdatedAtMs: null,
   ...overrides,
 });
 

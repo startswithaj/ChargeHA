@@ -304,6 +304,41 @@ describe("GoodweSemsClient", () => {
       expect(detail.powerflow?.pv).toBe("3000(W)");
     });
 
+    it("extracts the newest inverter upload time as sourceUpdatedAtMs", async () => {
+      mock.setPathResponse(NEW_LOGIN_PATH, loginOk("tok", GATEWAY_API));
+      mock.setPathResponse(
+        STATION_DETAIL_PATH,
+        semsOk({
+          hasPowerflow: true,
+          powerflow: { pv: "1000(W)" },
+          inverter: [
+            { invert_full: { model_type: "GW1", last_time: 1755130000000 } },
+            { invert_full: { model_type: "GW2", last_time: 1755130060000 } },
+          ],
+        }),
+      );
+
+      const detail = await makeClient().getStationDetail("station-1");
+
+      expect(detail.sourceUpdatedAtMs).toBe(1755130060000);
+    });
+
+    it("reports null sourceUpdatedAtMs when no inverter carries last_time", async () => {
+      mock.setPathResponse(NEW_LOGIN_PATH, loginOk("tok", GATEWAY_API));
+      mock.setPathResponse(
+        STATION_DETAIL_PATH,
+        semsOk({
+          hasPowerflow: true,
+          powerflow: { pv: "1000(W)" },
+          inverter: [{ invert_full: { model_type: "GW1" } }],
+        }),
+      );
+
+      const detail = await makeClient().getStationDetail("station-1");
+
+      expect(detail.sourceUpdatedAtMs).toBeNull();
+    });
+
     it("falls back to top-level soc.power when powerflow carries no soc", async () => {
       mock.setPathResponse(NEW_LOGIN_PATH, loginOk("tok", GATEWAY_API));
       mock.setPathResponse(
