@@ -50,6 +50,14 @@ export class NotificationService {
     message: string,
     opts?: { vehicleName?: string; vehicleId?: string },
   ): Promise<void> {
+    const payload: NotificationPayload = {
+      eventType,
+      title,
+      message,
+      vehicleName: opts?.vehicleName,
+      vehicleId: opts?.vehicleId,
+      timestamp: new Date(),
+    };
     try {
       // Check if notifications are enabled for this event
       const providerType = await this.db.getConfig("notification_provider");
@@ -71,20 +79,12 @@ export class NotificationService {
         return;
       }
 
-      const payload: NotificationPayload = {
-        eventType,
-        title,
-        message,
-        vehicleName: opts?.vehicleName,
-        vehicleId: opts?.vehicleId,
-        timestamp: new Date(),
-      };
-
       await provider.send(payload);
 
       this.logger.info(`Sent ${eventType} via ${providerType}`);
     } catch (error) {
       this.logger.error("Failed to send notification:", error);
+      this.logger.error("Notification payload:", JSON.stringify(payload));
     }
   }
 
