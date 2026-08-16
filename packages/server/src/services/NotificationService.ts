@@ -1,7 +1,10 @@
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import { notificationConfigDef } from "@chargeha/shared/configSections";
 import type { Logger } from "../lib/Logger.ts";
-import type { NotificationEventType } from "@chargeha/shared";
+import {
+  MANDATORY_NOTIFICATION_EVENTS,
+  type NotificationEventType,
+} from "@chargeha/shared";
 import {
   type NotificationPayload,
   type NotificationProvider,
@@ -52,13 +55,15 @@ export class NotificationService {
       const providerType = await this.db.getConfig("notification_provider");
       if (!providerType) return;
 
-      const enabledEventsRaw = await this.db.getConfig(
-        "notification_enabled_events",
-      );
-      if (!enabledEventsRaw) return;
+      if (!MANDATORY_NOTIFICATION_EVENTS.has(eventType)) {
+        const enabledEventsRaw = await this.db.getConfig(
+          "notification_enabled_events",
+        );
+        if (!enabledEventsRaw) return;
 
-      const enabledEvents = enabledEventsRaw.split(",").map((s) => s.trim());
-      if (!enabledEvents.includes(eventType)) return;
+        const enabledEvents = enabledEventsRaw.split(",").map((s) => s.trim());
+        if (!enabledEvents.includes(eventType)) return;
+      }
 
       const provider = this.providers.get(providerType);
       if (!provider) {
