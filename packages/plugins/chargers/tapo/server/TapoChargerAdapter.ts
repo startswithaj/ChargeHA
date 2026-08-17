@@ -250,7 +250,6 @@ export class TapoChargerAdapter implements ChargerAdapter {
     const info = await this.client.request<TapoDeviceInfo>("get_device_info");
     if (info.device_on === on) return true;
     await this.client.request("set_device_info", { device_on: on });
-    this.logger.info(`Plug switched ${on ? "on" : "off"}`);
     // State change, not routine polling — worth an info row.
     this.dbLog.info(
       `Plug switched ${on ? "on" : "off"} (${this.config.chargerId})`,

@@ -503,9 +503,6 @@ export class OcppCentralSystem {
     const data = connection.getData();
     if (data.transactionId === transactionId) return {};
     connection.reserveTransactionId(transactionId);
-    this.logger.info(
-      `Adopted transaction ${transactionId} for ${chargePointId} from MeterValues`,
-    );
     // Once per reconnect that lost its StartTransaction, not per MeterValues.
     this.dbLog.info(`Adopted transaction ${transactionId} (${chargePointId})`, {
       payload: { chargePointId, transactionId },
