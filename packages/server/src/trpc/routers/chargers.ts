@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { publicProcedure, router } from "../trpc.ts";
 import { createTraceId } from "@chargeha/shared";
 
@@ -65,10 +66,17 @@ export const chargersRouter = router({
   ),
 
   setMode: publicProcedure.input(modeInput).mutation(async ({ ctx, input }) => {
-    await ctx.chargingPointManager.setMode(input.id, input.mode, {
-      origin: "user:set-mode",
-      traceId: createTraceId(),
-    });
+    const result = await ctx.chargingPointManager.setMode(
+      input.id,
+      input.mode,
+      { origin: "user:set-mode", traceId: createTraceId() },
+    );
+    if (!result.success) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: result.error ?? "Charger command failed",
+      });
+    }
   }),
 
   reorder: publicProcedure.input(priorityInput).mutation(

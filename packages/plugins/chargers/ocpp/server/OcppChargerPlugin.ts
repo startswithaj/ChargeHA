@@ -101,6 +101,7 @@ export class OcppChargerPlugin implements ChargerPlugin {
       {
         chargerId: row.id,
         meterTimeoutSeconds: intConfig(config.meter_timeout_seconds, 300),
+        disconnectGraceSeconds: intConfig(config.disconnect_grace_seconds, 120),
         maxAmps: intConfig(config.max_amps, 32),
         minAmps: intConfig(config.min_amps, 6),
         phases: config.phases === "3" ? 3 : 1,

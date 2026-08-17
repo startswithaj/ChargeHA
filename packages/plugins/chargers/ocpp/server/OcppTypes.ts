@@ -14,6 +14,8 @@ export interface OcppLiveData {
   connected: boolean;
   status: ChargePointStatus | null;
   errorCode: string | null;
+  statusInfo: string | null;
+  vendorErrorCode: string | null;
   info: OcppChargerInfo | null;
   transactionId: number | null;
   // Wh register at StartTransaction — session energy baseline.
@@ -34,6 +36,8 @@ export const freshData = (): OcppLiveData => ({
   connected: false,
   status: null,
   errorCode: null,
+  statusInfo: null,
+  vendorErrorCode: null,
   info: null,
   transactionId: null,
   meterStartWh: null,

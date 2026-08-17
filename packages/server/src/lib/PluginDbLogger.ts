@@ -35,10 +35,29 @@ export class PluginDbLogger {
       origin: opts?.origin ?? null,
       traceId: opts?.traceId ?? null,
     };
+    this.mirrorToStdout(level, message, entry.payload);
     try {
       await this.persist(entry);
     } catch (error) {
       this.logger.error("Failed to persist log entry:", error, entry);
+    }
+  }
+
+  private mirrorToStdout(
+    level: string,
+    message: string,
+    payload: string | null,
+  ): void {
+    const args = payload === null ? [] : [payload];
+    switch (level) {
+      case "debug":
+        return this.logger.debug(message, ...args);
+      case "warn":
+        return this.logger.warn(message, ...args);
+      case "error":
+        return this.logger.error(message, ...args);
+      default:
+        return this.logger.info(message, ...args);
     }
   }
 

@@ -107,7 +107,6 @@ export class KlapClient {
         authHash,
       );
       this.session = { keys, seq: keys.initialSeq, cookie };
-      this.logger.debug(`KLAP session established with ${this.host}`);
       this.dbLog.debug(`Handshake established (${this.chargerId})`, {
         payload: {
           chargerId: this.chargerId,
@@ -143,7 +142,6 @@ export class KlapClient {
       return await this.send<T>(method, params);
     } catch (error) {
       if (!isSessionExpiry(error)) throw error;
-      this.logger.debug(`Session expired for ${this.host}, re-handshaking`);
       this.dbLog.debug(`Session expired (${this.chargerId}), re-handshaking`, {
         payload: { chargerId: this.chargerId, host: this.host, method },
       });

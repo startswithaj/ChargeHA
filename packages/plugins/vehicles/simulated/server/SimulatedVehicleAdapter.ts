@@ -71,18 +71,18 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
   }
 
   connect(ctx: CallContext): Promise<void> {
-    this.logger.info(
+    this.dbLog.info(
       `${this.config.vehicleName} (${this.id}) connected — SOC ${this.socPercent}%, limit ${this.chargeLimit}%`,
-    );
-    this.dbLog.info("connect", {
-      payload: {
-        vehicleId: this.id,
-        socPercent: this.socPercent,
-        chargeLimit: this.chargeLimit,
+      {
+        payload: {
+          vehicleId: this.id,
+          socPercent: this.socPercent,
+          chargeLimit: this.chargeLimit,
+        },
+        origin: ctx.origin,
+        traceId: ctx.traceId,
       },
-      origin: ctx.origin,
-      traceId: ctx.traceId,
-    });
+    );
     return Promise.resolve();
   }
 
@@ -148,20 +148,20 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
     this.isCharging = true;
     this.lastUpdateTime = Date.now();
     const powerW = this.calculatePowerKw() * 1000;
-    this.logger.info(
+    this.dbLog.info(
       `${this.config.vehicleName} started charging at ${this.chargeAmps}A (${
         Math.round(powerW)
       }W)`,
-    );
-    this.dbLog.info("startCharging", {
-      payload: {
-        vehicleId: this.id,
-        amps: this.chargeAmps,
-        powerW: Math.round(powerW),
+      {
+        payload: {
+          vehicleId: this.id,
+          amps: this.chargeAmps,
+          powerW: Math.round(powerW),
+        },
+        origin: ctx.origin,
+        traceId: ctx.traceId,
       },
-      origin: ctx.origin,
-      traceId: ctx.traceId,
-    });
+    );
     return Promise.resolve(true);
   }
 
@@ -170,19 +170,19 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
       this.updateSoc(); // Finalize SOC before stopping
     }
     this.isCharging = false;
-    this.logger.info(
+    this.dbLog.info(
       `${this.config.vehicleName} stopped charging at SOC ${
         this.socPercent.toFixed(1)
       }%`,
-    );
-    this.dbLog.info("stopCharging", {
-      payload: {
-        vehicleId: this.id,
-        socPercent: Math.round(this.socPercent * 10) / 10,
+      {
+        payload: {
+          vehicleId: this.id,
+          socPercent: Math.round(this.socPercent * 10) / 10,
+        },
+        origin: ctx.origin,
+        traceId: ctx.traceId,
       },
-      origin: ctx.origin,
-      traceId: ctx.traceId,
-    });
+    );
     return Promise.resolve(true);
   }
 
@@ -197,32 +197,27 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
       Math.min(this.config.maxAmps, Math.round(amps)),
     );
 
-    if (this.isCharging) {
-      const powerW = this.calculatePowerKw() * 1000;
-      this.logger.debug(
-        `${this.config.vehicleName} amps set to ${this.chargeAmps}A (${
-          Math.round(powerW)
-        }W)`,
-      );
-    }
-    this.dbLog.info("setChargeAmps", {
-      payload: { vehicleId: this.id, amps: this.chargeAmps },
-      origin: ctx.origin,
-      traceId: ctx.traceId,
-    });
+    this.dbLog.info(
+      `${this.config.vehicleName} amps set to ${this.chargeAmps}A`,
+      {
+        payload: { vehicleId: this.id, amps: this.chargeAmps },
+        origin: ctx.origin,
+        traceId: ctx.traceId,
+      },
+    );
     return Promise.resolve(true);
   }
 
   async setChargeLimit(percent: number, ctx: CallContext): Promise<boolean> {
     this.chargeLimit = Math.max(0, Math.min(100, Math.round(percent)));
-    this.logger.info(
+    this.dbLog.info(
       `${this.config.vehicleName} charge limit set to ${this.chargeLimit}%`,
+      {
+        payload: { vehicleId: this.id, chargeLimit: this.chargeLimit },
+        origin: ctx.origin,
+        traceId: ctx.traceId,
+      },
     );
-    this.dbLog.info("setChargeLimit", {
-      payload: { vehicleId: this.id, chargeLimit: this.chargeLimit },
-      origin: ctx.origin,
-      traceId: ctx.traceId,
-    });
 
     if (this.isCharging && this.socPercent >= this.chargeLimit) {
       await this.stopCharging(ctx);

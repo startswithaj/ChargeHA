@@ -17,6 +17,8 @@ describe("OCPP adapter — setChargeAmps profiles", () => {
     connected: true,
     status: "Charging",
     errorCode: "NoError",
+    statusInfo: null,
+    vendorErrorCode: null,
     info: null,
     transactionId,
     meterStartWh: 0,
@@ -32,6 +34,7 @@ describe("OCPP adapter — setChargeAmps profiles", () => {
   const CONFIG = {
     chargerId: "row-1",
     meterTimeoutSeconds: 300,
+    disconnectGraceSeconds: 120,
     maxAmps: 32,
     minAmps: 6,
     phases: 3,
@@ -63,7 +66,7 @@ describe("OCPP adapter — setChargeAmps profiles", () => {
   // Flattens each profile to the parts the charger acts on.
   const summarise = (sent: unknown[]) =>
     sent.map((entry) => {
-      const p = entry as {
+      const p = (entry as { payload: unknown }).payload as {
         connectorId: number;
         csChargingProfiles: {
           chargingProfilePurpose: string;
