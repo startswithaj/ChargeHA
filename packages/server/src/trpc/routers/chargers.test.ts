@@ -75,7 +75,7 @@ describe("Chargers tRPC Router", () => {
       const caller = callerWithStub({
         setMode: (id, mode, ctx) => {
           calls.push([id, mode, ctx]);
-          return Promise.resolve();
+          return Promise.resolve({ success: true });
         },
       });
       await caller.charger.setMode({ id: "charger-1", mode: "charge_now" });

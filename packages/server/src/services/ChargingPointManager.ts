@@ -633,22 +633,26 @@ export class ChargingPointManager {
     id: string,
     mode: ChargingPointMode,
     ctx: CallContext,
-  ): Promise<void> {
+  ): Promise<{ success: boolean; error?: string }> {
     await this.db.updateChargerMode(id, mode);
     const entry = this.chargers.get(id);
     if (entry) entry.row = { ...entry.row, mode };
     this.eventEmitter.emit("chargers_changed", {});
 
     const state = this.getState(id);
-    if (!state) return;
+    if (!state) {
+      if (mode === "auto") return { success: true };
+      return { success: false, error: "No charger state available" };
+    }
     if (mode === "charge_now") {
-      await this.startChargingAt(id, state.chargeAmpsMax, ctx, state, {
+      return await this.startChargingAt(id, state.chargeAmpsMax, ctx, state, {
         force: true,
       });
     }
     if (mode === "stop") {
-      await this.stopCharging(id, ctx, state, { force: true });
+      return await this.stopCharging(id, ctx, state, { force: true });
     }
+    return { success: true };
   }
 
   async reorder(order: string[]): Promise<void> {

@@ -11,6 +11,7 @@ import {
   authorizeReq,
   bootNotificationReq,
   chargingProfilePayload,
+  type ChargingProfileRequest,
   meterValuesReq,
   startTransactionReq,
   statusNotificationReq,
@@ -63,9 +64,7 @@ export interface OcppChargerHandle {
   getData(): OcppLiveData;
   remoteStart(): Promise<boolean>;
   remoteStop(): Promise<boolean>;
-  setChargingProfiles(payloads: Array<Record<string, unknown>>): Promise<
-    boolean
-  >;
+  setChargingProfiles(profiles: ChargingProfileRequest[]): Promise<boolean>;
   ping(): Promise<{ latencyMs: number }>;
 }
 
@@ -244,7 +243,14 @@ export class OcppCentralSystem {
     const res = await this.send(chargePointId, action, payload);
     const accepted = isAccepted(res);
     this.logOutcome(chargePointId, action, accepted, res);
-    return accepted;
+    if (!accepted) {
+      throw new Error(
+        `${action} not accepted: ${resultStatus(res)}${
+          this.chargerContext(chargePointId)
+        }`,
+      );
+    }
+    return true;
   }
 
   // Rare and user- or controller-triggered, so info/warn is safe volume.
@@ -272,21 +278,46 @@ export class OcppCentralSystem {
     const res = await this.send(
       chargePointId,
       "SetChargingProfile",
-      chargingProfilePayload("ChargePointMaxProfile", 0),
+      chargingProfilePayload("ChargePointMaxProfile", 0).payload,
     );
     return isAccepted(res);
   }
 
   async setChargingProfiles(
     chargePointId: string,
-    payloads: Array<Record<string, unknown>>,
+    profiles: ChargingProfileRequest[],
   ): Promise<boolean> {
     const results = await Promise.all(
-      payloads.map((p) => this.send(chargePointId, "SetChargingProfile", p)),
+      profiles.map((p) =>
+        this.send(chargePointId, "SetChargingProfile", p.payload)
+      ),
     );
     const accepted = results.every(isAccepted);
     this.logOutcome(chargePointId, "SetChargingProfile", accepted, results);
-    return accepted;
+    if (!accepted) {
+      const detail = profiles
+        .map((p, i) => `${p.purpose}=${resultStatus(results[i])}`)
+        .join(", ");
+      throw new Error(
+        `SetChargingProfile not accepted: ${detail}${
+          this.chargerContext(chargePointId)
+        }`,
+      );
+    }
+    return true;
+  }
+
+  private chargerContext(chargePointId: string): string {
+    const data = this.getData(chargePointId);
+    if (data.status === null) return "";
+    if (data.errorCode === null || data.errorCode === "NoError") {
+      return ` (charger status ${data.status})`;
+    }
+    const vendor = data.vendorErrorCode !== null
+      ? `/${data.vendorErrorCode}`
+      : "";
+    const info = data.statusInfo !== null ? `: ${data.statusInfo}` : "";
+    return ` (charger status ${data.status} ${data.errorCode}${vendor}${info})`;
   }
 
   // GetConfiguration round trip: proves the charger answers calls.
@@ -447,7 +478,12 @@ export class OcppCentralSystem {
         return { currentTime: new Date().toISOString() };
       case "StatusNotification": {
         const s = statusNotificationReq.parse(payload);
-        this.patch(chargePointId, { status: s.status, errorCode: s.errorCode });
+        this.patch(chargePointId, {
+          status: s.status,
+          errorCode: s.errorCode,
+          statusInfo: s.info ?? null,
+          vendorErrorCode: s.vendorErrorCode ?? null,
+        });
         return {};
       }
       case "MeterValues": {
@@ -569,6 +605,13 @@ export class OcppCentralSystem {
   private patch(chargePointId: string, delta: Partial<OcppLiveData>): void {
     this.connections.get(chargePointId)?.patch(delta);
   }
+}
+
+function resultStatus(res: unknown): string {
+  if (typeof res === "object" && res !== null && "status" in res) {
+    return String((res as { status: unknown }).status);
+  }
+  return "no status in response";
 }
 
 function isAccepted(res: unknown): boolean {

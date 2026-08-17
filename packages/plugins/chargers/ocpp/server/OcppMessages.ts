@@ -26,6 +26,8 @@ export const statusNotificationReq = z.object({
   connectorId: z.number(),
   errorCode: z.string(),
   status: chargePointStatus,
+  info: z.string().optional(),
+  vendorErrorCode: z.string().optional(),
 }).passthrough();
 
 export const sampledValue = z.object({
@@ -85,23 +87,36 @@ export const changeConfigurationRes = z.object({
   status: z.string(),
 }).passthrough();
 
+export type ChargingProfilePurpose =
+  | "ChargePointMaxProfile"
+  | "TxProfile"
+  | "TxDefaultProfile";
+
+export interface ChargingProfileRequest {
+  purpose: ChargingProfilePurpose;
+  payload: Record<string, unknown>;
+}
+
 // Three-tier charging profile payloads (HA-integration pattern).
 export function chargingProfilePayload(
-  purpose: "ChargePointMaxProfile" | "TxProfile" | "TxDefaultProfile",
+  purpose: ChargingProfilePurpose,
   amps: number,
   transactionId?: number,
-) {
+): ChargingProfileRequest {
   return {
-    connectorId: purpose === "ChargePointMaxProfile" ? 0 : 1,
-    csChargingProfiles: {
-      chargingProfileId: purposeIds[purpose],
-      stackLevel: 0,
-      chargingProfilePurpose: purpose,
-      chargingProfileKind: "Absolute",
-      ...(transactionId !== undefined && { transactionId }),
-      chargingSchedule: {
-        chargingRateUnit: "A",
-        chargingSchedulePeriod: [{ startPeriod: 0, limit: amps }],
+    purpose,
+    payload: {
+      connectorId: purpose === "ChargePointMaxProfile" ? 0 : 1,
+      csChargingProfiles: {
+        chargingProfileId: purposeIds[purpose],
+        stackLevel: 0,
+        chargingProfilePurpose: purpose,
+        chargingProfileKind: "Absolute",
+        ...(transactionId !== undefined && { transactionId }),
+        chargingSchedule: {
+          chargingRateUnit: "A",
+          chargingSchedulePeriod: [{ startPeriod: 0, limit: amps }],
+        },
       },
     },
   };

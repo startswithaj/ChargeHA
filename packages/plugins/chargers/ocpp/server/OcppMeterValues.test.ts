@@ -287,6 +287,8 @@ describe("OCPP adapter — tier 3 power derivation", () => {
     connected: true,
     status: "Charging",
     errorCode: "NoError",
+    statusInfo: null,
+    vendorErrorCode: null,
     info: null,
     transactionId: 1,
     meterStartWh: 0,
