@@ -273,19 +273,27 @@ describe("OCPP e2e", () => {
     expect(state?.chargePowerKw ?? 0).toBeGreaterThan(0); // loose: timing-safe
   });
 
-  it("stale MeterValues flips the charger to faulted", async () => {
+  it("stale MeterValues flips the charger to faulted mid-transaction", async () => {
     // Shrink the meter timeout rather than mock the clock: keeps the check
     // in-band and deterministic.
     await ocppTrpc.plugin.charger.ocpp.setConfig.mutate({
       chargerRowId: await ocppRowId(),
       values: { ocppMeterTimeoutSeconds: "5" },
     });
-    await vcpSend("MeterValues", meterValuesPayload(7200, 2000));
+    // Staleness only counts while a transaction runs — an idle charger sends
+    // no MeterValues and must not fault. The transaction id rides in on the
+    // MeterValues so the app adopts it.
+    await vcpSend("MeterValues", meterValuesPayload(7200, 2000, 4242));
     const state = await waitFor(async () => {
       const s = (await ocppRow())?.state;
       return s?.status === "faulted" ? s : null;
     }, { label: "stale → faulted", timeoutMs: 30_000 });
     expect(state.statusDetail).toBe("stale (no MeterValues)");
+    await vcpSend("StopTransaction", {
+      transactionId: 4242,
+      meterStop: 2000,
+      timestamp: new Date().toISOString(),
+    });
     await ocppTrpc.plugin.charger.ocpp.setConfig.mutate({
       chargerRowId: await ocppRowId(),
       values: { ocppMeterTimeoutSeconds: "300" },
