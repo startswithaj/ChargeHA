@@ -36,6 +36,7 @@ const PLUGGED_STATUSES: ReadonlySet<ChargePointStatus> = new Set([
 export interface OcppAdapterConfig {
   chargerId: string;
   meterTimeoutSeconds: number;
+  disconnectGraceSeconds: number;
   maxAmps: number;
   minAmps: number;
   // From the plugin's phases setting — a charger can't report this.
@@ -47,6 +48,7 @@ export class OcppChargerAdapter implements ChargerAdapter {
   // Tracks whether the last computed state was stale, so the dashboard's
   // frequent polling only writes a log row on the transition, not every poll.
   private wasStale = false;
+  private disconnectedSince: number | null = null;
 
   constructor(
     private readonly config: OcppAdapterConfig,
@@ -134,7 +136,17 @@ export class OcppChargerAdapter implements ChargerAdapter {
       });
     }
     this.wasStale = meterStale;
-    const disconnected = !data.connected || meterStale;
+    if (data.connected) {
+      this.disconnectedSince = null;
+    } else if (this.disconnectedSince === null) {
+      this.disconnectedSince = Date.now();
+    }
+    // Chargers drop and re-dial the socket routinely; a fault that clears
+    // itself within the grace window was never worth alarming on.
+    const graceMs = this.config.disconnectGraceSeconds * 1000;
+    const socketDown = this.disconnectedSince !== null &&
+      Date.now() - this.disconnectedSince >= graceMs;
+    const disconnected = socketDown || meterStale;
     const charging = isChargingNow(data);
     const status = resolveStatus(disconnected, data.status, charging);
 

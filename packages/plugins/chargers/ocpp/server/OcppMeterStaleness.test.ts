@@ -32,7 +32,7 @@ describe("OCPP meter staleness", () => {
     ...overrides,
   });
 
-  const adapterFor = (data: OcppLiveData) => {
+  const adapterFor = (data: OcppLiveData, disconnectGraceSeconds = 0) => {
     const logger = new Logger("OcppTest", "error");
     const handle: OcppChargerHandle = {
       getData: () => data,
@@ -45,6 +45,7 @@ describe("OCPP meter staleness", () => {
       {
         chargerId: "row-1",
         meterTimeoutSeconds: 300,
+        disconnectGraceSeconds,
         maxAmps: 32,
         minAmps: 6,
         phases: 1,
@@ -101,6 +102,22 @@ describe("OCPP meter staleness", () => {
     const state = await adapter.getChargerState(ctx);
 
     expect(state.status).toBe("faulted");
+  });
+
+  it("rides out a socket drop within the grace window without faulting", async () => {
+    const adapter = adapterFor(
+      liveData({
+        connected: false,
+        status: null,
+        transactionId: null,
+        lastMeterValuesAt: null,
+      }),
+      120,
+    );
+
+    const state = await adapter.getChargerState(ctx);
+
+    expect(state.status).not.toBe("faulted");
   });
 
   it("clears the MeterValues timestamp on StopTransaction", async () => {

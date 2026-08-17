@@ -315,6 +315,7 @@ describe("OCPP adapter — tier 3 power derivation", () => {
       {
         chargerId: "row-1",
         meterTimeoutSeconds: 300,
+        disconnectGraceSeconds: 120,
         maxAmps: 32,
         minAmps: 6,
         phases,
