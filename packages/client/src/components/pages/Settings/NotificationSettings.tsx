@@ -2,7 +2,10 @@ import { useCallback } from "react";
 import { Bell, CheckCircle, Send } from "lucide-react";
 import { Button, Select, Switch, Text, TextField } from "@radix-ui/themes";
 import type { NotificationConfig } from "@chargeha/shared/configSections";
-import { NOTIFICATION_EVENTS } from "@chargeha/shared";
+import {
+  MANDATORY_NOTIFICATION_EVENTS,
+  NOTIFICATION_EVENTS,
+} from "@chargeha/shared";
 import { trpc } from "../../../trpc.ts";
 import {
   useNotificationConfig,
@@ -123,25 +126,31 @@ function EventToggles(
       <SettingsRow label="Toggle All" help="Enable or disable all events">
         <Switch
           checked={NOTIFICATION_EVENTS.every((evt) =>
+            MANDATORY_NOTIFICATION_EVENTS.has(evt.key) ||
             enabledEvents.includes(evt.key)
           )}
           onCheckedChange={(checked) => {
-            const newEvents = checked
-              ? NOTIFICATION_EVENTS.map((evt) => evt.key)
-              : [];
+            const pool = NOTIFICATION_EVENTS.filter((evt) =>
+              checked || MANDATORY_NOTIFICATION_EVENTS.has(evt.key)
+            );
+            const newEvents = pool.map((evt) => evt.key);
             setField("notificationEnabledEvents", newEvents.join(","));
           }}
         />
       </SettingsRow>
-      {NOTIFICATION_EVENTS.map((evt) => (
-        <SettingsRow key={evt.key} label={evt.label} help={evt.description}>
-          <Switch
-            checked={enabledEvents.includes(evt.key)}
-            onCheckedChange={() =>
-              toggleEvent(evt.key)}
-          />
-        </SettingsRow>
-      ))}
+      {NOTIFICATION_EVENTS.map((evt) => {
+        const mandatory = MANDATORY_NOTIFICATION_EVENTS.has(evt.key);
+        return (
+          <SettingsRow key={evt.key} label={evt.label} help={evt.description}>
+            <Switch
+              checked={mandatory || enabledEvents.includes(evt.key)}
+              disabled={mandatory}
+              onCheckedChange={() =>
+                toggleEvent(evt.key)}
+            />
+          </SettingsRow>
+        );
+      })}
       <div
         style={{
           display: "flex",
