@@ -33,6 +33,8 @@ const PLUGGED_STATUSES: ReadonlySet<ChargePointStatus> = new Set([
   "Finishing",
 ]);
 
+const COMMAND_CONFIRM_MS = 30_000;
+
 export interface OcppAdapterConfig {
   chargerId: string;
   meterTimeoutSeconds: number;
@@ -49,6 +51,11 @@ export class OcppChargerAdapter implements ChargerAdapter {
   // frequent polling only writes a log row on the transition, not every poll.
   private wasStale = false;
   private disconnectedSince: number | null = null;
+  // OCPP confirms start/stop by push, not in the command reply; without
+  // bridging that lag the controller re-sends the command every loop and
+  // the charger rejects the duplicates.
+  private pendingCommand: { command: "start" | "stop"; at: number } | null =
+    null;
 
   constructor(
     private readonly config: OcppAdapterConfig,
@@ -65,14 +72,18 @@ export class OcppChargerAdapter implements ChargerAdapter {
     return Promise.resolve();
   }
 
-  startCharging(ctx: CallContext): Promise<boolean> {
+  async startCharging(ctx: CallContext): Promise<boolean> {
     this.command("info", "remoteStart", {}, ctx);
-    return this.cs.remoteStart();
+    const ok = await this.cs.remoteStart();
+    if (ok) this.pendingCommand = { command: "start", at: Date.now() };
+    return ok;
   }
 
-  stopCharging(ctx: CallContext): Promise<boolean> {
+  async stopCharging(ctx: CallContext): Promise<boolean> {
     this.command("info", "remoteStop", {}, ctx);
-    return this.cs.remoteStop();
+    const ok = await this.cs.remoteStop();
+    if (ok) this.pendingCommand = { command: "stop", at: Date.now() };
+    return ok;
   }
 
   // Three-tier profile per the HA-integration pattern.
@@ -93,6 +104,21 @@ export class OcppChargerAdapter implements ChargerAdapter {
 
   getChargerState(ctx: CallContext): Promise<ChargerState> {
     return Promise.resolve(this.buildState(this.cs.getData(), ctx));
+  }
+
+  // Bridges the gap between an accepted start/stop and the charger's own
+  // confirmation push: reports the commanded state until the charger agrees
+  // or the window lapses.
+  private confirmCharging(real: boolean): boolean {
+    const pending = this.pendingCommand;
+    if (pending === null) return real;
+    const expected = pending.command === "start";
+    const lapsed = Date.now() - pending.at >= COMMAND_CONFIRM_MS;
+    if (real === expected || lapsed) {
+      this.pendingCommand = null;
+      return real;
+    }
+    return expected;
   }
 
   private command(
@@ -136,6 +162,7 @@ export class OcppChargerAdapter implements ChargerAdapter {
       });
     }
     this.wasStale = meterStale;
+    const charging = this.confirmCharging(isChargingNow(data));
     if (data.connected) {
       this.disconnectedSince = null;
     } else if (this.disconnectedSince === null) {
@@ -147,7 +174,6 @@ export class OcppChargerAdapter implements ChargerAdapter {
     const socketDown = this.disconnectedSince !== null &&
       Date.now() - this.disconnectedSince >= graceMs;
     const disconnected = socketDown || meterStale;
-    const charging = isChargingNow(data);
     const status = resolveStatus(disconnected, data.status, charging);
 
     return {
