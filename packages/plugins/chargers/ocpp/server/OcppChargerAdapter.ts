@@ -110,7 +110,9 @@ export class OcppChargerAdapter implements ChargerAdapter {
     const meterAgeMs = data.lastMeterValuesAt === null
       ? null
       : Date.now() - data.lastMeterValuesAt;
-    const meterStale = meterAgeMs !== null &&
+    // OCPP 1.6 MeterValues are transaction-scoped: an idle charger sends
+    // none, so silence only signals trouble while a transaction is active.
+    const meterStale = data.transactionId !== null && meterAgeMs !== null &&
       meterAgeMs > this.config.meterTimeoutSeconds * 1000;
     // Log only the transition into/out of staleness — this is read on every
     // dashboard poll, and a stuck charger would otherwise flood the table.

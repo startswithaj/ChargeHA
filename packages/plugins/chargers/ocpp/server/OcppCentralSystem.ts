@@ -515,7 +515,11 @@ export class OcppCentralSystem {
         };
       }
       case "StopTransaction": {
-        this.patch(chargePointId, { transactionId: null, meterStartWh: null });
+        this.patch(chargePointId, {
+          transactionId: null,
+          meterStartWh: null,
+          lastMeterValuesAt: null,
+        });
         return { idTagInfo: { status: "Accepted" } };
       }
       case "Authorize":
