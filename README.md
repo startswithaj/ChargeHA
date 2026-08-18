@@ -421,6 +421,13 @@ Contributions are very welcome — especially **new vehicles, inverters, and
 chargers**. If you own hardware ChargeHA doesn't support yet, adding it is
 usually a weekend's work.
 
+New features will be considered, but not every feature can be included. Feature
+bloat is a real issue in the age of AI, and the codebase cannot stay manageable
+if every vibe-coded feature is merged. ChargeHA has a plugin architecture for
+charger, inverter, and vehicle integrations. I'm open to extending that plugin
+architecture to other, more core features that people can opt into — and to PRs
+along those lines — but the codebase does not have this capability today.
+
 ### Plugin architecture
 
 Every integration lives in `packages/plugins/` as a self-contained plugin. Core
