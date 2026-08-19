@@ -219,7 +219,13 @@ describe("OCPP measurand negotiation — refusals", () => {
     await answer(socket, { unknownKey: ["MeterValuesSampledData"] });
     await call(socket, "BootNotification", BOOT);
 
-    expect(callsTo(socket, "GetConfiguration")).toHaveLength(1);
+    // Only the negotiator's filtered reads: the max-amps detector sends its
+    // own unfiltered GetConfiguration once, which is not what this rate
+    // limit is about.
+    const reads = callsTo(socket, "GetConfiguration").filter(
+      (f) => (f[3] as { key?: unknown }).key !== undefined,
+    );
+    expect(reads).toHaveLength(1);
   });
 
   it("rate-limits a flapping charger to one negotiation per reconnect burst", async () => {
@@ -234,8 +240,12 @@ describe("OCPP measurand negotiation — refusals", () => {
     await call(socket, "BootNotification", BOOT);
 
     // The two reads of the one negotiation, and nothing from the two boots
-    // that followed it.
-    expect(callsTo(socket, "GetConfiguration")).toHaveLength(2);
+    // that followed it. Filtered reads only — the max-amps detector's one
+    // unfiltered dump is counted elsewhere.
+    const reads = callsTo(socket, "GetConfiguration").filter(
+      (f) => (f[3] as { key?: unknown }).key !== undefined,
+    );
+    expect(reads).toHaveLength(2);
   });
 
   it("records a disconnect mid-negotiation instead of throwing", async () => {

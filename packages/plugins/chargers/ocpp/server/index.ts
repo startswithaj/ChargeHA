@@ -93,13 +93,17 @@ export class OcppChargerPlugin implements ChargerPlugin {
   // Every OCPP row that has a charge point id. A row without one is
   // unconfigured and stays silent in every check.
   private async configuredPoints(): Promise<
-    Array<{ name: string; chargePointId: string }>
+    Array<{ name: string; chargePointId: string; maxAmps: number }>
   > {
     const entries = await this.deps.resolveChargerConfigs();
     return entries
-      .map((e) => ({ name: e.row.name, chargePointId: e.config.charger_id }))
+      .map((e) => ({
+        name: e.row.name,
+        chargePointId: e.config.charger_id,
+        maxAmps: intConfig(e.config.max_amps, 32),
+      }))
       .filter(
-        (p): p is { name: string; chargePointId: string } =>
+        (p): p is { name: string; chargePointId: string; maxAmps: number } =>
           p.chargePointId !== undefined,
       );
   }
@@ -140,6 +144,25 @@ export class OcppChargerPlugin implements ChargerPlugin {
         });
         if (degraded.length === 0) return { status: "ok" };
         return { status: "warning", message: degraded.join(" ") };
+      },
+    }, {
+      // A warning, never an error: commands under the limit still work.
+      name: "ocpp-max-amps",
+      timeoutMs: 2000,
+      warningTitle: "Max amps exceeds the charger's limit",
+      warningMessage:
+        "The configured max amps is higher than the limit the charger " +
+        "reports. Commands above the charger's limit will be rejected.",
+      run: async () => {
+        const over = (await this.configuredPoints()).flatMap((p) => {
+          const detected = this.centralSystem.detectedMaxAmps(p.chargePointId);
+          if (detected === null || p.maxAmps <= detected) return [];
+          return [
+            `${p.name}: set to ${p.maxAmps}A, charger limit ${detected}A.`,
+          ];
+        });
+        if (over.length === 0) return { status: "ok" };
+        return { status: "warning", message: over.join(" ") };
       },
     }];
   }
