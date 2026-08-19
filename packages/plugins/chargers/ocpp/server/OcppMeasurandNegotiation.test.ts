@@ -219,13 +219,14 @@ describe("OCPP measurand negotiation — refusals", () => {
     await answer(socket, { unknownKey: ["MeterValuesSampledData"] });
     await call(socket, "BootNotification", BOOT);
 
-    // Only the negotiator's filtered reads: the max-amps detector sends its
-    // own unfiltered GetConfiguration once, which is not what this rate
-    // limit is about.
-    const reads = callsTo(socket, "GetConfiguration").filter(
+    const reads = callsTo(socket, "GetConfiguration");
+    const negotiatorReads = reads.filter(
       (f) => (f[3] as { key?: unknown }).key !== undefined,
     );
-    expect(reads).toHaveLength(1);
+    expect(negotiatorReads).toHaveLength(1);
+    // The detector's unfiltered dump is rate-limited, so the second boot
+    // adds nothing.
+    expect(reads.length - negotiatorReads.length).toBe(1);
   });
 
   it("rate-limits a flapping charger to one negotiation per reconnect burst", async () => {
@@ -240,12 +241,15 @@ describe("OCPP measurand negotiation — refusals", () => {
     await call(socket, "BootNotification", BOOT);
 
     // The two reads of the one negotiation, and nothing from the two boots
-    // that followed it. Filtered reads only — the max-amps detector's one
-    // unfiltered dump is counted elsewhere.
-    const reads = callsTo(socket, "GetConfiguration").filter(
+    // that followed it.
+    const reads = callsTo(socket, "GetConfiguration");
+    const negotiatorReads = reads.filter(
       (f) => (f[3] as { key?: unknown }).key !== undefined,
     );
-    expect(reads).toHaveLength(2);
+    expect(negotiatorReads).toHaveLength(2);
+    // The detector's unfiltered dump is rate-limited, so two more boots
+    // add nothing.
+    expect(reads.length - negotiatorReads.length).toBe(1);
   });
 
   it("records a disconnect mid-negotiation instead of throwing", async () => {
