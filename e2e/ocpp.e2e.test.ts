@@ -8,7 +8,7 @@ import {
   SAP_STATION_ID,
   sapConfigValue,
   sapReconnect,
-  sapTransactionStarted,
+  sapTransactionId,
   vcpSend,
 } from "./ocppHelpers.ts";
 
@@ -39,6 +39,38 @@ describe("OCPP e2e", () => {
     const row = await ocppRow(chargePointId);
     if (!row) throw new Error(`No OCPP charger row for ${chargePointId}`);
     return row.id;
+  }
+
+  async function injectStatus(status: string) {
+    await vcpSend("StatusNotification", {
+      connectorId: 1,
+      errorCode: "NoError",
+      status,
+    });
+  }
+
+  async function stationAndAppIdle(chargerId: string) {
+    const liveTx = await sapTransactionId();
+    if (liveTx !== undefined) {
+      await vcpSend("StopTransaction", { transactionId: liveTx });
+    }
+    await injectStatus("Available");
+    await waitFor(async () => {
+      if (await sapTransactionId() !== undefined) return null;
+      const s = (await trpc.charger.list.query())
+        .find((c) => c.id === chargerId)?.state;
+      return s?.isCharging === false ? true : null;
+    }, { label: "station and app idle" });
+  }
+
+  async function startFreshTransaction(chargerId: string): Promise<number> {
+    await injectStatus("Preparing");
+    const priorTx = await sapTransactionId();
+    await trpc.charger.setMode.mutate({ id: chargerId, mode: "charge_now" });
+    return await waitFor(async () => {
+      const id = await sapTransactionId();
+      return id !== undefined && id !== priorTx ? id : null;
+    }, { label: "station started a new transaction" });
   }
 
   beforeAll(async () => {
@@ -190,32 +222,17 @@ describe("OCPP e2e", () => {
 
   it("stop mode sends RemoteStop and the transaction ends", async () => {
     const chargerId = await ocppRowId();
-    // Start this test's own transaction rather than inheriting one. The
-    // status-mapping tests above inject Reserved, which is "booked, no cable"
-    // — the station ends its transaction on it. So by the time this runs
-    // there is nothing left to stop, and remoteStop() would take its
-    // no-transaction fallback (a 0A profile) and prove nothing.
-    await vcpSend("StatusNotification", {
-      connectorId: 1,
-      errorCode: "NoError",
-      status: "Preparing",
-    });
-    await trpc.charger.setMode.mutate({ id: chargerId, mode: "charge_now" });
-
-    // The station's own transaction, not the app's opinion of one — that is
-    // the thing RemoteStop has to end below.
-    await waitFor(async () => await sapTransactionStarted() || null, {
-      label: "station transaction running before stop",
-    });
+    // Earlier tests leave station and app disagreeing about a transaction —
+    // reset both sides so stop targets a transaction that really exists.
+    await stationAndAppIdle(chargerId);
+    await startFreshTransaction(chargerId);
 
     await trpc.charger.setMode.mutate({ id: chargerId, mode: "stop" });
 
-    // The station's own state, not a status the test injected: a remoteStop()
-    // that never sends RemoteStopTransaction must fail here.
-    await waitFor(async () => await sapTransactionStarted() ? null : true, {
-      label: "station ended the transaction after RemoteStop",
-    });
-
+    await waitFor(
+      async () => await sapTransactionId() === undefined ? true : null,
+      { label: "station ended the transaction after RemoteStop" },
+    );
     const state = await waitFor(async () => {
       const s = (await trpc.charger.list.query())
         .find((c) => c.id === chargerId)?.state;
@@ -273,19 +290,27 @@ describe("OCPP e2e", () => {
     expect(state?.chargePowerKw ?? 0).toBeGreaterThan(0); // loose: timing-safe
   });
 
-  it("stale MeterValues flips the charger to faulted", async () => {
+  it("stale MeterValues flips the charger to faulted mid-transaction", async () => {
     // Shrink the meter timeout rather than mock the clock: keeps the check
     // in-band and deterministic.
     await ocppTrpc.plugin.charger.ocpp.setConfig.mutate({
       chargerRowId: await ocppRowId(),
       values: { ocppMeterTimeoutSeconds: "5" },
     });
-    await vcpSend("MeterValues", meterValuesPayload(7200, 2000));
+    // Staleness only counts while a transaction runs — an idle charger sends
+    // no MeterValues and must not fault. The transaction id rides in on the
+    // MeterValues so the app adopts it.
+    await vcpSend("MeterValues", meterValuesPayload(7200, 2000, 4242));
     const state = await waitFor(async () => {
       const s = (await ocppRow())?.state;
       return s?.status === "faulted" ? s : null;
     }, { label: "stale → faulted", timeoutMs: 30_000 });
     expect(state.statusDetail).toBe("stale (no MeterValues)");
+    await vcpSend("StopTransaction", {
+      transactionId: 4242,
+      meterStop: 2000,
+      timestamp: new Date().toISOString(),
+    });
     await ocppTrpc.plugin.charger.ocpp.setConfig.mutate({
       chargerRowId: await ocppRowId(),
       values: { ocppMeterTimeoutSeconds: "300" },

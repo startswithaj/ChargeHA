@@ -64,7 +64,6 @@ export class EnphaseLocalAdapter implements EnergySourceAdapter {
       const mode = map ? "CT meter readings" : "solar-only fallback";
       const message =
         `Connected to Envoy at ${this.client.host} — using ${mode}`;
-      this.logger.info(message);
       await this.dbLog.info(message);
     } catch (err) {
       await this.recordPollError(err);
@@ -131,7 +130,6 @@ export class EnphaseLocalAdapter implements EnergySourceAdapter {
     if (!this.meterMap) {
       const message =
         "Envoy has no enabled production + net-consumption CT meters — falling back to solar-only readings (grid reported as 0)";
-      this.logger.info(message);
       await this.dbLog.info(message);
     }
     return this.meterMap;
@@ -215,7 +213,6 @@ export class EnphaseLocalAdapter implements EnergySourceAdapter {
         this.ensembleAbsent = true;
         const message =
           "Envoy has no battery (ensemble endpoints absent) — skipping battery readings";
-        this.logger.info(message);
         await this.dbLog.info(message);
         return null;
       }

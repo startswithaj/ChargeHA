@@ -169,28 +169,30 @@ export async function sapConfigValue(
     ?.find((k) => k.key === key)?.value;
 }
 
-// Connector 1's transaction state as the STATION holds it. The app's own
-// charger state only shows what it believes; this is what actually happened
-// on the wire, so a RemoteStart/RemoteStop that was never sent cannot pass.
-export async function sapTransactionStarted(
+// Connector 1's transaction id as the STATION holds it — what happened on
+// the wire, not the app's belief. An id, not a boolean: a leftover
+// transaction from an earlier test would satisfy a "started" check.
+export async function sapTransactionId(
   stationId: string = SAP_STATION_ID,
-): Promise<boolean> {
+): Promise<number | undefined> {
   const res = await sapUi.request<
     {
       chargingStations: {
         stationInfo: { chargingStationId: string };
         connectors: {
           connectorId: number;
-          connectorStatus: { transactionStarted?: boolean };
+          connectorStatus: {
+            transactionStarted?: boolean;
+            transactionId?: number;
+          };
         }[];
       }[];
     }
   >("listChargingStations", {});
-  const station = res.chargingStations.find((s) =>
-    s.stationInfo.chargingStationId === stationId
-  );
-  return station?.connectors.find((c) => c.connectorId === 1)
-    ?.connectorStatus.transactionStarted === true;
+  const status = res.chargingStations
+    .find((s) => s.stationInfo.chargingStationId === stationId)
+    ?.connectors.find((c) => c.connectorId === 1)?.connectorStatus;
+  return status?.transactionStarted === true ? status.transactionId : undefined;
 }
 
 // Injects a charger-initiated OCPP message via the SAP UI server, replacing vcp's

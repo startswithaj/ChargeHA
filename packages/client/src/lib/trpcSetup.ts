@@ -35,6 +35,7 @@ export function shouldRetry(failureCount: number, error: unknown): boolean {
 export function handleAuthError(error: unknown): void {
   if (isUnauthorizedError(error)) {
     queryClient.clear();
+    void queryClient.refetchQueries({ queryKey: [["auth", "session"]] });
   }
 }
 

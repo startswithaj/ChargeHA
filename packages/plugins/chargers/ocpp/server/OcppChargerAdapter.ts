@@ -33,9 +33,12 @@ const PLUGGED_STATUSES: ReadonlySet<ChargePointStatus> = new Set([
   "Finishing",
 ]);
 
+const COMMAND_CONFIRM_MS = 30_000;
+
 export interface OcppAdapterConfig {
   chargerId: string;
   meterTimeoutSeconds: number;
+  disconnectGraceSeconds: number;
   maxAmps: number;
   minAmps: number;
   // From the plugin's phases setting — a charger can't report this.
@@ -47,6 +50,12 @@ export class OcppChargerAdapter implements ChargerAdapter {
   // Tracks whether the last computed state was stale, so the dashboard's
   // frequent polling only writes a log row on the transition, not every poll.
   private wasStale = false;
+  private disconnectedSince: number | null = null;
+  // OCPP confirms start/stop by push, not in the command reply; without
+  // bridging that lag the controller re-sends the command every loop and
+  // the charger rejects the duplicates.
+  private pendingCommand: { command: "start" | "stop"; at: number } | null =
+    null;
 
   constructor(
     private readonly config: OcppAdapterConfig,
@@ -63,14 +72,18 @@ export class OcppChargerAdapter implements ChargerAdapter {
     return Promise.resolve();
   }
 
-  startCharging(ctx: CallContext): Promise<boolean> {
+  async startCharging(ctx: CallContext): Promise<boolean> {
     this.command("info", "remoteStart", {}, ctx);
-    return this.cs.remoteStart();
+    const ok = await this.cs.remoteStart();
+    if (ok) this.pendingCommand = { command: "start", at: Date.now() };
+    return ok;
   }
 
-  stopCharging(ctx: CallContext): Promise<boolean> {
+  async stopCharging(ctx: CallContext): Promise<boolean> {
     this.command("info", "remoteStop", {}, ctx);
-    return this.cs.remoteStop();
+    const ok = await this.cs.remoteStop();
+    if (ok) this.pendingCommand = { command: "stop", at: Date.now() };
+    return ok;
   }
 
   // Three-tier profile per the HA-integration pattern.
@@ -93,6 +106,21 @@ export class OcppChargerAdapter implements ChargerAdapter {
     return Promise.resolve(this.buildState(this.cs.getData(), ctx));
   }
 
+  // Bridges the gap between an accepted start/stop and the charger's own
+  // confirmation push: reports the commanded state until the charger agrees
+  // or the window lapses.
+  private confirmCharging(real: boolean): boolean {
+    const pending = this.pendingCommand;
+    if (pending === null) return real;
+    const expected = pending.command === "start";
+    const lapsed = Date.now() - pending.at >= COMMAND_CONFIRM_MS;
+    if (real === expected || lapsed) {
+      this.pendingCommand = null;
+      return real;
+    }
+    return expected;
+  }
+
   private command(
     level: "info" | "debug",
     name: string,
@@ -110,7 +138,9 @@ export class OcppChargerAdapter implements ChargerAdapter {
     const meterAgeMs = data.lastMeterValuesAt === null
       ? null
       : Date.now() - data.lastMeterValuesAt;
-    const meterStale = meterAgeMs !== null &&
+    // OCPP 1.6 MeterValues are transaction-scoped: an idle charger sends
+    // none, so silence only signals trouble while a transaction is active.
+    const meterStale = data.transactionId !== null && meterAgeMs !== null &&
       meterAgeMs > this.config.meterTimeoutSeconds * 1000;
     // Log only the transition into/out of staleness — this is read on every
     // dashboard poll, and a stuck charger would otherwise flood the table.
@@ -132,8 +162,18 @@ export class OcppChargerAdapter implements ChargerAdapter {
       });
     }
     this.wasStale = meterStale;
-    const disconnected = !data.connected || meterStale;
-    const charging = isChargingNow(data);
+    const charging = this.confirmCharging(isChargingNow(data));
+    if (data.connected) {
+      this.disconnectedSince = null;
+    } else if (this.disconnectedSince === null) {
+      this.disconnectedSince = Date.now();
+    }
+    // Chargers drop and re-dial the socket routinely; a fault that clears
+    // itself within the grace window was never worth alarming on.
+    const graceMs = this.config.disconnectGraceSeconds * 1000;
+    const socketDown = this.disconnectedSince !== null &&
+      Date.now() - this.disconnectedSince >= graceMs;
+    const disconnected = socketDown || meterStale;
     const status = resolveStatus(disconnected, data.status, charging);
 
     return {
