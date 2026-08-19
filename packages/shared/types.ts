@@ -338,6 +338,9 @@ export const NOTIFICATION_EVENTS: NotificationEventInfo[] = [
   },
 ];
 
+export const MANDATORY_NOTIFICATION_EVENTS: ReadonlySet<NotificationEventType> =
+  new Set(["safety_trip"]);
+
 // ---- WebSocket Message Types ----
 
 // Single SSE subscription multiplexing all real-time events. Multiple

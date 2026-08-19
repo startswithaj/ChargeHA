@@ -19,6 +19,7 @@ import {
 import { readMeterValueFields } from "./OcppMeterValues.ts";
 import { measurandWarningFor } from "./OcppMeasurands.ts";
 import { OcppMeasurandNegotiator } from "./OcppMeasurandNegotiator.ts";
+import { OcppMaxAmpsDetector } from "./OcppMaxAmpsDetector.ts";
 
 // Several can turn up in one window (two chargers, or an old id still
 // retrying), so the user picks rather than us guessing.
@@ -80,6 +81,7 @@ export class OcppCentralSystem {
   private lastLogged: ChargerStamp | null = null;
   // Not per connection: the reconnect it must survive destroys that object.
   private readonly negotiator: OcppMeasurandNegotiator;
+  private readonly maxAmpsDetector: OcppMaxAmpsDetector;
 
   constructor(
     private readonly logger: Logger,
@@ -91,6 +93,10 @@ export class OcppCentralSystem {
     this.negotiator = new OcppMeasurandNegotiator(
       (id, action, payload) => this.send(id, action, payload),
       logger,
+      dbLog,
+    );
+    this.maxAmpsDetector = new OcppMaxAmpsDetector(
+      (id, action, payload) => this.send(id, action, payload),
       dbLog,
     );
   }
@@ -412,6 +418,11 @@ export class OcppCentralSystem {
   private async afterBoot(chargePointId: string): Promise<void> {
     if (!(await this.hasChargerRow(chargePointId))) return;
     await this.negotiator.negotiate(chargePointId);
+    await this.maxAmpsDetector.detect(chargePointId);
+  }
+
+  detectedMaxAmps(chargePointId: string): number | null {
+    return this.maxAmpsDetector.detectedMaxAmps(chargePointId);
   }
 
   // Evidence-based, so a false "Accepted" is caught but idle silence is not.
