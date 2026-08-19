@@ -152,8 +152,8 @@ export class OcppChargerPlugin implements ChargerPlugin {
       warningTitle: "Max amps exceeds the charger's limit",
       warningMessage:
         "The configured max amps is higher than the limit the charger " +
-        "reports, so commands above that limit will be rejected. Update the " +
-        "charger's max amps setting on the settings page.",
+        "reports it accepts, so commands above that limit will be rejected. " +
+        "Update the charger's max amps setting on the settings page.",
       run: async () => {
         const over = (await this.configuredPoints()).flatMap((p) => {
           const detected = this.centralSystem.detectedMaxAmps(p.chargePointId);
