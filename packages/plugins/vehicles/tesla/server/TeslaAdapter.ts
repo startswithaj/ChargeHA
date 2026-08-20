@@ -150,12 +150,15 @@ export class TeslaAdapter implements VehicleAdapter {
     const chargingState = charge.charging_state ?? "Unknown";
     const chargeAmps = charge.charge_amps ?? 0;
     const chargerVoltage = charge.charger_voltage ?? 0;
-    const chargerPhases = charge.charger_phases ?? 1;
+    // Reported only while charging; null is "unknown", which the engine
+    // resolves from the threePhaseCharger setting.
+    const chargerPhases = charge.charger_phases ?? null;
     // Compute from V × I × phases — Tesla's charger_power field rounds to
     // integer kW, which misreports e.g. 1.44 kW as 1 and shows 0 during
     // ramp-up transitions.
     const chargerPowerKw =
-      Math.round(chargeAmps * chargerVoltage * chargerPhases / 10) / 100;
+      Math.round(chargeAmps * chargerVoltage * (chargerPhases ?? 1) / 10) /
+      100;
     const notChargingStates = [
       "Disconnected",
       "Stopped",

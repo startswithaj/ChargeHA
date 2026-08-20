@@ -511,7 +511,7 @@ export class ControllerEngine {
       energy,
       config.gridVoltage,
     );
-    const phases = SolarAllocator.resolvePhases(state, config);
+    const phases = SolarAllocator.resolvePhases(state.chargerPhases, config);
 
     const availableW = SolarAllocator.calculateAvailableSolar(
       config,
@@ -878,7 +878,7 @@ export class ControllerEngine {
       energy,
       config.gridVoltage,
     );
-    const phases = SolarAllocator.resolvePhases(state, config);
+    const phases = SolarAllocator.resolvePhases(state.chargerPhases, config);
     const addBackW = SolarAllocator.addBackW(config, state, voltage, phases);
     return SolarAllocator.surplusW(energy, addBackW) / 1000;
   }

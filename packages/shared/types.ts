@@ -52,7 +52,7 @@ export interface VehicleChargeState {
   chargeAmpsMin: number; // Minimum charge amps (hardware limit)
   chargePowerKw: number; // Current charge power in kW
   chargerVoltage: number; // Charger voltage
-  chargerPhases: number; // Number of phases (1 or 3)
+  chargerPhases: number | null; // Phases (1 or 3); null = not reported
   energyAddedKwh: number; // Energy added this session
   minutesToFull: number; // Estimated minutes to charge limit
   chargePortOpen: boolean; // Charge port door open
@@ -168,7 +168,7 @@ export interface ChargerState {
   chargeAmpsMin: number;
   chargePowerKw: number | null;
   chargerVoltage: number | null;
-  chargerPhases: number;
+  chargerPhases: number | null;
   energyAddedKwh: number;
   status: ChargerStatus;
   // The adapter's native status, as close to the device as possible.
