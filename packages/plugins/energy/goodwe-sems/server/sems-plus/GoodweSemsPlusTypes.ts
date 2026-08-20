@@ -24,29 +24,18 @@ export interface SemsPlusStation {
   name: string;
 }
 
-// stations/simple-query paging response — defensive: the exact envelope is
-// unconfirmed, so records/list/bare-array and several name keys are accepted.
 export const semsPlusStationEntrySchema = z.object({
   id: z.union([z.string(), z.number()]).nullish(),
-  plantId: z.union([z.string(), z.number()]).nullish(),
   name: z.string().nullish(),
-  plantName: z.string().nullish(),
   stationName: z.string().nullish(),
 }).passthrough();
 
-export const semsPlusStationPageSchema = z.union([
-  z.array(semsPlusStationEntrySchema),
-  z.object({ records: z.array(semsPlusStationEntrySchema) }),
-  z.object({ list: z.array(semsPlusStationEntrySchema) }),
-]);
-
-export function stationEntries(
-  data: z.infer<typeof semsPlusStationPageSchema>,
-): z.infer<typeof semsPlusStationEntrySchema>[] {
-  if (Array.isArray(data)) return data;
-  if ("records" in data) return data.records;
-  return data.list;
-}
+// simple-query pages like every list in the SEMS+ app: data.dataList with
+// data.total, page keys current/size (index.2bdaccf7.js dataPath/totalPath).
+export const semsPlusStationPageSchema = z.object({
+  dataList: z.array(semsPlusStationEntrySchema).default([]),
+  total: z.number().nullish(),
+}).passthrough();
 
 export function parseFlow(data: unknown): SemsPlusFlow {
   const parsed = semsPlusFlowSchema.safeParse(data);
@@ -68,10 +57,10 @@ export function parseFlow(data: unknown): SemsPlusFlow {
 export function parseStations(data: unknown): SemsPlusStation[] | null {
   const parsed = semsPlusStationPageSchema.safeParse(data);
   if (!parsed.success) return null;
-  return stationEntries(parsed.data).flatMap((entry) => {
-    const id = entry.id ?? entry.plantId;
+  return parsed.data.dataList.flatMap((entry) => {
+    const id = entry.id;
     if (id === null || id === undefined) return [];
-    const name = entry.name ?? entry.plantName ?? entry.stationName;
+    const name = entry.name ?? entry.stationName;
     return [{ id: String(id), name: name || String(id) }];
   });
 }

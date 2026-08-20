@@ -20,6 +20,7 @@ import {
 describe("GoodweSemsPlusClient", () => {
   const LOGIN_PATH = "sems-user/api/v1/auth/cross-login";
   const FLOW_PATH = "sems-plant/api/stations/flow";
+  const STATION_LIST_PATH = "sems-plant/api/stations/simple-query";
   const GATEWAY_API = "https://au-gateway.semsportal.com/web/sems";
 
   const loginOk = (api: string = GATEWAY_API): MockResp =>
@@ -193,5 +194,61 @@ describe("GoodweSemsPlusClient", () => {
       call.url.includes(LOGIN_PATH)
     );
     expect(loginCalls.length).toBe(1);
+  });
+
+  it("logs in as semsPlusWeb so the gateway will accept the token", async () => {
+    mock.setPathResponse(LOGIN_PATH, loginOk());
+    mock.setPathResponse(FLOW_PATH, semsOk(buildSemsPlusFlow()));
+
+    await makeSemsPlus().getFlow("station-1");
+
+    const login = mock.fetchCalls.find((call) => call.url.includes(LOGIN_PATH));
+    const token = JSON.parse(login?.headers["token"] ?? "{}");
+    expect(token.client).toBe("semsPlusWeb");
+    expect(token.token).toBe("");
+    expect(login?.headers["X-Signature"]).toBeTruthy();
+  });
+
+  it("sends the web identity headers on gateway calls too", async () => {
+    mock.setPathResponse(LOGIN_PATH, loginOk());
+    mock.setPathResponse(FLOW_PATH, semsOk(buildSemsPlusFlow()));
+
+    await makeSemsPlus().getFlow("station-1");
+
+    const flow = mock.fetchCalls.find((call) => call.url.includes(FLOW_PATH));
+    const token = JSON.parse(flow?.headers["token"] ?? "{}");
+    expect(token.client).toBe("semsPlusWeb");
+    expect(token.token).toBe("inner-token");
+    expect(flow?.headers["X-Signature"]).toBeTruthy();
+  });
+
+  it("reads the station list from data.dataList", async () => {
+    mock.setPathResponse(LOGIN_PATH, loginOk());
+    mock.setPathResponse(
+      STATION_LIST_PATH,
+      semsOk({
+        dataList: [{ id: "st-1", name: "Roof" }, { id: "st-2", name: "Shed" }],
+        total: 2,
+      }),
+    );
+
+    const stations = await makeSemsPlus().getStations();
+
+    expect(stations).toEqual([
+      { id: "st-1", name: "Roof" },
+      { id: "st-2", name: "Shed" },
+    ]);
+  });
+
+  it("pages the station list with current and size", async () => {
+    mock.setPathResponse(LOGIN_PATH, loginOk());
+    mock.setPathResponse(STATION_LIST_PATH, semsOk({ dataList: [], total: 0 }));
+
+    await makeSemsPlus().getStations();
+
+    const call = mock.fetchCalls.find((entry) =>
+      entry.url.includes(STATION_LIST_PATH)
+    );
+    expect(JSON.parse(call?.body ?? "{}")).toEqual({ current: 1, size: 100 });
   });
 });

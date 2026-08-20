@@ -42,10 +42,17 @@ const signature = async (uid: string, token: string): Promise<string> => {
   return btoa(`${hex}@${ms}`);
 };
 
+const BOOTSTRAP_TOKEN =
+  '{"uid":"","timestamp":0,"token":"","client":"semsPlusWeb","version":"","language":"en"}';
+
 const login = async (password = PASSWORD): Promise<Json> => {
   const res = await fetch(`${BASE}${LOGIN_PATH}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "token": BOOTSTRAP_TOKEN,
+      "X-Signature": await signature("", ""),
+    },
     body: JSON.stringify({
       account: ACCOUNT,
       pwd: md5Base64(password),
@@ -100,6 +107,23 @@ check(
 );
 
 const session = dataOf(loginBody);
+
+const plainLogin = await fetch(`${BASE}${LOGIN_PATH}`, {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({
+    account: ACCOUNT,
+    pwd: md5Base64(PASSWORD),
+    agreement: 1,
+    isChinese: false,
+    isLocal: false,
+  }),
+}).then((r) => r.json()) as Json;
+check(
+  "a plain cross-login without the semsPlusWeb identity is refused",
+  plainLogin.code === "C0602",
+  `code ${plainLogin.code}`,
+);
 
 const badLogin = await login("wrong-password");
 check(
@@ -158,9 +182,9 @@ const listBody = await authed(session, `${BASE}${LIST_PATH}`, {
   headers: { "content-type": "application/json" },
   body: JSON.stringify({ current: 1, size: 100 }),
 });
-const records = (dataOf(listBody).records ?? []) as Json[];
+const records = (dataOf(listBody).dataList ?? []) as Json[];
 check(
-  "station list returns records with id and name",
+  "station list returns dataList with id and name",
   records.length > 0 && Boolean(records[0].id) && Boolean(records[0].name),
   `${records.length} station(s)`,
 );

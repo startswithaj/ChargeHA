@@ -7,6 +7,8 @@ const LOGIN_HOSTS = [
   "https://semsplus.goodwe.com",
 ];
 export const FALLBACK_GATEWAY = "https://au-gateway.semsportal.com/web/sems";
+const WEB_LOGIN_BOOTSTRAP_TOKEN =
+  '{"uid":"","timestamp":0,"token":"","client":"semsPlusWeb","version":"","language":"en"}';
 
 export interface SemsPlusToken {
   readonly api: string;
@@ -48,23 +50,19 @@ export function gatewayBase(token: SemsPlusToken): string {
   return `https://${region}-gateway.semsportal.com/web/sems`;
 }
 
-// X-Signature auth the SEMS+ web app sends on every gateway call:
-// base64(sha256hex("{ms}@{uid}@{token}") + "@" + ms), recomputed per request,
-// plus the semsPlusWeb client identity in the token header.
-export async function gatewayHeaders(
-  token: SemsPlusToken,
-): Promise<Record<string, string>> {
-  const uid = String(token.uid ?? "");
-  const inner = String(token.token ?? "");
+// base64(sha256hex("{ms}@{uid}@{token}") + "@" + ms), fresh per request. uid
+// and token are empty strings on the login call itself.
+export async function signature(uid: string, inner: string): Promise<string> {
   const ms = Date.now();
   const digest = await globalThis.crypto.subtle.digest(
     "SHA-256",
     new TextEncoder().encode(`${ms}@${uid}@${inner}`),
   );
-  // The gateway rejects non-browser identities, so mimic the SEMS+ web app.
-  const region = typeof token.region === "string" && token.region
-    ? token.region
-    : "au";
+  return btoa(`${encodeHex(new Uint8Array(digest))}@${ms}`);
+}
+
+// The gateway rejects non-browser identities, so mimic the SEMS+ web app.
+function webAppHeaders(region: string): Record<string, string> {
   const origin = `https://${region}-semsplus.goodwe.com`;
   return {
     "Accept": "application/json, text/plain, */*",
@@ -72,9 +70,46 @@ export async function gatewayHeaders(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
     "Origin": origin,
     "Referer": `${origin}/`,
-    "token": JSON.stringify({ ...token, client: "semsPlusWeb" }),
-    "X-Signature": btoa(`${encodeHex(new Uint8Array(digest))}@${ms}`),
   };
+}
+
+export function tokenRegion(token: SemsPlusToken): string {
+  return typeof token.region === "string" && token.region ? token.region : "au";
+}
+
+export async function gatewayHeaders(
+  token: SemsPlusToken,
+): Promise<Record<string, string>> {
+  return {
+    ...webAppHeaders(tokenRegion(token)),
+    "token": JSON.stringify({ ...token, client: "semsPlusWeb" }),
+    "X-Signature": await signature(
+      String(token.uid ?? ""),
+      String(token.token ?? ""),
+    ),
+  };
+}
+
+// The gateway runs a dual-session model: a token minted by a plain cross-login
+// is refused on every route with C0602. A usable one comes from the same URL
+// and body carrying the semsPlusWeb bootstrap identity below.
+export async function loginHeaders(
+  region: string,
+): Promise<Record<string, string>> {
+  return {
+    ...webAppHeaders(region),
+    "Content-Type": "application/json",
+    "token": WEB_LOGIN_BOOTSTRAP_TOKEN,
+    "X-Signature": await signature("", ""),
+  };
+}
+
+export function hostRegion(url: string): string {
+  const host = url.replace(/^https?:\/\//, "").split("/")[0];
+  const prefix = host.split(/[.:-]/)[0];
+  return prefix && prefix !== "semsplus" && prefix !== "localhost"
+    ? prefix
+    : "au";
 }
 
 export function gatewayUrl(

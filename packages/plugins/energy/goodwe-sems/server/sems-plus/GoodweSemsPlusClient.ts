@@ -23,6 +23,8 @@ import {
   FALLBACK_GATEWAY,
   gatewayHeaders,
   gatewayUrl,
+  hostRegion,
+  loginHeaders,
   loginHosts,
   type SemsPlusToken,
 } from "./GoodweSemsPlusHelpers.ts";
@@ -235,10 +237,7 @@ export class GoodweSemsPlusClient {
     try {
       const response = await fetch(url, {
         method: LOGIN.method,
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json, */*;q=0.5",
-        },
+        headers: await loginHeaders(hostRegion(url)),
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });

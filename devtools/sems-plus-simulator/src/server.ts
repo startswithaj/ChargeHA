@@ -83,7 +83,32 @@ const authFailure = (req: Request): Response | null => {
   return null;
 };
 
+// The real gateway mints a usable token only for a semsPlusWeb login; a plain
+// cross-login is answered C0602 and every later call fails. Enforced here so an
+// unsigned login cannot pass the fake while failing in production.
+const loginAuthFailure = (req: Request): Response | null => {
+  const raw = req.headers.get("token");
+  if (raw === null || req.headers.get("x-signature") === null) {
+    log("  login missing the semsPlusWeb bootstrap headers");
+    return json(envelope("C0602", "account_login_abnormal", null));
+  }
+  const client = ((): unknown => {
+    try {
+      return (JSON.parse(raw) as { client?: string }).client;
+    } catch {
+      return undefined;
+    }
+  })();
+  if (client !== "semsPlusWeb") {
+    log(`  login carried a non-web client identity (${client ?? "none"})`);
+    return json(envelope("C0602", "account_login_abnormal", null));
+  }
+  return null;
+};
+
 const handleLogin = async (req: Request): Promise<Response> => {
+  const failure = loginAuthFailure(req);
+  if (failure !== null) return failure;
   const body = await req.json().catch(() => ({})) as {
     account?: string;
     pwd?: string;
@@ -134,7 +159,7 @@ const handleStationList = (req: Request): Response => {
   const failure = authFailure(req);
   if (failure !== null) return failure;
   return json(ok({
-    records: STATIONS.map(stationListEntry),
+    dataList: STATIONS.map(stationListEntry),
     total: STATIONS.length,
     current: 1,
     size: 100,
