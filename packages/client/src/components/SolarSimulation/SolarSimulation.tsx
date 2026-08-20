@@ -12,7 +12,7 @@ import { RotateCcw } from "lucide-react";
 import { useRouter } from "../../hooks/useRouter.ts";
 import type { DayOfWeek, EnergyData, Schedule } from "@chargeha/shared";
 import type { VehicleWithState } from "@chargeha/shared";
-import type { ControllerConfig } from "@chargeha/shared/engine";
+import { type ControllerConfig, SolarAllocator } from "@chargeha/shared/engine";
 import {
   previewSolarAllocation,
   type PreviewVehicle,
@@ -434,7 +434,7 @@ function buildPreviewVehicles(
     string,
     { batteryLevel?: number; mode?: VehicleMode }
   >,
-  threePhaseCharger: boolean,
+  config: ControllerConfig,
 ): PreviewVehicle[] {
   return vehicles.map((v) => {
     const overrides = vehicleOverrides[v.id] ?? {};
@@ -449,7 +449,10 @@ function buildPreviewVehicles(
       chargeAmpsMin: s?.chargeAmpsMin || 5,
       chargeAmpsMax: s?.chargeAmpsMax || 16,
       chargerVoltage: s?.chargerVoltage || 230,
-      chargerPhases: threePhaseCharger ? 3 : (s?.chargerPhases ?? 1),
+      chargerPhases: SolarAllocator.resolvePhases(
+        s?.chargerPhases ?? null,
+        config,
+      ),
       isCharging: s?.isCharging ?? false,
       chargeAmps: s?.chargeAmps ?? 0,
     };
@@ -480,13 +483,8 @@ function useSolarSimState(
   >({});
 
   const simVehicles: PreviewVehicle[] = useMemo(
-    () =>
-      buildPreviewVehicles(
-        vehicles,
-        vehicleOverrides,
-        config.threePhaseCharger,
-      ),
-    [vehicles, vehicleOverrides, config.threePhaseCharger],
+    () => buildPreviewVehicles(vehicles, vehicleOverrides, config),
+    [vehicles, vehicleOverrides, config],
   );
 
   const hasBattery = config.batteryPriorityEnabled ||
