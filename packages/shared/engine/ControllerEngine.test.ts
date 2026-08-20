@@ -238,6 +238,34 @@ describe("ControllerEngine", () => {
       const d = output.decisions.get("V1");
       expect(d?.targetAmps).toBe(10);
     });
+
+    // 6 kW of export at 230 V: 26 A single-phase, 8 A three-phase.
+    const idleSurplus = { solarProductionW: 8000, gridPowerW: -6000 };
+
+    it("uses a reported single-phase count over the flag while idle too", () => {
+      // OCPP configures phases per charger, so its 1 is a wiring fact even
+      // when nothing is charging. Dividing by 3 here allocated a third of the
+      // amps the surplus supports.
+      const engine = new ControllerEngine();
+      const output = engine.decide(makeInput({
+        configOverrides: { threePhaseCharger: true },
+        vehicle: { state: { isCharging: false, chargerPhases: 1 } },
+        energyOverrides: idleSurplus,
+      }));
+      const d = output.decisions.get("V1");
+      expect(d?.targetAmps).toBe(26);
+    });
+
+    it("falls back to the flag when the adapter reports no phase count", () => {
+      const engine = new ControllerEngine();
+      const output = engine.decide(makeInput({
+        configOverrides: { threePhaseCharger: true },
+        vehicle: { state: { isCharging: false, chargerPhases: null } },
+        energyOverrides: idleSurplus,
+      }));
+      const d = output.decisions.get("V1");
+      expect(d?.targetAmps).toBe(8);
+    });
   });
 
   describe("amp debouncing", () => {
