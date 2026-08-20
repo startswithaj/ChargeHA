@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Button, Text, TextField } from "@radix-ui/themes";
+import { Button, Switch, Text, TextField } from "@radix-ui/themes";
 import { Loader2 } from "lucide-react";
 import { trpc } from "./trpc.ts";
 import {
@@ -8,16 +8,19 @@ import {
   type TestStatus,
 } from "../../../hostUi.ts";
 import { type StationOption, StationPicker } from "./StationPicker.tsx";
+import { USE_SEMS_PLUS_HELP, USE_SEMS_PLUS_LABEL } from "./fields.ts";
 import { FormError } from "../../../hostUi.ts";
 
 interface GoodweSemsFormProps {
   initialAccount: string;
   initialStationId: string;
+  initialUseSemsPlus: boolean;
   onTestSuccess: (
     account: string,
     password: string,
     stationId: string,
   ) => void;
+  onUseSemsPlusChange: (useSemsPlus: boolean) => void;
 }
 
 function CredentialFields(
@@ -121,11 +124,14 @@ function useTestResult(mutation: TestMutationState): TestStatus {
 export function GoodweSemsForm({
   initialAccount,
   initialStationId,
+  initialUseSemsPlus,
   onTestSuccess,
+  onUseSemsPlusChange,
 }: GoodweSemsFormProps): JSX.Element {
   const [account, setAccount] = useState(initialAccount);
   const [password, setPassword] = useState("");
   const [stationId, setStationId] = useState(initialStationId);
+  const [useSemsPlus, setUseSemsPlus] = useState(initialUseSemsPlus);
 
   const stationsMutation = trpc.plugin.energy.goodwe_sems.listStations
     .useMutation();
@@ -179,12 +185,27 @@ export function GoodweSemsForm({
         setPassword={setPassword}
       />
 
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <Switch
+          checked={useSemsPlus}
+          onCheckedChange={(checked: boolean) => {
+            setUseSemsPlus(checked);
+            onUseSemsPlusChange(checked);
+          }}
+          aria-label={USE_SEMS_PLUS_LABEL}
+        />
+        <Text size="2">
+          {USE_SEMS_PLUS_LABEL} — {USE_SEMS_PLUS_HELP}
+        </Text>
+      </div>
+
       <ActionRow
         label="Load Stations"
         pendingLabel="Loading..."
         pending={stationsMutation.isPending}
         disabled={!account || !password || stationsMutation.isPending}
-        onClick={() => stationsMutation.mutate({ account, password })}
+        onClick={() =>
+          stationsMutation.mutate({ account, password, useSemsPlus })}
       >
         <FormError message={stationsError} />
       </ActionRow>
@@ -207,6 +228,7 @@ export function GoodweSemsForm({
             account,
             password,
             stationId: selectedStationId,
+            useSemsPlus,
           })}
       >
         <TestResultBadge testResult={testResult} />

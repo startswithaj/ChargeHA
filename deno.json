@@ -35,6 +35,8 @@
     "db:cli": "deno run -A --unstable-ffi devtools/db/db-cli.ts",
     "sems:sim": "deno run --allow-net --allow-env --allow-read devtools/sems-simulator/src/server.ts",
     "sems:sim:smoke": "deno run --allow-net --allow-env devtools/sems-simulator/smoke.ts",
+    "semsplus:sim": "deno run --allow-net --allow-env --allow-read devtools/sems-plus-simulator/src/server.ts",
+    "semsplus:sim:smoke": "deno run --allow-net --allow-env devtools/sems-plus-simulator/smoke.ts",
     "db:generate": "deno -A --node-modules-dir npm:drizzle-kit generate --config drizzle/drizzle.config.ts",
     "check:unused": "bash devtools/quality/check-unused-files.sh",
     "check:packument": "bash devtools/quality/check-packument-bloat.sh",

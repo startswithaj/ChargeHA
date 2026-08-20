@@ -5,7 +5,7 @@ import {
   GoodweSemsAuthError,
   GoodweSemsConnectionError,
   GoodweSemsRateLimitError,
-} from "./GoodweSemsClient.ts";
+} from "./errors.ts";
 import {
   type FetchMock,
   GATEWAY_API,
@@ -148,6 +148,29 @@ describe("GoodweSemsClient", () => {
 
       await expect(makeClient().login()).rejects.toBeInstanceOf(
         GoodweSemsAuthError,
+      );
+    });
+
+    it("holds a rejected-login cooldown instead of retrying every poll", async () => {
+      mock.setPathResponse(NEW_LOGIN_PATH, semsCode("100005"));
+      mock.setPathResponse(LEGACY_LOGIN_PATH, semsCode("100005"));
+      const client = makeClient();
+
+      await expect(client.getStations()).rejects.toBeInstanceOf(
+        GoodweSemsAuthError,
+      );
+      const callsAfterFirst = mock.fetchCalls.length;
+
+      await expect(client.getStations()).rejects.toBeInstanceOf(
+        GoodweSemsAuthError,
+      );
+      expect(mock.fetchCalls.length).toBe(callsAfterFirst);
+    });
+
+    it("reports unreachable, not bad credentials, when no host answers", async () => {
+      // No overrides registered: every login host 404s.
+      await expect(makeClient().login()).rejects.toThrow(
+        "SEMS is unreachable",
       );
     });
 

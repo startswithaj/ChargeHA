@@ -24,6 +24,11 @@ export const goodweSemsConfigDef = defineSection({
     schema: z.string(),
     default: "",
   },
+  goodweSemsUseSemsPlus: {
+    key: "use_sems_plus",
+    schema: z.boolean(),
+    default: false,
+  },
 });
 
 export type GoodweSemsConfig = SectionType<typeof goodweSemsConfigDef>;

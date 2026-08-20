@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Badge, Button, Text, TextField } from "@radix-ui/themes";
+import { Badge, Button, Switch, Text, TextField } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
 import {
   SettingsRow,
@@ -7,6 +7,7 @@ import {
   useSaveStatus,
 } from "../../../hostUi.ts";
 import { type StationOption, StationPicker } from "./StationPicker.tsx";
+import { USE_SEMS_PLUS_HELP, USE_SEMS_PLUS_LABEL } from "./fields.ts";
 import { FormError } from "../../../hostUi.ts";
 
 type ListStationsMutation = ReturnType<
@@ -26,6 +27,7 @@ interface GoodweSemsValues {
   goodweSemsAccount: string;
   goodweSemsPassword: string;
   goodweSemsStationId: string;
+  goodweSemsUseSemsPlus: boolean;
 }
 
 type GoodweSemsDraft = Partial<GoodweSemsValues>;
@@ -47,13 +49,20 @@ function useGoodweSemsDraft(config: GoodweSemsValues | undefined) {
     config?.goodweSemsPassword ?? "";
   const goodweSemsStationId = draft.goodweSemsStationId ??
     config?.goodweSemsStationId ?? "";
+  const goodweSemsUseSemsPlus = draft.goodweSemsUseSemsPlus ??
+    config?.goodweSemsUseSemsPlus ?? false;
   const isDirty = Object.keys(draft).length > 0;
 
   const save = useCallback(() => {
     if (!isDirty) return;
     onMutate();
     configMutation.mutate(
-      { goodweSemsAccount, goodweSemsPassword, goodweSemsStationId },
+      {
+        goodweSemsAccount,
+        goodweSemsPassword,
+        goodweSemsStationId,
+        goodweSemsUseSemsPlus,
+      },
       {
         onSuccess: () => {
           onSuccess();
@@ -67,6 +76,7 @@ function useGoodweSemsDraft(config: GoodweSemsValues | undefined) {
     goodweSemsAccount,
     goodweSemsPassword,
     goodweSemsStationId,
+    goodweSemsUseSemsPlus,
     configMutation,
     onMutate,
     onSuccess,
@@ -83,6 +93,7 @@ function useGoodweSemsDraft(config: GoodweSemsValues | undefined) {
     goodweSemsAccount,
     goodweSemsPassword,
     goodweSemsStationId,
+    goodweSemsUseSemsPlus,
     setDraft,
   };
 }
@@ -90,10 +101,11 @@ function useGoodweSemsDraft(config: GoodweSemsValues | undefined) {
 /** Re-list the account's stations from Settings, so the station can be changed
  *  without walking back through the setup wizard. */
 function StationSection(
-  { account, password, stationId, stationsMutation, onSelect }: {
+  { account, password, stationId, useSemsPlus, stationsMutation, onSelect }: {
     account: string;
     password: string;
     stationId: string;
+    useSemsPlus: boolean;
     stationsMutation: ListStationsMutation;
     onSelect: (stationId: string) => void;
   },
@@ -116,7 +128,8 @@ function StationSection(
           size="2"
           variant="soft"
           disabled={!account || !password || stationsMutation.isPending}
-          onClick={() => stationsMutation.mutate({ account, password })}
+          onClick={() =>
+            stationsMutation.mutate({ account, password, useSemsPlus })}
         >
           {stationsMutation.isPending ? "Loading..." : "Load Stations"}
         </Button>
@@ -134,10 +147,11 @@ function StationSection(
 }
 
 function TestConnectionRow(
-  { account, password, stationId, testMutation }: {
+  { account, password, stationId, useSemsPlus, testMutation }: {
     account: string;
     password: string;
     stationId: string;
+    useSemsPlus: boolean;
     testMutation: TestMutation;
   },
 ) {
@@ -148,7 +162,8 @@ function TestConnectionRow(
         variant="soft"
         disabled={!account || !password || !stationId ||
           testMutation.isPending}
-        onClick={() => testMutation.mutate({ account, password, stationId })}
+        onClick={() =>
+          testMutation.mutate({ account, password, stationId, useSemsPlus })}
       >
         {testMutation.isPending ? "Testing..." : "Test Connection"}
       </Button>
@@ -181,6 +196,7 @@ export function GoodweSemsConfig(): JSX.Element | null {
     goodweSemsAccount,
     goodweSemsPassword,
     goodweSemsStationId,
+    goodweSemsUseSemsPlus,
     setDraft,
   } = useGoodweSemsDraft(config as GoodweSemsValues | undefined);
 
@@ -231,10 +247,22 @@ export function GoodweSemsConfig(): JSX.Element | null {
         />
       </SettingsRow>
 
+      <SettingsRow
+        label={USE_SEMS_PLUS_LABEL}
+        help={USE_SEMS_PLUS_HELP}
+      >
+        <Switch
+          checked={goodweSemsUseSemsPlus}
+          onCheckedChange={(goodweSemsUseSemsPlus: boolean) =>
+            setDraft((d) => ({ ...d, goodweSemsUseSemsPlus }))}
+        />
+      </SettingsRow>
+
       <StationSection
         account={goodweSemsAccount}
         password={goodweSemsPassword}
         stationId={goodweSemsStationId}
+        useSemsPlus={goodweSemsUseSemsPlus}
         stationsMutation={stationsMutation}
         onSelect={(goodweSemsStationId: string) =>
           setDraft((d) => ({ ...d, goodweSemsStationId }))}
@@ -244,6 +272,7 @@ export function GoodweSemsConfig(): JSX.Element | null {
         account={goodweSemsAccount}
         password={goodweSemsPassword}
         stationId={goodweSemsStationId}
+        useSemsPlus={goodweSemsUseSemsPlus}
         testMutation={testMutation}
       />
     </>

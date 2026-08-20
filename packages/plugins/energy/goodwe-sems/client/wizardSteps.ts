@@ -8,7 +8,8 @@ export const goodweSemsOption: EnergyPluginOption = {
   id: "goodwe_sems",
   label: "GoodWe (Cloud / SEMS Portal)",
   description:
-    "Connect via the GoodWe SEMS Portal using your account login. Requires a " +
-    "GoodWe HomeKit or smart meter for grid and consumption readings.",
+    "Connect via your GoodWe account login. Supports the legacy SEMS Portal " +
+    "and the newer SEMS+ backend. Requires a GoodWe HomeKit or smart meter " +
+    "for grid and consumption readings.",
   iconKey: "cloud",
 };

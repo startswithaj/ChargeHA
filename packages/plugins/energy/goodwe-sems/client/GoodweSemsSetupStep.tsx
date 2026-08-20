@@ -40,6 +40,8 @@ export const goodweSemsSetupStep: PluginStepDef = {
     const [validated, setValidated] = useState<ValidatedConnection | null>(
       null,
     );
+    // null = untouched, so re-running the wizard keeps the saved value.
+    const [useSemsPlus, setUseSemsPlus] = useState<boolean | null>(null);
 
     const handleTestSuccess = useCallback(
       (account: string, password: string, stationId: string) => {
@@ -53,6 +55,8 @@ export const goodweSemsSetupStep: PluginStepDef = {
         goodweSemsAccount: v.account,
         goodweSemsPassword: v.password,
         goodweSemsStationId: v.stationId,
+        goodweSemsUseSemsPlus: useSemsPlus ??
+          (config?.goodweSemsUseSemsPlus ?? false),
       });
     };
 
@@ -63,7 +67,9 @@ export const goodweSemsSetupStep: PluginStepDef = {
           <GoodweSemsForm
             initialAccount={config?.goodweSemsAccount || ""}
             initialStationId={config?.goodweSemsStationId || ""}
+            initialUseSemsPlus={config?.goodweSemsUseSemsPlus ?? false}
             onTestSuccess={handleTestSuccess}
+            onUseSemsPlusChange={setUseSemsPlus}
           />
         </div>
       ),

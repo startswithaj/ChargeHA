@@ -10,6 +10,7 @@ import type { GoodweSemsPlugin } from "./GoodweSemsPlugin.ts";
 const credentialsInput = z.object({
   account: z.string(),
   password: z.string(),
+  useSemsPlus: z.boolean().optional(),
 });
 
 const testConnectionInput = credentialsInput.extend({
@@ -35,13 +36,18 @@ export function createGoodweSemsRouter(
     listStations: publicProcedure
       .input(credentialsInput)
       .mutation(({ input }) =>
-        plugin.listStations(input.account, input.password)
+        plugin.listStations(input.account, input.password, input.useSemsPlus)
       ),
 
     testConnection: publicProcedure
       .input(testConnectionInput)
       .mutation(({ input }) =>
-        plugin.testConnection(input.account, input.password, input.stationId)
+        plugin.testConnection(
+          input.account,
+          input.password,
+          input.stationId,
+          input.useSemsPlus,
+        )
       ),
   });
 }
