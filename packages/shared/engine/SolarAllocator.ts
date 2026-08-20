@@ -29,14 +29,16 @@ export class SolarAllocator {
     return energy?.gridVoltageV ?? gridVoltage;
   }
 
-  // A live single-phase reading while charging overrides the threePhaseCharger
-  // flag (e.g. a three-phase install on a regular wall socket); vehicles only report phases while charging, so the flag stands until a real reading arrives.
+  // A reported phase count is ground truth and always wins — OCPP's per-charger
+  // setting is a wiring fact and must not be second-guessed by an install-wide
+  // flag. null means the adapter cannot observe it (Tesla reports phases only
+  // while charging), and only then does threePhaseCharger decide.
   static resolvePhases(
-    state: VehicleChargeState,
+    chargerPhases: number | null,
     config: ControllerConfig,
   ): number {
-    if (state.isCharging && state.chargerPhases === 1) return 1;
-    return config.threePhaseCharger ? 3 : state.chargerPhases;
+    if (chargerPhases !== null) return chargerPhases;
+    return config.threePhaseCharger ? 3 : 1;
   }
 
   // Surplus solar in watts, before the safety margin.
@@ -218,7 +220,10 @@ export class SolarAllocator {
           energy,
           config.gridVoltage,
         );
-        const phases = SolarAllocator.resolvePhases(state, config);
+        const phases = SolarAllocator.resolvePhases(
+          state.chargerPhases,
+          config,
+        );
         return {
           id: v.id,
           name: v.name,

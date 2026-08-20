@@ -248,6 +248,7 @@ export class ChargingPointManager {
     if (!state) return null;
     if (state.chargeAmps !== null || state.chargePowerKw === null) return state;
     if (this.cachedGridVoltage === null) return state;
+    if (state.chargerPhases === null) return state;
 
     const energy = this.latestEnergy;
     const voltage = SolarAllocator.resolveVoltage(
