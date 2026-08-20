@@ -304,6 +304,17 @@ function useAuthStepState(advance: () => void) {
   const selectMode = (mode: AuthMode) => {
     setSelectedMode(mode);
     setValidationError(null);
+    // "No Authentication" has nothing to fill in, so save and move on rather
+    // than making the user click Next on an empty step.
+    if (mode === "none") {
+      setAuthModeMutate({
+        mode: "none",
+        localConfig: undefined,
+        oidcConfig: undefined,
+      })
+        .then(() => advance())
+        .catch((e: Error) => setValidationError(e.message));
+    }
   };
 
   return {
