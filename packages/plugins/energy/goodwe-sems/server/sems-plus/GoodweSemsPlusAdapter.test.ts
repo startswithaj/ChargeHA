@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { FakeTime } from "@std/testing/time";
-import { resetSemsPlusBackoffForTests } from "./SemsPlusAdapter.ts";
-import { toEnergyDataFromFlow } from "./mapping.ts";
+import { resetSemsPlusBackoffForTests } from "./GoodweSemsPlusAdapter.ts";
+import { toEnergyDataFromFlow } from "./GoodweSemsPlusMapping.ts";
 import { GoodweSemsConnectionError } from "../errors.ts";
 import {
   type FetchMock,
@@ -90,7 +90,7 @@ describe("toEnergyDataFromFlow", () => {
   });
 });
 
-describe("SemsPlusAdapter", () => {
+describe("GoodweSemsPlusAdapter", () => {
   let fetchMock: FetchMock;
 
   beforeEach(() => {

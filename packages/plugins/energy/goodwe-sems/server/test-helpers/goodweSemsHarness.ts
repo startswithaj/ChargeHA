@@ -5,12 +5,12 @@ import {
   type GoodweSemsStationReader,
   type SemsPowerflow,
   type SemsStationDetail,
-} from "../GoodweSemsClient.ts";
+} from "../sems-legacy/GoodweSemsClient.ts";
 import { GoodweSemsRateLimitError } from "../errors.ts";
-import { GoodweSemsAdapter } from "../GoodweSemsAdapter.ts";
-import { SemsPlusAdapter } from "../semsplus/SemsPlusAdapter.ts";
-import { SemsPlusClient } from "../semsplus/SemsPlusClient.ts";
-import type { SemsPlusFlow } from "../semsplus/types.ts";
+import { GoodweSemsAdapter } from "../sems-legacy/GoodweSemsAdapter.ts";
+import { GoodweSemsPlusAdapter } from "../sems-plus/GoodweSemsPlusAdapter.ts";
+import { GoodweSemsPlusClient } from "../sems-plus/GoodweSemsPlusClient.ts";
+import type { SemsPlusFlow } from "../sems-plus/GoodweSemsPlusTypes.ts";
 
 export const testLogger = new Logger("GoodweSems", "error");
 export const testDbLogger = new PluginDbLogger(
@@ -251,7 +251,7 @@ export const buildSemsPlusFlow = (
 });
 
 // SEMS+ gateway URL fragments and envelope builders for transport-mocked
-// SemsPlusAdapter/SemsPlusClient tests — no object fakes, the real client
+// GoodweSemsPlusAdapter/GoodweSemsPlusClient tests — no object fakes, the real client
 // runs against the fetch mock.
 export const SEMS_PLUS_FLOW_PATH = "sems-plant/api/stations/flow";
 
@@ -268,9 +268,9 @@ export const semsPlusFlowOk = (
 
 export const makeSemsPlusAdapter = (
   overrides: Partial<{ stationId: string; logger: Logger }> = {},
-): SemsPlusAdapter =>
-  new SemsPlusAdapter(
-    new SemsPlusClient(
+): GoodweSemsPlusAdapter =>
+  new GoodweSemsPlusAdapter(
+    new GoodweSemsPlusClient(
       "user@example.com",
       "secret123",
       overrides.logger ?? testLogger,

@@ -6,8 +6,8 @@ import type { VehicleManager } from "@chargeha/server/services/VehicleManager";
 import type { ChargingPointManager } from "@chargeha/server/services/ChargingPointManager";
 import { throwingMock } from "../../../../server/src/test-helpers/throwingMock.ts";
 import { GoodweSemsPlugin } from "./GoodweSemsPlugin.ts";
-import { GoodweSemsAdapter } from "./GoodweSemsAdapter.ts";
-import { SemsPlusAdapter } from "./semsplus/SemsPlusAdapter.ts";
+import { GoodweSemsAdapter } from "./sems-legacy/GoodweSemsAdapter.ts";
+import { GoodweSemsPlusAdapter } from "./sems-plus/GoodweSemsPlusAdapter.ts";
 
 describe("GoodweSemsPlugin.createAdapter", () => {
   let db: AppDatabase;
@@ -56,6 +56,6 @@ describe("GoodweSemsPlugin.createAdapter", () => {
   it("builds the SEMS+ adapter when use_sems_plus is true", async () => {
     await db.setPluginConfig("goodwe_sems.use_sems_plus", "true");
     const adapter = await new GoodweSemsPlugin(makeDeps()).createAdapter();
-    expect(adapter).toBeInstanceOf(SemsPlusAdapter);
+    expect(adapter).toBeInstanceOf(GoodweSemsPlusAdapter);
   });
 });

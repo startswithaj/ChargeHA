@@ -15,13 +15,13 @@ import {
   loginHosts,
   type SemsPlusToken,
   stationEntries,
-} from "./helpers.ts";
+} from "./GoodweSemsPlusHelpers.ts";
 import {
   type SemsPlusFlow,
   semsPlusFlowSchema,
   type SemsPlusStation,
   semsPlusStationPageSchema,
-} from "./types.ts";
+} from "./GoodweSemsPlusTypes.ts";
 
 const SUCCESS_CODES: ReadonlySet<string> = new Set(["0", "00000"]);
 // Rejected credentials can't fix themselves — don't hammer rate-limited CrossLogin.
@@ -38,7 +38,7 @@ const loginEnvelopeSchema = z.object({
     .passthrough().optional(),
 }).passthrough();
 
-export class SemsPlusClient {
+export class GoodweSemsPlusClient {
   private token: SemsPlusToken | null = null;
   private loginPromise: Promise<void> | null = null;
   private lastRejectedAtMs = 0;

@@ -10,7 +10,7 @@ import {
   toBatteryPowerW,
   toEnergyData,
   toGridPowerW,
-} from "./mapping.ts";
+} from "./GoodweSemsMapping.ts";
 
 beforeEach(() => {
   resetSemsBackoffForTests();
@@ -18,7 +18,7 @@ beforeEach(() => {
 import {
   GoodweSemsConnectionError,
   GoodweSemsRateLimitError,
-} from "./errors.ts";
+} from "../errors.ts";
 import {
   buildPowerflow,
   buildStationDetail,
@@ -28,7 +28,7 @@ import {
   MAX_STALE_MS,
   RATE_LIMIT_MS,
   rateLimitError as rateLimit,
-} from "./test-helpers/goodweSemsHarness.ts";
+} from "../test-helpers/goodweSemsHarness.ts";
 
 describe("parseSemsValue", () => {
   const cases: Array<[string | number | undefined, number | null]> = [

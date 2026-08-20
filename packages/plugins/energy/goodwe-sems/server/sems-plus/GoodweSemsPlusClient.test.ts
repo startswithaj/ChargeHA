@@ -5,7 +5,7 @@ import {
   GoodweSemsConnectionError,
   GoodweSemsRateLimitError,
 } from "../errors.ts";
-import { SemsPlusClient } from "./SemsPlusClient.ts";
+import { GoodweSemsPlusClient } from "./GoodweSemsPlusClient.ts";
 import {
   buildSemsPlusFlow,
   type FetchMock,
@@ -17,7 +17,7 @@ import {
   testLogger,
 } from "../test-helpers/goodweSemsHarness.ts";
 
-describe("SemsPlusClient", () => {
+describe("GoodweSemsPlusClient", () => {
   const LOGIN_PATH = "sems-user/api/v1/auth/cross-login";
   const FLOW_PATH = "sems-plant/api/stations/flow";
   const GATEWAY_API = "https://au-gateway.semsportal.com/web/sems";
@@ -25,8 +25,8 @@ describe("SemsPlusClient", () => {
   const loginOk = (api: string = GATEWAY_API): MockResp =>
     semsOk({ token: "inner-token", uid: "uid-1", api }, api);
 
-  const makeSemsPlus = (): SemsPlusClient =>
-    new SemsPlusClient(
+  const makeSemsPlus = (): GoodweSemsPlusClient =>
+    new GoodweSemsPlusClient(
       "user@example.com",
       "secret123",
       testLogger,

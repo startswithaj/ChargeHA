@@ -1,5 +1,5 @@
 import type { EnergyData } from "@chargeha/shared";
-import type { SemsPlusFlow } from "./types.ts";
+import type { SemsPlusFlow } from "./GoodweSemsPlusTypes.ts";
 
 // refreshTime arrives station-local with no offset; the server shares the
 // station's timezone in a home install, so local parsing recovers UTC.

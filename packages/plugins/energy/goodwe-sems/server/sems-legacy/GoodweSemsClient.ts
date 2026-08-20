@@ -7,7 +7,7 @@ import {
   GoodweSemsAuthError,
   GoodweSemsConnectionError,
   GoodweSemsRateLimitError,
-} from "./errors.ts";
+} from "../errors.ts";
 import { SemsGatewayProbe } from "./SemsGatewayProbe.ts";
 
 function baseOverride(): string | undefined {

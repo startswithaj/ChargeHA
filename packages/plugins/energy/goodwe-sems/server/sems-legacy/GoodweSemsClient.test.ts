@@ -5,7 +5,7 @@ import {
   GoodweSemsAuthError,
   GoodweSemsConnectionError,
   GoodweSemsRateLimitError,
-} from "./errors.ts";
+} from "../errors.ts";
 import {
   type FetchMock,
   GATEWAY_API,
@@ -20,7 +20,7 @@ import {
   STATION_DETAIL_PATH,
   STATION_LIST_PATH,
   stationDetailPayload,
-} from "./test-helpers/goodweSemsHarness.ts";
+} from "../test-helpers/goodweSemsHarness.ts";
 
 describe("GoodweSemsClient", () => {
   let mock: FetchMock;

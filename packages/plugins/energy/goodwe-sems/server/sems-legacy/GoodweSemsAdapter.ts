@@ -13,12 +13,12 @@ import {
 import {
   GoodweSemsConnectionError,
   GoodweSemsRateLimitError,
-} from "./errors.ts";
+} from "../errors.ts";
 import {
   isImpossibleExport,
   parseSemsValue,
   toEnergyDataFromDetail,
-} from "./mapping.ts";
+} from "./GoodweSemsMapping.ts";
 
 const POLL_INTERVAL_SECONDS = 60;
 

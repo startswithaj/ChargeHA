@@ -9,8 +9,8 @@ import {
   GoodweSemsConnectionError,
   GoodweSemsRateLimitError,
 } from "../errors.ts";
-import { SemsPlusClient } from "./SemsPlusClient.ts";
-import { toEnergyDataFromFlow } from "./mapping.ts";
+import { GoodweSemsPlusClient } from "./GoodweSemsPlusClient.ts";
+import { toEnergyDataFromFlow } from "./GoodweSemsPlusMapping.ts";
 
 const POLL_INTERVAL_SECONDS = 60;
 
@@ -24,12 +24,12 @@ export function resetSemsPlusBackoffForTests(): void {
   backoffUntilByStation.clear();
 }
 
-export class SemsPlusAdapter implements EnergySourceAdapter {
+export class GoodweSemsPlusAdapter implements EnergySourceAdapter {
   private lastGood: EnergyData | null = null;
   private lastGoodAtMs = 0;
 
   constructor(
-    private readonly client: SemsPlusClient,
+    private readonly client: GoodweSemsPlusClient,
     private readonly stationId: string,
     private readonly logger: Logger,
     private readonly dbLog: PluginDbLogger,
@@ -41,9 +41,9 @@ export class SemsPlusAdapter implements EnergySourceAdapter {
     stationId: string,
     logger: Logger,
     dbLog: PluginDbLogger,
-  ): SemsPlusAdapter {
-    return new SemsPlusAdapter(
-      new SemsPlusClient(account, password, logger, dbLog),
+  ): GoodweSemsPlusAdapter {
+    return new GoodweSemsPlusAdapter(
+      new GoodweSemsPlusClient(account, password, logger, dbLog),
       stationId,
       logger,
       dbLog,

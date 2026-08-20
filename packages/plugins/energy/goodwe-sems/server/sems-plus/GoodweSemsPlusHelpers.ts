@@ -4,7 +4,7 @@ import type { z } from "zod";
 import type {
   semsPlusStationEntrySchema,
   semsPlusStationPageSchema,
-} from "./types.ts";
+} from "./GoodweSemsPlusTypes.ts";
 
 export const LOGIN_PATH = "/web/sems/sems-user/api/v1/auth/cross-login";
 const LOGIN_HOSTS = [

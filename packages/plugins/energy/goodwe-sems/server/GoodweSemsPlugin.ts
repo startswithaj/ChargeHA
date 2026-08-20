@@ -3,13 +3,13 @@ import type { EnergySourceAdapter } from "@chargeha/shared";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import type { EnergyPlugin, PluginHealthCheck } from "@chargeha/shared/plugins";
 import { GOODWE_SEMS_SECRET_KEYS, goodweSemsConfigDef } from "./config.ts";
-import { GoodweSemsAdapter } from "./GoodweSemsAdapter.ts";
-import { SemsPlusAdapter } from "./semsplus/SemsPlusAdapter.ts";
-import { SemsPlusClient } from "./semsplus/SemsPlusClient.ts";
+import { GoodweSemsAdapter } from "./sems-legacy/GoodweSemsAdapter.ts";
+import { GoodweSemsPlusAdapter } from "./sems-plus/GoodweSemsPlusAdapter.ts";
+import { GoodweSemsPlusClient } from "./sems-plus/GoodweSemsPlusClient.ts";
 import {
   GoodweSemsClient,
   type SemsStationSummary,
-} from "./GoodweSemsClient.ts";
+} from "./sems-legacy/GoodweSemsClient.ts";
 import { createGoodweSemsRouter } from "./router.ts";
 
 export type SemsUiResult<T> =
@@ -31,7 +31,7 @@ export class GoodweSemsPlugin implements EnergyPlugin {
   // instead of logging in per request; changed credentials replace it.
   private uiSession: { key: string; client: GoodweSemsClient } | null = null;
   private uiSemsPlusSession:
-    | { key: string; client: SemsPlusClient }
+    | { key: string; client: GoodweSemsPlusClient }
     | null = null;
 
   constructor(private readonly deps: PluginDependencies) {
@@ -54,12 +54,15 @@ export class GoodweSemsPlugin implements EnergyPlugin {
     return this.uiSession.client;
   }
 
-  private semsPlusClientFor(account: string, password: string): SemsPlusClient {
+  private semsPlusClientFor(
+    account: string,
+    password: string,
+  ): GoodweSemsPlusClient {
     const key = `${account}\n${password}`;
     if (this.uiSemsPlusSession?.key !== key) {
       this.uiSemsPlusSession = {
         key,
-        client: new SemsPlusClient(
+        client: new GoodweSemsPlusClient(
           account,
           password,
           this.deps.log,
@@ -153,7 +156,7 @@ export class GoodweSemsPlugin implements EnergyPlugin {
     }
     // Two fully independent backends — the toggle picks which adapter exists.
     if (useSemsPlus === "true") {
-      return SemsPlusAdapter.create(
+      return GoodweSemsPlusAdapter.create(
         account,
         password,
         stationId,
