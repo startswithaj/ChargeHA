@@ -22,8 +22,10 @@ describe("ChargeController — processSolarTracking", () => {
     it("uses 3 phases for three-phase charger config", async () => {
       // 3000W / (230V × 3 phases) = 4.3A → below min 5A → should not start.
       // (1-phase would give 13A and would start.)
+      // chargerPhases null is what makes the flag apply: an adapter that
+      // reports a count is trusted over it.
       ctx = await setupController(
-        { chargerVoltage: 230 },
+        { chargerVoltage: 230, chargerPhases: null },
         "auto",
         { ...BASE_ENERGY, gridPowerW: -3000 },
         { three_phase_charger: "true" },
