@@ -2,12 +2,15 @@ import { Logger } from "@chargeha/server/lib/Logger";
 import { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import {
   GoodweSemsClient,
-  GoodweSemsRateLimitError,
   type GoodweSemsStationReader,
   type SemsPowerflow,
   type SemsStationDetail,
 } from "../GoodweSemsClient.ts";
+import { GoodweSemsRateLimitError } from "../errors.ts";
 import { GoodweSemsAdapter } from "../GoodweSemsAdapter.ts";
+import { SemsPlusAdapter } from "../semsplus/SemsPlusAdapter.ts";
+import { SemsPlusClient } from "../semsplus/SemsPlusClient.ts";
+import type { SemsPlusFlow } from "../semsplus/types.ts";
 
 export const testLogger = new Logger("GoodweSems", "error");
 export const testDbLogger = new PluginDbLogger(
@@ -233,6 +236,50 @@ export const makeFakeClient = (
     },
   };
 };
+
+// A day sample straight from the AU gateway probe captures.
+export const buildSemsPlusFlow = (
+  overrides: Partial<SemsPlusFlow> = {},
+): SemsPlusFlow => ({
+  status: "1",
+  pAc: 5.153,
+  pSystem: 5.153,
+  pGrid: 3.837,
+  pConsum: 1.316,
+  refreshTime: "2026-08-17T10:30:02.033",
+  ...overrides,
+});
+
+// SEMS+ gateway URL fragments and envelope builders for transport-mocked
+// SemsPlusAdapter/SemsPlusClient tests — no object fakes, the real client
+// runs against the fetch mock.
+export const SEMS_PLUS_FLOW_PATH = "sems-plant/api/stations/flow";
+
+export const semsPlusLoginOk = (): MockResp =>
+  semsOk({ token: "sems-plus-token", uid: "uid-1", api: GATEWAY_API });
+
+export const semsPlusFlowOk = (
+  overrides: Partial<SemsPlusFlow> = {},
+): MockResp => ({
+  ok: true,
+  status: 200,
+  json: { code: "00000", data: buildSemsPlusFlow(overrides) },
+});
+
+export const makeSemsPlusAdapter = (
+  overrides: Partial<{ stationId: string; logger: Logger }> = {},
+): SemsPlusAdapter =>
+  new SemsPlusAdapter(
+    new SemsPlusClient(
+      "user@example.com",
+      "secret123",
+      overrides.logger ?? testLogger,
+      testDbLogger,
+    ),
+    overrides.stationId ?? "station-1",
+    overrides.logger ?? testLogger,
+    testDbLogger,
+  );
 
 export const makeAdapter = (
   client: GoodweSemsStationReader,

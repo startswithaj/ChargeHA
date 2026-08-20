@@ -50,7 +50,9 @@ describe("GoodweSemsForm", () => {
       <GoodweSemsForm
         initialAccount="owner@example.com"
         initialStationId=""
+        initialUseSemsPlus={false}
         onTestSuccess={vi.fn()}
+        onUseSemsPlusChange={vi.fn()}
       />,
     );
 
@@ -97,6 +99,7 @@ describe("GoodweSemsForm", () => {
     expect(mocks.listStationsMutate).toHaveBeenCalledWith({
       account: "owner@example.com",
       password: "secret",
+      useSemsPlus: false,
     });
   });
 
@@ -172,6 +175,7 @@ describe("GoodweSemsForm", () => {
       account: "owner@example.com",
       password: "secret",
       stationId: "station-a",
+      useSemsPlus: false,
     });
   });
 

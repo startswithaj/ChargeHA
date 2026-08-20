@@ -3,6 +3,11 @@ import { encodeHex } from "@std/encoding/hex";
 import { z } from "zod";
 import type { Logger } from "@chargeha/server/lib/Logger";
 import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
+import {
+  GoodweSemsAuthError,
+  GoodweSemsConnectionError,
+  GoodweSemsRateLimitError,
+} from "./errors.ts";
 import { SemsGatewayProbe } from "./SemsGatewayProbe.ts";
 
 function baseOverride(): string | undefined {
@@ -37,31 +42,12 @@ const BOOTSTRAP_TOKEN = '{"version":"3.1.1","client":"ios","language":"en"}';
 const SUCCESS_CODES: ReadonlySet<string> = new Set(["0", "00000"]);
 const STALE_TOKEN_CODES: ReadonlySet<string> = new Set(["100002", "C0602"]);
 const EMPTY_RETRY_COOLDOWN_MS = 10 * 60 * 1000;
+// Rejected credentials can't fix themselves — don't hammer rate-limited CrossLogin.
+const REJECTED_LOGIN_COOLDOWN_MS = 5 * 60 * 1000;
 const RATE_LIMIT_CODE = "GY0429";
 const REQUEST_TIMEOUT_MS = 15_000;
 
 const RATE_LIMIT_BACKOFF_MS = 300_000;
-
-export class GoodweSemsAuthError extends Error {
-  constructor(message: string, cause?: Error) {
-    super(message, { cause });
-    this.name = "GoodweSemsAuthError";
-  }
-}
-
-export class GoodweSemsConnectionError extends Error {
-  constructor(message: string, cause?: Error) {
-    super(message, { cause });
-    this.name = "GoodweSemsConnectionError";
-  }
-}
-
-export class GoodweSemsRateLimitError extends Error {
-  constructor(readonly retryAfterMs: number) {
-    super(`SEMS rate limited (${RATE_LIMIT_CODE})`);
-    this.name = "GoodweSemsRateLimitError";
-  }
-}
 
 export interface SemsToken {
   readonly api: string;
@@ -205,6 +191,7 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
   private readonly gatewayProbe: SemsGatewayProbe;
   private loginPromise: Promise<void> | null = null;
   private lastEmptyRetryAtMs = 0;
+  private lastRejectedAtMs = 0;
 
   constructor(
     private readonly account: string,
@@ -221,6 +208,11 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
 
   private async ensureLoggedIn(): Promise<void> {
     if (this.token) return;
+    if (Date.now() - this.lastRejectedAtMs < REJECTED_LOGIN_COOLDOWN_MS) {
+      throw new GoodweSemsAuthError(
+        "SEMS login rejected — check the account email and password",
+      );
+    }
     if (!this.loginPromise) {
       this.loginPromise = this.login().finally(() => {
         this.loginPromise = null;
@@ -234,23 +226,35 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
       ? ["legacy", "new"]
       : ["new", "legacy"];
 
-    const token = await modes.reduce<Promise<SemsToken | null>>(
+    const result = await modes.reduce<
+      Promise<{ token: SemsToken | null; sawRejection: boolean }>
+    >(
       async (carry, mode) => {
-        const found = await carry;
-        if (found) return found;
+        const acc = await carry;
+        if (acc.token) return acc;
         const attempt = await this.attemptLogin(mode);
-        if (attempt) this.preferredMode = mode;
-        return attempt;
+        if (attempt === "rejected") return { ...acc, sawRejection: true };
+        if (attempt === "unreachable") return acc;
+        this.preferredMode = mode;
+        return { ...acc, token: attempt };
       },
-      Promise.resolve(null),
+      Promise.resolve({ token: null, sawRejection: false }),
     );
 
-    if (!token) {
+    if (result.token) {
+      this.token = result.token;
+      return;
+    }
+    // Only blame the password when a host actually rejected it.
+    if (result.sawRejection) {
+      this.lastRejectedAtMs = Date.now();
       throw new GoodweSemsAuthError(
         "SEMS login rejected — check the account email and password",
       );
     }
-    this.token = token;
+    throw new GoodweSemsConnectionError(
+      "SEMS is unreachable — check your internet connection and try again later",
+    );
   }
 
   async probeGatewayFlow(
@@ -387,18 +391,30 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     });
   }
 
-  private async attemptLogin(mode: LoginMode): Promise<SemsToken | null> {
+  private async attemptLogin(
+    mode: LoginMode,
+  ): Promise<SemsToken | "rejected" | "unreachable"> {
     const urls = mode === "new" ? newLoginUrls() : [legacyLoginUrl()];
-    return await urls.reduce<Promise<SemsToken | null>>(
-      async (carry, url) => (await carry) ?? this.attemptLoginAt(mode, url),
-      Promise.resolve(null),
+    return await urls.reduce<
+      Promise<SemsToken | "rejected" | "unreachable">
+    >(
+      async (carry, url) => {
+        const found = await carry;
+        if (found !== "unreachable" && found !== "rejected") return found;
+        const attempt = await this.attemptLoginAt(mode, url);
+        // Keep a rejection over a later unreachable host — the server has
+        // already refused these credentials.
+        if (attempt === "unreachable" && found === "rejected") return found;
+        return attempt;
+      },
+      Promise.resolve("unreachable"),
     );
   }
 
   private async attemptLoginAt(
     mode: LoginMode,
     url: string,
-  ): Promise<SemsToken | null> {
+  ): Promise<SemsToken | "rejected" | "unreachable"> {
     try {
       const json = await this.post(
         url,
@@ -414,20 +430,20 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
         this.dbLog.warn(`SEMS ${mode} login rejected`, {
           payload: { mode, code: String(json.code ?? "") },
         });
-        return null;
+        return "rejected";
       }
 
       const envelope = loginEnvelopeSchema.safeParse(json);
       if (!envelope.success || !envelope.data.data?.token) {
         this.logger.warn(`SEMS ${mode} login returned no token field`);
-        return null;
+        return "rejected";
       }
 
       const payload = envelope.data.data;
       const api = resolveLoginApi(envelope.data.api, payload.api, mode);
       if (!api) {
         this.logger.warn(`SEMS ${mode} login returned no api base`);
-        return null;
+        return "rejected";
       }
       this.logger.info(`SEMS ${mode} login succeeded — api base ${api}`);
       this.dbLog.info(`SEMS ${mode} login succeeded`, {
@@ -437,7 +453,7 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     } catch (error) {
       if (error instanceof GoodweSemsRateLimitError) throw error;
       this.logger.warn(`SEMS ${mode} login unreachable: ${error}`);
-      return null;
+      return "unreachable";
     }
   }
 

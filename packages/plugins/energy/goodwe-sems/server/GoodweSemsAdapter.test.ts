@@ -2,15 +2,15 @@ import { beforeEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { assertExists } from "@std/assert";
 import { FakeTime } from "@std/testing/time";
+import { resetSemsBackoffForTests } from "./GoodweSemsAdapter.ts";
 import {
   applyStatus,
   isImpossibleExport,
   parseSemsValue,
-  resetSemsBackoffForTests,
   toBatteryPowerW,
   toEnergyData,
   toGridPowerW,
-} from "./GoodweSemsAdapter.ts";
+} from "./mapping.ts";
 
 beforeEach(() => {
   resetSemsBackoffForTests();
@@ -18,7 +18,7 @@ beforeEach(() => {
 import {
   GoodweSemsConnectionError,
   GoodweSemsRateLimitError,
-} from "./GoodweSemsClient.ts";
+} from "./errors.ts";
 import {
   buildPowerflow,
   buildStationDetail,

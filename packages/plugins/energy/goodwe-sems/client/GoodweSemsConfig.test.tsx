@@ -93,6 +93,7 @@ describe("GoodweSemsConfig", () => {
     expect(mocks.listStationsMutate).toHaveBeenCalledWith({
       account: "owner@example.com",
       password: "secret",
+      useSemsPlus: false,
     });
   });
 
@@ -138,5 +139,25 @@ describe("GoodweSemsConfig", () => {
     renderWithProviders(<GoodweSemsConfig />);
 
     expect(screen.getByText("Login failed")).toBeInTheDocument();
+  });
+
+  it("routes Load Stations and Test Connection to SEMS+ when toggled on", () => {
+    renderWithProviders(<GoodweSemsConfig />);
+
+    fireEvent.click(screen.getByRole("switch"));
+    fireEvent.click(screen.getByRole("button", { name: "Load Stations" }));
+    fireEvent.click(screen.getByRole("button", { name: "Test Connection" }));
+
+    expect(mocks.listStationsMutate).toHaveBeenCalledWith({
+      account: "owner@example.com",
+      password: "secret",
+      useSemsPlus: true,
+    });
+    expect(mocks.testMutate).toHaveBeenCalledWith({
+      account: "owner@example.com",
+      password: "secret",
+      stationId: "station-a",
+      useSemsPlus: true,
+    });
   });
 });

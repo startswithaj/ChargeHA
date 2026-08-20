@@ -56,6 +56,7 @@ const DEFAULT_DB_PATH = `${Deno.cwd()}/data/chargeha.db`;
 const STARTUP_ENV_VARS = [
   "GOODWE_SEMS_GATEWAY_PROBE",
   "GOODWE_SEMS_BASE_URL",
+  "GOODWE_SEMS_PLUS_BASE_URL",
   "LOG_LEVEL",
   "PORT",
   "TZ",
