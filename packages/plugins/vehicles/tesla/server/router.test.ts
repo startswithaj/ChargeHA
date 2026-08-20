@@ -16,7 +16,7 @@ import type { TeslaServiceIo } from "./TeslaService.ts";
 import { Logger } from "@chargeha/server/lib/Logger";
 import { decrypt } from "@chargeha/server/lib/Encryption";
 import { createTeslaRouter } from "./router.ts";
-import { TeslaVehiclePlugin } from "./index.ts";
+import { TeslaVehiclePlugin } from "./TeslaVehiclePlugin.ts";
 import { StubTeslaProxyManager } from "./test-helpers/StubTeslaProxyManager.ts";
 
 describe("Tesla Plugin Router", () => {

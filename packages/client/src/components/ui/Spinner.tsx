@@ -1,13 +1,13 @@
 import styles from "./Spinner.module.css";
 
 interface SpinnerProps {
-  size?: "sm" | "md" | "lg";
   className?: string;
 }
 
-export function Spinner({ size = "md", className }: SpinnerProps) {
-  const classes = [styles.spinner, size !== "md" && styles[size], className]
-    .filter(Boolean)
-    .join(" ");
-  return <span className={classes} />;
+/** A command is running and we expect it back. For a wait we do not control,
+ *  use WaitingBars. */
+export function Spinner({ className }: SpinnerProps) {
+  return (
+    <span className={[styles.spinner, className].filter(Boolean).join(" ")} />
+  );
 }

@@ -1,0 +1,78 @@
+import { useCallback, useState } from "react";
+import {
+  type PluginStepDef,
+  stepStyles as styles,
+  type WizardNext,
+} from "../../../hostUi.ts";
+import { trpc } from "./trpc.ts";
+import { GoodweSemsForm } from "./GoodweSemsForm.tsx";
+
+interface ValidatedConnection {
+  account: string;
+  password: string;
+  stationId: string;
+}
+
+/** Only the tested-connection branch carries a handler, so there is no
+ *  "save without a validated connection" state to guard against. */
+function goodweSemsNext(
+  validated: ValidatedConnection | null,
+  save: (v: ValidatedConnection) => Promise<void>,
+): WizardNext {
+  if (!validated) {
+    return { kind: "blocked", reason: "Test the connection to continue" };
+  }
+  return {
+    kind: "ready",
+    hint: "Next saves your SEMS Portal settings",
+    onNext: () => save(validated),
+  };
+}
+
+export const goodweSemsSetupStep: PluginStepDef = {
+  id: "goodwe-sems-setup",
+  label: "GoodWe SEMS Setup",
+  useStep: () => {
+    const { data: config } = trpc.plugin.energy.goodwe_sems.getConfig
+      .useQuery();
+    const saveMutation = trpc.plugin.energy.goodwe_sems.setConfig.useMutation();
+
+    const [validated, setValidated] = useState<ValidatedConnection | null>(
+      null,
+    );
+    // null = untouched, so re-running the wizard keeps the saved value.
+    const [useSemsPlus, setUseSemsPlus] = useState<boolean | null>(null);
+
+    const handleTestSuccess = useCallback(
+      (account: string, password: string, stationId: string) => {
+        setValidated({ account, password, stationId });
+      },
+      [],
+    );
+
+    const save = async (v: ValidatedConnection) => {
+      await saveMutation.mutateAsync({
+        goodweSemsAccount: v.account,
+        goodweSemsPassword: v.password,
+        goodweSemsStationId: v.stationId,
+        goodweSemsUseSemsPlus: useSemsPlus ??
+          (config?.goodweSemsUseSemsPlus ?? false),
+      });
+    };
+
+    return {
+      next: goodweSemsNext(validated, save),
+      view: (
+        <div className={styles.stepContainer}>
+          <GoodweSemsForm
+            initialAccount={config?.goodweSemsAccount || ""}
+            initialStationId={config?.goodweSemsStationId || ""}
+            initialUseSemsPlus={config?.goodweSemsUseSemsPlus ?? false}
+            onTestSuccess={handleTestSuccess}
+            onUseSemsPlusChange={setUseSemsPlus}
+          />
+        </div>
+      ),
+    };
+  },
+};

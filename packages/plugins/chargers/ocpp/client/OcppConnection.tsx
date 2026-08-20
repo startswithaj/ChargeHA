@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { Badge, Button, Code, Text, TextField } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
-import { Spinner, TestResultBadge, type TestStatus } from "../../../hostUi.ts";
+import {
+  Spinner,
+  TestResultBadge,
+  type TestStatus,
+  WaitingBars,
+} from "../../../hostUi.ts";
 import {
   isLikelyDockerNetwork,
   isPrivateLanIpv4,
@@ -29,14 +34,13 @@ function chooseBase(
   const candidates = isPrivateLanIpv4(hostname)
     ? [...serverUrls, wsUrlFor(hostname)]
     : serverUrls;
-  const best = candidates.find((u) => !isLikelyDockerNetwork(hostOf(u))) ??
-    candidates[0];
-  if (best === undefined) {
-    return { base: wsUrlFor(PLACEHOLDER_HOST), warn: "unknown" };
-  }
+  const best = candidates.find((u) => !isLikelyDockerNetwork(hostOf(u)));
+  if (best !== undefined) return { base: best, warn: null };
+  // Only docker-internal candidates (or none at all): a charger can never
+  // reach those, so show the placeholder instead of a dead address.
   return {
-    base: best,
-    warn: isLikelyDockerNetwork(hostOf(best)) ? "docker" : null,
+    base: wsUrlFor(PLACEHOLDER_HOST),
+    warn: candidates.length > 0 ? "docker" : "unknown",
   };
 }
 
@@ -125,10 +129,11 @@ function AddressStep(
       <Code size="2">{base}</Code>
       {warn === "docker" && (
         <Text size="1" color="orange" as="div" style={{ marginTop: 6 }}>
-          {hostOf(base)}{" "}
-          looks like a Docker internal address, not your real network address —
-          your charger cannot reach it. Use the LAN address of the machine
-          running ChargeHA, usually starting with 192.168.
+          ChargeHA is running inside Docker and only sees its internal network
+          address, which your charger cannot reach. Replace{" "}
+          <Code size="1">{PLACEHOLDER_HOST}</Code>{" "}
+          with the LAN address of the machine running ChargeHA — usually starts
+          with 192.168.
         </Text>
       )}
       {warn === "unknown" && (
@@ -153,28 +158,6 @@ function AddressStep(
         </Text>
       )}
     </div>
-  );
-}
-
-// Three bars bouncing in sequence. The wait has no measurable pace, so this
-// says "still going" without implying progress toward a deadline — the only
-// real number, the window countdown, is in step 1.
-function WaitingBars() {
-  return (
-    <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
-      {[0, 1, 2].map((i) => (
-        <span
-          key={i}
-          style={{
-            width: 3,
-            height: 14,
-            borderRadius: 2,
-            background: "var(--blue-9)",
-            animation: `waitBounce 1s ${i * 0.15}s infinite`,
-          }}
-        />
-      ))}
-    </span>
   );
 }
 
@@ -418,7 +401,9 @@ function usePairingWindow() {
     base,
     warn,
     // The chosen address is shown on its own; this is only the alternates.
-    baseUrls: baseUrls.filter((u) => u !== base),
+    baseUrls: baseUrls.filter((u) =>
+      u !== base && !isLikelyDockerNetwork(hostOf(u))
+    ),
     port: base.split(":")[2]?.split("/")[0] ?? "",
     remainingMs: (deadline ?? now) - now,
     // How long this window has been open with the user watching. Zero while

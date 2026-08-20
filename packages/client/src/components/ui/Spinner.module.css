@@ -9,16 +9,6 @@
   vertical-align: middle;
 }
 
-.sm {
-  width: 12px;
-  height: 12px;
-}
-
-.lg {
-  width: 18px;
-  height: 18px;
-}
-
 @keyframes spin {
   to {
     transform: rotate(360deg);

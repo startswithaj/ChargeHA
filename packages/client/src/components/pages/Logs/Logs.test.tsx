@@ -79,6 +79,15 @@ vi.mock("../../../trpc.ts", () => ({
         })),
       },
     },
+    log: {
+      pluginLogIds: {
+        useQuery: vi.fn(() => ({
+          data: [],
+          isLoading: false,
+          error: null,
+        })),
+      },
+    },
   },
 }));
 

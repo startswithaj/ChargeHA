@@ -7,6 +7,7 @@ import {
   type WizardNext,
 } from "../../../hostUi.ts";
 import { trpc } from "./trpc.ts";
+import { FormError } from "../../../hostUi.ts";
 
 function verifyNext(toggled: boolean): WizardNext {
   if (!toggled) {
@@ -60,11 +61,11 @@ export const tapoVerifyStep: PluginStepDef = {
               </Badge>
             )}
             {setPower.isError && (
-              <Text size="2" color="red">
-                {setPower.error instanceof Error
+              <FormError
+                message={setPower.error instanceof Error
                   ? setPower.error.message
                   : "Command failed"}
-              </Text>
+              />
             )}
           </div>
         </div>

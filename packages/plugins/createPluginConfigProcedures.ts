@@ -41,13 +41,16 @@ export function createPluginConfigProcedures(
         const validated = inputSchema.parse(input);
         const kvPairs = serializeSection(configDef, validated);
 
-        await Promise.all(
-          Object.entries(kvPairs).map(([key, value]) =>
-            secretKeySet.has(key)
-              ? deps.setSecret(key, value)
-              : deps.setConfig(key, value)
-          ),
+        const entries = Object.entries(kvPairs);
+        const plain = Object.fromEntries(
+          entries.filter(([key]) => !secretKeySet.has(key)),
         );
+        const secrets = Object.fromEntries(
+          entries.filter(([key]) => secretKeySet.has(key)),
+        );
+        // One atomic write: every key lands before config_changed fires, so
+        // the adapter rebuild never reads a half-applied save.
+        await deps.setConfigValues(plain, secrets);
 
         deps.log.info("Plugin config updated");
       }),

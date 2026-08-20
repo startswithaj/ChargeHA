@@ -11,6 +11,7 @@ import {
   type VehicleConfig,
 } from "@chargeha/shared/simulation";
 import styles from "./Simulator.module.css";
+import { FormError } from "../../ui/FormError.tsx";
 
 // Loaded lazily via dynamic import
 type ChartJs = typeof import("chart.js");
@@ -434,7 +435,7 @@ function ActionRow(
           Done in {elapsed}ms ({output?.results.length} ticks)
         </Text>
       )}
-      {error && <Text size="2" color="red">{error}</Text>}
+      <FormError message={error} />
     </div>
   );
 }

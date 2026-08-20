@@ -8,6 +8,7 @@ export interface EnergyData {
   batterySoc: number | null; // Battery state of charge (0-100)
   gridVoltageV: number | null; // AC grid voltage (e.g. 230, 240, 120)
   lastUpdated: string; // ISO 8601 timestamp of when this data was fetched
+  sourceUpdatedAt?: string | null;
   // Set by EnergyPoller — true when the adapter poll threw and zeros were
   // substituted. Adapters never set this. Defaults to false when omitted.
   pollFailed?: boolean;

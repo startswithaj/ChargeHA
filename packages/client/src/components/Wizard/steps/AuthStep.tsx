@@ -5,6 +5,7 @@ import { trpc } from "../../../trpc.ts";
 import { demoMode, Feature } from "../../../lib/featureFlags.ts";
 import type { StepDef, WizardNext } from "../flow.ts";
 import styles from "./steps.module.css";
+import { FormError } from "../../ui/FormError.tsx";
 
 type AuthMode = "none" | "local" | "oidc";
 
@@ -303,6 +304,17 @@ function useAuthStepState(advance: () => void) {
   const selectMode = (mode: AuthMode) => {
     setSelectedMode(mode);
     setValidationError(null);
+    // "No Authentication" has nothing to fill in, so save and move on rather
+    // than making the user click Next on an empty step.
+    if (mode === "none") {
+      setAuthModeMutate({
+        mode: "none",
+        localConfig: undefined,
+        oidcConfig: undefined,
+      })
+        .then(() => advance())
+        .catch((e: Error) => setValidationError(e.message));
+    }
   };
 
   return {
@@ -424,11 +436,7 @@ function AuthModes(
         )}
       </div>
 
-      {validationError && (
-        <Text as="p" size="2" color="red">
-          {validationError}
-        </Text>
-      )}
+      <FormError message={validationError} size="2" />
     </div>
   );
 }

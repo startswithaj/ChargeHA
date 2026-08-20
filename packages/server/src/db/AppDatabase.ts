@@ -182,6 +182,31 @@ export class AppDatabase {
     await this.config.setConfig(key, value);
     this.eventEmitter?.emit("config_changed", { key });
   }
+  // Atomic multi-key save: every key (plain and secret) is written before any
+  // config_changed is emitted, so a subscriber rebuilding on the first event
+  // can never read a half-applied save. The mid-save rebuild otherwise races
+  // the writes, fails on an incomplete set, and — being the last rebuild —
+  // leaves the adapter down until the next unrelated write.
+  async setPluginConfigValues(
+    plain: Record<string, string | null>,
+    secrets: Record<string, string | null>,
+  ): Promise<void> {
+    await Promise.all(
+      Object.entries(plain).map(([key, value]) =>
+        this.config.setConfig(key, value)
+      ),
+    );
+    await Promise.all(
+      Object.entries(secrets).map(([key, value]) =>
+        value === null
+          ? this.config.setConfig(key, null)
+          : storeSecret(this, key, value, this.encryptionKey)
+      ),
+    );
+    [...Object.keys(plain), ...Object.keys(secrets)].forEach((key) =>
+      this.eventEmitter?.emit("config_changed", { key })
+    );
+  }
   async setSecret(
     key: string,
     value: string,

@@ -8,12 +8,14 @@ import {
   LogOut,
   Menu,
   Moon,
+  Palette,
   ScrollText,
   Settings,
   Sun,
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { isDev } from "../../lib/featureFlags.ts";
 import { ConnectionBadge } from "../ConnectionBadge/ConnectionBadge.tsx";
 import logoSrc from "../../assets/chargeha_soft-plug_light.svg";
 import styles from "./AppLayout.module.css";
@@ -24,7 +26,8 @@ export type Page =
   | "schedules"
   | "logs"
   | "settings"
-  | "simulator";
+  | "simulator"
+  | "components";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -36,6 +39,7 @@ interface AppLayoutProps {
   onLogout?: () => void;
 }
 
+// The style guide is dev-only in the nav; the route still resolves in prod.
 const NAV_ITEMS: { page: Page; label: string; icon: LucideIcon }[] = [
   { page: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { page: "stats", label: "Stats", icon: BarChart3 },
@@ -43,6 +47,9 @@ const NAV_ITEMS: { page: Page; label: string; icon: LucideIcon }[] = [
   { page: "logs", label: "Logs", icon: ScrollText },
   { page: "simulator", label: "Simulator", icon: FlaskConical },
   { page: "settings", label: "Settings", icon: Settings },
+  ...(isDev()
+    ? [{ page: "components" as const, label: "Components", icon: Palette }]
+    : []),
 ];
 
 function MobileMenu(

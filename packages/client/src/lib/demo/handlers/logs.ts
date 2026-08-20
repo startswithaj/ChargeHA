@@ -119,4 +119,5 @@ export const logsHandlers: Record<string, QueryHandler> = {
   },
   // No plugin logs in demo — nothing meaningful to fabricate.
   "log.pluginLogs": () => ({ logs: [], total: 0 }),
+  "log.pluginLogIds": () => [],
 };

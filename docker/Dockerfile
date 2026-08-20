@@ -24,6 +24,9 @@ WORKDIR /app
 COPY deno.json deno.lock* ./
 COPY packages/shared/ packages/shared/
 COPY packages/server/deno.json packages/server/deno.json
+# Every workspace member's manifest has to be present: the Deno loader builds
+# the whole workspace before resolving anything, so a missing member fails the
+# build rather than being ignored.
 COPY packages/plugins/ packages/plugins/
 COPY packages/client/ packages/client/
 RUN deno install

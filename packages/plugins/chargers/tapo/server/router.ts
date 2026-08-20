@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { Logger } from "@chargeha/server/lib/Logger";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import {
@@ -9,9 +8,8 @@ import {
 import { TAPO_SECRET_KEYS, tapoConfigDef } from "./config.ts";
 import { discoverTapo } from "./TapoDiscovery.ts";
 import { KlapClient } from "./KlapClient.ts";
-import { TapoApiError, TapoAuthError, TapoLockedError } from "./errors.ts";
-import { decodeNickname } from "./TapoChargerAdapter.ts";
 import type { TapoDeviceInfo, TapoEnergyUsage } from "./TapoChargerAdapter.ts";
+import type { TapoChargerPlugin } from "./TapoChargerPlugin.ts";
 
 const discoverInput = z.object({
   subnet: z.string().optional(),
@@ -50,27 +48,16 @@ async function savedClient(
     host,
     email,
     password,
-    new Logger("Tapo", "error"),
+    deps.log,
     deps.dbLog,
     chargerRowId,
   );
 }
 
-function testFailure(err: unknown) {
-  if (err instanceof TapoAuthError) {
-    return { success: false as const, error: "Wrong Tapo email or password" };
-  }
-  // Carries its own remedy — the credentials are irrelevant to this failure.
-  if (err instanceof TapoLockedError) {
-    return { success: false as const, error: err.message };
-  }
-  return {
-    success: false as const,
-    error: err instanceof Error ? err.message : "Connection failed",
-  };
-}
-
-export function createTapoRouter(deps: PluginDependencies) {
+export function createTapoRouter(
+  deps: PluginDependencies,
+  plugin: Pick<TapoChargerPlugin, "testConnection">,
+) {
   return router({
     ...createChargerConfigProcedures(deps, tapoConfigDef, TAPO_SECRET_KEYS),
     ...createNetworkDiscoveryProcedures(deps),
@@ -84,48 +71,7 @@ export function createTapoRouter(deps: PluginDependencies) {
 
     testConnection: publicProcedure
       .input(testConnectionInput)
-      .mutation(async ({ input }) => {
-        const logger = new Logger("Tapo", "error");
-        const client = new KlapClient(
-          input.host,
-          input.email,
-          input.password,
-          logger,
-          deps.dbLog,
-          // No charger row exists yet during wizard setup — a stable label
-          // instead of an id keeps this call distinguishable in the log.
-          "wizard-test-connection",
-        );
-        try {
-          await client.handshake();
-          const info = await client.request<TapoDeviceInfo>("get_device_info");
-          const energy = await client
-            .request<TapoEnergyUsage>("get_energy_usage")
-            .catch((error: unknown) => {
-              // Only a device-level rejection means meterless; connection
-              // errors fall through to the outer catch.
-              if (error instanceof TapoApiError) return null;
-              throw error;
-            });
-          if (!energy) {
-            return {
-              success: false as const,
-              error: `This model (${info.model}) has no energy meter — an ` +
-                "energy-monitoring model (P110/P115) is required",
-            };
-          }
-          return {
-            success: true as const,
-            model: info.model,
-            firmwareVersion: info.fw_ver,
-            // The name set in the Tapo app — what the user calls this plug.
-            nickname: decodeNickname(info.nickname, logger),
-            powerW: energy.current_power / 1000,
-          };
-        } catch (err) {
-          return testFailure(err);
-        }
-      }),
+      .mutation(({ input }) => plugin.testConnection(input)),
 
     // Wizard verify step: toggle the saved plug and read live power.
     setPower: publicProcedure

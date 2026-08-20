@@ -1,12 +1,14 @@
-# Reusable build called by ci.yml on every push/PR.
+# Reusable build called by ci.yml for pushes to main and for PRs whose head
+# branch lives in this repo.
 #
 # PR image behaviour vs build-pr.yml:
 #   - Same-repo PRs: builds the MERGE commit and pushes pr-<n> + sha-<short>,
 #     then comments the image tag on the PR.
-#   - Fork PRs: builds only (fork PR tokens are read-only, so no push and no
-#     comment). Maintainers comment /build on the PR to get an image via
-#     build-pr.yml, which runs with this repo's token and pushes the PR's
-#     HEAD commit under the same pr-<n> tag.
+#   - Fork PRs: ci.yml does not run this at all — a fork head is untrusted and
+#     its token is read-only, so there would be nothing to push. Maintainers
+#     comment /build on the PR to get an image via build-pr.yml, which runs
+#     with this repo's token and pushes the PR's HEAD commit under the same
+#     pr-<n> tag.
 name: build
 
 on:

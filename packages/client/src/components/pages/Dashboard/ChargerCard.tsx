@@ -35,6 +35,7 @@ import {
 } from "../../../lib/settingsAnchors.ts";
 import { CHARGER_STATUS_LABELS } from "../../../lib/chargerLabels.ts";
 import { Spinner } from "../../ui/Spinner.tsx";
+import { WaitingBars } from "../../ui/WaitingBars.tsx";
 import layout from "../../ui/CardLayout.module.css";
 
 const STATUS_BADGE_COLORS: Record<
@@ -131,7 +132,7 @@ function DeviceStatusRow({ state }: { state: ChargerState | null }) {
 function StatusIcon({ state }: { state: ChargerState | null }) {
   const iconStyle = (color: string) => ({ color, flexShrink: 0 });
   // No state = first poll still in flight, not a device reporting blank.
-  if (!state) return <Spinner />;
+  if (!state) return <WaitingBars />;
   if (isAlarm(state)) {
     return <TriangleAlert size={14} style={iconStyle("var(--red-11)")} />;
   }

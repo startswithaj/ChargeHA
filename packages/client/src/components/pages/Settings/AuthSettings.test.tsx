@@ -611,8 +611,7 @@ describe("AuthSettings", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId("mode-change-error")).toBeInTheDocument();
-      expect(screen.getByText("Unauthorized")).toBeInTheDocument();
+      expect(screen.getByRole("alert")).toHaveTextContent("Unauthorized");
     });
   });
 
@@ -764,10 +763,9 @@ describe("AuthSettings", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId("oidc-edit-error")).toBeInTheDocument();
-      expect(
-        screen.getByText("Discovery endpoint unreachable"),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Discovery endpoint unreachable",
+      );
     });
   });
 
@@ -783,10 +781,9 @@ describe("AuthSettings", () => {
     renderWithProviders(<AuthSettings />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("oidc-error")).toBeInTheDocument();
-      expect(
-        screen.getByText("The identity provider denied the request."),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "The identity provider denied the request.",
+      );
     });
   });
 
@@ -804,7 +801,9 @@ describe("AuthSettings", () => {
     renderWithProviders(<AuthSettings />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("oidc-error")).toBeInTheDocument();
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Token exchange failed. Check your OIDC configuration.",
+      );
     });
 
     // URL should be cleaned
@@ -858,11 +857,13 @@ describe("AuthSettings", () => {
     renderWithProviders(<AuthSettings />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("oidc-error")).toBeInTheDocument();
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Could not reach the identity provider. Check the issuer URL.",
+      );
     });
 
     fireEvent.click(screen.getByTestId("edit-oidc-button"));
 
-    expect(screen.queryByTestId("oidc-error")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

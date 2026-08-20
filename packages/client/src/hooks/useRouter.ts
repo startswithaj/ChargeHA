@@ -15,6 +15,7 @@ const PATH_TO_PAGE: Record<string, Page> = {
   "/logs": "logs",
   "/settings": "settings",
   "/simulator": "simulator",
+  "/components": "components",
 };
 
 const PAGE_TO_PATH: Record<Page, string> = {
@@ -24,6 +25,7 @@ const PAGE_TO_PATH: Record<Page, string> = {
   logs: "/logs",
   settings: "/settings",
   simulator: "/simulator",
+  components: "/components",
 };
 
 export function pageFromPath(pathname: string): Page {

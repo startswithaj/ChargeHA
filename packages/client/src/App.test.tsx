@@ -50,9 +50,6 @@ vi.mock("./components/Login/LoginPage.tsx", () => ({
     </div>
   ),
 }));
-vi.mock("./components/ui/Spinner.tsx", () => ({
-  Spinner: () => <div data-testid="auth-loading">Loading...</div>,
-}));
 vi.mock("@chargeha/plugins/componentRegistry", () => ({
   vehiclePluginOptions: [
     { id: "tesla", label: "Tesla", description: "Tesla", iconKey: "car" },
@@ -507,7 +504,8 @@ describe("App", () => {
 
       render(<App />);
 
-      expect(screen.getByTestId("auth-loading")).toBeInTheDocument();
+      expect(screen.getByRole("status", { name: "Waiting" }))
+        .toBeInTheDocument();
       expect(screen.queryByText("Dashboard Page")).not.toBeInTheDocument();
       expect(screen.queryByText("Login Page")).not.toBeInTheDocument();
     });
