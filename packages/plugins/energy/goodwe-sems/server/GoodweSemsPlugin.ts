@@ -6,10 +6,8 @@ import { GOODWE_SEMS_SECRET_KEYS, goodweSemsConfigDef } from "./config.ts";
 import { GoodweSemsAdapter } from "./sems-legacy/GoodweSemsAdapter.ts";
 import { GoodweSemsPlusAdapter } from "./sems-plus/GoodweSemsPlusAdapter.ts";
 import { GoodweSemsPlusClient } from "./sems-plus/GoodweSemsPlusClient.ts";
-import {
-  GoodweSemsClient,
-  type SemsStationSummary,
-} from "./sems-legacy/GoodweSemsClient.ts";
+import { GoodweSemsClient } from "./sems-legacy/GoodweSemsClient.ts";
+import type { SemsStationSummary } from "./sems-legacy/GoodweSemsTypes.ts";
 import { createGoodweSemsRouter } from "./router.ts";
 
 export type SemsUiResult<T> =

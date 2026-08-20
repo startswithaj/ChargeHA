@@ -1,11 +1,11 @@
 import { Logger } from "@chargeha/server/lib/Logger";
 import { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
-import {
-  GoodweSemsClient,
-  type GoodweSemsStationReader,
-  type SemsPowerflow,
-  type SemsStationDetail,
-} from "../sems-legacy/GoodweSemsClient.ts";
+import { GoodweSemsClient } from "../sems-legacy/GoodweSemsClient.ts";
+import type {
+  GoodweSemsStationReader,
+  SemsPowerflow,
+  SemsStationDetail,
+} from "../sems-legacy/GoodweSemsTypes.ts";
 import { GoodweSemsRateLimitError } from "../errors.ts";
 import { GoodweSemsAdapter } from "../sems-legacy/GoodweSemsAdapter.ts";
 import { GoodweSemsPlusAdapter } from "../sems-plus/GoodweSemsPlusAdapter.ts";

@@ -1,6 +1,3 @@
-import { crypto as stdCrypto } from "@std/crypto";
-import { encodeHex } from "@std/encoding/hex";
-import { z } from "zod";
 import type { Logger } from "@chargeha/server/lib/Logger";
 import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import {
@@ -9,181 +6,37 @@ import {
   GoodweSemsRateLimitError,
 } from "../errors.ts";
 import { SemsGatewayProbe } from "./SemsGatewayProbe.ts";
-
-function baseOverride(): string | undefined {
-  return Deno.env.get("GOODWE_SEMS_BASE_URL")?.replace(/\/$/, "");
-}
-
-function newLoginUrls(): string[] {
-  const base = baseOverride();
-  const path = "/web/sems/sems-user/api/v1/auth/cross-login";
-  if (base) return [`${base}${path}`];
-  return [
-    `https://au-semsplus.goodwe.com${path}`,
-    `https://semsplus.goodwe.com${path}`,
-  ];
-}
-
-function legacyLoginUrl(): string {
-  const base = baseOverride();
-  return base
-    ? `${base}/api/v3/Common/CrossLogin`
-    : "https://www.semsportal.com/api/v3/Common/CrossLogin";
-}
-
-const NEW_LOGIN_FALLBACK_API = "https://au-gateway.semsportal.com/web/sems";
-const LEGACY_API_FALLBACK = "https://au.semsportal.com/api";
-
-const STATION_DETAIL_PATH = "/v3/PowerStation/GetMonitorDetailByPowerstationId";
-const STATION_LIST_PATH = "/PowerStation/GetPowerStationIdByOwner";
-
-const BOOTSTRAP_TOKEN = '{"version":"3.1.1","client":"ios","language":"en"}';
-
-const SUCCESS_CODES: ReadonlySet<string> = new Set(["0", "00000"]);
-const STALE_TOKEN_CODES: ReadonlySet<string> = new Set(["100002", "C0602"]);
-const EMPTY_RETRY_COOLDOWN_MS = 10 * 60 * 1000;
-// Rejected credentials can't fix themselves — don't hammer rate-limited CrossLogin.
-const REJECTED_LOGIN_COOLDOWN_MS = 5 * 60 * 1000;
-const RATE_LIMIT_CODE = "GY0429";
-const REQUEST_TIMEOUT_MS = 15_000;
-
-const RATE_LIMIT_BACKOFF_MS = 300_000;
-
-export interface SemsToken {
-  readonly api: string;
-  readonly region?: string;
-  readonly [key: string]: unknown;
-}
-
-export interface SemsStationSummary {
-  id: string;
-  name: string;
-}
-
-const numericish = z.union([z.string(), z.number()]).optional();
-
-export const semsPowerflowSchema = z.object({
-  pv: numericish,
-  load: numericish,
-  grid: numericish,
-  bettery: numericish,
-  betteryStatus: numericish,
-  soc: numericish,
-  gridStatus: numericish,
-  loadStatus: numericish,
-}).passthrough();
-
-export type SemsPowerflow = z.infer<typeof semsPowerflowSchema>;
-
-const semsEnvelopeSchema = z.object({
-  code: z.union([z.string(), z.number()]).optional(),
-  api: z.string().optional(),
-  data: z.unknown(),
-}).passthrough();
-
-const loginEnvelopeSchema = semsEnvelopeSchema.extend({
-  data: z.object({ token: z.string().optional(), api: z.string().optional() })
-    .passthrough().optional(),
-});
-
-const stationListSchema = z.array(
-  z.object({
-    id: z.string().optional(),
-    powerstation_id: z.string().optional(),
-    stationname: z.string().optional(),
-  }).passthrough(),
-);
-
-const stationDetailSchema = z.object({
-  hasPowerflow: z.boolean().optional(),
-  powerflow: semsPowerflowSchema.nullish(),
-  soc: z.object({ power: numericish }).passthrough().optional(),
-  info: z.object({ stationname: z.string().optional() }).passthrough()
-    .optional(),
-  inverter: z.array(
-    z.object({
-      invert_full: z.object({
-        model_type: z.string().optional(),
-        last_time: z.number().optional(),
-      })
-        .passthrough().optional(),
-    }).passthrough(),
-  ).optional(),
-}).passthrough();
-
-export interface SemsStationDetail {
-  hasPowerflow: boolean;
-  powerflow: SemsPowerflow | null;
-  stationName: string | null;
-  inverterModel: string | null;
-  sourceUpdatedAtMs: number | null;
-}
-
-type LoginMode = "new" | "legacy";
-
-function loginHeaders(mode: LoginMode): Record<string, string> {
-  if (mode === "legacy") {
-    return {
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-      "token": BOOTSTRAP_TOKEN,
-    };
-  }
-  return {
-    "Content-Type": "application/json",
-    "Accept": "application/json, */*;q=0.5",
-  };
-}
-
-function resolveLoginApi(
-  envelopeApi: string | undefined,
-  payloadApi: string | undefined,
-  mode: LoginMode,
-): string | null {
-  if (envelopeApi) return envelopeApi;
-  if (payloadApi) return payloadApi;
-  if (mode === "new") return NEW_LOGIN_FALLBACK_API;
-  return null;
-}
-
-async function encodeSemsPlusPassword(password: string): Promise<string> {
-  const digest = await stdCrypto.subtle.digest(
-    "MD5",
-    new TextEncoder().encode(password),
-  );
-  return btoa(encodeHex(new Uint8Array(digest)));
-}
-
-function isEmptyData(data: unknown): boolean {
-  if (data === null || data === undefined || data === "") return true;
-  if (Array.isArray(data)) return data.length === 0;
-  if (typeof data === "object") return Object.keys(data).length === 0;
-  return false;
-}
-
-function validRegion(region: unknown): string | null {
-  if (typeof region !== "string") return null;
-  const trimmed = region.trim().toLowerCase();
-  return /^[a-z]{2,4}$/.test(trimmed) ? trimmed : null;
-}
-
-function extractRegion(base: string): string | null {
-  const host = base.split("//").at(-1)?.split("/")[0] ?? "";
-  if (host.endsWith("-gateway.semsportal.com")) {
-    return host.replace("-gateway.semsportal.com", "") || null;
-  }
-  if (host.endsWith(".semsportal.com")) return host.split(".")[0] || null;
-  return null;
-}
-
-export interface GoodweSemsStationReader {
-  clearSession(): void;
-  getStationDetail(stationId: string): Promise<SemsStationDetail>;
-  probeGatewayFlow?(
-    stationId: string,
-    legacy: SemsPowerflow | null,
-  ): Promise<void>;
-}
+import {
+  EMPTY_RETRY_COOLDOWN_MS,
+  encodeSemsPlusPassword,
+  isEmptyData,
+  LEGACY_API_FALLBACK,
+  legacyLoginUrl,
+  loginHeaders,
+  type LoginMode,
+  newLoginUrls,
+  RATE_LIMIT_BACKOFF_MS,
+  RATE_LIMIT_CODE,
+  REJECTED_LOGIN_COOLDOWN_MS,
+  REQUEST_TIMEOUT_MS,
+  resolveApiBase,
+  resolveLoginApi,
+  STALE_TOKEN_CODES,
+  STATION_DETAIL_PATH,
+  STATION_LIST_PATH,
+  SUCCESS_CODES,
+} from "./GoodweSemsProtocol.ts";
+import {
+  type GoodweSemsStationReader,
+  loginEnvelopeSchema,
+  type SemsPowerflow,
+  type SemsStationDetail,
+  type SemsStationSummary,
+  type SemsToken,
+  stationDetailSchema,
+  stationListSchema,
+  toStationDetail,
+} from "./GoodweSemsTypes.ts";
 
 export class GoodweSemsClient implements GoodweSemsStationReader {
   private token: SemsToken | null = null;
@@ -289,8 +142,7 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     const raw = await this.call(STATION_DETAIL_PATH, {
       powerStationId: stationId,
     });
-    // The full payload, not the parsed subset — glitch forensics and the
-    // SEMS+ migration both need fields our schema does not yet read.
+
     this.logger.debug(`SEMS raw station detail: ${JSON.stringify(raw)}`);
     const parsed = stationDetailSchema.safeParse(raw);
     if (!parsed.success) {
@@ -298,25 +150,7 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
         "SEMS returned a station payload in an unrecognised shape",
       );
     }
-    const data = parsed.data;
-    const powerflow = data.hasPowerflow === true
-      ? data.powerflow ?? null
-      : null;
-    if (
-      powerflow && powerflow.soc === undefined && data.soc?.power !== undefined
-    ) {
-      powerflow.soc = data.soc.power;
-    }
-    const uploadTimes = (data.inverter ?? [])
-      .map((entry) => entry.invert_full?.last_time)
-      .filter((time): time is number => Number.isFinite(time));
-    return {
-      hasPowerflow: data.hasPowerflow === true,
-      powerflow,
-      stationName: data.info?.stationname ?? null,
-      inverterModel: data.inverter?.[0]?.invert_full?.model_type ?? null,
-      sourceUpdatedAtMs: uploadTimes.length ? Math.max(...uploadTimes) : null,
-    };
+    return toStationDetail(parsed.data);
   }
 
   private async call(
@@ -328,7 +162,7 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     const token = this.token;
     if (!token) throw new GoodweSemsAuthError("SEMS login produced no token");
 
-    const url = this.resolveApiBase(token, path) + path;
+    const url = this.apiBase(token, path) + path;
     const startedAt = performance.now();
     const json = await this.post(url, body, {
       "Content-Type": "application/json",
@@ -470,23 +304,11 @@ export class GoodweSemsClient implements GoodweSemsStationReader {
     };
   }
 
-  private resolveApiBase(token: SemsToken, path: string): string {
-    const override = baseOverride();
-    if (override) return `${override}/api`;
-
-    const base = token.api.replace(/\/$/, "");
-    const isStationRoute = path.startsWith("/PowerStation") ||
-      path.startsWith("/v3/PowerStation");
-    if (!isStationRoute) return base;
-    const host = base.split("//").at(-1)?.split("/")[0] ?? "";
-    const isSemsPlusHost = host.endsWith("-gateway.semsportal.com") ||
-      host.endsWith("semsplus.goodwe.com");
-    if (!isSemsPlusHost) return base;
-
-    const region = validRegion(token.region) ?? extractRegion(base);
-    if (region) return `https://${region}.semsportal.com/api`;
+  private apiBase(token: SemsToken, path: string): string {
+    const base = resolveApiBase(token, path);
+    if (base !== null) return base;
     this.logger.warn(
-      `SEMS region unresolvable from api base ${base} — falling back to ${LEGACY_API_FALLBACK}`,
+      `SEMS region unresolvable from api base ${token.api} — falling back to ${LEGACY_API_FALLBACK}`,
     );
     return LEGACY_API_FALLBACK;
   }

@@ -1,5 +1,5 @@
 import type { EnergyData } from "@chargeha/shared";
-import type { SemsPowerflow, SemsStationDetail } from "./GoodweSemsClient.ts";
+import type { SemsPowerflow, SemsStationDetail } from "./GoodweSemsTypes.ts";
 
 const LOAD_STATUS_IMPORTING = 1;
 

@@ -12,12 +12,13 @@ import {
 import { GoodweSemsPlusClient } from "./GoodweSemsPlusClient.ts";
 import { toEnergyDataFromFlow } from "./GoodweSemsPlusMapping.ts";
 
-const POLL_INTERVAL_SECONDS = 60;
-
-const MAX_STALE_MS = 15 * 60 * 1000;
-
 // Backoff windows outlive adapter instances: a config save rebuilds the
 // adapter, and a fresh instance must not call SEMS+ inside a declared window.
+import {
+  MAX_STALE_MS,
+  POLL_INTERVAL_SECONDS,
+} from "./GoodweSemsPlusProtocol.ts";
+
 const backoffUntilByStation = new Map<string, number>();
 
 export function resetSemsPlusBackoffForTests(): void {

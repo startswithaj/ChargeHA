@@ -5,11 +5,11 @@ import type {
 } from "@chargeha/shared";
 import type { Logger } from "@chargeha/server/lib/Logger";
 import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
-import {
-  GoodweSemsClient,
-  type GoodweSemsStationReader,
-  type SemsPowerflow,
-} from "./GoodweSemsClient.ts";
+import { GoodweSemsClient } from "./GoodweSemsClient.ts";
+import type {
+  GoodweSemsStationReader,
+  SemsPowerflow,
+} from "./GoodweSemsTypes.ts";
 import {
   GoodweSemsConnectionError,
   GoodweSemsRateLimitError,
@@ -20,12 +20,10 @@ import {
   toEnergyDataFromDetail,
 } from "./GoodweSemsMapping.ts";
 
-const POLL_INTERVAL_SECONDS = 60;
-
-const MAX_STALE_MS = 15 * 60 * 1000;
-
 // Backoff windows outlive adapter instances: a config save rebuilds the
 // adapter, and a fresh instance must not call SEMS inside a declared window.
+import { MAX_STALE_MS, POLL_INTERVAL_SECONDS } from "./GoodweSemsProtocol.ts";
+
 const backoffUntilByStation = new Map<string, number>();
 
 export function resetSemsBackoffForTests(): void {

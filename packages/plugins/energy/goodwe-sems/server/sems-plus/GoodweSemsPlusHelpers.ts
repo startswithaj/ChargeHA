@@ -1,12 +1,7 @@
+import type { SemsPlusEndpoint } from "./GoodweSemsPlusProtocol.ts";
 import { crypto as stdCrypto } from "@std/crypto";
 import { encodeHex } from "@std/encoding/hex";
-import type { z } from "zod";
-import type {
-  semsPlusStationEntrySchema,
-  semsPlusStationPageSchema,
-} from "./GoodweSemsPlusTypes.ts";
 
-export const LOGIN_PATH = "/web/sems/sems-user/api/v1/auth/cross-login";
 const LOGIN_HOSTS = [
   "https://au-semsplus.goodwe.com",
   "https://semsplus.goodwe.com",
@@ -27,14 +22,6 @@ function baseOverride(): string | undefined {
 export function loginHosts(): string[] {
   const base = baseOverride();
   return base ? [base] : LOGIN_HOSTS;
-}
-
-export function stationEntries(
-  data: z.infer<typeof semsPlusStationPageSchema>,
-): z.infer<typeof semsPlusStationEntrySchema>[] {
-  if (Array.isArray(data)) return data;
-  if ("records" in data) return data.records;
-  return data.list;
 }
 
 export async function encodePassword(password: string): Promise<string> {
@@ -88,4 +75,15 @@ export async function gatewayHeaders(
     "token": JSON.stringify({ ...token, client: "semsPlusWeb" }),
     "X-Signature": btoa(`${encodeHex(new Uint8Array(digest))}@${ms}`),
   };
+}
+
+export function gatewayUrl(
+  token: SemsPlusToken,
+  endpoint: SemsPlusEndpoint,
+  query?: Record<string, string>,
+): string {
+  const search = query === undefined
+    ? ""
+    : `?${new URLSearchParams(query).toString()}`;
+  return `${gatewayBase(token)}${endpoint.path}${search}`;
 }

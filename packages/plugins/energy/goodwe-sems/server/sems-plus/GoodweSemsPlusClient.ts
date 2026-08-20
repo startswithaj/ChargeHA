@@ -1,4 +1,3 @@
-import { z } from "zod";
 import type { Logger } from "@chargeha/server/lib/Logger";
 import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import {
@@ -7,36 +6,33 @@ import {
   GoodweSemsRateLimitError,
 } from "../errors.ts";
 import {
+  FLOW,
+  LOGIN,
+  RATE_LIMIT_BACKOFF_MS,
+  RATE_LIMIT_CODE,
+  REJECTED_LOGIN_COOLDOWN_MS,
+  REQUEST_TIMEOUT_MS,
+  type SemsPlusEndpoint,
+  STALE_TOKEN_CODES,
+  STATION_LIST,
+  STATION_LIST_BODY,
+  SUCCESS_CODES,
+} from "./GoodweSemsPlusProtocol.ts";
+import {
   encodePassword,
   FALLBACK_GATEWAY,
-  gatewayBase,
   gatewayHeaders,
-  LOGIN_PATH,
+  gatewayUrl,
   loginHosts,
   type SemsPlusToken,
-  stationEntries,
 } from "./GoodweSemsPlusHelpers.ts";
 import {
+  loginEnvelopeSchema,
+  parseFlow,
+  parseStations,
   type SemsPlusFlow,
-  semsPlusFlowSchema,
   type SemsPlusStation,
-  semsPlusStationPageSchema,
 } from "./GoodweSemsPlusTypes.ts";
-
-const SUCCESS_CODES: ReadonlySet<string> = new Set(["0", "00000"]);
-// Rejected credentials can't fix themselves — don't hammer rate-limited CrossLogin.
-const REJECTED_LOGIN_COOLDOWN_MS = 5 * 60 * 1000;
-const STALE_TOKEN_CODES: ReadonlySet<string> = new Set(["100002", "C0602"]);
-const RATE_LIMIT_CODE = "GY0429";
-const RATE_LIMIT_BACKOFF_MS = 300_000;
-const REQUEST_TIMEOUT_MS = 15_000;
-
-const loginEnvelopeSchema = z.object({
-  code: z.union([z.string(), z.number()]).optional(),
-  api: z.string().optional(),
-  data: z.object({ token: z.string().optional(), api: z.string().optional() })
-    .passthrough().optional(),
-}).passthrough();
 
 export class GoodweSemsPlusClient {
   private token: SemsPlusToken | null = null;
@@ -54,160 +50,128 @@ export class GoodweSemsPlusClient {
     this.token = null;
   }
 
-  async getFlow(stationId: string, isRetry = false): Promise<SemsPlusFlow> {
+  async getFlow(stationId: string): Promise<SemsPlusFlow> {
+    return await this.call(FLOW, { query: { stationId } }, parseFlow);
+  }
+
+  async getStations(): Promise<SemsPlusStation[]> {
+    return await this.call(
+      STATION_LIST,
+      { body: STATION_LIST_BODY },
+      (data) => {
+        const stations = parseStations(data);
+        if (stations !== null) return stations;
+        this.logger.warn("SEMS+ station list arrived in an unrecognised shape");
+        return [];
+      },
+    );
+  }
+
+  // The one place that owns the gateway envelope: auth, rate limits, the
+  // single stale-token retry and the success codes. Endpoints only parse data.
+  private async call<T>(
+    endpoint: SemsPlusEndpoint,
+    request: { query?: Record<string, string>; body?: unknown },
+    parse: (data: unknown) => T,
+    isRetry = false,
+  ): Promise<T> {
     await this.ensureLoggedIn();
     const token = this.token;
     if (!token) throw new GoodweSemsAuthError("SEMS+ login produced no token");
 
-    const url = `${gatewayBase(token)}/sems-plant/api/stations/flow?stationId=${
-      encodeURIComponent(stationId)
-    }`;
-    const startedAt = performance.now();
-    const response = await this.fetchFlow(url, token);
-    const durationMs = Math.round(performance.now() - startedAt);
-    this.logger.info(
-      `SEMS+ flow → HTTP ${response.status} in ${durationMs}ms`,
-    );
-    if (!response.ok) {
-      this.logFlowFailure(stationId, `HTTP ${response.status}`, isRetry);
-      throw new GoodweSemsConnectionError(
-        `SEMS+ gateway returned HTTP ${response.status}`,
-      );
-    }
-    const json = await response.json() as Record<string, unknown>;
+    const json = await this.send(endpoint, token, request);
     const code = String(json.code ?? "");
+
     if (code === RATE_LIMIT_CODE) {
-      this.logFlowFailure(stationId, `code ${code}`, isRetry);
+      this.logFailure(endpoint, `code ${code}`, isRetry);
       throw new GoodweSemsRateLimitError(RATE_LIMIT_BACKOFF_MS);
     }
     if (!isRetry && STALE_TOKEN_CODES.has(code)) {
       this.logger.debug("SEMS+ token stale — re-authenticating and retrying");
       this.token = null;
-      return await this.getFlow(stationId, true);
+      return await this.call(endpoint, request, parse, true);
     }
     if (!SUCCESS_CODES.has(code)) {
-      this.logFlowFailure(stationId, `code ${code || "(none)"}`, isRetry);
+      this.logFailure(endpoint, `code ${code || "(none)"}`, isRetry);
       throw new GoodweSemsConnectionError(
-        `SEMS+ flow failed with code ${code || "(none)"}`,
+        `SEMS+ ${endpoint.label} failed with code ${code || "(none)"}`,
       );
     }
-    const parsed = semsPlusFlowSchema.safeParse(json.data);
-    if (!parsed.success) {
-      this.logFlowFailure(stationId, "unrecognised payload shape", isRetry);
-      throw new GoodweSemsConnectionError(
-        "SEMS+ flow payload arrived in an unrecognised shape",
-      );
-    }
-    // A parseable but empty flow is what the gateway returns for an unknown
-    // or un-migrated station — all-zero readings must not pass as good data.
-    if (parsed.data.pGrid == null && parsed.data.pConsum == null) {
-      this.logFlowFailure(
-        stationId,
-        "payload carried no power fields",
-        isRetry,
-      );
-      throw new GoodweSemsConnectionError(
-        "SEMS+ returned no power flow data for this station — a GoodWe " +
-          "HomeKit or smart meter is required for grid and consumption " +
-          "readings, and the station must appear in the SEMS+ app",
-      );
-    }
-    return parsed.data;
+    return this.parseOrThrow(endpoint, json.data, parse, isRetry);
   }
 
-  private logFlowFailure(
-    stationId: string,
+  private parseOrThrow<T>(
+    endpoint: SemsPlusEndpoint,
+    data: unknown,
+    parse: (data: unknown) => T,
+    isRetry: boolean,
+  ): T {
+    try {
+      return parse(data);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logFailure(endpoint, reason, isRetry);
+      throw new GoodweSemsConnectionError(reason);
+    }
+  }
+
+  private async send(
+    endpoint: SemsPlusEndpoint,
+    token: SemsPlusToken,
+    request: { query?: Record<string, string>; body?: unknown },
+  ): Promise<Record<string, unknown>> {
+    const url = gatewayUrl(token, endpoint, request.query);
+    const headers = await gatewayHeaders(token);
+    const startedAt = performance.now();
+    const response = await this.fetchOrThrow(url, {
+      method: endpoint.method,
+      headers: request.body === undefined
+        ? headers
+        : { ...headers, "Content-Type": "application/json" },
+      body: request.body === undefined
+        ? undefined
+        : JSON.stringify(request.body),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    const durationMs = Math.round(performance.now() - startedAt);
+    this.logger.info(
+      `SEMS+ ${endpoint.label} → HTTP ${response.status} in ${durationMs}ms`,
+    );
+    if (!response.ok) {
+      this.logFailure(endpoint, `HTTP ${response.status}`, false);
+      throw new GoodweSemsConnectionError(
+        `SEMS+ gateway returned HTTP ${response.status} for the ${endpoint.label}`,
+      );
+    }
+    return await response.json() as Record<string, unknown>;
+  }
+
+  private async fetchOrThrow(
+    url: string,
+    init: RequestInit,
+  ): Promise<Response> {
+    try {
+      return await fetch(url, init);
+    } catch (error) {
+      throw new GoodweSemsConnectionError(
+        `Failed to reach SEMS+ gateway at ${url}`,
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  private logFailure(
+    endpoint: SemsPlusEndpoint,
     reason: string,
     isRetry: boolean,
   ): void {
-    const summary = `SEMS+ flow failed — ${reason}${isRetry ? " (retry)" : ""}`;
+    const summary = `SEMS+ ${endpoint.label} failed — ${reason}${
+      isRetry ? " (retry)" : ""
+    }`;
     this.logger.warn(summary);
-    this.dbLog.warn(summary, { payload: { stationId, reason, isRetry } });
-  }
-
-  async getStations(isRetry = false): Promise<SemsPlusStation[]> {
-    await this.ensureLoggedIn();
-    const token = this.token;
-    if (!token) throw new GoodweSemsAuthError("SEMS+ login produced no token");
-
-    const url = `${gatewayBase(token)}/sems-plant/api/stations/simple-query`;
-    const response = await this.fetchGateway(url, token, {
-      current: 1,
-      size: 100,
+    this.dbLog.warn(summary, {
+      payload: { endpoint: endpoint.path, reason, isRetry },
     });
-    if (!response.ok) {
-      throw new GoodweSemsConnectionError(
-        `SEMS+ gateway returned HTTP ${response.status} for the station list`,
-      );
-    }
-    const json = await response.json() as Record<string, unknown>;
-    const code = String(json.code ?? "");
-    if (code === RATE_LIMIT_CODE) {
-      throw new GoodweSemsRateLimitError(RATE_LIMIT_BACKOFF_MS);
-    }
-    if (!isRetry && STALE_TOKEN_CODES.has(code)) {
-      this.token = null;
-      return await this.getStations(true);
-    }
-    if (!SUCCESS_CODES.has(code)) {
-      throw new GoodweSemsConnectionError(
-        `SEMS+ station list failed with code ${code || "(none)"}`,
-      );
-    }
-    const parsed = semsPlusStationPageSchema.safeParse(json.data);
-    if (!parsed.success) {
-      this.logger.warn(
-        `SEMS+ station list arrived in an unrecognised shape: ${parsed.error.message}`,
-      );
-      return [];
-    }
-    return stationEntries(parsed.data).flatMap((entry) => {
-      const id = entry.id ?? entry.plantId;
-      if (id === null || id === undefined) return [];
-      const name = entry.name ?? entry.plantName ?? entry.stationName;
-      return [{ id: String(id), name: name || String(id) }];
-    });
-  }
-
-  private async fetchGateway(
-    url: string,
-    token: SemsPlusToken,
-    body: Record<string, unknown>,
-  ): Promise<Response> {
-    try {
-      return await fetch(url, {
-        method: "POST",
-        headers: {
-          ...await gatewayHeaders(token),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      });
-    } catch (error) {
-      throw new GoodweSemsConnectionError(
-        `Failed to reach SEMS+ gateway at ${url}`,
-        error instanceof Error ? error : undefined,
-      );
-    }
-  }
-
-  private async fetchFlow(
-    url: string,
-    token: SemsPlusToken,
-  ): Promise<Response> {
-    try {
-      return await fetch(url, {
-        method: "GET",
-        headers: await gatewayHeaders(token),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      });
-    } catch (error) {
-      throw new GoodweSemsConnectionError(
-        `Failed to reach SEMS+ gateway at ${url}`,
-        error instanceof Error ? error : undefined,
-      );
-    }
   }
 
   private async ensureLoggedIn(): Promise<void> {
@@ -241,7 +205,7 @@ export class GoodweSemsPlusClient {
         // Both hosts front the same auth system — a definitive rejection from
         // one is final, and retrying the other just doubles login volume.
         if (acc.token || acc.sawRejection) return acc;
-        const outcome = await this.attemptLoginAt(`${host}${LOGIN_PATH}`, body);
+        const outcome = await this.attemptLoginAt(`${host}${LOGIN.path}`, body);
         if (outcome === "rejected") return { ...acc, sawRejection: true };
         if (outcome === "unreachable") return acc;
         return { ...acc, token: outcome };
@@ -270,7 +234,7 @@ export class GoodweSemsPlusClient {
   ): Promise<SemsPlusToken | "rejected" | "unreachable"> {
     try {
       const response = await fetch(url, {
-        method: "POST",
+        method: LOGIN.method,
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json, */*;q=0.5",
