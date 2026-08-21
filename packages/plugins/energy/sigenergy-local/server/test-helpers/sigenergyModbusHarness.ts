@@ -11,9 +11,16 @@ export class FakeModbusReader implements ModbusReader {
   disconnectCalls = 0;
   private readonly responses = new Map<string, Buffer>();
   private readonly failures = new Set<string>();
+  private readonly readCounts = new Map<string, number>();
 
   private key(unitId: number, address: number): string {
     return `${unitId}:${address}`;
+  }
+
+  /** How many reads (successful or failed) hit one register. Lets tests assert
+   *  that values the adapter caches are only fetched once. */
+  readCount(unitId: number, address: number): number {
+    return this.readCounts.get(this.key(unitId, address)) ?? 0;
   }
 
   setS32(unitId: number, address: number, value: number): this {
@@ -70,6 +77,7 @@ export class FakeModbusReader implements ModbusReader {
     _count: number,
   ): Promise<Buffer> {
     const key = this.key(unitId, address);
+    this.readCounts.set(key, (this.readCounts.get(key) ?? 0) + 1);
     if (this.failures.has(key)) {
       return Promise.reject(new Error(`fake modbus failure at ${key}`));
     }

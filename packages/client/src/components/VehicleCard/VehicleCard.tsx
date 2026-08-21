@@ -12,6 +12,7 @@ import {
 import { Badge, Button, Callout, Card, Skeleton, Text } from "@radix-ui/themes";
 import type { VehicleChargeState, VehicleMode } from "@chargeha/shared";
 import { formatRelativeTime, formatTime12h } from "../../utils/Format.ts";
+import type { HomeBatteryState } from "../../utils/homeBattery.ts";
 import { StaticMap } from "../StaticMap/StaticMap.tsx";
 import { Spinner } from "../ui/Spinner.tsx";
 import { ErrorBanner } from "../ui/ErrorBanner.tsx";
@@ -47,6 +48,8 @@ interface VehicleCardProps {
   pollingSuspendReason?: string | null;
   controllerReason?: string | null;
   controllerDetail?: string | null;
+  /** Home battery state, used by the battery-priority status line. */
+  homeBattery?: HomeBatteryState;
 }
 
 const MODE_LABELS: Record<VehicleMode, string> = {
@@ -354,6 +357,7 @@ export function VehicleCard({
   pollingSuspendReason,
   controllerReason,
   controllerDetail,
+  homeBattery,
 }: VehicleCardProps) {
   if (loading) {
     return (
@@ -429,6 +433,7 @@ export function VehicleCard({
           allocationStatus={allocationStatus ?? null}
           controllerReason={controllerReason ?? null}
           controllerDetail={controllerDetail ?? null}
+          homeBattery={homeBattery}
           state={state}
           disabled={disabled}
           commandPending={commandPending}

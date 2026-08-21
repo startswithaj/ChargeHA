@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   formatCost,
   formatDays,
+  formatDurationCoarse,
   formatRelativeTime,
   formatTime12h,
   kwhValue,
@@ -206,5 +207,38 @@ describe("formatRelativeTime", () => {
     expect(formatRelativeTime(new Date("2026-02-28T12:00:00Z"))).toBe(
       "24h ago",
     );
+  });
+});
+
+describe("formatDurationCoarse", () => {
+  it("collapses anything under five minutes", () => {
+    expect(formatDurationCoarse(0)).toBe("under 5 minutes");
+    expect(formatDurationCoarse(4.9)).toBe("under 5 minutes");
+  });
+
+  it("rounds to the nearest five minutes below an hour", () => {
+    expect(formatDurationCoarse(5)).toBe("5 minutes");
+    expect(formatDurationCoarse(7)).toBe("5 minutes");
+    expect(formatDurationCoarse(33)).toBe("35 minutes");
+    expect(formatDurationCoarse(57)).toBe("55 minutes");
+  });
+
+  it("reads a value that rounds up to a full hour as an hour", () => {
+    expect(formatDurationCoarse(58)).toBe("1 hour");
+    expect(formatDurationCoarse(60)).toBe("1 hour");
+    expect(formatDurationCoarse(70)).toBe("1 hour");
+  });
+
+  it("rounds to the nearest half hour above an hour", () => {
+    expect(formatDurationCoarse(90)).toBe("1.5 hours");
+    expect(formatDurationCoarse(100)).toBe("1.5 hours");
+    expect(formatDurationCoarse(105)).toBe("2 hours");
+    expect(formatDurationCoarse(270)).toBe("4.5 hours");
+    expect(formatDurationCoarse(599)).toBe("10 hours");
+  });
+
+  it("caps at ten hours rather than pretending to be precise", () => {
+    expect(formatDurationCoarse(600)).toBe("over 10 hours");
+    expect(formatDurationCoarse(5000)).toBe("over 10 hours");
   });
 });

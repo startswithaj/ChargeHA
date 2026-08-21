@@ -89,7 +89,9 @@ This is where the main logic lives. The checks run in priority order:
    reached it, fall through to solar tracking instead.
 
 3. **Battery priority** — If enabled and the home battery SoC is below the
-   configured threshold, stop charging to let the home battery charge first.
+   configured threshold, stop charging to let the home battery charge first. The
+   dashboard estimates how long that will take — see _Battery priority status
+   line_ below.
 
 4. **Free tariff** — If enabled and the active tariff rate is at or below
    `free_tariff_max_rate_per_kwh`, charge from the grid at maximum amps
@@ -99,6 +101,44 @@ This is where the main logic lives. The checks run in priority order:
 
 6. **Fallback** — If nothing above applied, stop charging (or do nothing if
    already stopped). Marks the vehicle as suspendable.
+
+## Battery priority status line
+
+While battery priority is holding a vehicle back, its card shows how long the
+home battery still needs:
+
+```
+Home battery priority (35 minutes until 80%)
+```
+
+The estimate is computed in the client from the realtime energy snapshot and the
+configured priority limit:
+
+```
+chargeKw    = -batteryPowerW / 1000        // negative battery power is charging
+kwhToTarget = (limitPct - socPct) / 100 * batteryCapacityKwh
+minutes     = kwhToTarget / chargeKw * 60
+```
+
+`batteryCapacityKwh` comes from the energy adapter. Only the Sigenergy adapter
+reports it today (plant register `30083`, ESS rated energy capacity, read once
+and cached — it's nameplate data). Every other adapter leaves it unset.
+
+The output is rounded hard — 5-minute steps below an hour, half-hours above,
+`under 5 minutes` and `over 10 hours` at the ends. The inputs are an
+instantaneous power reading, so a to-the-minute figure would flicker under
+broken cloud and read like a countdown rather than an estimate.
+
+When no honest estimate is possible the line falls back to the percentages
+alone, e.g. `Home battery priority (65% → 80%)`. That covers: no capacity from
+the adapter, no SoC or battery power reading, the battery already at the limit,
+and — importantly — a battery that is idle or discharging, which is never going
+to arrive at the current rate.
+
+> The estimate assumes SoC maps linearly onto rated capacity. Sigenergy also
+> exposes charge/discharge cut-off SoCs (`30085`/`30086`), so the reported
+> 0-100% may not span the full rated kWh. The resulting error is small enough to
+> disappear into the rounding.
 
 ## Free tariff charging
 

@@ -88,6 +88,15 @@ vi.mock("../../../trpc.ts", () => ({
           })),
         },
       },
+      battery: {
+        get: {
+          useQuery: vi.fn(() => ({
+            data: { batteryPriorityEnabled: false, batteryPriorityLimit: 80 },
+            isLoading: false,
+            error: null,
+          })),
+        },
+      },
       systemAlert: {
         useQuery: () => dashboardMocks.configGetAllUseQuery(),
       },

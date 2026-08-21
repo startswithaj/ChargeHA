@@ -69,6 +69,18 @@ It also handles:
   wattage to `homeConsumptionW` and `gridPowerW` so the rest of the system sees
   it as if it were real meter data.
 
+#### Optional `EnergyData` fields
+
+Most of `EnergyData` is required, so every adapter has to answer for it. A field
+only some hardware can report is optional instead, and consumers treat an absent
+value as _unknown_ rather than substituting a default:
+
+- `batteryCapacityKwh` — home battery rated capacity. Only the Sigenergy adapter
+  reports it (plant register `30083`), read once and cached since it's nameplate
+  data. Used by the dashboard to estimate how long the home battery needs to
+  reach the battery-priority limit; without it that status line falls back to
+  showing percentages alone.
+
 ### Energy poller
 
 Source: `packages/server/src/services/EnergyPoller.ts`

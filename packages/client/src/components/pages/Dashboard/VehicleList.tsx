@@ -1,9 +1,14 @@
 import { type ComponentProps, useMemo, useState } from "react";
 import { Car, Settings, Zap } from "lucide-react";
 import { Button, Card, Text } from "@radix-ui/themes";
-import type { VehicleChargeState, VehicleMode } from "@chargeha/shared";
+import type {
+  EnergyData,
+  VehicleChargeState,
+  VehicleMode,
+} from "@chargeha/shared";
 import { isHome } from "@chargeha/shared/geo";
 import {
+  useBatteryConfig,
   useChargingConfig,
   useHomeConfig,
 } from "../../../hooks/useSectionConfig.ts";
@@ -16,6 +21,7 @@ import { VehicleCard } from "../../VehicleCard/VehicleCard.tsx";
 import { OneOffChargeDialog } from "../../OneOffChargeDialog/OneOffChargeDialog.tsx";
 import { trpc } from "../../../trpc.ts";
 import { useVehicleSolarGrid } from "./energyHelpers.ts";
+import type { HomeBatteryState } from "../../../utils/homeBattery.ts";
 
 type VehicleCardProps = ComponentProps<typeof VehicleCard>;
 
@@ -41,6 +47,25 @@ function ConnectedVehicleCard(
 
 interface VehicleListProps {
   onNavigateSettings?: () => void;
+}
+
+/** Home battery state for the battery-priority status line. The home battery is
+ *  a whole-house resource, so every card waiting on it shows the same estimate.
+ *
+ *  Returns undefined until the priority limit has loaded — there is no sensible
+ *  placeholder for the target, and a 0% target would read as a fact rather than
+ *  a missing value. */
+function buildHomeBattery(
+  realtime: EnergyData | null,
+  priorityLimit: number | undefined,
+): HomeBatteryState | undefined {
+  if (priorityLimit === undefined) return undefined;
+  return {
+    socPct: realtime?.batterySoc ?? null,
+    targetPct: priorityLimit,
+    capacityKwh: realtime?.batteryCapacityKwh ?? null,
+    powerW: realtime?.batteryPowerW ?? null,
+  };
 }
 
 function WakingSpinner() {
@@ -170,6 +195,7 @@ function VehicleCards(
     vehicleSolarGrid,
     allocationStatus,
     controllerStatuses,
+    homeBattery,
     wakeMutation,
     refreshMutation,
     startCharging,
@@ -188,6 +214,7 @@ function VehicleCards(
     vehicleSolarGrid: Record<string, { solarW: number; gridW: number }>;
     allocationStatus: Record<string, string>;
     controllerStatuses: ReturnType<typeof useControllerStatuses>;
+    homeBattery?: HomeBatteryState;
     wakeMutation: ReturnType<typeof trpc.vehicle.command.useMutation>;
     refreshMutation: ReturnType<typeof trpc.vehicle.refreshState.useMutation>;
     startCharging: (id: string) => void;
@@ -229,6 +256,7 @@ function VehicleCards(
               pollingSuspendReason={v.pollingSuspendReason}
               controllerReason={controllerStatuses[v.id]?.reason ?? null}
               controllerDetail={controllerStatuses[v.id]?.detail ?? null}
+              homeBattery={homeBattery}
               onNavigateSettings={onNavigateSettings}
               onRefresh={() => refreshMutation.mutateAsync({ vehicleId: v.id })}
             />
@@ -301,6 +329,7 @@ export function VehicleList(
     : null;
   const { data: energyData } = useEnergyData();
   const realtime = energyData?.realtime ?? null;
+  const { data: batteryConfig } = useBatteryConfig();
   const {
     vehicles,
     loading: vehiclesLoading,
@@ -327,6 +356,10 @@ export function VehicleList(
   });
 
   const vehicleSolarGrid = useVehicleSolarGrid(realtime, vehicles);
+  const homeBattery = buildHomeBattery(
+    realtime,
+    batteryConfig?.batteryPriorityLimit,
+  );
   const controllerStatuses = useControllerStatuses();
   const allocationStatus = useAllocationStatus(
     chargingConfig?.priorityChargingEnabled,
@@ -359,6 +392,7 @@ export function VehicleList(
         vehicleSolarGrid={vehicleSolarGrid}
         allocationStatus={allocationStatus}
         controllerStatuses={controllerStatuses}
+        homeBattery={homeBattery}
         wakeMutation={wakeMutation}
         refreshMutation={refreshMutation}
         startCharging={startCharging}

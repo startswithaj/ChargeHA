@@ -115,6 +115,32 @@ export function formatRate(
 }
 
 /**
+ * Format a duration as a coarse, human-readable estimate.
+ *
+ * Deliberately low-resolution: the inputs are estimates derived from an
+ * instantaneous power reading, so a to-the-minute figure would flicker on a
+ * partly cloudy day and read like a countdown rather than a guess. Rounding
+ * hard means the text only changes when the estimate really moves.
+ *
+ * Expects a finite, non-negative number of minutes — callers decide whether an
+ * estimate is possible at all and pass nothing when it isn't.
+ *
+ * e.g. 3 → "under 5 minutes", 33 → "35 minutes", 100 → "1.5 hours"
+ */
+export function formatDurationCoarse(minutes: number): string {
+  if (minutes < 5) return "under 5 minutes";
+  if (minutes >= 600) return "over 10 hours";
+
+  // Round to 5 minutes below the hour, half-hours above it. A value that rounds
+  // up to a full 60 reads better as "1 hour" than "60 minutes".
+  const roundedMinutes = Math.round(minutes / 5) * 5;
+  if (roundedMinutes < 60) return `${roundedMinutes} minutes`;
+
+  const hours = Math.round(minutes / 30) / 2;
+  return hours === 1 ? "1 hour" : `${hours} hours`;
+}
+
+/**
  * Format a date to a relative time string.
  * e.g. "just now", "5s ago", "2m ago"
  */

@@ -13,6 +13,7 @@ describe("SigenergyLocalAdapter", () => {
   const PLANT_ESS_SOC = 30014;
   const PLANT_PV_POWER = 30035;
   const PLANT_BATTERY_POWER = 30037;
+  const PLANT_ESS_RATED_ENERGY_CAPACITY = 30083;
   const DEVICE_PHASE_A_VOLTAGE = 31011;
   const DEVICE_MODEL_TYPE = 30500;
   const DEVICE_SERIAL = 30515;
@@ -24,6 +25,7 @@ describe("SigenergyLocalAdapter", () => {
       .setS32(PLANT, PLANT_GRID_POWER, 2000) // +2 kW import
       .setS32(PLANT, PLANT_BATTERY_POWER, -3000) // Sigenergy <0 = discharging
       .setU16(PLANT, PLANT_ESS_SOC, 555) // 55.5 %
+      .setU32(PLANT, PLANT_ESS_RATED_ENERGY_CAPACITY, 1600) // 16 kWh
       .setU32(DEVICE, DEVICE_PHASE_A_VOLTAGE, 24010) // 240.1 V
       .setString(DEVICE, DEVICE_MODEL_TYPE, "SigenStor", 15)
       .setString(DEVICE, DEVICE_SERIAL, "SN123456", 10);
@@ -84,6 +86,38 @@ describe("SigenergyLocalAdapter", () => {
       const data = await makeAdapter().getRealtimeData();
       // 5000 + (-6000) + (-4000) = -5000 → clamped
       expect(data.homeConsumptionW).toBe(0);
+    });
+
+    it("decodes the rated battery capacity", async () => {
+      const data = await makeAdapter().getRealtimeData();
+      expect(data.batteryCapacityKwh).toBe(16);
+    });
+
+    // Nameplate data — re-reading it every poll would cost a register read a
+    // few times a minute for a value that cannot change.
+    it("reads the rated capacity once, then reuses it", async () => {
+      const adapter = makeAdapter();
+      await adapter.getRealtimeData();
+      await adapter.getRealtimeData();
+      await adapter.getRealtimeData();
+
+      expect(reader.readCount(PLANT, PLANT_ESS_RATED_ENERGY_CAPACITY)).toBe(1);
+    });
+
+    it("retries the rated capacity while it is still unknown", async () => {
+      reader.failAt(PLANT, PLANT_ESS_RATED_ENERGY_CAPACITY);
+      const adapter = makeAdapter();
+      expect((await adapter.getRealtimeData()).batteryCapacityKwh).toBeNull();
+      expect((await adapter.getRealtimeData()).batteryCapacityKwh).toBeNull();
+
+      expect(reader.readCount(PLANT, PLANT_ESS_RATED_ENERGY_CAPACITY)).toBe(2);
+    });
+
+    // A plant with no battery reports 0, and 0 kWh is never a real capacity.
+    it("treats a zero rated capacity as unknown", async () => {
+      reader.setU32(PLANT, PLANT_ESS_RATED_ENERGY_CAPACITY, 0);
+      const data = await makeAdapter().getRealtimeData();
+      expect(data.batteryCapacityKwh).toBeNull();
     });
 
     it("treats failed battery/soc/voltage reads as null without failing", async () => {

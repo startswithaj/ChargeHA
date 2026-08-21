@@ -12,7 +12,11 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { Button, Text, Tooltip } from "@radix-ui/themes";
 import type { VehicleChargeState } from "@chargeha/shared";
-import { kwValue } from "../../utils/Format.ts";
+import { formatDurationCoarse, kwValue } from "../../utils/Format.ts";
+import {
+  homeBatteryMinutesToTarget,
+  type HomeBatteryState,
+} from "../../utils/homeBattery.ts";
 import { Spinner } from "../ui/Spinner.tsx";
 import styles from "./VehicleCard.module.css";
 
@@ -44,8 +48,39 @@ const REASON_COLORS: Record<string, "blue" | "orange" | "green"> = {
   free_tariff: "green",
 };
 
+/** Extra context a label may need beyond the controller's detail string. */
+interface ReasonContext {
+  homeBattery?: HomeBatteryState;
+}
+
+/** Battery priority label.
+ *
+ *  Prefers an estimated time to the target SoC, which needs the home battery's
+ *  capacity from the inverter and a battery that's actually charging. When any
+ *  of that is missing it falls back to the plain numbers, which is all this
+ *  label ever showed before.
+ *
+ *  Note it does NOT parse the controller's detail string. It used to, and the
+ *  regex silently dropped the leading digit of both percentages — an 80% limit
+ *  rendered as "0%". Both numbers are available as real values here. */
+function batteryPriorityLabel(battery?: HomeBatteryState): string {
+  if (!battery || battery.socPct === null) return "Waiting for home battery";
+
+  const soc = Math.round(battery.socPct);
+  const minutes = homeBatteryMinutesToTarget(battery);
+  if (minutes === null) {
+    return `Home battery priority (${soc}% → ${battery.targetPct}%)`;
+  }
+  return `Home battery priority (${
+    formatDurationCoarse(minutes)
+  } until ${battery.targetPct}%)`;
+}
+
 /** User-friendly label formatters per reason. */
-const REASON_LABELS: Record<string, (detail: string) => string> = {
+const REASON_LABELS: Record<
+  string,
+  (detail: string, ctx: ReasonContext) => string
+> = {
   schedule: (detail) => {
     const match = detail.match(/schedule (\d{2}:\d{2}-\d{2}:\d{2})/);
     return match
@@ -63,12 +98,7 @@ const REASON_LABELS: Record<string, (detail: string) => string> = {
     const match = detail.match(/(\d+)s remaining/);
     return match ? `Cooldown — ${match[1]}s remaining` : "Cooldown active";
   },
-  battery_priority: (detail) => {
-    const match = detail.match(/(\d+)%.*<.*(\d+)%/);
-    return match
-      ? `Home battery priority (${match[1]}% < ${match[2]}%)`
-      : "Waiting for home battery";
-  },
+  battery_priority: (_detail, ctx) => batteryPriorityLabel(ctx.homeBattery),
   free_tariff: (detail) =>
     detail.includes("home battery")
       ? "Grid is free — waiting for home battery"
@@ -88,6 +118,7 @@ interface VehicleCardDetailsProps {
   allocationStatus: string | null;
   controllerReason: string | null;
   controllerDetail: string | null;
+  homeBattery?: HomeBatteryState;
 }
 
 function formatMinutes(minutes: number): string {
@@ -135,10 +166,14 @@ function ChargeButton(
 }
 
 function ControllerReasonRow(
-  { reason, detail }: { reason: string; detail: string },
+  { reason, detail, homeBattery }: {
+    reason: string;
+    detail: string;
+    homeBattery?: HomeBatteryState;
+  },
 ) {
   const Icon = REASON_ICONS[reason];
-  const label = REASON_LABELS[reason]?.(detail) ?? detail;
+  const label = REASON_LABELS[reason]?.(detail, { homeBattery }) ?? detail;
   const color = REASON_COLORS[reason] ?? "gray";
   return (
     <div className={styles.detailRow}>
@@ -198,6 +233,7 @@ export function VehicleCardDetails({
   allocationStatus,
   controllerReason,
   controllerDetail,
+  homeBattery,
 }: VehicleCardDetailsProps) {
   return (
     <>
@@ -222,6 +258,7 @@ export function VehicleCardDetails({
           <ControllerReasonRow
             reason={controllerReason}
             detail={controllerDetail}
+            homeBattery={homeBattery}
           />
         )}
         {state.isCharging && (

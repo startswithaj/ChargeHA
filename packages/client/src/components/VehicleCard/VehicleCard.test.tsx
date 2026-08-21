@@ -394,16 +394,16 @@ describe("VehicleCard", () => {
 
   // --- one-off charge scheduling ---
 
-  describe("ADHOC CHARGE button", () => {
+  describe("ADHOC button", () => {
     it("is hidden when no handler is supplied", () => {
       renderVC();
-      expect(screen.queryByText("ADHOC CHARGE")).toBeNull();
+      expect(screen.queryByText("ADHOC")).toBeNull();
     });
 
     it("opens the dialog via the handler", () => {
       const onScheduleCharge = vi.fn();
       renderVC({ onScheduleCharge });
-      fireEvent.click(screen.getByText("ADHOC CHARGE"));
+      fireEvent.click(screen.getByText("ADHOC"));
       expect(onScheduleCharge).toHaveBeenCalledTimes(1);
     });
 
@@ -412,19 +412,88 @@ describe("VehicleCard", () => {
         onScheduleCharge: vi.fn(),
         state: makeVehicleState({ isPluggedIn: false }),
       });
-      expect(screen.getByText("ADHOC CHARGE").closest("button")).toBeDisabled();
+      expect(screen.getByText("ADHOC").closest("button")).toBeDisabled();
     });
 
     it("is disabled while a command is pending", () => {
       renderVC({ onScheduleCharge: vi.fn(), commandPending: "start" });
-      expect(screen.getByText("ADHOC CHARGE").closest("button")).toBeDisabled();
+      expect(screen.getByText("ADHOC").closest("button")).toBeDisabled();
     });
 
     it("does not change the vehicle mode", () => {
       const onChangeMode = vi.fn();
       renderVC({ onScheduleCharge: vi.fn(), onChangeMode });
-      fireEvent.click(screen.getByText("ADHOC CHARGE"));
+      fireEvent.click(screen.getByText("ADHOC"));
       expect(onChangeMode).not.toHaveBeenCalled();
+    });
+  });
+
+  // The old label scraped these numbers out of the controller's detail string
+  // with a greedy regex that dropped the leading digit of both percentages —
+  // an 80% limit rendered as "0%". They come through as real values now.
+  describe("battery priority status line", () => {
+    const withBatteryPriority = (
+      homeBattery?: VCProps["homeBattery"],
+    ) =>
+      renderVC({
+        controllerReason: "battery_priority",
+        controllerDetail: "Waiting for home battery (65.3% < 80%)",
+        homeBattery,
+      });
+
+    it("estimates the time to the priority limit", () => {
+      // 80 - 60 = 20% of 10 kWh = 2 kWh at 2 kW = 60 minutes
+      withBatteryPriority({
+        socPct: 60,
+        targetPct: 80,
+        capacityKwh: 10,
+        powerW: -2000,
+      });
+      expect(screen.getByText("Home battery priority (1 hour until 80%)"))
+        .toBeInTheDocument();
+    });
+
+    it("falls back to plain percentages without a capacity", () => {
+      withBatteryPriority({
+        socPct: 65.3,
+        targetPct: 80,
+        capacityKwh: null,
+        powerW: -2000,
+      });
+      expect(screen.getByText("Home battery priority (65% → 80%)"))
+        .toBeInTheDocument();
+    });
+
+    it("falls back to plain percentages while the battery is discharging", () => {
+      withBatteryPriority({
+        socPct: 65.3,
+        targetPct: 80,
+        capacityKwh: 10,
+        powerW: 1500,
+      });
+      expect(screen.getByText("Home battery priority (65% → 80%)"))
+        .toBeInTheDocument();
+    });
+
+    it("does not reproduce the old regex's mangled percentages", () => {
+      withBatteryPriority({
+        socPct: 65.3,
+        targetPct: 80,
+        capacityKwh: null,
+        powerW: null,
+      });
+      // For this exact detail string the old label rendered "(3% < 0%)":
+      // greedy backtracking took the last digit of each percentage.
+      expect(screen.queryByText(/3% < 0%/)).toBeNull();
+      expect(screen.queryByText(/→ 0%/)).toBeNull();
+      expect(screen.getByText("Home battery priority (65% → 80%)"))
+        .toBeInTheDocument();
+    });
+
+    it("waits for the home battery when nothing is known about it", () => {
+      withBatteryPriority(undefined);
+      expect(screen.getByText("Waiting for home battery"))
+        .toBeInTheDocument();
     });
   });
 

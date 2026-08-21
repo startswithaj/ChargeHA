@@ -13,6 +13,7 @@ const PLANT_GRID_POWER = 30005; // int32, kW ×0.001. <0 = export, >0 = import
 const PLANT_ESS_SOC = 30014; // uint16, % ×0.1
 const PLANT_PV_POWER = 30035; // int32, kW ×0.001
 const PLANT_BATTERY_POWER = 30037; // int32, kW ×0.001. >0 = charging
+const PLANT_ESS_RATED_ENERGY_CAPACITY = 30083; // uint32, kWh ×0.01
 const DEVICE_PHASE_A_VOLTAGE = 31011; // uint32, V ×0.01
 const DEVICE_MODEL_TYPE = 30500; // string, 15 registers
 const DEVICE_SERIAL = 30515; // string, 10 registers
@@ -46,6 +47,11 @@ function socPercent(raw: number): number {
   return Math.round(raw) / 10;
 }
 
+/** Energy register (scale 0.01) → kWh. */
+function energyToKwh(raw: number): number {
+  return raw / 100;
+}
+
 /** Voltage register (scale 0.01) → volts. */
 function voltageToVolts(raw: number): number {
   return raw * 0.01;
@@ -65,6 +71,11 @@ function voltageToVolts(raw: number): number {
  * balance: PV + grid import + battery discharge.
  */
 export class SigenergyLocalAdapter implements EnergySourceAdapter {
+  // Rated capacity is nameplate data, so it's read once and reused rather than
+  // costing a register read on every poll. Stays null until a read succeeds —
+  // consumers treat null as "unknown" and skip anything that depends on it.
+  private batteryCapacityKwh: number | null = null;
+
   constructor(
     private readonly reader: ModbusReader,
     private readonly plantUnitId: number,
@@ -96,6 +107,7 @@ export class SigenergyLocalAdapter implements EnergySourceAdapter {
     const batteryPowerW = await this.readBatteryPowerW();
     const batterySoc = await this.readBatterySoc();
     const gridVoltageV = await this.readGridVoltageV();
+    const batteryCapacityKwh = await this.resolveBatteryCapacityKwh();
 
     const homeConsumptionW = Math.max(
       0,
@@ -109,6 +121,7 @@ export class SigenergyLocalAdapter implements EnergySourceAdapter {
       batteryPowerW,
       batterySoc,
       gridVoltageV,
+      batteryCapacityKwh,
       lastUpdated: new Date().toISOString(),
     };
   }
@@ -142,6 +155,28 @@ export class SigenergyLocalAdapter implements EnergySourceAdapter {
   private async readBatterySoc(): Promise<number | null> {
     const buf = await this.tryRead(this.plantUnitId, PLANT_ESS_SOC, 1);
     return buf ? socPercent(readU16(buf)) : null;
+  }
+
+  /** Rated ESS capacity, read once then cached. Retries on later polls while
+   *  it's still unknown, so a plant that isn't ready at startup still resolves.
+   *  A zero reading counts as unknown — a plant with no battery reports 0, and
+   *  0 kWh is never a useful capacity. */
+  private async resolveBatteryCapacityKwh(): Promise<number | null> {
+    if (this.batteryCapacityKwh !== null) return this.batteryCapacityKwh;
+
+    const buf = await this.tryRead(
+      this.plantUnitId,
+      PLANT_ESS_RATED_ENERGY_CAPACITY,
+      2,
+    );
+    if (!buf) return null;
+
+    const capacityKwh = energyToKwh(readU32(buf));
+    if (capacityKwh <= 0) return null;
+
+    this.logger.info(`Home battery rated capacity: ${capacityKwh} kWh`);
+    this.batteryCapacityKwh = capacityKwh;
+    return capacityKwh;
   }
 
   private async readGridVoltageV(): Promise<number | null> {
