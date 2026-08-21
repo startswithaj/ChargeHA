@@ -297,6 +297,31 @@ describe("TeslaVehicleMiddleware", () => {
       expect(middleware.online).toBe(false);
     });
 
+    // Serving stale cache is not a fetch. Marking it as one made the cache look
+    // permanently fresh, so a wrong cached isCharging could never age out —
+    // and VehicleManager.startChargingAt skips the start command while cached
+    // isCharging is true, so the controller would never send anything.
+    it("does not mark the cache fresh when it serves stale state without fetching", async () => {
+      adapter.state = buildVehicleChargeState({ isPluggedIn: true });
+      await middleware.requestState(ctx());
+      adapter.getChargeStateCalls = 0;
+
+      // Car falls asleep; no solar, no schedule, so no wake is justified.
+      adapter.isOnline = false;
+      time.tick(21 * 60 * 1000);
+      await middleware.requestState(ctx());
+      expect(adapter.getChargeStateCalls).toBe(0);
+
+      // Solar arrives a minute later. The cache must still count as stale, so
+      // the wake-and-fetch path runs instead of serving the stale snapshot.
+      time.tick(60 * 1000);
+      adapter.wakeResult = true;
+      await middleware.requestState(ctx({ hasSolar: true }));
+
+      expect(adapter.wakeVehicleCalls).toBe(1);
+      expect(adapter.getChargeStateCalls).toBe(1);
+    });
+
     it("refetches every 5 min while online + unplugged to catch plug-in", async () => {
       // First fetch: car online, cached unplugged. The 5-min staleness rule
       // exists because Tesla sleeps ~5-6 min after plug-in if not charging,
@@ -389,6 +414,117 @@ describe("TeslaVehicleMiddleware", () => {
       );
 
       expect(adapter.stopChargingCalls).toBe(0);
+    });
+  });
+
+  // The dashboard's flow diagram and the DataRecorder both treat
+  // chargePowerKw === 0 as "not drawing power". A confirmed start that left it
+  // at zero showed the car's draw as home consumption and recorded no charge
+  // readings until the next fetch — up to 10 minutes later.
+  describe("commands — cached charge power", () => {
+    it("derives charge power from the committed amps on start", async () => {
+      adapter.state = buildVehicleChargeState({
+        isCharging: false,
+        chargeAmps: 0,
+        chargePowerKw: 0,
+        chargerVoltage: 240,
+        chargerPhases: 1,
+      });
+      await middleware.requestState(ctx());
+
+      await middleware.setChargeAmps(20, cc("controller:amps"));
+      await middleware.startCharging(cc("controller:start"));
+
+      const state = middleware.getCachedState();
+      expect(state?.isCharging).toBe(true);
+      expect(state?.chargeAmps).toBe(20);
+      expect(state?.chargePowerKw).toBe(4.8);
+    });
+
+    it("recomputes charge power when amps change mid-charge", async () => {
+      adapter.state = buildVehicleChargeState({
+        isCharging: true,
+        chargeAmps: 32,
+        chargePowerKw: 7.36,
+        chargerVoltage: 230,
+        chargerPhases: 1,
+      });
+      await middleware.requestState(ctx());
+
+      await middleware.setChargeAmps(10, cc("controller:amps"));
+
+      expect(middleware.getCachedState()?.chargePowerKw).toBe(2.3);
+    });
+
+    it("leaves charge power alone when amps change while idle", async () => {
+      adapter.state = buildVehicleChargeState({
+        isCharging: false,
+        chargePowerKw: 0,
+        chargerVoltage: 230,
+      });
+      await middleware.requestState(ctx());
+
+      await middleware.setChargeAmps(16, cc("controller:amps"));
+
+      expect(middleware.getCachedState()?.chargePowerKw).toBe(0);
+    });
+
+    it("keeps the last real charger reading across an idle fetch", async () => {
+      // Charging: real 240V reading lands in the cache.
+      adapter.state = buildVehicleChargeState({
+        isCharging: true,
+        chargeAmps: 16,
+        chargerVoltage: 240,
+        chargerPhases: 1,
+      });
+      await middleware.requestState(ctx());
+
+      // Idle: Tesla reports zeroes for voltage and phases.
+      adapter.state = buildVehicleChargeState({
+        isCharging: false,
+        chargeAmps: 0,
+        chargePowerKw: 0,
+        chargerVoltage: 0,
+        chargerPhases: 0,
+      });
+      time.tick(21 * 60 * 1000);
+      await middleware.requestState(ctx());
+
+      await middleware.setChargeAmps(30, cc("controller:amps"));
+      await middleware.startCharging(cc("controller:start"));
+
+      expect(middleware.getCachedState()?.chargePowerKw).toBe(7.2);
+    });
+
+    it("leaves charge power reported when no real reading has been seen", async () => {
+      middleware.seedState(buildVehicleChargeState({
+        isCharging: false,
+        chargePowerKw: 0,
+        chargerVoltage: 0,
+        chargerPhases: 0,
+      }));
+
+      await middleware.startCharging(cc("controller:start"));
+
+      const state = middleware.getCachedState();
+      expect(state?.isCharging).toBe(true);
+      expect(state?.chargePowerKw).toBe(0);
+    });
+
+    it("zeroes charge power on stop", async () => {
+      adapter.state = buildVehicleChargeState({
+        isCharging: true,
+        chargeAmps: 16,
+        chargePowerKw: 3.68,
+      });
+      await middleware.requestState(ctx());
+
+      await middleware.stopCharging(cc("controller:stop"));
+
+      const state = middleware.getCachedState();
+      expect(state?.isCharging).toBe(false);
+      expect(state?.chargePowerKw).toBe(0);
+      expect(state?.chargeAmps).toBe(0);
     });
   });
 

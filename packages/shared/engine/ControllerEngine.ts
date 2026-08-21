@@ -18,6 +18,23 @@ import type {
 } from "./types.ts";
 import { createControlState } from "./types.ts";
 
+/** Grace and cooldown are solar-tracking timers: grace means "riding out a dip
+ *  while charging", cooldown means "we just stopped for low solar, don't
+ *  restart yet". Both only mean something across an unbroken run of solar
+ *  tracking evaluations, so any loop that resolves before solar tracking runs
+ *  clears them.
+ *
+ *  Without this, a grace period armed before a schedule or free-tariff window
+ *  is still armed when the window ends hours later, and the first
+ *  insufficient-solar loop after it reads an hours-old `graceStartedAt` as an
+ *  already-expired grace period — stopping the charge outright instead of
+ *  riding the dip out at minimum amps. */
+const SOLAR_TIMERS_RESET: ControlStateUpdates = {
+  graceStartedAt: null,
+  graceNotified: false,
+  cooldownUntil: null,
+};
+
 /** Pure decision engine for the charge controller.
  *
  *  Owns per-vehicle runtime state (grace periods, cooldowns, amp debouncing)
@@ -91,8 +108,10 @@ export class ControllerEngine {
     timestamp: number,
     currentRatePerKwh: number | null,
   ): VehicleDecision {
+    const cs = this.getControlState(vehicle.id);
     const precondition = this.checkPreconditions(vehicle);
     if (precondition.decision) {
+      Object.assign(cs, SOLAR_TIMERS_RESET);
       return { ...precondition.decision, checks: precondition.checks };
     }
 
@@ -106,9 +125,11 @@ export class ControllerEngine {
 
     switch (vehicle.mode) {
       case "stop":
+        Object.assign(cs, SOLAR_TIMERS_RESET);
         return { ...this.decideStopMode(state), checks: [...checks] };
 
       case "charge_now":
+        Object.assign(cs, SOLAR_TIMERS_RESET);
         return { ...this.decideChargeNowMode(state), checks: [...checks] };
 
       case "auto":
@@ -274,6 +295,7 @@ export class ControllerEngine {
     );
     allChecks.push(...blockout.checks);
     if (blockout.decision) {
+      Object.assign(cs, SOLAR_TIMERS_RESET);
       if (blockout.stateUpdates) Object.assign(cs, blockout.stateUpdates);
       return { ...blockout.decision, checks: allChecks };
     }
@@ -287,6 +309,7 @@ export class ControllerEngine {
     );
     allChecks.push(...schedule.checks);
     if (schedule.decision) {
+      Object.assign(cs, SOLAR_TIMERS_RESET);
       return { ...schedule.decision, checks: allChecks };
     }
     const scheduleLimitContext = schedule.scheduleLimitContext;
@@ -294,6 +317,7 @@ export class ControllerEngine {
     const battery = this.evaluateBatteryPriority(state, config, energy);
     allChecks.push(...battery.checks);
     if (battery.decision) {
+      Object.assign(cs, SOLAR_TIMERS_RESET);
       return { ...battery.decision, checks: allChecks, scheduleLimitContext };
     }
 
@@ -309,6 +333,7 @@ export class ControllerEngine {
     );
     allChecks.push(...freeTariff.checks);
     if (freeTariff.decision) {
+      Object.assign(cs, SOLAR_TIMERS_RESET);
       return {
         ...freeTariff.decision,
         checks: allChecks,
@@ -329,6 +354,9 @@ export class ControllerEngine {
       return { ...solar.decision, checks: allChecks, scheduleLimitContext };
     }
 
+    // Reaching here means solar tracking was skipped entirely (disabled, or no
+    // energy snapshot) — processSolarTracking always returns a decision.
+    Object.assign(cs, SOLAR_TIMERS_RESET);
     const fallback = this.decideDefault(state);
     return { ...fallback, checks: allChecks, scheduleLimitContext };
   }
@@ -701,11 +729,16 @@ export class ControllerEngine {
       graceNotified: false,
     };
 
-    // Check cooldown: don't restart if recently stopped
-    if (controlState.cooldownUntil && timestamp < controlState.cooldownUntil) {
-      const remainingSec = Math.round(
-        (controlState.cooldownUntil - timestamp) / 1000,
-      );
+    // Cooldown suppresses a *restart*, so it only applies while stopped. A
+    // vehicle already charging — started by a higher-priority rule such as a
+    // schedule or a free-tariff window — has no restart to suppress, and
+    // holding it here would leave it running at whatever amps that rule set
+    // (often max, from the grid) until the cooldown expired.
+    const cooldownRemainingMs = controlState.cooldownUntil === null
+      ? 0
+      : controlState.cooldownUntil - timestamp;
+    if (cooldownRemainingMs > 0 && !state.isCharging) {
+      const remainingSec = Math.round(cooldownRemainingMs / 1000);
       checks.push(DecisionChecks.cooldown(remainingSec));
       return {
         decision: {

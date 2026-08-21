@@ -126,6 +126,21 @@ interface VehicleMiddleware {
 Each plugin tunes its middleware to its API's cost model — Tesla's, for example,
 optimises around the Fleet API's pay-per-call wake/data pricing.
 
+Two rules keep a cost-aware cache honest:
+
+- **A confirmed command writes every field it changes.** Tesla's middleware
+  derives `chargePowerKw` from the amps it just committed (using the last real
+  charger voltage / phase count it saw, since an idle Tesla reports zeroes).
+  Consumers treat `chargePowerKw === 0` as "not drawing power", so a start that
+  updated only `isCharging` showed the car's draw as home consumption and
+  recorded no charge readings until the next fetch — up to 10 minutes later.
+- **Serving stale cache is not a fetch.** The "asleep, not worth waking" path
+  leaves the freshness clock alone. Marking it as a fetch made stale state look
+  permanently fresh, which matters most when the cache wrongly says
+  `isCharging`: `VehicleManager.startChargingAt` skips the start command while
+  cached `isCharging` is true, so the controller would report "already charging"
+  every loop and never send anything.
+
 ### Request context
 
 Every state request carries a `VehicleRequestContext` so the middleware can make

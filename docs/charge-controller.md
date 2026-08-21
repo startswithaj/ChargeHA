@@ -136,6 +136,21 @@ The step sits deliberately **after battery priority and before solar tracking**:
 - **Negative rates count as free**, since the default threshold is `0` and the
   comparison is `rate <= threshold`.
 
+### When the window closes
+
+The step simply stops applying, and the vehicle falls through to solar tracking
+on the next loop. In daylight that means the charge is adjusted down from max
+amps to whatever the current surplus supports; at night solar tracking's
+zero-production rule stops it.
+
+The handover is where the grace and cooldown timers matter: the free-tariff step
+charges at max amps, so the first loop after the window can easily read as
+insufficient solar (the car's own draw is added back, but any other grid draw
+that outlives the tariff boundary — a home battery still grid-charging, for
+instance — is not). That loop is entitled to a full grace period, which is why
+the timers are cleared while the window holds the pipeline (see _Timer
+lifetime_).
+
 ### Cheap-rate windows
 
 Raising `free_tariff_max_rate_per_kwh` above `0` turns the feature into "charge
@@ -230,7 +245,24 @@ When available solar can't sustain minimum charging amps:
    the grid instead.
 3. **Cooldown** — The vehicle won't restart charging for the cooldown duration
    (default 15 minutes), even if solar recovers. This prevents rapid on/off
-   cycling.
+   cycling. A cooldown suppresses a _restart_, so it only applies while the
+   vehicle is stopped — a charge some higher-priority step started (a schedule,
+   a free-tariff window) is handed straight to solar tracking rather than held
+   at whatever amps that step set.
+
+### Timer lifetime
+
+Both timers only mean something across an unbroken run of solar-tracking
+evaluations, so any loop that resolves **before** solar tracking runs clears
+them — a blockout, a schedule, battery priority, a free-tariff window, `stop` /
+`charge_now` mode, a failed precondition, or solar tracking being switched off.
+
+Without this, a grace period armed shortly before a free-tariff window would
+still be armed when the window closed hours later, and the first
+insufficient-solar loop after it would read the stale `graceStartedAt` as an
+already-expired grace period — stopping the charge outright, and locking out a
+restart for the cooldown duration, instead of riding the dip out at minimum
+amps.
 
 ### Solar+Grid fallback
 
@@ -318,6 +350,10 @@ The engine tracks in-memory state per vehicle (not persisted to DB):
 | `allocatedAmps`          | Pre-computed solar allocation for this vehicle (set each loop)          |
 | `pendingAmps`            | Debounced target amps waiting to settle                                 |
 | `pendingSince`           | Timestamp when pendingAmps was first seen                               |
+
+`graceStartedAt`, `graceNotified` and `cooldownUntil` are cleared on any loop
+that resolves before solar tracking runs — see _Timer lifetime_ under Solar
+tracking.
 
 This state is lost on server restart, which is safe — grace periods, cooldowns,
 and debounce state will simply reset.

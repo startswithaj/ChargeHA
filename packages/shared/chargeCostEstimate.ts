@@ -68,7 +68,11 @@ export function resolveChargePhases(
   threePhaseCharger: boolean,
 ): number {
   if (state.isCharging && state.chargerPhases === 1) return 1;
-  return threePhaseCharger ? 3 : state.chargerPhases;
+  if (threePhaseCharger) return 3;
+  // An idle vehicle can report 0 phases. Never return it — callers divide
+  // available watts by voltage * phases, and a zero there yields Infinity or
+  // NaN, which slips straight past the "below minimum amps" guard.
+  return state.chargerPhases >= 1 ? state.chargerPhases : 1;
 }
 
 /** Charging power in kW for a given current, voltage and phase count. */

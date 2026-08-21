@@ -70,6 +70,23 @@ describe("charge cost estimation", () => {
       expect(resolveChargePhases(idle, true)).toBe(3);
       expect(resolveChargePhases(idle, false)).toBe(1);
     });
+
+    // Callers divide available watts by voltage * phases, so a zero here would
+    // yield Infinity or NaN and slip past their "below minimum amps" guard.
+    it("never returns zero phases for an idle vehicle reporting none", () => {
+      const idle = { chargerVoltage: 0, chargerPhases: 0, isCharging: false };
+      expect(resolveChargePhases(idle, false)).toBe(1);
+      expect(resolveChargePhases(idle, true)).toBe(3);
+    });
+
+    it("still honours a live multi-phase reading over the flag being off", () => {
+      const charging = {
+        chargerVoltage: 400,
+        chargerPhases: 3,
+        isCharging: true,
+      };
+      expect(resolveChargePhases(charging, false)).toBe(3);
+    });
   });
 
   describe("estimateChargeCost", () => {

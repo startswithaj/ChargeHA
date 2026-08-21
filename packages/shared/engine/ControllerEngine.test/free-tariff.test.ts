@@ -236,3 +236,119 @@ describe("ControllerEngine — free tariff respects home battery priority", () =
     expect(d?.detail).toContain("home battery SoC is unknown");
   });
 });
+
+/** The window closing in daylight, across several loops of one engine instance.
+ *  Every other free-tariff test builds a fresh engine and calls decide() once,
+ *  so none of them see the grace/cooldown state that solar tracking carries
+ *  between loops — which is exactly where the handover went wrong. */
+describe("ControllerEngine — free tariff hands back to solar tracking", () => {
+  const FREE = { freeTariffChargingEnabled: true, freeTariffMaxRatePerKwh: 0 };
+
+  /** Marginal solar: above minSolarGenerationKw (1 kW) but the surplus can't
+   *  sustain the vehicle's 5A minimum, so solar tracking goes to grace. */
+  const DIP = { solarProductionW: 1100, gridPowerW: 2000 };
+  /** Enough surplus for 21A once the car's own draw is added back. */
+  const SUN = { solarProductionW: 5000, gridPowerW: 2000 };
+
+  const T0 = 1_700_000_000_000;
+  const MINUTE = 60 * 1000;
+
+  it("adjusts down to available solar when the window ends in daylight", () => {
+    const engine = new ControllerEngine();
+    const output = engine.decide(makeInput({
+      vehicle: { state: { isCharging: true, chargeAmps: 32 } },
+      configOverrides: FREE,
+      energyOverrides: SUN,
+      currentRatePerKwh: 0.45,
+    }));
+    const d = output.decisions.get("V1");
+    expect(d?.action).toBe("adjust_amps");
+    expect(d?.reason).toBe("solar_tracking");
+    expect(d?.targetAmps).toBe(21);
+  });
+
+  it("starts a fresh grace period, not an instant stop, on a stale timer", () => {
+    const engine = new ControllerEngine();
+
+    // Cloudy morning before the window: charging on marginal solar, so solar
+    // tracking arms a grace period and drops to minimum amps.
+    const dip = engine.decide(makeInput({
+      vehicle: { state: { isCharging: true, chargeAmps: 32 } },
+      energyOverrides: DIP,
+      timestamp: T0,
+    }));
+    expect(dip.decisions.get("V1")?.reason).toBe("grace_period");
+
+    // Window opens five minutes later and takes the charge to max amps. The
+    // grace period it interrupted must not stay armed behind it.
+    const free = engine.decide(makeInput({
+      vehicle: { state: { isCharging: true, chargeAmps: 5 } },
+      configOverrides: FREE,
+      energyOverrides: DIP,
+      currentRatePerKwh: 0,
+      timestamp: T0 + 5 * MINUTE,
+    }));
+    expect(free.decisions.get("V1")?.reason).toBe("free_tariff");
+
+    // Three hours later the window closes into the same marginal solar. The
+    // dip is entitled to the full 6-minute grace; a leaked timer would read as
+    // long expired and stop the charge outright.
+    const after = engine.decide(makeInput({
+      vehicle: { state: { isCharging: true, chargeAmps: 32 } },
+      configOverrides: FREE,
+      energyOverrides: DIP,
+      currentRatePerKwh: 0.45,
+      timestamp: T0 + 180 * MINUTE,
+    }));
+    const d = after.decisions.get("V1");
+    expect(d?.action).toBe("adjust_amps");
+    expect(d?.reason).toBe("grace_period");
+    expect(d?.targetAmps).toBe(5);
+    expect(d?.detail).toContain("0s/360s");
+  });
+
+  it("does not hold a running charge under a cooldown from before the window", () => {
+    const engine = new ControllerEngine();
+
+    engine.decide(makeInput({
+      vehicle: { state: { isCharging: true, chargeAmps: 32 } },
+      energyOverrides: DIP,
+      timestamp: T0,
+    }));
+
+    // Grace expires: stop, and a 15-minute cooldown is armed.
+    const expired = engine.decide(makeInput({
+      vehicle: { state: { isCharging: true, chargeAmps: 5 } },
+      energyOverrides: DIP,
+      timestamp: T0 + 7 * MINUTE,
+    }));
+    expect(expired.decisions.get("V1")?.action).toBe("stop");
+
+    // A free window opening inside that cooldown charges anyway — the cooldown
+    // only ever governed a solar restart.
+    const free = engine.decide(makeInput({
+      vehicle: { state: { isCharging: false } },
+      configOverrides: FREE,
+      energyOverrides: DIP,
+      currentRatePerKwh: 0,
+      timestamp: T0 + 8 * MINUTE,
+    }));
+    expect(free.decisions.get("V1")?.action).toBe("start");
+    expect(free.decisions.get("V1")?.reason).toBe("free_tariff");
+
+    // Window closes while the original cooldown would still be running. Solar
+    // tracking must take the running charge over rather than hold it at the
+    // max amps the free window set.
+    const after = engine.decide(makeInput({
+      vehicle: { state: { isCharging: true, chargeAmps: 32 } },
+      configOverrides: FREE,
+      energyOverrides: SUN,
+      currentRatePerKwh: 0.45,
+      timestamp: T0 + 9 * MINUTE,
+    }));
+    const d = after.decisions.get("V1");
+    expect(d?.action).toBe("adjust_amps");
+    expect(d?.reason).toBe("solar_tracking");
+    expect(d?.targetAmps).toBe(21);
+  });
+});

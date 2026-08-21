@@ -8,6 +8,7 @@ import type {
   VehicleRequestContext,
 } from "../../../types.ts";
 import type { Logger } from "@chargeha/server/lib/Logger";
+import { chargePowerKw } from "@chargeha/shared/chargeCostEstimate";
 import { TeslaApiStrategy } from "./TeslaApiStrategy.ts";
 
 // Rate-limit floor for the free /vehicles probe in the polling path.
@@ -35,6 +36,11 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
   private lastFetchAtMs = 0;
   private lastWakeAtMs = 0;
   private lastOnlineCheckAtMs = 0;
+  // Last real charger electricals seen from the vehicle. Tesla reports 0V and
+  // 0 phases while idle, so a charge starting from idle has nothing to derive
+  // power from unless we remember the previous session's readings.
+  private lastChargerVoltage = 0;
+  private lastChargerPhases = 0;
 
   constructor(adapter: VehicleAdapter, logger: Logger) {
     this.adapter = adapter;
@@ -64,6 +70,7 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
     );
     const { isOnline: _isOnline, ...rest } = state;
     this.cachedState = rest;
+    this.rememberChargerElectricals(state);
   }
 
   async requestState(
@@ -129,11 +136,19 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
       return this.wakeAndFetch(withSuffix(context, `wake:${wakeReason}`));
     }
 
-    // 5. Asleep, not worth waking → return stale cache
+    // 5. Asleep, not worth waking → return stale cache.
+    //
+    // Deliberately does NOT touch lastFetchAtMs: nothing was fetched, so the
+    // cache is no fresher than it was. Sliding the clock here made stale state
+    // look permanently fresh, which matters most when the cache wrongly says
+    // isCharging — VehicleManager.startChargingAt skips the start command while
+    // cached isCharging is true, so the controller would report "already
+    // charging" every loop and never send anything. Re-entering this branch
+    // each loop is free: the /vehicles probe has its own debounce and wakes are
+    // rate-limited by WAKE_COOLDOWN_MS.
     this.logger.debug(
       `Skip wake: battery=${this.cachedState?.batteryLevel}% limit=${this.cachedState?.chargeLimit}% schedule=${context.hasSchedule} solar=${context.hasSolar} blockout=${context.hasBlockout}`,
     );
-    this.lastFetchAtMs = Date.now();
     return this.getCachedState();
   }
 
@@ -144,9 +159,11 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
     await this.ensureOnline(withSuffix(ctx, "pre"));
     const ok = await this.adapter.startCharging(ctx);
     if (ok && this.cachedState) {
+      const powerKw = this.estimatedPowerKw(this.cachedState.chargeAmps);
       this.cachedState = {
         ...this.cachedState,
         isCharging: true,
+        chargePowerKw: powerKw ?? this.cachedState.chargePowerKw,
         lastUpdated: new Date().toISOString(),
       };
       this.logger.debug("startCharging confirmed — updated cache");
@@ -180,9 +197,14 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
     await this.ensureOnline(withSuffix(ctx, "pre"));
     const ok = await this.adapter.setChargeAmps(amps, ctx);
     if (ok && this.cachedState) {
+      // Only while charging — an amps change on an idle vehicle draws nothing.
+      const powerKw = this.cachedState.isCharging
+        ? this.estimatedPowerKw(amps)
+        : null;
       this.cachedState = {
         ...this.cachedState,
         chargeAmps: amps,
+        chargePowerKw: powerKw ?? this.cachedState.chargePowerKw,
         lastUpdated: new Date().toISOString(),
       };
       this.logger.debug(`setChargeAmps confirmed — cache amps=${amps}`);
@@ -252,6 +274,37 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
     return isOnline;
   }
 
+  /** Keep the last plausible charger voltage / phase count from a real reading,
+   *  so `estimatedPowerKw` has something to work with once the vehicle goes
+   *  idle and reports zeroes. */
+  private rememberChargerElectricals(state: AdapterVehicleChargeState): void {
+    if (state.chargerVoltage >= 100) {
+      this.lastChargerVoltage = state.chargerVoltage;
+    }
+    if (state.chargerPhases >= 1) {
+      this.lastChargerPhases = state.chargerPhases;
+    }
+  }
+
+  /** Charge power for the amps we just committed to the vehicle.
+   *
+   *  Consumers gate on `chargePowerKw > 0` to decide whether a vehicle is
+   *  drawing power — the dashboard's energy flow diagram and the DataRecorder's
+   *  solar attribution both do. A confirmed start that left `chargePowerKw` at
+   *  its stale zero therefore reads as "not charging" while the house meter
+   *  already sees the draw, so the car's power shows up as home consumption and
+   *  no charge readings get recorded — for as long as `isCacheFresh` defers the
+   *  next fetch, which is up to 10 minutes.
+   *
+   *  Returns null when no real charger reading has ever been seen, so we leave
+   *  the reported value alone rather than invent a figure. */
+  private estimatedPowerKw(amps: number): number | null {
+    if (this.lastChargerVoltage < 100 || this.lastChargerPhases < 1) {
+      return null;
+    }
+    return chargePowerKw(amps, this.lastChargerVoltage, this.lastChargerPhases);
+  }
+
   /** Fetch vehicle data from the adapter and update the cache ($0.002). */
   private async fetchAndCache(
     ctx: CallContext,
@@ -263,6 +316,7 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
     this.lastFetchAtMs = Date.now();
     const { isOnline: _isOnline, ...rest } = state;
     this.cachedState = rest;
+    this.rememberChargerElectricals(state);
 
     return this.getCachedState();
   }
