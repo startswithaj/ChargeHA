@@ -375,3 +375,35 @@ describe("getApplicablePeriodForTime", () => {
     expect(result).toBeNull();
   });
 });
+
+describe("getApplicablePeriodForTime — all-day period (start === end)", () => {
+  const makeFlat = (): TariffPeriodRow => ({
+    id: 1,
+    label: "Flat Rate",
+    enabled: true,
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+    startTime: "00:00",
+    endTime: "00:00",
+    ratePerKwh: 25,
+    days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+  });
+
+  it("flat 00:00-00:00 period matches at midnight", () => {
+    const result = getApplicablePeriodForTime(0, "mon", [makeFlat()]);
+    assertExists(result);
+    expect(result.ratePerKwh).toBe(25);
+  });
+
+  it("flat 00:00-00:00 period matches midday", () => {
+    const result = getApplicablePeriodForTime(720, "wed", [makeFlat()]);
+    assertExists(result);
+    expect(result.ratePerKwh).toBe(25);
+  });
+
+  it("flat 00:00-00:00 period matches the last minute of the day", () => {
+    const result = getApplicablePeriodForTime(1439, "sun", [makeFlat()]);
+    assertExists(result);
+    expect(result.ratePerKwh).toBe(25);
+  });
+});
