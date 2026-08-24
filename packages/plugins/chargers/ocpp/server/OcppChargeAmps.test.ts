@@ -13,9 +13,12 @@ import { OcppChargerAdapter } from "./OcppChargerAdapter.ts";
 describe("OCPP adapter — setChargeAmps profiles", () => {
   const ctx: CallContext = { origin: "test", traceId: "trace" };
 
-  const liveData = (transactionId: number | null): OcppLiveData => ({
+  const liveData = (
+    transactionId: number | null,
+    status: OcppLiveData["status"] = "Charging",
+  ): OcppLiveData => ({
     connected: true,
-    status: "Charging",
+    status,
     errorCode: "NoError",
     statusInfo: null,
     vendorErrorCode: null,
@@ -42,10 +45,14 @@ describe("OCPP adapter — setChargeAmps profiles", () => {
 
   // Adapter plus the profiles it pushed, so the assertions read what a
   // charger would actually receive.
-  const harness = (transactionId: number | null, accept = true) => {
+  const harness = (
+    transactionId: number | null,
+    accept = true,
+    status: OcppLiveData["status"] = "Charging",
+  ) => {
     const sent: unknown[] = [];
     const handle: OcppChargerHandle = {
-      getData: () => liveData(transactionId),
+      getData: () => liveData(transactionId, status),
       remoteStart: () => Promise.resolve(true),
       remoteStop: () => Promise.resolve(true),
       setChargingProfiles: (profiles) => {
@@ -127,6 +134,18 @@ describe("OCPP adapter — setChargeAmps profiles", () => {
         transactionId: null,
         limit: 6,
       },
+    ]);
+  });
+
+  it("omits TxProfile in Finishing even with a cached transaction id — the charger must reject it there", async () => {
+    const { adapter, sent } = harness(77, true, "Finishing");
+
+    const ok = await adapter.setChargeAmps(9, ctx);
+
+    expect(ok).toBe(true);
+    expect(summarise(sent).map((p) => p.purpose)).toEqual([
+      "ChargePointMaxProfile",
+      "TxDefaultProfile",
     ]);
   });
 

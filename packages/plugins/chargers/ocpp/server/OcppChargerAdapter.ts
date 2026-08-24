@@ -35,6 +35,14 @@ const PLUGGED_STATUSES: ReadonlySet<ChargePointStatus> = new Set([
 
 const COMMAND_CONFIRM_MS = 30_000;
 
+// Spec: a TxProfile without an active transaction SHALL be rejected, so it
+// is only sent while the charger says one is running.
+const TX_PROFILE_STATUSES: ReadonlySet<ChargePointStatus> = new Set([
+  "Charging",
+  "SuspendedEV",
+  "SuspendedEVSE",
+]);
+
 export interface OcppAdapterConfig {
   chargerId: string;
   meterTimeoutSeconds: number;
@@ -88,7 +96,11 @@ export class OcppChargerAdapter implements ChargerAdapter {
 
   // Three-tier profile per the HA-integration pattern.
   setChargeAmps(amps: number, ctx: CallContext): Promise<boolean> {
-    const tx = this.cs.getData().transactionId ?? undefined;
+    const data = this.cs.getData();
+    const tx = data.transactionId !== null && data.status !== null &&
+        TX_PROFILE_STATUSES.has(data.status)
+      ? data.transactionId
+      : undefined;
     this.command("debug", "setChargeAmps", {
       amps,
       transactionId: tx ?? null,
