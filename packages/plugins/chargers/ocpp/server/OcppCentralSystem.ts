@@ -323,6 +323,50 @@ export class OcppCentralSystem {
     return true;
   }
 
+  // User-triggered escape hatch from a disordered state: forget any cached
+  // transaction, wipe stored profiles (including a standing 0A clamp), and
+  // ask the charger to restate the truth.
+  async recoverConnection(chargePointId: string): Promise<string[]> {
+    const steps: string[] = [];
+    this.patch(chargePointId, {
+      transactionId: null,
+      meterStartWh: null,
+      lastMeterValuesAt: null,
+    });
+    steps.push("cleared cached transaction state");
+    // Best-effort per step: TriggerMessage is an optional feature profile and
+    // a NotImplemented reply must not abort the rest of the recovery.
+    for (
+      const [label, action, payload] of [
+        ["cleared charging profiles", "ClearChargingProfile", {}],
+        ["requested status", "TriggerMessage", {
+          requestedMessage: "StatusNotification",
+          connectorId: 1,
+        }],
+        ["requested meter values", "TriggerMessage", {
+          requestedMessage: "MeterValues",
+          connectorId: 1,
+        }],
+      ] as const
+    ) {
+      try {
+        const res = await this.send(chargePointId, action, payload);
+        steps.push(`${label}: ${resultStatus(res)}`);
+      } catch (error) {
+        steps.push(`${label}: failed (${error})`);
+      }
+    }
+    this.dbLog.info(`Connection recovery (${chargePointId})`, {
+      payload: { chargePointId, steps },
+    });
+    return steps;
+  }
+
+  // Remote equivalent of the isolation switch.
+  softReset(chargePointId: string): Promise<boolean> {
+    return this.command(chargePointId, "Reset", { type: "Soft" });
+  }
+
   private chargerContext(chargePointId: string): string {
     const data = this.getData(chargePointId);
     if (data.status === null) return "";
