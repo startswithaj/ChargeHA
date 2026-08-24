@@ -1,6 +1,12 @@
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { attached, fakeSocket } from "./test-helpers/ocppHarness.ts";
+import {
+  answer,
+  attached,
+  callsTo,
+  fakeSocket,
+} from "./test-helpers/ocppHarness.ts";
+import { chargingProfilePayload } from "./OcppMessages.ts";
 
 describe("OCPP message ordering", () => {
   const CP = "ABB-83214";
@@ -102,6 +108,26 @@ describe("OCPP message ordering", () => {
     expect(messageTypeId).toBe(4); // CALLERROR, not a silent drop
     expect(id).toBe("overflow");
     expect(code).toBe("InternalError");
+  });
+
+  it("sends outgoing CALLs one at a time — the next only after the previous CALLRESULT", async () => {
+    const { cs, socket } = attached(CP);
+
+    // OCPP-J permits one outstanding CALL per direction; chargers drop or
+    // misorder overlapping CALLs.
+    const pending = cs.setChargingProfiles(CP, [
+      chargingProfilePayload("ChargePointMaxProfile", 10),
+      chargingProfilePayload("TxDefaultProfile", 10),
+    ]).catch(() => false);
+    await tick();
+
+    expect(callsTo(socket, "SetChargingProfile").length).toBe(1);
+
+    await answer(socket, { status: "Accepted" });
+    expect(callsTo(socket, "SetChargingProfile").length).toBe(2);
+
+    await answer(socket, { status: "Accepted" });
+    expect(await pending).toBe(true);
   });
 
   it("drops a handler still queued against a socket a reconnect already replaced", async () => {

@@ -14,6 +14,9 @@ export class OcppConnection {
   private readonly queue: OcppMessageQueue;
   private transactionCounter = 0;
   private readonly stoppedTransactionIds = new Set<number>();
+  // OCPP-J permits one outstanding CALL per direction; chargers drop or
+  // misorder overlapping CALLs, so sends are chained.
+  private outbound: Promise<unknown> | null = null;
 
   constructor(
     readonly socket: WebSocket,
@@ -79,7 +82,22 @@ export class OcppConnection {
     this.transactionCounter = Math.max(this.transactionCounter, transactionId);
   }
 
-  async send(action: string, payload: unknown): Promise<unknown> {
+  send(action: string, payload: unknown): Promise<unknown> {
+    // An idle line dispatches synchronously so the CALL is on the wire (and
+    // visible to callers) before any await.
+    const result = this.outbound === null
+      ? this.dispatch(action, payload)
+      : this.outbound.catch(() => {}).then(() =>
+        this.dispatch(action, payload)
+      );
+    const tail: Promise<void> = result.catch(() => {}).then(() => {
+      if (this.outbound === tail) this.outbound = null;
+    });
+    this.outbound = tail;
+    return result;
+  }
+
+  private async dispatch(action: string, payload: unknown): Promise<unknown> {
     if (this.socket.readyState !== WebSocket.OPEN) {
       throw new Error(`Charger ${this.chargePointId} not connected`);
     }
