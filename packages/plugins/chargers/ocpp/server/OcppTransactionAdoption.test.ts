@@ -188,6 +188,32 @@ describe("OCPP transaction adoption", () => {
     expect(cs.getData(CP).meterStartWh).toBe(2000);
   });
 
+  it("keeps connector 1's status when a charge-point-level (connectorId 0) StatusNotification arrives", async () => {
+    const { cs, socket } = attached(CP);
+
+    await call(socket, "StatusNotification", {
+      connectorId: 1,
+      errorCode: "NoError",
+      status: "Charging",
+    });
+    await call(socket, "StatusNotification", {
+      connectorId: 0,
+      errorCode: "NoError",
+      status: "Available",
+    });
+
+    expect(cs.getData(CP).status).toBe("Charging");
+
+    await call(socket, "StatusNotification", {
+      connectorId: 0,
+      errorCode: "OtherError",
+      status: "Faulted",
+    });
+
+    expect(cs.getData(CP).status).toBe("Charging");
+    expect(cs.getData(CP).errorCode).toBe("OtherError");
+  });
+
   it("remoteStop with no transaction id sends a 0A ChargePointMaxProfile on connectorId 0 and resolves true when accepted", async () => {
     const { cs, socket } = attached(CP);
     expect(cs.getData(CP).transactionId).toBeNull();

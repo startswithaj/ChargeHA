@@ -547,8 +547,10 @@ export class OcppCentralSystem {
         return { currentTime: new Date().toISOString() };
       case "StatusNotification": {
         const s = statusNotificationReq.parse(payload);
+        // connectorId 0 is the charge point as a whole; its status must not
+        // overwrite connector 1's (a boot-time Available would mask Charging).
         this.patch(chargePointId, {
-          status: s.status,
+          ...(s.connectorId !== 0 && { status: s.status }),
           errorCode: s.errorCode,
           statusInfo: s.info ?? null,
           vendorErrorCode: s.vendorErrorCode ?? null,
