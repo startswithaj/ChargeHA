@@ -15,6 +15,7 @@ import {
   meterValuesReq,
   startTransactionReq,
   statusNotificationReq,
+  stopTransactionReq,
 } from "./OcppMessages.ts";
 import { readMeterValueFields } from "./OcppMeterValues.ts";
 import { measurandWarningFor } from "./OcppMeasurands.ts";
@@ -526,6 +527,17 @@ export class OcppCentralSystem {
         };
       }
       case "StopTransaction": {
+        const stop = stopTransactionReq.safeParse(payload);
+        const connection = this.connections.get(chargePointId);
+        if (stop.success && connection !== undefined) {
+          connection.noteStoppedTransaction(stop.data.transactionId);
+          const current = connection.getData().transactionId;
+          // A replayed offline stop for an old transaction must not kill the
+          // current one.
+          if (current !== null && current !== stop.data.transactionId) {
+            return { idTagInfo: { status: "Accepted" } };
+          }
+        }
         this.patch(chargePointId, {
           transactionId: null,
           meterStartWh: null,
@@ -551,7 +563,11 @@ export class OcppCentralSystem {
     if (transactionId === undefined) return {};
     const connection = this.connections.get(chargePointId);
     if (connection === undefined) return {};
+    // Chargers flush 1-2 final MeterValues after StopTransaction; adopting
+    // that id resurrects a dead transaction (the 22 Aug incident).
+    if (connection.hasStoppedTransaction(transactionId)) return {};
     const data = connection.getData();
+    if (data.status === "Finishing" || data.status === "Available") return {};
     if (data.transactionId === transactionId) return {};
     connection.reserveTransactionId(transactionId);
     // Once per reconnect that lost its StartTransaction, not per MeterValues.

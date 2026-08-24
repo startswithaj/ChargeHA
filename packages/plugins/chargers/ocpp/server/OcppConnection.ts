@@ -13,6 +13,7 @@ export class OcppConnection {
   private readonly pending = new PendingCalls();
   private readonly queue: OcppMessageQueue;
   private transactionCounter = 0;
+  private readonly stoppedTransactionIds = new Set<number>();
 
   constructor(
     readonly socket: WebSocket,
@@ -57,6 +58,14 @@ export class OcppConnection {
     this.pending.rejectAll(reason);
     this.queue.stop();
     this.socket.close();
+  }
+
+  noteStoppedTransaction(transactionId: number): void {
+    this.stoppedTransactionIds.add(transactionId);
+  }
+
+  hasStoppedTransaction(transactionId: number): boolean {
+    return this.stoppedTransactionIds.has(transactionId);
   }
 
   nextTransactionId(): number {

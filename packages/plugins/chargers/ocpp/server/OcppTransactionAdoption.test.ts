@@ -108,6 +108,86 @@ describe("OCPP transaction adoption", () => {
     expect((reply[2] as { transactionId: number }).transactionId).toBe(8);
   });
 
+  it("does not re-adopt a transaction after its StopTransaction — trailing MeterValues must not resurrect it", async () => {
+    const { cs, socket } = attached(CP);
+    await startTransaction(socket, 1000);
+    expect(cs.getData(CP).transactionId).toBe(1);
+
+    // StarCharge (and most chargers) flush 1-2 final transaction-scoped
+    // MeterValues after StopTransaction; adopting that id resurrects a dead
+    // transaction (the 22 Aug incident).
+    await call(socket, "StopTransaction", {
+      transactionId: 1,
+      meterStop: 1500,
+      timestamp: new Date().toISOString(),
+      idTag: "tag",
+      reason: "Remote",
+    });
+    expect(cs.getData(CP).transactionId).toBeNull();
+
+    await meterValues(socket, { transactionId: 1, registerWh: 1500 });
+
+    expect(cs.getData(CP).transactionId).toBeNull();
+    expect(cs.getData(CP).meterStartWh).toBeNull();
+  });
+
+  it("refuses adoption while the charger reports Finishing or Available — no transaction can be running", async () => {
+    const { cs, socket } = attached(CP);
+
+    await call(socket, "StatusNotification", {
+      connectorId: 1,
+      errorCode: "NoError",
+      status: "Finishing",
+    });
+    await meterValues(socket, { transactionId: 5, registerWh: 3000 });
+    expect(cs.getData(CP).transactionId).toBeNull();
+
+    await call(socket, "StatusNotification", {
+      connectorId: 1,
+      errorCode: "NoError",
+      status: "Available",
+    });
+    await meterValues(socket, { transactionId: 5, registerWh: 3000 });
+    expect(cs.getData(CP).transactionId).toBeNull();
+
+    // Charging status is the reconnect case adoption exists for.
+    await call(socket, "StatusNotification", {
+      connectorId: 1,
+      errorCode: "NoError",
+      status: "Charging",
+    });
+    await meterValues(socket, { transactionId: 5, registerWh: 3100 });
+    expect(cs.getData(CP).transactionId).toBe(5);
+  });
+
+  it("ignores a replayed StopTransaction for a different transaction id", async () => {
+    const { cs, socket } = attached(CP);
+    await startTransaction(socket, 1000);
+    await call(socket, "StopTransaction", {
+      transactionId: 1,
+      meterStop: 1500,
+      timestamp: new Date().toISOString(),
+    });
+    await call(socket, "StatusNotification", {
+      connectorId: 1,
+      errorCode: "NoError",
+      status: "Charging",
+    });
+    await startTransaction(socket, 2000);
+    expect(cs.getData(CP).transactionId).toBe(2);
+
+    // OCPP 1.6 replays queued offline messages after reconnect — a stale stop
+    // for transaction 1 can arrive while transaction 2 is live.
+    await call(socket, "StopTransaction", {
+      transactionId: 1,
+      meterStop: 1500,
+      timestamp: new Date().toISOString(),
+    });
+
+    expect(cs.getData(CP).transactionId).toBe(2);
+    expect(cs.getData(CP).meterStartWh).toBe(2000);
+  });
+
   it("remoteStop with no transaction id sends a 0A ChargePointMaxProfile on connectorId 0 and resolves true when accepted", async () => {
     const { cs, socket } = attached(CP);
     expect(cs.getData(CP).transactionId).toBeNull();
