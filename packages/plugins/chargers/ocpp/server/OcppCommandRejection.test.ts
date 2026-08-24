@@ -1,6 +1,7 @@
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
+  answer,
   attached,
   call,
   callsTo,
@@ -46,9 +47,8 @@ describe("OCPP command rejection detail", () => {
       chargingProfilePayload("ChargePointMaxProfile", 32),
       chargingProfilePayload("TxDefaultProfile", 32),
     ]));
-    const [first, second] = callsTo(socket, "SetChargingProfile");
-    await answerFrame(socket, first[1], { status: "Accepted" });
-    await answerFrame(socket, second[1], { status: "Rejected" });
+    await answer(socket, { status: "Accepted" });
+    await answer(socket, { status: "Rejected" });
 
     const outcome = await pending;
     expect(outcome).toBeInstanceOf(Error);
@@ -94,6 +94,40 @@ describe("OCPP command rejection detail", () => {
     );
   });
 
+  it("resolves true when only the TxProfile tier is rejected — Max and TxDefault already steer the charger", async () => {
+    const { cs, socket } = attached(CP);
+
+    const pending = settle(cs.setChargingProfiles(CP, [
+      chargingProfilePayload("ChargePointMaxProfile", 8),
+      chargingProfilePayload("TxDefaultProfile", 8),
+      chargingProfilePayload("TxProfile", 8, 1),
+    ]));
+    await tick();
+    await answer(socket, { status: "Accepted" });
+    await answer(socket, { status: "Accepted" });
+    await answer(socket, { status: "Rejected" });
+
+    expect(await pending).toBe("resolved");
+  });
+
+  it("still throws when an authoritative tier is rejected", async () => {
+    const { cs, socket } = attached(CP);
+
+    const pending = settle(cs.setChargingProfiles(CP, [
+      chargingProfilePayload("ChargePointMaxProfile", 8),
+      chargingProfilePayload("TxDefaultProfile", 8),
+    ]));
+    await tick();
+    await answer(socket, { status: "Accepted" });
+    await answer(socket, { status: "Rejected" });
+
+    const outcome = await pending;
+    expect(outcome).toBeInstanceOf(Error);
+    expect((outcome as Error).message).toContain(
+      "SetChargingProfile not accepted",
+    );
+  });
+
   it("still resolves true when everything is accepted", async () => {
     const { cs, socket } = attached(CP);
 
@@ -101,9 +135,8 @@ describe("OCPP command rejection detail", () => {
       chargingProfilePayload("ChargePointMaxProfile", 7),
       chargingProfilePayload("TxDefaultProfile", 7),
     ]));
-    const [first, second] = callsTo(socket, "SetChargingProfile");
-    await answerFrame(socket, first[1], { status: "Accepted" });
-    await answerFrame(socket, second[1], { status: "Accepted" });
+    await answer(socket, { status: "Accepted" });
+    await answer(socket, { status: "Accepted" });
 
     expect(await pending).toBe("resolved");
   });

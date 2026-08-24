@@ -294,14 +294,23 @@ export class OcppCentralSystem {
     chargePointId: string,
     profiles: ChargingProfileRequest[],
   ): Promise<boolean> {
-    const results = await Promise.all(
-      profiles.map((p) =>
-        this.send(chargePointId, "SetChargingProfile", p.payload)
-      ),
+    const results: unknown[] = [];
+    for (const p of profiles) {
+      results.push(
+        await this.send(chargePointId, "SetChargingProfile", p.payload),
+      );
+    }
+    const rejected = profiles.filter((_, i) => !isAccepted(results[i]));
+    // A rejected TxProfile is advisory when the authoritative tiers landed:
+    // ChargePointMax + TxDefault already steer the charger.
+    const fatal = rejected.filter((p) => p.purpose !== "TxProfile");
+    this.logOutcome(
+      chargePointId,
+      "SetChargingProfile",
+      rejected.length === 0,
+      results,
     );
-    const accepted = results.every(isAccepted);
-    this.logOutcome(chargePointId, "SetChargingProfile", accepted, results);
-    if (!accepted) {
+    if (fatal.length > 0) {
       const detail = profiles
         .map((p, i) => `${p.purpose}=${resultStatus(results[i])}`)
         .join(", ");
