@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { skipToken } from "@tanstack/react-query";
+import { Button, Flex, Text } from "@radix-ui/themes";
 import { PluginConfigForm } from "../../../hostUi.ts";
 import type { PluginSettingsProps } from "../../../pluginOptions.ts";
 import { trpc } from "./trpc.ts";
@@ -52,6 +53,48 @@ export function OcppSettings(
           onDetected={(id) => setValue("ocppChargerId", id)}
         />
       )}
+      renderFooter={() =>
+        rowId === null ? null : <OcppRecoveryBlock rowId={rowId} />}
     />
+  );
+}
+
+function OcppRecoveryBlock({ rowId }: { rowId: string }): JSX.Element {
+  const recover = trpc.plugin.charger.ocpp.recoverConnection.useMutation();
+  const reset = trpc.plugin.charger.ocpp.softReset.useMutation();
+  return (
+    <Flex direction="column" gap="2">
+      <Text size="2" color="gray">
+        Stuck charger? Recover clears cached state and stored charging profiles,
+        then re-syncs. Soft reset reboots the charger remotely.
+      </Text>
+      <Flex gap="2">
+        <Button
+          type="button"
+          variant="soft"
+          disabled={recover.isPending}
+          onClick={() => recover.mutate({ chargerRowId: rowId })}
+        >
+          Recover connection
+        </Button>
+        <Button
+          type="button"
+          variant="soft"
+          color="amber"
+          disabled={reset.isPending}
+          onClick={() => reset.mutate({ chargerRowId: rowId })}
+        >
+          Soft reset charger
+        </Button>
+      </Flex>
+      {recover.data && (
+        <Text size="1" color="gray">{recover.data.steps.join(" · ")}</Text>
+      )}
+      {reset.data && (
+        <Text size="1" color="gray">
+          Reset {reset.data.accepted ? "accepted" : "rejected"}
+        </Text>
+      )}
+    </Flex>
   );
 }

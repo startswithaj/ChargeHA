@@ -113,6 +113,24 @@ export function createOcppRouter(
 
     ...pairingProcedures(centralSystem),
 
+    recoverConnection: publicProcedure
+      .input(chargerInput)
+      .mutation(async ({ input }) => {
+        const chargePointId = await plugin.chargePointIdFor(input.chargerRowId);
+        if (chargePointId === null) {
+          return { steps: ["no charge point id configured"] };
+        }
+        return { steps: await centralSystem.recoverConnection(chargePointId) };
+      }),
+
+    softReset: publicProcedure
+      .input(chargerInput)
+      .mutation(async ({ input }) => {
+        const chargePointId = await plugin.chargePointIdFor(input.chargerRowId);
+        if (chargePointId === null) return { accepted: false };
+        return { accepted: await centralSystem.softReset(chargePointId) };
+      }),
+
     testConnection: publicProcedure
       .input(testConnectionInput)
       .mutation(async ({ input }) =>
