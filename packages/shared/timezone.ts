@@ -31,13 +31,3 @@ export function localDateStr(instant: Date, timezone: string): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${year}-${pad(month)}-${pad(day)}`;
 }
-
-export function zoneOffsetHours(instant: Date, timezone: string): number {
-  const { year, month, day, hour, minute, second } = zonedParts(
-    instant,
-    timezone,
-  );
-  const asUtc = Date.UTC(year, month - 1, day, hour, minute, second);
-  const truncated = Math.floor(instant.getTime() / 1000) * 1000;
-  return (asUtc - truncated) / 3_600_000;
-}

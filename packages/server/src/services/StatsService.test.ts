@@ -69,7 +69,6 @@ describe("StatsService", () => {
       const service = new StatsService(db);
       const result = await service.buildDayStats(
         "2026-03-01",
-        0,
         undefined,
         true,
       );
@@ -112,7 +111,6 @@ describe("StatsService", () => {
       const service = new StatsService(db);
       const result = await service.buildDayStats(
         "2026-03-01",
-        0,
         undefined,
         true,
       );
@@ -137,7 +135,7 @@ describe("StatsService", () => {
         },
       });
       const service = new StatsService(db);
-      const result = await service.buildMonthStats(2026, 3, 0, undefined);
+      const result = await service.buildMonthStats(2026, 3, undefined);
 
       // day 15 → index 14
       expect(result.energyBuckets[14].solarProductionWh).toBe(5000);
@@ -157,7 +155,7 @@ describe("StatsService", () => {
         },
       });
       const service = new StatsService(db);
-      const result = await service.buildMonthStats(2026, 3, 0, undefined);
+      const result = await service.buildMonthStats(2026, 3, undefined);
 
       // day 5, quarter 2 → x = 5 + 2*0.25 = 5.5
       // solarProductionKwh = round(1000 * 4 / 1000 * 100) / 100 = 4.0
@@ -183,7 +181,7 @@ describe("StatsService", () => {
         },
       });
       const service = new StatsService(db);
-      const result = await service.buildYearStats(2026, 0, undefined);
+      const result = await service.buildYearStats(2026, undefined);
 
       // month 3 → index 2
       expect(result.energyBuckets[2].solarProductionWh).toBe(8000);
@@ -203,7 +201,7 @@ describe("StatsService", () => {
         },
       });
       const service = new StatsService(db);
-      const result = await service.buildYearStats(2026, 0, undefined);
+      const result = await service.buildYearStats(2026, undefined);
 
       // week 10 → index 10 in solarProductionLine (weeks 0-52)
       const point = result.solarProductionLine[10];
@@ -229,7 +227,6 @@ describe("StatsService", () => {
       const service = new StatsService(db);
       const result = await service.buildDayStats(
         "2026-03-01",
-        0,
         undefined,
         false,
       );
@@ -262,7 +259,6 @@ describe("StatsService", () => {
       const service = new StatsService(db);
       const result = await service.buildDayStats(
         "2026-03-01",
-        0,
         undefined,
         false,
       );
@@ -286,7 +282,6 @@ describe("StatsService", () => {
       const service = new StatsService(db);
       const result = await service.buildDayStats(
         "2026-03-01",
-        0,
         undefined,
         false,
       );
@@ -299,7 +294,6 @@ describe("StatsService", () => {
       const service = new StatsService(mockDb());
       const result = await service.buildDayStats(
         "2026-03-01",
-        0,
         undefined,
         false,
       );
@@ -324,7 +318,6 @@ describe("StatsService", () => {
       const service = new StatsService(db);
       const result = await service.buildDayStats(
         "2026-03-01",
-        0,
         undefined,
         false,
       );
@@ -347,7 +340,6 @@ describe("StatsService", () => {
       const service = new StatsService(db);
       const result = await service.buildDayStats(
         "2026-03-01",
-        0,
         undefined,
         false,
       );
@@ -374,7 +366,6 @@ describe("StatsService", () => {
       const service = new StatsService(db);
       const result = await service.buildDayStats(
         "2026-03-01",
-        0,
         undefined,
         false,
       );
@@ -407,7 +398,6 @@ describe("StatsService", () => {
       const service = new StatsService(db);
       const result = await service.buildDayStats(
         "2026-03-01",
-        0,
         undefined,
         false,
       );
@@ -421,7 +411,6 @@ describe("StatsService", () => {
       const service = new StatsService(mockDb());
       const result = await service.buildDayStats(
         "2026-03-01",
-        0,
         undefined,
         false,
       );
@@ -449,7 +438,6 @@ describe("StatsService", () => {
       const service = new StatsService(db);
       const result = await service.buildDayStats(
         "2026-03-01",
-        0,
         undefined,
         false,
       );
@@ -479,7 +467,6 @@ describe("StatsService", () => {
       const service = new StatsService(db);
       const result = await service.buildDayStats(
         "2026-03-01",
-        0,
         undefined,
         false,
       );
@@ -496,7 +483,6 @@ describe("StatsService", () => {
       const service = new StatsService(mockDb());
       const result = await service.buildDayStats(
         "2026-03-01",
-        0,
         undefined,
         false,
       );
@@ -529,7 +515,6 @@ describe("StatsService", () => {
       const service = new StatsService(db);
       const result = await service.buildDayStats(
         "2026-03-01",
-        0,
         undefined,
         false,
       );

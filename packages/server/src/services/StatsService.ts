@@ -1,4 +1,5 @@
 import type { AppDatabase } from "../db/AppDatabase.ts";
+import { offsetHoursAt } from "../db/repositories/sqliteHelpers.ts";
 import type {
   EnergyBucket,
   SolarProductionPoint,
@@ -38,12 +39,17 @@ interface CostInfo {
 export class StatsService {
   constructor(private db: AppDatabase) {}
 
+  private async offsetFor(isoDate: string): Promise<number> {
+    const timezone = (await this.db.getConfig("timezone")) || "UTC";
+    return offsetHoursAt(timezone, isoDate);
+  }
+
   async buildDayStats(
     date: string,
-    tz: number,
     vehicleId: string | undefined,
     detailed: boolean,
   ): Promise<StatsResponse> {
+    const tz = await this.offsetFor(date);
     return detailed
       ? await this.buildDetailedDayStats(date, tz, vehicleId)
       : await this.buildHourlyDayStats(date, tz, vehicleId);
@@ -52,11 +58,11 @@ export class StatsService {
   async buildMonthStats(
     year: number,
     month: number,
-    tz: number,
     vehicleId: string | undefined,
   ): Promise<StatsResponse> {
     const numDays = daysInMonth(year, month);
     const monthStr = String(month).padStart(2, "0");
+    const tz = await this.offsetFor(`${year}-${monthStr}-15`);
     const startDate = `${year}-${monthStr}-01`;
     const endDate = `${year}-${monthStr}-${String(numDays).padStart(2, "0")}`;
 
@@ -102,9 +108,9 @@ export class StatsService {
 
   async buildYearStats(
     year: number,
-    tz: number,
     vehicleId: string | undefined,
   ): Promise<StatsResponse> {
+    const tz = await this.offsetFor(`${year}-07-01`);
     const startDate = `${year}-01-01`;
     const endDate = `${year}-12-31`;
 

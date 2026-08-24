@@ -18,7 +18,7 @@ import { useVehicles } from "../../../hooks/useVehicles.ts";
 import { EnergyFlowDiagram } from "../../EnergyFlowDiagram/EnergyFlowDiagram.tsx";
 import { MetricCard } from "../../MetricCard/MetricCard.tsx";
 import { kwhValue, kwValue } from "../../../utils/Format.ts";
-import { localDateStr, zoneOffsetHours } from "@chargeha/shared/timezone";
+import { localDateStr } from "@chargeha/shared/timezone";
 import { useSiteTimezone } from "../../../hooks/useSiteTimezone.ts";
 import { trpc } from "../../../trpc.ts";
 import {
@@ -153,9 +153,8 @@ function useOverviewData() {
 
   const timezone = useSiteTimezone();
   const today = localDateStr(new Date(), timezone);
-  const tz = zoneOffsetHours(new Date(), timezone);
   const { data: statsDay = null } = trpc.stats.day.useQuery(
-    { date: today, tz },
+    { date: today },
     { refetchInterval: 60_000 },
   );
   const { data: currentRate = null } = trpc.tariff.currentRate.useQuery(

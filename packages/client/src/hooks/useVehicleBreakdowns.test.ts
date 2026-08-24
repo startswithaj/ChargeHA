@@ -110,8 +110,6 @@ describe("useVehicleBreakdowns", () => {
   });
 
   describe("query inputs per period", () => {
-    const tz = -(new Date().getTimezoneOffset() / 60);
-
     const runWithOneVehicle = (overrides: Partial<Args>) => {
       hoisted.state.listData = { vehicles: [{ id: "VIN1", name: "Model 3" }] };
       hoisted.state.queriesResults = [{ data: undefined, isPending: false }];
@@ -127,7 +125,6 @@ describe("useVehicleBreakdowns", () => {
         input: {
           date: "2026-01-15",
           vehicleId: "VIN1",
-          tz,
           resolution: undefined,
         },
       }]);
@@ -141,7 +138,6 @@ describe("useVehicleBreakdowns", () => {
         input: {
           date: "2026-01-15",
           vehicleId: "VIN1",
-          tz,
           resolution: "15m",
         },
       }]);
@@ -152,7 +148,7 @@ describe("useVehicleBreakdowns", () => {
 
       expect(calls).toEqual([{
         procedure: "month",
-        input: { year: 2026, month: 1, vehicleId: "VIN1", tz },
+        input: { year: 2026, month: 1, vehicleId: "VIN1" },
       }]);
     });
 
@@ -161,7 +157,7 @@ describe("useVehicleBreakdowns", () => {
 
       expect(calls).toEqual([{
         procedure: "year",
-        input: { year: 2026, vehicleId: "VIN1", tz },
+        input: { year: 2026, vehicleId: "VIN1" },
       }]);
     });
   });
