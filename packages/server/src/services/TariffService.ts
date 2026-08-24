@@ -8,8 +8,7 @@ import {
   parseTimeToMinutes,
 } from "../lib/Tariffs.ts";
 import type { Logger } from "../lib/Logger.ts";
-import { offsetHoursAt } from "../db/repositories/sqliteHelpers.ts";
-import { localDateStr } from "@chargeha/shared/timezone";
+import { localDateStr, offsetHoursAt } from "@chargeha/shared/timezone";
 
 function nextLocalDate(dateStr: string): string {
   const [y, m, d] = dateStr.split("-").map(Number);

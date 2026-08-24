@@ -4,17 +4,7 @@ import type { VehicleUpdateEntry } from "../../../hooks/useVehicleUpdates.ts";
 import { useFreshRowIds } from "../../../hooks/useFreshRowIds.ts";
 import { PAGE_SIZE_OPTIONS } from "./Logs.tsx";
 import styles from "./Logs.module.css";
-
-function formatTimestamp(ts: string): string {
-  const d = new Date(ts + "Z");
-  return d.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
+import { formatTimestamp } from "./logsTime.ts";
 
 interface VehicleUpdatesTableProps {
   readings: VehicleUpdateEntry[];
@@ -25,6 +15,7 @@ interface VehicleUpdatesTableProps {
   pageSize: number;
   onPageSizeChange: (size: number) => void;
   vehicles: Array<{ id: string; name: string }>;
+  timezone: string;
 }
 
 export function VehicleUpdatesTable({
@@ -35,6 +26,7 @@ export function VehicleUpdatesTable({
   onPageChange,
   pageSize,
   onPageSizeChange,
+  timezone,
 }: VehicleUpdatesTableProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const freshIds = useFreshRowIds(readings);
@@ -84,7 +76,7 @@ export function VehicleUpdatesTable({
                 className={freshIds.has(r.id) ? styles.freshRow : undefined}
               >
                 <td className={styles.timestamp}>
-                  {formatTimestamp(r.timestamp)}
+                  {formatTimestamp(r.timestamp, timezone)}
                 </td>
                 <td>{r.vehicleName}</td>
                 <td>{r.isOnline ? "Yes" : "No"}</td>

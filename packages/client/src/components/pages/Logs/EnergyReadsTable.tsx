@@ -4,17 +4,7 @@ import type { EnergyReadingEntry } from "../../../hooks/useEnergyReadings.ts";
 import { useFreshRowIds } from "../../../hooks/useFreshRowIds.ts";
 import { PAGE_SIZE_OPTIONS } from "./Logs.tsx";
 import styles from "./Logs.module.css";
-
-function formatTimestamp(ts: string): string {
-  const d = new Date(ts + "Z");
-  return d.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
+import { formatTimestamp } from "./logsTime.ts";
 
 function fmt(w: number): string {
   return `${Math.round(w).toLocaleString()}W`;
@@ -52,6 +42,7 @@ interface EnergyReadsTableProps {
   onPageChange: (page: number) => void;
   pageSize: number;
   onPageSizeChange: (size: number) => void;
+  timezone: string;
 }
 
 export function EnergyReadsTable({
@@ -62,6 +53,7 @@ export function EnergyReadsTable({
   onPageChange,
   pageSize,
   onPageSizeChange,
+  timezone,
 }: EnergyReadsTableProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const freshIds = useFreshRowIds(readings);
@@ -105,7 +97,7 @@ export function EnergyReadsTable({
                 className={freshIds.has(r.id) ? styles.freshRow : undefined}
               >
                 <td className={styles.timestamp}>
-                  {formatTimestamp(r.timestamp)}
+                  {formatTimestamp(r.timestamp, timezone)}
                 </td>
                 <ReadingCells r={r} />
               </tr>

@@ -88,6 +88,17 @@ vi.mock("../../../trpc.ts", () => ({
         })),
       },
     },
+    config: {
+      system: {
+        get: {
+          useQuery: vi.fn(() => ({
+            data: { timezone: "Australia/Brisbane" },
+            isLoading: false,
+            error: null,
+          })),
+        },
+      },
+    },
   },
 }));
 

@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { Badge, Card, Text } from "@radix-ui/themes";
 import type { ControllerLogEntry } from "../../../hooks/useControllerLogs.ts";
 import styles from "./Logs.module.css";
+import { formatTimestamp } from "./logsTime.ts";
 
 function actionColor(
   action: string,
@@ -17,17 +18,6 @@ function actionColor(
     default:
       return "gray";
   }
-}
-
-function formatTimestamp(ts: string): string {
-  const d = new Date(ts + "Z");
-  return d.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
 }
 
 type Inputs = NonNullable<ControllerLogEntry["inputs"]>;
@@ -142,7 +132,9 @@ function SchedulesGroup(
   );
 }
 
-export function LogEntryCard({ entry }: { entry: ControllerLogEntry }) {
+export function LogEntryCard(
+  { entry, timezone }: { entry: ControllerLogEntry; timezone: string },
+) {
   const [expanded, setExpanded] = useState(false);
   const inputs = entry.inputs;
 
@@ -157,7 +149,7 @@ export function LogEntryCard({ entry }: { entry: ControllerLogEntry }) {
             {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </span>
           <Text size="1" color="gray" className={styles.timestamp}>
-            {formatTimestamp(entry.timestamp)}
+            {formatTimestamp(entry.timestamp, timezone)}
           </Text>
           <div className={styles.badges}>
             <Badge size="1" variant="soft" color="gray">

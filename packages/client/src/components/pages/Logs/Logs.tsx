@@ -15,6 +15,8 @@ import { VehicleUpdatesTable } from "./VehicleUpdatesTable.tsx";
 import { PluginLogsTable } from "./PluginLogsTable.tsx";
 import { useStoredState } from "../../../lib/storage.ts";
 import styles from "./Logs.module.css";
+import { getPresetRange } from "./logsTime.ts";
+import { useSiteTimezone } from "../../../hooks/useSiteTimezone.ts";
 
 export type TimeRangePreset =
   | "all"
@@ -74,46 +76,6 @@ type LogTab =
   | "energy-reads"
   | "vehicle-updates"
   | "plugin-logs";
-
-function getPresetRange(
-  preset: TimeRangePreset,
-): { from?: string; to?: string } {
-  const now = new Date();
-  switch (preset) {
-    case "all":
-      return {};
-    case "1h":
-      return { from: new Date(now.getTime() - 60 * 60 * 1000).toISOString() };
-    case "6h":
-      return {
-        from: new Date(now.getTime() - 6 * 60 * 60 * 1000).toISOString(),
-      };
-    case "24h":
-      return {
-        from: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(),
-      };
-    case "today": {
-      const start = new Date(now);
-      start.setHours(0, 0, 0, 0);
-      return { from: start.toISOString() };
-    }
-    case "yesterday": {
-      const yStart = new Date(now);
-      yStart.setDate(yStart.getDate() - 1);
-      yStart.setHours(0, 0, 0, 0);
-      const yEnd = new Date(now);
-      yEnd.setDate(yEnd.getDate() - 1);
-      yEnd.setHours(23, 59, 59, 999);
-      return { from: yStart.toISOString(), to: yEnd.toISOString() };
-    }
-    case "7d":
-      return {
-        from: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      };
-    case "custom":
-      return {};
-  }
-}
 
 function readFiltersFromUrl(): {
   tab?: LogTab;
@@ -204,13 +166,14 @@ function useChargeControlTab(
     "logs.pageSize",
     50,
   );
+  const timezone = useSiteTimezone();
 
   const timeFilter = useMemo(() => {
     if (timeRange === "custom") {
       return { from: customFrom || undefined, to: customTo || undefined };
     }
-    return getPresetRange(timeRange);
-  }, [timeRange, customFrom, customTo]);
+    return getPresetRange(timeRange, new Date(), timezone);
+  }, [timeRange, customFrom, customTo, timezone]);
 
   const actionFilter = useMemo(() => {
     if (selectedActions.length === ALL_ACTIONS.length) return undefined;
@@ -277,12 +240,13 @@ function useTimeFilterState(initial: TimeRangePreset = "all") {
   const [timeRange, setTimeRange] = useState<TimeRangePreset>(initial);
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
+  const timezone = useSiteTimezone();
   const timeFilter = useMemo(() => {
     if (timeRange === "custom") {
       return { from: customFrom || undefined, to: customTo || undefined };
     }
-    return getPresetRange(timeRange);
-  }, [timeRange, customFrom, customTo]);
+    return getPresetRange(timeRange, new Date(), timezone);
+  }, [timeRange, customFrom, customTo, timezone]);
   return {
     timeRange,
     setTimeRange,
@@ -467,6 +431,7 @@ function ChargeControlTab(
     points: Array<{ id: string; name: string }>;
   },
 ) {
+  const timezone = useSiteTimezone();
   return (
     <div className={styles.tabContent}>
       <LogFilterBar
@@ -491,6 +456,7 @@ function ChargeControlTab(
         isFetching={cc.data.isFetching}
       />
       <LogTable
+        timezone={timezone}
         logs={cc.data.logs}
         loading={cc.data.loading}
         total={cc.data.total}
@@ -506,6 +472,7 @@ function ChargeControlTab(
 function EnergyReadsTabContent(
   { er }: { er: ReturnType<typeof useEnergyReadsTab> },
 ) {
+  const timezone = useSiteTimezone();
   return (
     <div className={styles.tabContent}>
       <SimpleFilterBar
@@ -523,6 +490,7 @@ function EnergyReadsTabContent(
         isFetching={er.data.isFetching}
       />
       <EnergyReadsTable
+        timezone={timezone}
         readings={er.data.readings}
         loading={er.data.loading}
         total={er.data.total}
@@ -541,6 +509,7 @@ function CarUpdatesTabContent(
     vehicles: VehicleWithState[];
   },
 ) {
+  const timezone = useSiteTimezone();
   return (
     <div className={styles.tabContent}>
       <SimpleFilterBar
@@ -561,6 +530,7 @@ function CarUpdatesTabContent(
         isFetching={cu.data.isFetching}
       />
       <VehicleUpdatesTable
+        timezone={timezone}
         readings={cu.data.readings}
         loading={cu.data.loading}
         total={cu.data.total}
@@ -577,6 +547,7 @@ function CarUpdatesTabContent(
 function PluginLogsTabContent(
   { pl }: { pl: ReturnType<typeof usePluginLogsTab> },
 ) {
+  const timezone = useSiteTimezone();
   return (
     <div className={styles.tabContent}>
       <SimpleFilterBar
@@ -604,6 +575,7 @@ function PluginLogsTabContent(
         searchPlaceholder="Search logs (use -term to exclude)"
       />
       <PluginLogsTable
+        timezone={timezone}
         logs={pl.data.logs}
         loading={pl.data.loading}
         total={pl.data.total}

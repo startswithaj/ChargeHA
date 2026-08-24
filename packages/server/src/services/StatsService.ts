@@ -1,5 +1,5 @@
 import type { AppDatabase } from "../db/AppDatabase.ts";
-import { offsetHoursAt } from "../db/repositories/sqliteHelpers.ts";
+import { offsetHoursAt } from "@chargeha/shared/timezone";
 import type {
   EnergyBucket,
   SolarProductionPoint,
