@@ -1,6 +1,7 @@
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { asc, eq } from "drizzle-orm";
 import { chargers } from "../Schema.ts";
+import { toSqliteDatetime } from "./sqliteHelpers.ts";
 import type { ChargerRow, UpsertChargerInput } from "../types.ts";
 import type { ChargerKind, ChargingPointMode } from "@chargeha/shared";
 
@@ -54,7 +55,10 @@ export class ChargerRepository {
       .values(values)
       .onConflictDoUpdate({
         target: chargers.id,
-        set: { ...values, updatedAt: new Date().toISOString() },
+        set: {
+          ...values,
+          updatedAt: toSqliteDatetime(new Date().toISOString()),
+        },
       });
   }
 
@@ -74,19 +78,22 @@ export class ChargerRepository {
 
   async updateChargerMode(id: string, mode: ChargingPointMode): Promise<void> {
     await this.db.update(chargers)
-      .set({ mode, updatedAt: new Date().toISOString() })
+      .set({ mode, updatedAt: toSqliteDatetime(new Date().toISOString()) })
       .where(eq(chargers.id, id));
   }
 
   async updateChargerPriority(id: string, priority: number): Promise<void> {
     await this.db.update(chargers)
-      .set({ priority, updatedAt: new Date().toISOString() })
+      .set({ priority, updatedAt: toSqliteDatetime(new Date().toISOString()) })
       .where(eq(chargers.id, id));
   }
 
   async updateChargerActive(id: string, active: boolean): Promise<void> {
     await this.db.update(chargers)
-      .set({ active: active ? 1 : 0, updatedAt: new Date().toISOString() })
+      .set({
+        active: active ? 1 : 0,
+        updatedAt: toSqliteDatetime(new Date().toISOString()),
+      })
       .where(eq(chargers.id, id));
   }
 
@@ -95,7 +102,7 @@ export class ChargerRepository {
     vehicleId: string | null,
   ): Promise<void> {
     await this.db.update(chargers)
-      .set({ vehicleId, updatedAt: new Date().toISOString() })
+      .set({ vehicleId, updatedAt: toSqliteDatetime(new Date().toISOString()) })
       .where(eq(chargers.id, id));
   }
 
@@ -120,7 +127,10 @@ export class ChargerRepository {
 
   async setChargerConfigJson(id: string, json: string): Promise<void> {
     await this.db.update(chargers)
-      .set({ chargerConfig: json, updatedAt: new Date().toISOString() })
+      .set({
+        chargerConfig: json,
+        updatedAt: toSqliteDatetime(new Date().toISOString()),
+      })
       .where(eq(chargers.id, id));
   }
 
@@ -146,7 +156,7 @@ export class ChargerRepository {
       .set({
         chargerSecrets: value,
         chargerSecretsEncrypted: isEncrypted ? 1 : 0,
-        updatedAt: new Date().toISOString(),
+        updatedAt: toSqliteDatetime(new Date().toISOString()),
       })
       .where(eq(chargers.id, id));
   }
