@@ -103,21 +103,41 @@ export function chargingProfilePayload(
   amps: number,
   transactionId?: number,
 ): ChargingProfileRequest {
+  const isMax = purpose === "ChargePointMaxProfile";
   return {
     purpose,
     payload: {
-      connectorId: purpose === "ChargePointMaxProfile" ? 0 : 1,
+      connectorId: isMax ? 0 : 1,
       csChargingProfiles: {
         chargingProfileId: purposeIds[purpose],
         stackLevel: 0,
         chargingProfilePurpose: purpose,
-        chargingProfileKind: "Absolute",
+        // Absolute needs a startSchedule anchor; Relative anchors to the
+        // transaction and is the spec-correct kind for the Tx tiers.
+        chargingProfileKind: isMax ? "Absolute" : "Relative",
         ...(transactionId !== undefined && { transactionId }),
         chargingSchedule: {
           chargingRateUnit: "A",
           chargingSchedulePeriod: [{ startPeriod: 0, limit: amps }],
+          ...(isMax && { startSchedule: new Date().toISOString() }),
         },
       },
+    },
+  };
+}
+
+// RemoteStartTransaction.req.chargingProfile — must be TxProfile purpose.
+// Embedding the limit here removes the SetChargingProfile-before-start
+// ordering problem entirely.
+export function remoteStartTxProfile(amps: number): Record<string, unknown> {
+  return {
+    chargingProfileId: purposeIds.TxProfile,
+    stackLevel: 0,
+    chargingProfilePurpose: "TxProfile",
+    chargingProfileKind: "Relative",
+    chargingSchedule: {
+      chargingRateUnit: "A",
+      chargingSchedulePeriod: [{ startPeriod: 0, limit: amps }],
     },
   };
 }

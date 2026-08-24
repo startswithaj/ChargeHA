@@ -51,9 +51,13 @@ describe("OCPP adapter — setChargeAmps profiles", () => {
     status: OcppLiveData["status"] = "Charging",
   ) => {
     const sent: unknown[] = [];
+    const startedWith: Array<number | null> = [];
     const handle: OcppChargerHandle = {
       getData: () => liveData(transactionId, status),
-      remoteStart: () => Promise.resolve(true),
+      remoteStart: (amps) => {
+        startedWith.push(amps ?? null);
+        return Promise.resolve(true);
+      },
       remoteStop: () => Promise.resolve(true),
       setChargingProfiles: (profiles) => {
         sent.push(...profiles);
@@ -67,8 +71,25 @@ describe("OCPP adapter — setChargeAmps profiles", () => {
       handle,
       new PluginDbLogger(() => Promise.resolve(), logger),
     );
-    return { adapter, sent };
+    return { adapter, sent, startedWith };
   };
+
+  const kindsOf = (sent: unknown[]) =>
+    sent.map((entry) => {
+      const p = (entry as { payload: unknown }).payload as {
+        csChargingProfiles: {
+          chargingProfilePurpose: string;
+          chargingProfileKind: string;
+          chargingSchedule: { startSchedule?: string };
+        };
+      };
+      return {
+        purpose: p.csChargingProfiles.chargingProfilePurpose,
+        kind: p.csChargingProfiles.chargingProfileKind,
+        anchored: p.csChargingProfiles.chargingSchedule.startSchedule !==
+          undefined,
+      };
+    });
 
   // Flattens each profile to the parts the charger acts on.
   const summarise = (sent: unknown[]) =>
@@ -146,6 +167,27 @@ describe("OCPP adapter — setChargeAmps profiles", () => {
     expect(summarise(sent).map((p) => p.purpose)).toEqual([
       "ChargePointMaxProfile",
       "TxDefaultProfile",
+    ]);
+  });
+
+  it("passes the last requested amps into remoteStart so the limit rides inside RemoteStartTransaction", async () => {
+    const { adapter, startedWith } = harness(null);
+
+    await adapter.setChargeAmps(7, ctx);
+    await adapter.startCharging(ctx);
+
+    expect(startedWith).toEqual([7]);
+  });
+
+  it("uses Relative kind for transaction profiles and anchors the Absolute max profile", async () => {
+    const { adapter, sent } = harness(77);
+
+    await adapter.setChargeAmps(16, ctx);
+
+    expect(kindsOf(sent)).toEqual([
+      { purpose: "ChargePointMaxProfile", kind: "Absolute", anchored: true },
+      { purpose: "TxDefaultProfile", kind: "Relative", anchored: false },
+      { purpose: "TxProfile", kind: "Relative", anchored: false },
     ]);
   });
 

@@ -13,6 +13,7 @@ import {
   chargingProfilePayload,
   type ChargingProfileRequest,
   meterValuesReq,
+  remoteStartTxProfile,
   startTransactionReq,
   statusNotificationReq,
   stopTransactionReq,
@@ -64,7 +65,7 @@ function withCharger(
 // reach plugin-wide operations like pairing.
 export interface OcppChargerHandle {
   getData(): OcppLiveData;
-  remoteStart(): Promise<boolean>;
+  remoteStart(amps?: number): Promise<boolean>;
   remoteStop(): Promise<boolean>;
   setChargingProfiles(profiles: ChargingProfileRequest[]): Promise<boolean>;
   ping(): Promise<{ latencyMs: number }>;
@@ -176,7 +177,7 @@ export class OcppCentralSystem {
   forCharger(chargePointId: string): OcppChargerHandle {
     return {
       getData: () => this.getData(chargePointId),
-      remoteStart: () => this.remoteStart(chargePointId),
+      remoteStart: (amps) => this.remoteStart(chargePointId, amps),
       remoteStop: () => this.remoteStop(chargePointId),
       setChargingProfiles: (payloads) =>
         this.setChargingProfiles(chargePointId, payloads),
@@ -227,10 +228,13 @@ export class OcppCentralSystem {
     this.connections.clear();
   }
 
-  remoteStart(chargePointId: string): Promise<boolean> {
+  remoteStart(chargePointId: string, amps?: number): Promise<boolean> {
     return this.command(chargePointId, "RemoteStartTransaction", {
       connectorId: 1,
       idTag: "chargeha",
+      ...(amps !== undefined && {
+        chargingProfile: remoteStartTxProfile(amps),
+      }),
     });
   }
 

@@ -128,6 +128,29 @@ describe("OCPP command rejection detail", () => {
     );
   });
 
+  it("remoteStart with amps embeds a Relative TxProfile in the request", async () => {
+    const { cs, socket } = attached(CP);
+
+    const pending = settle(cs.remoteStart(CP, 9));
+    await tick();
+    const [frame] = callsTo(socket, "RemoteStartTransaction");
+    const req = frame[3] as {
+      chargingProfile: {
+        chargingProfilePurpose: string;
+        chargingProfileKind: string;
+        chargingSchedule: { chargingSchedulePeriod: { limit: number }[] };
+      };
+    };
+    expect(req.chargingProfile.chargingProfilePurpose).toBe("TxProfile");
+    expect(req.chargingProfile.chargingProfileKind).toBe("Relative");
+    expect(
+      req.chargingProfile.chargingSchedule.chargingSchedulePeriod[0].limit,
+    ).toBe(9);
+
+    await answer(socket, { status: "Accepted" });
+    expect(await pending).toBe("resolved");
+  });
+
   it("still resolves true when everything is accepted", async () => {
     const { cs, socket } = attached(CP);
 

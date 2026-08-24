@@ -66,6 +66,9 @@ export class OcppChargerAdapter implements ChargerAdapter {
   // the charger rejects the duplicates.
   private pendingCommand: { command: "start" | "stop"; at: number } | null =
     null;
+  // Carried into RemoteStartTransaction so the limit applies from the first
+  // second of the transaction, with no separate profile round trip to order.
+  private lastRequestedAmps: number | null = null;
 
   constructor(
     private readonly config: OcppAdapterConfig,
@@ -83,8 +86,8 @@ export class OcppChargerAdapter implements ChargerAdapter {
   }
 
   async startCharging(ctx: CallContext): Promise<boolean> {
-    this.command("info", "remoteStart", {}, ctx);
-    const ok = await this.cs.remoteStart();
+    this.command("info", "remoteStart", { amps: this.lastRequestedAmps }, ctx);
+    const ok = await this.cs.remoteStart(this.lastRequestedAmps ?? undefined);
     if (ok) this.pendingCommand = { command: "start", at: Date.now() };
     return ok;
   }
@@ -98,6 +101,7 @@ export class OcppChargerAdapter implements ChargerAdapter {
 
   // Three-tier profile per the HA-integration pattern.
   setChargeAmps(amps: number, ctx: CallContext): Promise<boolean> {
+    this.lastRequestedAmps = amps;
     const data = this.cs.getData();
     const tx = data.transactionId !== null && data.status !== null &&
         TX_PROFILE_STATUSES.has(data.status)
