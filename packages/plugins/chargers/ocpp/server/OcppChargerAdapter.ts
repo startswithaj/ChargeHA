@@ -20,7 +20,9 @@ const STATUS_MAP: Record<ChargePointStatus, ChargerStatus> = {
   // Reserved (RFID/app booking) = won't charge right now, not "ready" —
   // statusDetail carries the raw "Reserved" for the UI.
   Reserved: "suspended",
-  Unavailable: "faulted",
+  // Operator-disabled, not a fault — statusDetail carries the raw
+  // "Unavailable".
+  Unavailable: "suspended",
   Faulted: "faulted",
 };
 
@@ -185,12 +187,11 @@ export class OcppChargerAdapter implements ChargerAdapter {
     const graceMs = this.config.disconnectGraceSeconds * 1000;
     const socketDown = this.disconnectedSince !== null &&
       Date.now() - this.disconnectedSince >= graceMs;
-    const disconnected = socketDown || meterStale;
-    const status = resolveStatus(disconnected, data.status, charging);
+    const status = resolveStatus(socketDown, data.status, charging);
 
     return {
       chargerId: this.config.chargerId,
-      isCharging: !disconnected && charging,
+      isCharging: !socketDown && charging,
       isPluggedIn: resolvePluggedIn(data.status, charging),
       // Measurand fallback chain: power measurand → register-delta
       // derivation (both in OcppCentralSystem.readMeterValues) → current ×
@@ -205,7 +206,7 @@ export class OcppChargerAdapter implements ChargerAdapter {
       chargerPhases: this.config.phases,
       energyAddedKwh: sessionEnergyKwh(data),
       status,
-      statusDetail: statusDetail(data, disconnected),
+      statusDetail: statusDetail(data, socketDown, meterStale),
       controlMode: "amps",
       lastUpdated: data.lastUpdated,
     };
@@ -213,11 +214,13 @@ export class OcppChargerAdapter implements ChargerAdapter {
 }
 
 function resolveStatus(
-  disconnected: boolean,
+  socketDown: boolean,
   status: ChargePointStatus | null,
   charging: boolean,
 ): ChargerStatus {
-  if (disconnected) return "faulted";
+  // "unreachable", never "faulted": only the charger's own StatusNotification
+  // may claim a fault.
+  if (socketDown) return "unreachable";
   // A live session with no status yet is not "available" — that reads as
   // nothing plugged in while energy is flowing.
   if (status === null) return charging ? "charging" : "available";
@@ -267,9 +270,13 @@ function sessionEnergyKwh(data: OcppLiveData): number {
   return Math.max(0, data.energyRegisterWh - data.meterStartWh) / 1000;
 }
 
-function statusDetail(data: OcppLiveData, disconnected: boolean): string {
-  if (!data.connected) return "disconnected";
-  if (disconnected) return "stale (no MeterValues)";
+function statusDetail(
+  data: OcppLiveData,
+  socketDown: boolean,
+  meterStale: boolean,
+): string {
+  if (!data.connected || socketDown) return "disconnected";
+  if (meterStale) return "no recent meter data";
   if (data.status === null) return "connected, no status yet";
   return data.errorCode && data.errorCode !== "NoError"
     ? `${data.status} (${data.errorCode})`

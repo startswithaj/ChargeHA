@@ -80,7 +80,7 @@ describe("OCPP meter staleness", () => {
     expect(state.status).toBe("available");
   });
 
-  it("still faults when MeterValues go quiet mid-transaction", async () => {
+  it("keeps the charger-reported status when MeterValues go quiet mid-transaction — staleness is detail, not a fault", async () => {
     const adapter = adapterFor(liveData({
       transactionId: 42,
       lastMeterValuesAt: Date.now() - STALE_AGE_MS,
@@ -88,11 +88,11 @@ describe("OCPP meter staleness", () => {
 
     const state = await adapter.getChargerState(ctx);
 
-    expect(state.status).toBe("faulted");
-    expect(state.statusDetail).toContain("stale");
+    expect(state.status).toBe("charging");
+    expect(state.statusDetail).toBe("no recent meter data");
   });
 
-  it("still faults when the socket is down, transaction or not", async () => {
+  it("reports unreachable, not faulted, when the socket is down — the charger never said Faulted", async () => {
     const adapter = adapterFor(liveData({
       connected: false,
       transactionId: null,
@@ -101,7 +101,14 @@ describe("OCPP meter staleness", () => {
 
     const state = await adapter.getChargerState(ctx);
 
-    expect(state.status).toBe("faulted");
+    expect(state.status).toBe("unreachable");
+    expect(state.isCharging).toBe(false);
+  });
+
+  it("only maps faulted from the charger's own Faulted status", async () => {
+    const adapter = adapterFor(liveData({ status: "Faulted" }));
+
+    expect((await adapter.getChargerState(ctx)).status).toBe("faulted");
   });
 
   it("rides out a socket drop within the grace window without faulting", async () => {
@@ -118,6 +125,7 @@ describe("OCPP meter staleness", () => {
     const state = await adapter.getChargerState(ctx);
 
     expect(state.status).not.toBe("faulted");
+    expect(state.status).not.toBe("unreachable");
   });
 
   it("clears the MeterValues timestamp on StopTransaction", async () => {

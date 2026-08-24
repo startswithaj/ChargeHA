@@ -49,6 +49,7 @@ const STATUS_BADGE_COLORS: Record<
   faulted: "red",
   finishing: "gray",
   no_draw: "gray",
+  unreachable: "red",
   unconfigured: "red",
 };
 
@@ -97,6 +98,7 @@ export function NoDrawNotice(
 // Nothing will charge until someone intervenes: red card, warning icon.
 const ALARM_STATUSES = new Set<ChargerState["status"]>([
   "faulted",
+  "unreachable",
   "unconfigured",
 ]);
 

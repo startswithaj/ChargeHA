@@ -153,6 +153,9 @@ export type ChargerStatus =
   | "faulted"
   | "finishing"
   | "no_draw"
+  // Adapter cannot reach the device (socket down past grace). Distinct from
+  // faulted: the charger itself never reported a fault.
+  | "unreachable"
   // No adapter was ever created for this charging point — its config is
   // missing or was rejected. Nothing behind it to report on.
   | "unconfigured";
