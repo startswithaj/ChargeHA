@@ -399,24 +399,32 @@ export class ChargingPointManager {
       // Switch chargers never receive amp commands.
       const alreadyCommanded = entry.lastCommandedAmps === clamped &&
         state.isCharging;
+      let ampsOk = true;
       if (
         state.controlMode === "amps" && !alreadyCommanded &&
         state.chargeAmps !== clamped
       ) {
-        const ok = await entry.middleware.setChargeAmps(
+        ampsOk = await entry.middleware.setChargeAmps(
           clamped,
           { ...ctx, origin: `${ctx.origin}:set-amps` },
-        );
-        if (!ok) throw new Error(`setChargeAmps(${clamped}) rejected`);
+        ).catch(() => false);
       }
-      entry.lastCommandedAmps = clamped;
       if (!state.isCharging) {
         const ok = await entry.middleware.startCharging(
           { ...ctx, origin: `${ctx.origin}:start` },
         );
         if (!ok) throw new Error("startCharging rejected");
         this.logger.info(`Started ${id} at ${clamped}A`);
+        if (!ampsOk) {
+          this.logger.warn(
+            `setChargeAmps(${clamped}) rejected before start for ${id}; ` +
+              "limit rides in RemoteStartTransaction",
+          );
+        }
+      } else if (!ampsOk) {
+        throw new Error(`setChargeAmps(${clamped}) rejected`);
       }
+      entry.lastCommandedAmps = clamped;
       this.resetCommandBackoff(id);
       return { success: true };
     } catch (error) {

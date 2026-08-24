@@ -597,16 +597,50 @@ describe("ChargingPointManager", () => {
       expect(mw.startCalls).toHaveLength(0);
     });
 
+    it("still starts when the amp command fails and the charger is not charging", async () => {
+      await manager.addCharger(ROW);
+      const mw = middlewares.get(ROW.id);
+      assertExists(mw);
+
+      mw.setAmpsResult = false;
+      const result = await manager.startChargingAt(
+        ROW.id,
+        16,
+        CTX,
+        { ...STATE, isCharging: false, chargeAmps: 0 },
+      );
+
+      expect(result.success).toBe(true);
+      expect(mw.startCalls).toHaveLength(1);
+    });
+
+    it("fails when the amp command is rejected while already charging", async () => {
+      await manager.addCharger(ROW);
+      const mw = middlewares.get(ROW.id);
+      assertExists(mw);
+
+      mw.setAmpsResult = false;
+      const result = await manager.startChargingAt(
+        ROW.id,
+        20,
+        CTX,
+        { ...STATE, isCharging: true, chargeAmps: 16 },
+      );
+
+      expect(result.success).toBe(false);
+      expect(mw.startCalls).toHaveLength(0);
+    });
+
     it("applies command backoff on failure, bypassed by force", async () => {
       await manager.addCharger(ROW);
       const mw = middlewares.get(ROW.id);
       assertExists(mw);
       const startState = { ...STATE, isCharging: false, chargeAmps: 0 };
 
-      mw.setAmpsResult = false;
+      mw.startResult = false;
       await manager.startChargingAt(ROW.id, 16, CTX, startState);
 
-      mw.setAmpsResult = true;
+      mw.startResult = true;
       const blocked = await manager.startChargingAt(
         ROW.id,
         16,
