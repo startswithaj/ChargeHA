@@ -12,6 +12,7 @@
     "./simulation": "./simulation/mod.ts",
     "./engine": "./engine/mod.ts",
     "./solarPreview": "./solarPreview.ts",
+    "./timezone": "./timezone.ts",
     "./async": "./async.ts",
     "./chargingPoints": "./chargingPoints.ts",
     "./geo": "./geo.ts",
