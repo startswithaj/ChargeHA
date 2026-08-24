@@ -8,6 +8,13 @@ import {
   parseTimeToMinutes,
 } from "../lib/Tariffs.ts";
 import type { Logger } from "../lib/Logger.ts";
+import { offsetHoursAt } from "../db/repositories/sqliteHelpers.ts";
+import { localDateStr } from "@chargeha/shared/timezone";
+
+function nextLocalDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+}
 
 const DAY_ABBRS: DayOfWeek[] = [
   "sun",
@@ -301,6 +308,7 @@ export class TariffService {
       periods,
       defaultRate,
       currentRate,
+      timezone,
     );
 
     return {
@@ -431,6 +439,7 @@ export class TariffService {
     tariffPeriods: import("../db/types.ts").TariffPeriodRow[],
     defaultRate: number,
     currentRate: number,
+    timezone: string,
   ): { ratePerKwh: number; label: string; startsAt: string } | null {
     const enabled = tariffPeriods.filter((p) => p.enabled);
 
@@ -527,8 +536,14 @@ export class TariffService {
       );
       const rate = period?.ratePerKwh ?? defaultRate;
       const label = period?.label ?? "Default";
+      const todayLocal = localDateStr(now, timezone || "UTC");
+      const targetDate = found.checkDay === currentDayAbbr
+        ? todayLocal
+        : nextLocalDate(todayLocal);
+      const [y, m, d] = targetDate.split("-").map(Number);
       const startsAt = new Date(
-        now.getTime() + found.minutesFromNow * 60_000,
+        Date.UTC(y, m - 1, d) + found.checkMinutes * 60_000 -
+          offsetHoursAt(timezone || "UTC", targetDate) * 3_600_000,
       ).toISOString();
       return { ratePerKwh: rate, label, startsAt };
     }
