@@ -1,10 +1,10 @@
+import { describe, it } from "@std/testing/bdd";
+import { expect } from "@std/expect";
+import { attached, fakeSocket } from "./test-helpers/ocppHarness.ts";
 // A CALL we sent is parked on the charger's answer. When that socket goes
 // away — reconnect, disconnect, shutdown, or a cancelled pairing window — the
 // answer can never arrive, so the caller must be failed rather than left to
 // time out 30s later on OcppFraming's CALL_TIMEOUT_MS.
-import { describe, it } from "@std/testing/bdd";
-import { expect } from "@std/expect";
-import { attached, fakeSocket } from "./test-helpers/ocppHarness.ts";
 
 describe("OCPP connection lifecycle", () => {
   const CP = "ABB-83214";
