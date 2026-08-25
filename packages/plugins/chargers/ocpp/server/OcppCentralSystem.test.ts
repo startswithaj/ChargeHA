@@ -461,7 +461,8 @@ describe("OCPP connection recovery", () => {
     await tick();
     await answer(socket, { status: "Accepted" });
 
-    const outgoing = socket.sent.filter((f) => f[0] === 2).at(-1)!;
+    const outgoing = socket.sent.filter((f) => f[0] === 2).at(-1);
+    if (outgoing === undefined) throw new Error("no outgoing CALL to refuse");
     socket.onmessage({
       data: JSON.stringify([4, outgoing[1], "NotImplemented", "", {}]),
     });

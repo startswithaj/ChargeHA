@@ -102,11 +102,7 @@ export class OcppChargerAdapter implements ChargerAdapter {
   // Three-tier profile per the HA-integration pattern.
   setChargeAmps(amps: number, ctx: CallContext): Promise<boolean> {
     this.lastRequestedAmps = amps;
-    const data = this.cs.getData();
-    const tx = data.transactionId !== null && data.status !== null &&
-        TX_PROFILE_STATUSES.has(data.status)
-      ? data.transactionId
-      : undefined;
+    const tx = liveTransactionId(this.cs.getData());
     this.command("debug", "setChargeAmps", {
       amps,
       transactionId: tx ?? null,
@@ -215,6 +211,11 @@ export class OcppChargerAdapter implements ChargerAdapter {
       lastUpdated: data.lastUpdated,
     };
   }
+}
+
+function liveTransactionId(data: OcppLiveData): number | undefined {
+  if (data.transactionId === null || data.status === null) return undefined;
+  return TX_PROFILE_STATUSES.has(data.status) ? data.transactionId : undefined;
 }
 
 function resolveStatus(

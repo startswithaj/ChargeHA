@@ -298,12 +298,13 @@ export class OcppCentralSystem {
     chargePointId: string,
     profiles: ChargingProfileRequest[],
   ): Promise<boolean> {
-    const results: unknown[] = [];
-    for (const p of profiles) {
-      results.push(
-        await this.send(chargePointId, "SetChargingProfile", p.payload),
-      );
-    }
+    // Wire order is preserved: OcppConnection.send chains outgoing CALLs, so
+    // mapping without awaiting each still yields one CALL at a time.
+    const results = await Promise.all(
+      profiles.map((p) =>
+        this.send(chargePointId, "SetChargingProfile", p.payload)
+      ),
+    );
     const rejected = profiles.filter((_, i) => !isAccepted(results[i]));
     // A rejected TxProfile is advisory when the authoritative tiers landed:
     // ChargePointMax + TxDefault already steer the charger.
@@ -331,35 +332,29 @@ export class OcppCentralSystem {
   // transaction, wipe stored profiles (including a standing 0A clamp), and
   // ask the charger to restate the truth.
   async recoverConnection(chargePointId: string): Promise<string[]> {
-    const steps: string[] = [];
     this.patch(chargePointId, {
       transactionId: null,
       meterStartWh: null,
       lastMeterValuesAt: null,
     });
-    steps.push("cleared cached transaction state");
     // Best-effort per step: TriggerMessage is an optional feature profile and
     // a NotImplemented reply must not abort the rest of the recovery.
-    for (
-      const [label, action, payload] of [
-        ["cleared charging profiles", "ClearChargingProfile", {}],
-        ["requested status", "TriggerMessage", {
-          requestedMessage: "StatusNotification",
-          connectorId: 1,
-        }],
-        ["requested meter values", "TriggerMessage", {
-          requestedMessage: "MeterValues",
-          connectorId: 1,
-        }],
-      ] as const
-    ) {
-      try {
-        const res = await this.send(chargePointId, action, payload);
-        steps.push(`${label}: ${resultStatus(res)}`);
-      } catch (error) {
-        steps.push(`${label}: failed (${error})`);
-      }
-    }
+    const attempt = (label: string, action: string, payload: unknown) =>
+      this.send(chargePointId, action, payload)
+        .then((res) => `${label}: ${resultStatus(res)}`)
+        .catch((error) => `${label}: failed (${error})`);
+    const steps = [
+      "cleared cached transaction state",
+      await attempt("cleared charging profiles", "ClearChargingProfile", {}),
+      await attempt("requested status", "TriggerMessage", {
+        requestedMessage: "StatusNotification",
+        connectorId: 1,
+      }),
+      await attempt("requested meter values", "TriggerMessage", {
+        requestedMessage: "MeterValues",
+        connectorId: 1,
+      }),
+    ];
     this.dbLog.info(`Connection recovery (${chargePointId})`, {
       payload: { chargePointId, steps },
     });

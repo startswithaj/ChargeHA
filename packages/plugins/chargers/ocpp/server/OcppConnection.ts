@@ -87,14 +87,22 @@ export class OcppConnection {
     // visible to callers) before any await.
     const result = this.outbound === null
       ? this.dispatch(action, payload)
-      : this.outbound.catch(() => {}).then(() =>
-        this.dispatch(action, payload)
-      );
-    const tail: Promise<void> = result.catch(() => {}).then(() => {
+      : this.afterOutbound(action, payload);
+    // A predecessor's failure is already delivered to its own caller via
+    // `result`; the chain only needs to know the slot freed up.
+    const tail: Promise<void> = result.catch(() => null).then(() => {
       if (this.outbound === tail) this.outbound = null;
     });
     this.outbound = tail;
     return result;
+  }
+
+  private async afterOutbound(
+    action: string,
+    payload: unknown,
+  ): Promise<unknown> {
+    await this.outbound?.catch(() => null);
+    return await this.dispatch(action, payload);
   }
 
   private async dispatch(action: string, payload: unknown): Promise<unknown> {

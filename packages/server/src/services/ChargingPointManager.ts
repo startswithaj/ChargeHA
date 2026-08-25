@@ -399,16 +399,13 @@ export class ChargingPointManager {
       // Switch chargers never receive amp commands.
       const alreadyCommanded = entry.lastCommandedAmps === clamped &&
         state.isCharging;
-      let ampsOk = true;
-      if (
-        state.controlMode === "amps" && !alreadyCommanded &&
-        state.chargeAmps !== clamped
-      ) {
-        ampsOk = await entry.middleware.setChargeAmps(
+      const ampsNeeded = state.controlMode === "amps" && !alreadyCommanded &&
+        state.chargeAmps !== clamped;
+      const ampsOk = !ampsNeeded ||
+        await entry.middleware.setChargeAmps(
           clamped,
           { ...ctx, origin: `${ctx.origin}:set-amps` },
         ).catch(() => false);
-      }
       if (!state.isCharging) {
         const ok = await entry.middleware.startCharging(
           { ...ctx, origin: `${ctx.origin}:start` },
