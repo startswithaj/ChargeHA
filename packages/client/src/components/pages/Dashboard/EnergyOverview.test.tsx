@@ -72,6 +72,6 @@ describe("EnergyOverview day boundary", () => {
     );
 
     const input = vi.mocked(trpc.stats.day.useQuery).mock.calls[0][0];
-    expect(input.date).toBe("2026-01-16");
+    expect(input).toEqual({ date: "2026-01-16" });
   });
 });

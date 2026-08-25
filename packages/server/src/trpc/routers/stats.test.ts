@@ -119,12 +119,6 @@ describe("Stats tRPC Router", () => {
       expect(data.energyBuckets).toHaveLength(96);
     });
 
-    it("applies timezone offset", async () => {
-      const data = await caller.stats.day({ date: "2026-03-01", tz: 11 });
-
-      expect(data.buckets).toHaveLength(24);
-    });
-
     it("includes summary totals", async () => {
       const data = await caller.stats.day({ date: "2026-03-01" });
 
