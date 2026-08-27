@@ -197,7 +197,12 @@ export class OcppChargerAdapter implements ChargerAdapter {
     const graceMs = this.config.disconnectGraceSeconds * 1000;
     const socketDown = this.disconnectedSince !== null &&
       Date.now() - this.disconnectedSince >= graceMs;
-    const status = resolveStatus(socketDown, data.status, charging);
+    const status = resolveStatus(
+      data.connected,
+      socketDown,
+      data.status,
+      charging,
+    );
 
     return {
       chargerId: this.config.chargerId,
@@ -229,6 +234,7 @@ function liveTransactionId(data: OcppLiveData): number | undefined {
 }
 
 function resolveStatus(
+  connected: boolean,
   socketDown: boolean,
   status: ChargePointStatus | null,
   charging: boolean,
@@ -236,6 +242,9 @@ function resolveStatus(
   // "unreachable", never "faulted": only the charger's own StatusNotification
   // may claim a fault.
   if (socketDown) return "unreachable";
+  // Down but within grace: the card must never claim a healthy status while
+  // the socket is dead.
+  if (!connected) return "reconnecting";
   // A live session with no status yet is not "available" — that reads as
   // nothing plugged in while energy is flowing.
   if (status === null) return charging ? "charging" : "available";

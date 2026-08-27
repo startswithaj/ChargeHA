@@ -8,6 +8,7 @@ export const CHARGER_STATUS_LABELS: Record<ChargerStatus, string> = {
   faulted: "Fault",
   finishing: "Finishing",
   no_draw: "No draw",
+  reconnecting: "Reconnecting…",
   unreachable: "Unreachable",
   unconfigured: "Setup needed",
 };

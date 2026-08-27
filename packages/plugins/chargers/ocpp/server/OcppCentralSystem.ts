@@ -83,6 +83,11 @@ export class OcppCentralSystem {
   // Separate from `knocking`: every retry refreshes that one, so rate-limiting
   // on it would log a given id exactly once, ever.
   private lastLogged: ChargerStamp | null = null;
+  // Health checks need "down since when", which must survive the connection
+  // object being destroyed. Never-connected ids fall back to process start so
+  // a charger that never dialled in still surfaces after the grace.
+  private readonly startedAt = Date.now();
+  private readonly disconnectedAt = new Map<string, number>();
   // Not per connection: the reconnect it must survive destroys that object.
   private readonly negotiator: OcppMeasurandNegotiator;
   private readonly maxAmpsDetector: OcppMaxAmpsDetector;
@@ -166,6 +171,7 @@ export class OcppCentralSystem {
     // once the new entry is in the map, so this is the last chance to fail the
     // replaced connection's callers.
     this.connections.get(id)?.close("Charger reconnected");
+    this.disconnectedAt.delete(id);
     const connection = new OcppConnection(socket, id, this.logger, this.dbLog);
     this.connections.set(id, connection);
     // deno-lint-ignore custom-no-param-mutation/no-param-mutation -- WebSocket handler wiring
@@ -480,6 +486,13 @@ export class OcppCentralSystem {
     await this.maxAmpsDetector.detect(chargePointId);
   }
 
+  // Milliseconds this id has been without a socket; null while connected.
+  disconnectedForMs(chargePointId: string): number | null {
+    if (this.getData(chargePointId).connected) return null;
+    return Date.now() -
+      (this.disconnectedAt.get(chargePointId) ?? this.startedAt);
+  }
+
   detectedMaxAmps(chargePointId: string): number | null {
     return this.maxAmpsDetector.detectedMaxAmps(chargePointId);
   }
@@ -675,6 +688,7 @@ export class OcppCentralSystem {
     if (connection === undefined || connection.socket !== socket) return;
     connection.close("Charger disconnected");
     this.connections.delete(chargePointId);
+    this.disconnectedAt.set(chargePointId, Date.now());
     this.logger.warn(`Charger ${chargePointId} disconnected`);
     this.dbLog.warn(`Charger ${chargePointId} disconnected`, {
       payload: { chargePointId },

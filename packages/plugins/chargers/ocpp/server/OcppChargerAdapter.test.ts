@@ -306,11 +306,11 @@ describe("OCPP meter staleness", () => {
     expect((await adapter.getChargerState(ctx)).status).toBe("faulted");
   });
 
-  it("rides out a socket drop within the grace window without faulting", async () => {
+  it("reports reconnecting, never a healthy status, during the disconnect grace window", async () => {
     const adapter = adapterFor(
       liveData({
         connected: false,
-        status: null,
+        status: "Available",
         transactionId: null,
         lastMeterValuesAt: null,
       }),
@@ -319,8 +319,7 @@ describe("OCPP meter staleness", () => {
 
     const state = await adapter.getChargerState(ctx);
 
-    expect(state.status).not.toBe("faulted");
-    expect(state.status).not.toBe("unreachable");
+    expect(state.status).toBe("reconnecting");
   });
 
   it("clears the MeterValues timestamp on StopTransaction", async () => {

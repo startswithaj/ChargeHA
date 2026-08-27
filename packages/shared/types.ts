@@ -153,6 +153,9 @@ export type ChargerStatus =
   | "faulted"
   | "finishing"
   | "no_draw"
+  // Device connection just dropped; routine blips self-heal within the
+  // disconnect grace, so this stays calm rather than alarming.
+  | "reconnecting"
   // Adapter cannot reach the device (socket down past grace). Distinct from
   // faulted: the charger itself never reported a fault.
   | "unreachable"

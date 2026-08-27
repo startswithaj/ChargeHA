@@ -51,9 +51,19 @@ describe("OCPP charger plugin", () => {
           log,
           dbLog,
           resolveChargerConfigs: () =>
+            // Zero grace so the check reports immediately — the grace window
+            // itself is covered by the disconnectedForMs tests.
             Promise.resolve([
-              { row: rowA, config: { charger_id: "cp-a" }, secrets: {} },
-              { row: rowB, config: { charger_id: "cp-b" }, secrets: {} },
+              {
+                row: rowA,
+                config: { charger_id: "cp-a", disconnect_grace_seconds: "0" },
+                secrets: {},
+              },
+              {
+                row: rowB,
+                config: { charger_id: "cp-b", disconnect_grace_seconds: "0" },
+                secrets: {},
+              },
             ] as ResolvedChargerRow[]),
         }),
       );
