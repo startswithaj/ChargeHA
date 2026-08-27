@@ -97,6 +97,10 @@ export class PluginDependencies<K extends string = string> {
     return this.db.getPluginConfig(`${this.prefix}${key}`);
   }
 
+  async getTimezone(): Promise<string> {
+    return (await this.db.getConfig("timezone")) || "UTC";
+  }
+
   setConfig(key: K, value: string | null): Promise<void> {
     return this.db.setPluginConfig(`${this.prefix}${key}`, value);
   }

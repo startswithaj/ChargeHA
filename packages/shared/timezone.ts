@@ -1,4 +1,4 @@
-function zonedParts(instant: Date, timezone: string) {
+export function zonedParts(instant: Date, timezone: string) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
     year: "numeric",

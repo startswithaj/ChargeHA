@@ -32,6 +32,7 @@ export class SimulatedEnergyPlugin implements EnergyPlugin {
       sunrise: parseFloat(await this.deps.getConfig("sunrise") ?? "6.5"),
       sunset: parseFloat(await this.deps.getConfig("sunset") ?? "18"),
       seed: parseInt(await this.deps.getConfig("seed") ?? "69", 10),
+      timezone: await this.deps.getTimezone(),
     }, this.deps.log);
   }
 

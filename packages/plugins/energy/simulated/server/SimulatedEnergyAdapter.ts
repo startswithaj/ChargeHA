@@ -6,11 +6,12 @@ import type {
 import type { EnergyReading, SolarConfig } from "@chargeha/shared/simulation";
 import { generateSolarDay } from "@chargeha/shared/simulation";
 import type { Logger } from "@chargeha/server/lib/Logger";
+import { localDateStr, zonedParts } from "@chargeha/shared/timezone";
 
 const GRID_VOLTAGE_V = 230;
 
 /** Solar knobs matching the Simulator page. `seed` is the base seed. */
-export type SimulatedEnergyOptions = SolarConfig;
+export type SimulatedEnergyOptions = SolarConfig & { timezone: string };
 
 /**
  * Produces a realistic solar/home/grid curve from the shared solar simulator.
@@ -80,16 +81,18 @@ export class SimulatedEnergyAdapter implements EnergySourceAdapter {
 
   /** Stable per-local-day key, e.g. "2026-6-3". */
   private dayKey(d: Date): string {
-    return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    return localDateStr(d, this.options.timezone);
   }
 
   /** Per-day seed offset so each local day produces a distinct curve. */
   private dayOffset(d: Date): number {
-    return (d.getFullYear() * 1000) + (d.getMonth() + 1) * 31 + d.getDate();
+    const { year, month, day } = zonedParts(d, this.options.timezone);
+    return (year * 1000) + month * 31 + day;
   }
 
   private minuteOfDay(d: Date): number {
-    return d.getHours() * 60 + d.getMinutes();
+    const { hour, minute } = zonedParts(d, this.options.timezone);
+    return hour * 60 + minute;
   }
 
   /** Regenerate the solar curve if the local day changed. */
