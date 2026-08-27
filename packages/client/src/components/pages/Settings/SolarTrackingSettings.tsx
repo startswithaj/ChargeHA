@@ -252,8 +252,8 @@ function SolarHardwareRows(
   return (
     <>
       <SettingsRow
-        label="Grid voltage"
-        help="Your region's nominal mains voltage. Used to convert available solar watts to charging amps."
+        label="Charger circuit voltage"
+        help="Voltage of the circuit your EV charger is on — in North America home EV charging is usually 240V, not 120V. Used to convert available solar watts to charging amps when no live reading is available."
       >
         <Select.Root
           size="2"
@@ -262,9 +262,15 @@ function SolarHardwareRows(
         >
           <Select.Trigger />
           <Select.Content>
-            <Select.Item value="230">230V</Select.Item>
-            <Select.Item value="240">240V</Select.Item>
-            <Select.Item value="120">120V</Select.Item>
+            <Select.Item value="230">
+              230V (Europe, Asia, Africa, Australia)
+            </Select.Item>
+            <Select.Item value="240">
+              240V (North America — home EV charging)
+            </Select.Item>
+            <Select.Item value="120">
+              120V (North America standard outlet, Japan)
+            </Select.Item>
           </Select.Content>
         </Select.Root>
       </SettingsRow>
