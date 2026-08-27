@@ -401,11 +401,12 @@ export class ChargingPointManager {
         state.isCharging;
       const ampsNeeded = state.controlMode === "amps" && !alreadyCommanded &&
         state.chargeAmps !== clamped;
-      const ampsOk = !ampsNeeded ||
-        await entry.middleware.setChargeAmps(
+      const sendAmps = () =>
+        entry.middleware.setChargeAmps(
           clamped,
           { ...ctx, origin: `${ctx.origin}:set-amps` },
         ).catch(() => false);
+      const ampsOk = !ampsNeeded || await sendAmps();
       if (!state.isCharging) {
         const ok = await entry.middleware.startCharging(
           { ...ctx, origin: `${ctx.origin}:start` },
@@ -839,8 +840,35 @@ export class ChargingPointManager {
         vehicleResolution: resolution.kind,
         controlOwner: controlPath.owner,
         passiveForVehicleId: controlPath.passiveForVehicleId,
+        supportsRecovery: this.chargers.get(row.id)?.middleware
+          .supportsRecovery() ?? false,
       };
     }));
+  }
+
+  async recoverCharger(
+    id: string,
+    ctx: CallContext,
+  ): Promise<{ steps: string[] } | { error: string }> {
+    const entry = this.chargers.get(id);
+    if (!entry) return { error: "Charger not registered" };
+    const steps = await entry.middleware.recoverConnection(ctx);
+    if (steps === null) return { error: "Not supported by this charger" };
+    // Repeated failures build up a long retry delay. Recovery means the user
+    // has fixed the problem, so the next command should run immediately.
+    this.resetCommandBackoff(id);
+    return { steps };
+  }
+
+  async softResetCharger(
+    id: string,
+    ctx: CallContext,
+  ): Promise<{ accepted: boolean } | { error: string }> {
+    const entry = this.chargers.get(id);
+    if (!entry) return { error: "Charger not registered" };
+    const accepted = await entry.middleware.softReset(ctx);
+    if (accepted === null) return { error: "Not supported by this charger" };
+    return { accepted };
   }
 
   isBackedOff(id: string): { backedOff: boolean; remainingMs: number } {

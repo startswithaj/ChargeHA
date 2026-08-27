@@ -96,6 +96,7 @@ export const smartCharger: ChargerWithState = {
   vehicleResolution: "linked",
   controlOwner: "self",
   passiveForVehicleId: null,
+  supportsRecovery: false,
 };
 
 export const apiCharger: ChargerWithState = {

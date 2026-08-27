@@ -186,6 +186,43 @@ export function ChargerCardSection() {
           resolvedVehicleName={null}
         />
       </StackedSpecimen>
+      <StackedSpecimen label="unreachable">
+        <ChargerCard
+          id="chg-5"
+          name="Driveway"
+          mode="auto"
+          state={{
+            ...chargerCardState,
+            status: "unreachable",
+            statusDetail: "disconnected",
+            isCharging: false,
+          }}
+          solarW={0}
+          gridW={0}
+          controllerDetail={null}
+          vehicleResolution="none"
+          resolvedVehicleName={null}
+        />
+      </StackedSpecimen>
+      <StackedSpecimen label="faulted + recovery">
+        <ChargerCard
+          id="chg-6"
+          name="Driveway"
+          mode="auto"
+          state={{
+            ...chargerCardState,
+            status: "faulted",
+            statusDetail: "Faulted (OtherError)",
+            isCharging: false,
+          }}
+          solarW={0}
+          gridW={0}
+          controllerDetail={null}
+          vehicleResolution="none"
+          resolvedVehicleName={null}
+          supportsRecovery
+        />
+      </StackedSpecimen>
     </GallerySection>
   );
 }

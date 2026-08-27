@@ -268,3 +268,42 @@ describe("PollingChargerMiddleware", () => {
     });
   });
 });
+
+class RecoverableAdapter extends StubChargerAdapter {
+  recoverConnection(_ctx: CallContext): Promise<string[]> {
+    return Promise.resolve(["cleared", "resynced"]);
+  }
+
+  softReset(_ctx: CallContext): Promise<boolean> {
+    return Promise.resolve(true);
+  }
+}
+
+describe("PollingChargerMiddleware recovery passthrough", () => {
+  const ctx: CallContext = { origin: "test", traceId: "test-trace" };
+
+  it("reports support and passes recovery calls through", async () => {
+    const middleware = new PollingChargerMiddleware(
+      new RecoverableAdapter(null),
+      new SpyLogger(),
+    );
+
+    expect(middleware.supportsRecovery()).toBe(true);
+    expect(await middleware.recoverConnection(ctx)).toEqual([
+      "cleared",
+      "resynced",
+    ]);
+    expect(await middleware.softReset(ctx)).toBe(true);
+  });
+
+  it("reports no support and returns null for a plain adapter", async () => {
+    const middleware = new PollingChargerMiddleware(
+      new StubChargerAdapter(null),
+      new SpyLogger(),
+    );
+
+    expect(middleware.supportsRecovery()).toBe(false);
+    expect(await middleware.recoverConnection(ctx)).toBeNull();
+    expect(await middleware.softReset(ctx)).toBeNull();
+  });
+});

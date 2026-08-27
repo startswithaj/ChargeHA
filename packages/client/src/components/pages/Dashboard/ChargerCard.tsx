@@ -1,4 +1,4 @@
-import { Badge, Button, Card, Link, Text } from "@radix-ui/themes";
+import { Badge, Button, Card, Flex, Link, Text } from "@radix-ui/themes";
 import {
   Activity,
   ArrowUpDown,
@@ -6,6 +6,8 @@ import {
   Car,
   Plug,
   PlugZap,
+  Power,
+  RefreshCw,
   Settings,
   Sun,
   TriangleAlert,
@@ -24,7 +26,11 @@ import type {
 // vehicle_api row, because that row IS the car's own API.
 type ControlOwner = "self" | "vehicle_api";
 import { ampsRange, kwhValue, kwValue } from "../../../utils/Format.ts";
-import { useChargerCommands } from "../../../hooks/useChargers.ts";
+import {
+  type ChargerRecoveryOutcome,
+  useChargerCommands,
+  useChargerRecovery,
+} from "../../../hooks/useChargers.ts";
 import {
   ControllerReasonRow,
   isVisibleReason,
@@ -34,6 +40,7 @@ import {
   revealSettingsSection,
 } from "../../../lib/settingsAnchors.ts";
 import { CHARGER_STATUS_LABELS } from "../../../lib/chargerLabels.ts";
+import { FormError } from "../../ui/FormError.tsx";
 import { Spinner } from "../../ui/Spinner.tsx";
 import { WaitingBars } from "../../ui/WaitingBars.tsx";
 import layout from "../../ui/CardLayout.module.css";
@@ -49,6 +56,7 @@ const STATUS_BADGE_COLORS: Record<
   faulted: "red",
   finishing: "gray",
   no_draw: "gray",
+  reconnecting: "gray",
   unreachable: "red",
   unconfigured: "red",
 };
@@ -201,6 +209,63 @@ function vehicleLine(
     : `Controlled by ${passiveForVehicleName}`;
 }
 
+// Shown only while the charger needs attention and its adapter can act.
+function RecoveryActions({ id }: { id: string }) {
+  const recovery = useChargerRecovery(id);
+  const recoverError = recovery.recoverError ??
+    outcomeError(recovery.recoverOutcome);
+  const resetError = recovery.softResetError ??
+    outcomeError(recovery.softResetOutcome);
+  const recoverText = recoverError
+    ? null
+    : recoveryOutcome(recovery.recoverOutcome);
+  const resetText = resetError
+    ? null
+    : recoveryOutcome(recovery.softResetOutcome);
+  return (
+    <Flex direction="column" gap="2" mt="1">
+      <Text size="1" color="gray">
+        Charger not responding? Try recovering the connection; soft reset
+        reboots the charger remotely.
+      </Text>
+      <Flex gap="2">
+        <Button
+          size="1"
+          variant="soft"
+          disabled={recovery.recoverPending}
+          onClick={recovery.recover}
+        >
+          <RefreshCw size={14} />
+          Recover connection
+        </Button>
+        <Button
+          size="1"
+          variant="soft"
+          color="amber"
+          disabled={recovery.softResetPending}
+          onClick={recovery.softReset}
+        >
+          <Power size={14} />
+          Soft reset charger
+        </Button>
+      </Flex>
+      {recoverText && <Text size="1" color="gray">{recoverText}</Text>}
+      {resetText && <Text size="1" color="gray">{resetText}</Text>}
+      <FormError message={recoverError ?? resetError} />
+    </Flex>
+  );
+}
+
+function outcomeError(data: ChargerRecoveryOutcome): string | null {
+  return data !== undefined && "error" in data ? data.error : null;
+}
+
+function recoveryOutcome(data: ChargerRecoveryOutcome): string | null {
+  if (data === undefined || "error" in data) return null;
+  if ("steps" in data) return data.steps.join(" · ");
+  return data.accepted ? "Reset accepted" : "Reset rejected";
+}
+
 // Only rendered for a charger deciding for itself. A passive one would
 // ignore these — that car's own card is where its commands land.
 function ModeToggle(
@@ -267,6 +332,7 @@ export function ChargerCard(
     onNavigateSettings,
     controlOwner = "self",
     passiveForVehicleName = null,
+    supportsRecovery = false,
   }: {
     id: string;
     name: string;
@@ -297,6 +363,9 @@ export function ChargerCard(
     controlOwner?: ControlOwner;
     // The self-driving car a passive charger is passing current to.
     passiveForVehicleName?: string | null;
+    // Whether the adapter offers recoverConnection/softReset; decides if the
+    // recovery actions appear in attention states.
+    supportsRecovery?: boolean;
   },
 ) {
   const { commandPending, changeMode } = useChargerCommands(id);
@@ -394,6 +463,14 @@ export function ChargerCard(
           <DetailRow icon={Activity}>{controllerDetail}</DetailRow>
         )}
         <DeviceStatusRow state={state} />
+        {state?.status === "unreachable" && (
+          <DetailRow icon={TriangleAlert} color="red">
+            ChargeHA can't reach the charger — check its power and network
+          </DetailRow>
+        )}
+        {state?.status === "faulted" && supportsRecovery && (
+          <RecoveryActions id={id} />
+        )}
       </div>
     </Card>
   );

@@ -35,6 +35,11 @@ export class OcppChargerPlugin implements ChargerPlugin {
       deps.dbLog,
       (chargePointId) =>
         this.rowForChargePoint(chargePointId).then((entry) => entry !== null),
+      (chargePointId) => {
+        void this.rowForChargePoint(chargePointId).then((entry) => {
+          if (entry !== null) deps.refreshChargerState(entry.row.id);
+        });
+      },
     );
     deps.log.info("OCPP plugin initialized");
   }
@@ -126,7 +131,12 @@ export class OcppChargerPlugin implements ChargerPlugin {
   // Every OCPP row that has a charge point id. A row without one is
   // unconfigured and stays silent in every check.
   private async configuredPoints(): Promise<
-    Array<{ name: string; chargePointId: string; maxAmps: number }>
+    Array<{
+      name: string;
+      chargePointId: string;
+      maxAmps: number;
+      graceSeconds: number;
+    }>
   > {
     const entries = await this.deps.resolveChargerConfigs();
     return entries
@@ -134,9 +144,10 @@ export class OcppChargerPlugin implements ChargerPlugin {
         name: e.row.name,
         chargePointId: e.config.charger_id,
         maxAmps: intConfig(e.config.max_amps, 32),
+        graceSeconds: intConfig(e.config.disconnect_grace_seconds, 120),
       }))
       .filter(
-        (p): p is { name: string; chargePointId: string; maxAmps: number } =>
+        (p): p is typeof p & { chargePointId: string } =>
           p.chargePointId !== undefined,
       );
   }
@@ -151,8 +162,15 @@ export class OcppChargerPlugin implements ChargerPlugin {
         "The charger is not connected to ChargeHA. Check the charger's OCPP " +
         "server URL and network connection.",
       run: async () => {
+        // Same grace as the card's "reconnecting" window, so the banner and
+        // the card go loud at the same moment rather than contradicting.
         const disconnected = (await this.configuredPoints())
-          .filter((p) => !this.centralSystem.getData(p.chargePointId).connected)
+          .filter((p) => {
+            const downMs = this.centralSystem.disconnectedForMs(
+              p.chargePointId,
+            );
+            return downMs !== null && downMs >= p.graceSeconds * 1000;
+          })
           .map((p) => p.name);
         if (disconnected.length === 0) return { status: "ok" };
         return {

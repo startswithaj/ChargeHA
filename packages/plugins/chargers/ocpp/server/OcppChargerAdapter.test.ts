@@ -64,6 +64,8 @@ describe("OCPP adapter — setChargeAmps profiles", () => {
         sent.push(...profiles);
         return Promise.resolve(accept);
       },
+      recoverConnection: () => Promise.resolve([]),
+      softReset: () => Promise.resolve(true),
       ping: () => Promise.resolve({ latencyMs: 1 }),
     };
     const logger = new Logger("OcppTest", "error");
@@ -230,6 +232,8 @@ describe("OCPP meter staleness", () => {
       remoteStart: () => Promise.resolve(true),
       remoteStop: () => Promise.resolve(true),
       setChargingProfiles: () => Promise.resolve(true),
+      recoverConnection: () => Promise.resolve([]),
+      softReset: () => Promise.resolve(true),
       ping: () => Promise.resolve({ latencyMs: 1 }),
     };
     return new OcppChargerAdapter(
@@ -302,11 +306,11 @@ describe("OCPP meter staleness", () => {
     expect((await adapter.getChargerState(ctx)).status).toBe("faulted");
   });
 
-  it("rides out a socket drop within the grace window without faulting", async () => {
+  it("reports reconnecting, never a healthy status, during the disconnect grace window", async () => {
     const adapter = adapterFor(
       liveData({
         connected: false,
-        status: null,
+        status: "Available",
         transactionId: null,
         lastMeterValuesAt: null,
       }),
@@ -315,8 +319,7 @@ describe("OCPP meter staleness", () => {
 
     const state = await adapter.getChargerState(ctx);
 
-    expect(state.status).not.toBe("faulted");
-    expect(state.status).not.toBe("unreachable");
+    expect(state.status).toBe("reconnecting");
   });
 
   it("clears the MeterValues timestamp on StopTransaction", async () => {
@@ -384,6 +387,8 @@ describe("OCPP command confirmation window", () => {
         return Promise.resolve(true);
       },
       setChargingProfiles: () => Promise.resolve(true),
+      recoverConnection: () => Promise.resolve([]),
+      softReset: () => Promise.resolve(true),
       ping: () => Promise.resolve({ latencyMs: 1 }),
     };
     const adapter = new OcppChargerAdapter(

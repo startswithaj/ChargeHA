@@ -50,6 +50,20 @@ export class PollingChargerMiddleware implements ChargerMiddleware {
     return this.adapter.setChargeAmps(amps, ctx);
   }
 
+  supportsRecovery(): boolean {
+    return this.adapter.recoverConnection !== undefined;
+  }
+
+  async recoverConnection(ctx: CallContext): Promise<string[] | null> {
+    if (this.adapter.recoverConnection === undefined) return null;
+    return await this.adapter.recoverConnection(ctx);
+  }
+
+  async softReset(ctx: CallContext): Promise<boolean | null> {
+    if (this.adapter.softReset === undefined) return null;
+    return await this.adapter.softReset(ctx);
+  }
+
   async shutdown(): Promise<void> {
     await this.adapter.disconnect();
   }

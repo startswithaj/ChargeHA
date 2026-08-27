@@ -1,6 +1,7 @@
 import { describe, it } from "@std/testing/bdd";
 import { assertRejects } from "@std/assert";
 import { expect } from "@std/expect";
+import { FakeTime } from "@std/testing/time";
 import { Logger } from "@chargeha/server/lib/Logger";
 import { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
@@ -43,7 +44,10 @@ describe("OCPP charger plugin", () => {
   });
 
   describe("getHealthChecks", () => {
-    it("names only the disconnected row when one of two is connected", async () => {
+    it("names only the disconnected row when one of two is connected past the grace", async () => {
+      // The banner shares the card's disconnect grace, so the check only
+      // reports once the window has lapsed — FakeTime steps past it.
+      using time = new FakeTime();
       const rowA = rowFor("row-a", "Connected Charger");
       const rowB = rowFor("row-b", "Disconnected Charger");
       const plugin = new OcppChargerPlugin(
@@ -81,6 +85,7 @@ describe("OCPP charger plugin", () => {
         },
       };
       centralSystem.attach(stubSocket, { chargerId: "cp-a" });
+      time.tick(121_000);
 
       const [check] = plugin.getHealthChecks();
       const result = await check.run();

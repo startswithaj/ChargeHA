@@ -91,6 +91,15 @@ export class PluginDependencies<K extends string = string> {
     );
   }
 
+  // Called by a plugin whose device just pushed new state. Core re-reads the
+  // charger immediately instead of waiting for the next controller loop.
+  refreshChargerState(chargerRowId: string): void {
+    void this.chargingPoints.requestState(chargerRowId, {
+      origin: `plugin:${this.pluginId}:push`,
+      traceId: crypto.randomUUID(),
+    });
+  }
+
   // ── Config / secret (auto-namespaced with `${pluginId}.` prefix) ─────
 
   getConfig(key: K): Promise<string | null> {

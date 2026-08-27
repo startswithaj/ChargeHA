@@ -153,6 +153,9 @@ export type ChargerStatus =
   | "faulted"
   | "finishing"
   | "no_draw"
+  // Device connection just dropped; routine blips self-heal within the
+  // disconnect grace, so this stays calm rather than alarming.
+  | "reconnecting"
   // Adapter cannot reach the device (socket down past grace). Distinct from
   // faulted: the charger itself never reported a fault.
   | "unreachable"
@@ -193,6 +196,10 @@ export interface ChargerAdapter {
   getChargerState(ctx: CallContext): Promise<ChargerState>;
   // null = push-based (no polling); a number = min seconds between fetches.
   pollIntervalSeconds(): number | null;
+  // Optional way out of a stuck device state. recoverConnection returns
+  // human-readable step results; adapters without recovery omit both.
+  recoverConnection?(ctx: CallContext): Promise<string[]>;
+  softReset?(ctx: CallContext): Promise<boolean>;
 }
 
 // Charging point mode reuses the existing values ("auto"|"charge_now"|"stop").

@@ -309,6 +309,8 @@ describe("OCPP adapter — tier 3 power derivation", () => {
       remoteStart: () => Promise.resolve(true),
       remoteStop: () => Promise.resolve(true),
       setChargingProfiles: () => Promise.resolve(true),
+      recoverConnection: () => Promise.resolve([]),
+      softReset: () => Promise.resolve(true),
       ping: () => Promise.resolve({ latencyMs: 1 }),
     };
     return new OcppChargerAdapter(

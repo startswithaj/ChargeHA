@@ -79,6 +79,20 @@ export const chargersRouter = router({
     }
   }),
 
+  recover: publicProcedure.input(idInput).mutation(({ ctx, input }) =>
+    ctx.chargingPointManager.recoverCharger(input.id, {
+      origin: "user:recover",
+      traceId: createTraceId(),
+    })
+  ),
+
+  softReset: publicProcedure.input(idInput).mutation(({ ctx, input }) =>
+    ctx.chargingPointManager.softResetCharger(input.id, {
+      origin: "user:soft-reset",
+      traceId: createTraceId(),
+    })
+  ),
+
   reorder: publicProcedure.input(priorityInput).mutation(
     async ({ ctx, input }) => {
       await ctx.chargingPointManager.reorder(input.order);

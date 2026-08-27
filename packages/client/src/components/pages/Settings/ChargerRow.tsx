@@ -28,6 +28,7 @@ const STATUS_COLORS: Record<ChargerStatus, "green" | "red" | "gray" | "amber"> =
     faulted: "red",
     finishing: "green",
     no_draw: "gray",
+    reconnecting: "amber",
     unreachable: "amber",
     unconfigured: "red",
   };
