@@ -120,6 +120,16 @@ export class OcppChargerAdapter implements ChargerAdapter {
     return Promise.resolve(this.buildState(this.cs.getData(), ctx));
   }
 
+  recoverConnection(ctx: CallContext): Promise<string[]> {
+    this.command("info", "recoverConnection", {}, ctx);
+    return this.cs.recoverConnection();
+  }
+
+  softReset(ctx: CallContext): Promise<boolean> {
+    this.command("info", "softReset", {}, ctx);
+    return this.cs.softReset();
+  }
+
   // Bridges the gap between an accepted start/stop and the charger's own
   // confirmation push: reports the commanded state until the charger agrees
   // or the window lapses.

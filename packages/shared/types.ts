@@ -193,6 +193,10 @@ export interface ChargerAdapter {
   getChargerState(ctx: CallContext): Promise<ChargerState>;
   // null = push-based (no polling); a number = min seconds between fetches.
   pollIntervalSeconds(): number | null;
+  // Optional way out of a stuck device state. recoverConnection returns
+  // human-readable step results; adapters without recovery omit both.
+  recoverConnection?(ctx: CallContext): Promise<string[]>;
+  softReset?(ctx: CallContext): Promise<boolean>;
 }
 
 // Charging point mode reuses the existing values ("auto"|"charge_now"|"stop").

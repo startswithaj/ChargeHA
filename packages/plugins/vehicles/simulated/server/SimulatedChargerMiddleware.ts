@@ -43,6 +43,18 @@ export class SimulatedChargerMiddleware implements ChargerMiddleware {
     return this.shared.setChargeAmps(amps, ctx);
   }
 
+  supportsRecovery(): boolean {
+    return false;
+  }
+
+  recoverConnection(_ctx: CallContext): Promise<string[] | null> {
+    return Promise.resolve(null);
+  }
+
+  softReset(_ctx: CallContext): Promise<boolean | null> {
+    return Promise.resolve(null);
+  }
+
   shutdown(): Promise<void> {
     // The vehicle role owns the shared instance's lifecycle — deleting the
     // charger row must not tear down vehicle data.

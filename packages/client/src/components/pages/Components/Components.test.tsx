@@ -3,6 +3,14 @@ import { describe, expect, it, vi } from "vitest";
 // ChargerCard needs the tRPC context on mount; the gallery has it, tests do not.
 vi.mock("../../../hooks/useChargers.ts", () => ({
   useChargerCommands: () => ({ commandPending: false, changeMode: vi.fn() }),
+  useChargerRecovery: () => ({
+    recover: vi.fn(),
+    softReset: vi.fn(),
+    recoverPending: false,
+    softResetPending: false,
+    recoverOutcome: undefined,
+    softResetOutcome: undefined,
+  }),
   isSmartCharger: (c: { kind: string }) => c.kind === "smart",
 }));
 import { screen } from "@testing-library/react";

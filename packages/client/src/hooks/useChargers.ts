@@ -70,3 +70,22 @@ export function useChargerCommands(chargerId: string | null) {
     },
   };
 }
+
+export type ChargerRecoveryOutcome =
+  | { steps: string[] }
+  | { accepted: boolean }
+  | { error: string }
+  | undefined;
+
+export function useChargerRecovery(chargerId: string) {
+  const recoverMutation = trpc.charger.recover.useMutation();
+  const softResetMutation = trpc.charger.softReset.useMutation();
+  return {
+    recover: () => recoverMutation.mutate({ id: chargerId }),
+    softReset: () => softResetMutation.mutate({ id: chargerId }),
+    recoverPending: recoverMutation.isPending,
+    softResetPending: softResetMutation.isPending,
+    recoverOutcome: recoverMutation.data as ChargerRecoveryOutcome,
+    softResetOutcome: softResetMutation.data as ChargerRecoveryOutcome,
+  };
+}

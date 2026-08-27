@@ -78,6 +78,8 @@ export const GATED_MUTATIONS = [
   "plugin.charger.tapo.setPower",
   "plugin.charger.ocpp.setConfig",
   "plugin.charger.ocpp.testConnection",
+  "charger.recover",
+  "charger.softReset",
   // Pairing drives a real websocket handshake from real hardware.
   "plugin.charger.ocpp.beginPairing",
   "plugin.charger.ocpp.cancelPairing",

@@ -10,6 +10,14 @@ vi.mock("../../../hooks/useChargers.ts", () => ({
     commandPending: false,
     changeMode: vi.fn(),
   }),
+  useChargerRecovery: () => ({
+    recover: vi.fn(),
+    softReset: vi.fn(),
+    recoverPending: false,
+    softResetPending: false,
+    recoverOutcome: undefined,
+    softResetOutcome: undefined,
+  }),
 }));
 
 describe("ChargerCard", () => {
@@ -265,5 +273,63 @@ describe("ChargerCard", () => {
     );
 
     expect(screen.getByText("tracking solar at 12A")).toBeInTheDocument();
+  });
+});
+
+describe("ChargerCard recovery actions", () => {
+  const STATE: ChargerState = {
+    chargerId: "c1",
+    isCharging: false,
+    isPluggedIn: null,
+    chargeAmps: null,
+    chargeAmpsMax: 32,
+    chargeAmpsMin: 6,
+    chargePowerKw: null,
+    chargerVoltage: null,
+    chargerPhases: 1,
+    energyAddedKwh: 0,
+    status: "unreachable",
+    statusDetail: "disconnected",
+    controlMode: "amps",
+    lastUpdated: "2024-01-01T00:00:00.000Z",
+  };
+
+  const renderCard = (
+    status: ChargerState["status"],
+    supportsRecovery: boolean,
+  ) =>
+    render(
+      <Theme>
+        <ChargerCard
+          id="c1"
+          name="Garage"
+          mode="auto"
+          state={{ ...STATE, status }}
+          solarW={0}
+          gridW={0}
+          controllerDetail={null}
+          vehicleResolution="none"
+          resolvedVehicleName={null}
+          supportsRecovery={supportsRecovery}
+        />
+      </Theme>,
+    );
+
+  afterEach(cleanup);
+
+  it("offers recovery while unreachable and supported", () => {
+    renderCard("unreachable", true);
+    expect(screen.getByText("Recover connection")).toBeInTheDocument();
+    expect(screen.getByText("Soft reset charger")).toBeInTheDocument();
+  });
+
+  it("offers nothing when the adapter has no recovery", () => {
+    renderCard("unreachable", false);
+    expect(screen.queryByText("Recover connection")).not.toBeInTheDocument();
+  });
+
+  it("offers nothing while healthy even when supported", () => {
+    renderCard("available", true);
+    expect(screen.queryByText("Recover connection")).not.toBeInTheDocument();
   });
 });

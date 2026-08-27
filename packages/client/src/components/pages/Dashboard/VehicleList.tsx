@@ -315,6 +315,7 @@ function SmartPointCards(
         passiveForVehicleName={ctx.vehicles.find((v) =>
           v.id === point.passiveForVehicleId
         )?.name || null}
+        supportsRecovery={point.supportsRecovery}
       />
       {
         /* Nothing here while passive: the car commands itself, so its own
