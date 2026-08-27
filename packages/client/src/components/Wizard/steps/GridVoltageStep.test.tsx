@@ -122,7 +122,16 @@ describe("GridVoltageStep", () => {
   });
 
   it.each<[string, { gridVoltage: number } | undefined, string]>([
-    ["explicit 120V", { gridVoltage: 120 }, "120V (North America, Japan)"],
+    [
+      "explicit 120V",
+      { gridVoltage: 120 },
+      "120V (North America standard outlet, Japan)",
+    ],
+    [
+      "explicit 240V",
+      { gridVoltage: 240 },
+      "240V (North America — home EV charging)",
+    ],
     [
       "missing config defaults to 230V",
       undefined,

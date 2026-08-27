@@ -158,7 +158,7 @@ describe("SolarTrackingSettings", () => {
     "Min excess solar",
     "Grace period",
     "Cooldown period",
-    "Grid voltage",
+    "Charger circuit voltage",
     "Three-phase charger",
     "Consumption excludes charging",
     "Simulate",

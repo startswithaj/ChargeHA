@@ -12,7 +12,7 @@ import styles from "./steps.module.css";
 
 export const gridVoltageStep: StepDef = {
   id: "grid-voltage",
-  label: "Grid Voltage",
+  label: "Charger Voltage",
   // Nothing to save and nothing to wait for — Next just moves on.
   useStep: () => ({
     next: { kind: "ready", hint: null, onNext: advanceOnly },
@@ -43,10 +43,10 @@ function GridVoltageFields() {
   return (
     <div className={styles.stepContainer}>
       <Text size="2" color="gray">
-        ChargeHA converts available solar watts into charging amps using your
-        grid voltage. It reads this from your vehicle or inverter when available
-        — this setting is used as a fallback when neither reports a valid
-        reading.
+        ChargeHA converts available solar watts into charging amps using the
+        voltage of the circuit your EV charger is on. It reads this from your
+        vehicle or inverter when available — this setting is used as a fallback
+        when neither reports a valid reading.
       </Text>
 
       {(vehicleReadings.length > 0 || inverterVoltage !== null) && (
@@ -72,7 +72,7 @@ function GridVoltageFields() {
 
       <div className={styles.fieldGroup}>
         <Text as="label" size="2" weight="medium">
-          Grid voltage
+          Charger circuit voltage
         </Text>
         <Select.Root
           size="2"
@@ -84,7 +84,12 @@ function GridVoltageFields() {
             <Select.Item value="230">
               230V (Europe, Asia, Africa, Australia)
             </Select.Item>
-            <Select.Item value="120">120V (North America, Japan)</Select.Item>
+            <Select.Item value="240">
+              240V (North America — home EV charging)
+            </Select.Item>
+            <Select.Item value="120">
+              120V (North America standard outlet, Japan)
+            </Select.Item>
           </Select.Content>
         </Select.Root>
       </div>

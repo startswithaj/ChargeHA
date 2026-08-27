@@ -386,6 +386,26 @@ describe("TeslaVehicleMiddleware", () => {
 
       expect(adapter.stopChargingCalls).toBe(0);
     });
+
+    it("invalidates the cache after a confirmed start so the next request fetches", async () => {
+      await middleware.requestState(ctx());
+      adapter.getChargeStateCalls = 0;
+
+      await middleware.startCharging(cc("test:start"));
+
+      await middleware.requestState(ctx());
+      expect(adapter.getChargeStateCalls).toBe(1);
+    });
+
+    it("keeps the cache fresh after setChargeAmps", async () => {
+      await middleware.requestState(ctx());
+      adapter.getChargeStateCalls = 0;
+
+      await middleware.setChargeAmps(16, cc("test:amps"));
+
+      await middleware.requestState(ctx());
+      expect(adapter.getChargeStateCalls).toBe(0);
+    });
   });
 
   describe("online", () => {
