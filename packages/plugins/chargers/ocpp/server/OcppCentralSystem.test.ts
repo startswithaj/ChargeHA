@@ -874,3 +874,28 @@ describe("OCPP pairing", () => {
     expect(adoptedClosed).toBe(false);
   });
 });
+
+describe("OCPP live data notification", () => {
+  const CP = "MG-10407939";
+
+  it("invokes the callback for every inbound message that changes live data", async () => {
+    const notified: string[] = [];
+    const { socket } = attached(CP, {
+      onLiveDataChanged: (id) => notified.push(id),
+    });
+
+    await call(socket, "StatusNotification", {
+      connectorId: 1,
+      errorCode: "NoError",
+      status: "Preparing",
+    });
+    await call(socket, "StartTransaction", {
+      connectorId: 1,
+      idTag: "tag",
+      meterStart: 100,
+      timestamp: new Date().toISOString(),
+    });
+
+    expect(notified).toEqual([CP, CP]);
+  });
+});

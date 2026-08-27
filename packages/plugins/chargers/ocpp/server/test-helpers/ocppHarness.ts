@@ -42,6 +42,7 @@ export const attached = (
   opts: {
     hasRow?: boolean;
     hasChargerRow?: (chargePointId: string) => Promise<boolean>;
+    onLiveDataChanged?: (chargePointId: string) => void;
   } = {},
 ) => {
   const hasRow = opts.hasRow ?? true;
@@ -50,6 +51,7 @@ export const attached = (
     logger,
     new PluginDbLogger(() => Promise.resolve(), logger),
     opts.hasChargerRow ?? (() => Promise.resolve(hasRow)),
+    opts.onLiveDataChanged,
   );
   const socket = fakeSocket();
   cs.attach(socket as unknown as WebSocket, { chargerId });

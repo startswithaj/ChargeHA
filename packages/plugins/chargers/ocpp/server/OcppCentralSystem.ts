@@ -68,6 +68,8 @@ export interface OcppChargerHandle {
   remoteStart(amps?: number): Promise<boolean>;
   remoteStop(): Promise<boolean>;
   setChargingProfiles(profiles: ChargingProfileRequest[]): Promise<boolean>;
+  recoverConnection(): Promise<string[]>;
+  softReset(): Promise<boolean>;
   ping(): Promise<{ latencyMs: number }>;
 }
 
@@ -91,6 +93,8 @@ export class OcppCentralSystem {
     // Async because saving a row must take effect on an already-open socket's
     // very next message.
     private readonly hasChargerRow: (chargePointId: string) => Promise<boolean>,
+    private readonly onLiveDataChanged: (chargePointId: string) => void =
+      () => {},
   ) {
     this.negotiator = new OcppMeasurandNegotiator(
       (id, action, payload) => this.send(id, action, payload),
@@ -181,6 +185,8 @@ export class OcppCentralSystem {
       remoteStop: () => this.remoteStop(chargePointId),
       setChargingProfiles: (payloads) =>
         this.setChargingProfiles(chargePointId, payloads),
+      recoverConnection: () => this.recoverConnection(chargePointId),
+      softReset: () => this.softReset(chargePointId),
       ping: () => this.ping(chargePointId),
     };
   }
@@ -689,6 +695,7 @@ export class OcppCentralSystem {
 
   private patch(chargePointId: string, delta: Partial<OcppLiveData>): void {
     this.connections.get(chargePointId)?.patch(delta);
+    this.onLiveDataChanged(chargePointId);
   }
 }
 

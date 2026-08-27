@@ -35,6 +35,11 @@ export class OcppChargerPlugin implements ChargerPlugin {
       deps.dbLog,
       (chargePointId) =>
         this.rowForChargePoint(chargePointId).then((entry) => entry !== null),
+      (chargePointId) => {
+        void this.rowForChargePoint(chargePointId).then((entry) => {
+          if (entry !== null) deps.refreshChargerState(entry.row.id);
+        });
+      },
     );
     deps.log.info("OCPP plugin initialized");
   }
