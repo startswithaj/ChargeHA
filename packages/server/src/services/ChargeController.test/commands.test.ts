@@ -113,7 +113,12 @@ describe("ChargeController — commands + backoff", () => {
     });
 
     it("handles non-Error thrown objects", async () => {
-      ctx = await setupController({}, "charge_now");
+      // Already charging: an amp-command failure is only fatal (and only
+      // feeds backoff) when there is no start to carry the limit instead.
+      ctx = await setupController(
+        { isCharging: true, chargeAmps: 5 },
+        "charge_now",
+      );
 
       ctx.adapter.setChargeAmps = () => {
         throw "string error";
