@@ -140,6 +140,10 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
         isCharging: true,
         lastUpdated: new Date().toISOString(),
       };
+      // Expire the cache so the next tick fetches vehicle_data: the car only
+      // reports real charger voltage/phases while charging, and stale
+      // stopped-state values (1V) make solar tracking miscalculate amps.
+      this.lastFetchAtMs = 0;
       this.logger.debug("startCharging confirmed — updated cache");
     } else if (!ok) {
       await this.refreshCacheAfterRejection(withSuffix(ctx, "post-reject"));
