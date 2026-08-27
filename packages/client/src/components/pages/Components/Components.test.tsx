@@ -10,6 +10,8 @@ vi.mock("../../../hooks/useChargers.ts", () => ({
     softResetPending: false,
     recoverOutcome: undefined,
     softResetOutcome: undefined,
+    recoverError: null,
+    softResetError: null,
   }),
   isSmartCharger: (c: { kind: string }) => c.kind === "smart",
 }));

@@ -6,6 +6,8 @@ import {
   Car,
   Plug,
   PlugZap,
+  Power,
+  RefreshCw,
   Settings,
   Sun,
   TriangleAlert,
@@ -38,6 +40,7 @@ import {
   revealSettingsSection,
 } from "../../../lib/settingsAnchors.ts";
 import { CHARGER_STATUS_LABELS } from "../../../lib/chargerLabels.ts";
+import { FormError } from "../../ui/FormError.tsx";
 import { Spinner } from "../../ui/Spinner.tsx";
 import { WaitingBars } from "../../ui/WaitingBars.tsx";
 import layout from "../../ui/CardLayout.module.css";
@@ -53,6 +56,7 @@ const STATUS_BADGE_COLORS: Record<
   faulted: "red",
   finishing: "gray",
   no_draw: "gray",
+  reconnecting: "gray",
   unreachable: "red",
   unconfigured: "red",
 };
@@ -208,8 +212,16 @@ function vehicleLine(
 // Shown only while the charger needs attention and its adapter can act.
 function RecoveryActions({ id }: { id: string }) {
   const recovery = useChargerRecovery(id);
-  const outcome = recoveryOutcome(recovery.recoverOutcome) ??
-    recoveryOutcome(recovery.softResetOutcome);
+  const recoverError = recovery.recoverError ??
+    outcomeError(recovery.recoverOutcome);
+  const resetError = recovery.softResetError ??
+    outcomeError(recovery.softResetOutcome);
+  const recoverText = recoverError
+    ? null
+    : recoveryOutcome(recovery.recoverOutcome);
+  const resetText = resetError
+    ? null
+    : recoveryOutcome(recovery.softResetOutcome);
   return (
     <Flex direction="column" gap="2" mt="1">
       <Text size="1" color="gray">
@@ -223,6 +235,7 @@ function RecoveryActions({ id }: { id: string }) {
           disabled={recovery.recoverPending}
           onClick={recovery.recover}
         >
+          <RefreshCw size={14} />
           Recover connection
         </Button>
         <Button
@@ -232,17 +245,23 @@ function RecoveryActions({ id }: { id: string }) {
           disabled={recovery.softResetPending}
           onClick={recovery.softReset}
         >
+          <Power size={14} />
           Soft reset charger
         </Button>
       </Flex>
-      {outcome && <Text size="1" color="gray">{outcome}</Text>}
+      {recoverText && <Text size="1" color="gray">{recoverText}</Text>}
+      {resetText && <Text size="1" color="gray">{resetText}</Text>}
+      <FormError message={recoverError ?? resetError} />
     </Flex>
   );
 }
 
+function outcomeError(data: ChargerRecoveryOutcome): string | null {
+  return data !== undefined && "error" in data ? data.error : null;
+}
+
 function recoveryOutcome(data: ChargerRecoveryOutcome): string | null {
-  if (data === undefined) return null;
-  if ("error" in data) return data.error;
+  if (data === undefined || "error" in data) return null;
   if ("steps" in data) return data.steps.join(" · ");
   return data.accepted ? "Reset accepted" : "Reset rejected";
 }
@@ -444,7 +463,14 @@ export function ChargerCard(
           <DetailRow icon={Activity}>{controllerDetail}</DetailRow>
         )}
         <DeviceStatusRow state={state} />
-        {alarm && supportsRecovery && <RecoveryActions id={id} />}
+        {state?.status === "unreachable" && (
+          <DetailRow icon={TriangleAlert} color="red">
+            ChargeHA can't reach the charger — check its power and network
+          </DetailRow>
+        )}
+        {state?.status === "faulted" && supportsRecovery && (
+          <RecoveryActions id={id} />
+        )}
       </div>
     </Card>
   );

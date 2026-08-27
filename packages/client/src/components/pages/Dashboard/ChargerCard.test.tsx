@@ -17,6 +17,8 @@ vi.mock("../../../hooks/useChargers.ts", () => ({
     softResetPending: false,
     recoverOutcome: undefined,
     softResetOutcome: undefined,
+    recoverError: null,
+    softResetError: null,
   }),
 }));
 
@@ -317,19 +319,26 @@ describe("ChargerCard recovery actions", () => {
 
   afterEach(cleanup);
 
-  it("offers recovery while unreachable and supported", () => {
-    renderCard("unreachable", true);
+  it("offers recovery while faulted and supported", () => {
+    renderCard("faulted", true);
     expect(screen.getByText("Recover connection")).toBeInTheDocument();
     expect(screen.getByText("Soft reset charger")).toBeInTheDocument();
   });
 
   it("offers nothing when the adapter has no recovery", () => {
-    renderCard("unreachable", false);
+    renderCard("faulted", false);
     expect(screen.queryByText("Recover connection")).not.toBeInTheDocument();
   });
 
   it("offers nothing while healthy even when supported", () => {
     renderCard("available", true);
     expect(screen.queryByText("Recover connection")).not.toBeInTheDocument();
+  });
+
+  it("shows guidance instead of buttons while unreachable — commands cannot reach the charger", () => {
+    renderCard("unreachable", true);
+    expect(screen.queryByText("Recover connection")).not.toBeInTheDocument();
+    expect(screen.getByText(/check its power and network/))
+      .toBeInTheDocument();
   });
 });

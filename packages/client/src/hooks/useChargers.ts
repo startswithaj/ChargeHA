@@ -87,5 +87,7 @@ export function useChargerRecovery(chargerId: string) {
     softResetPending: softResetMutation.isPending,
     recoverOutcome: recoverMutation.data as ChargerRecoveryOutcome,
     softResetOutcome: softResetMutation.data as ChargerRecoveryOutcome,
+    recoverError: recoverMutation.error?.message ?? null,
+    softResetError: softResetMutation.error?.message ?? null,
   };
 }
