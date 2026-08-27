@@ -142,12 +142,13 @@ describe("OCPP e2e", () => {
 
     // The station auto-sends StartTransaction + StatusNotification(Charging)
     // after accepting RemoteStartTransaction, so the test injects neither.
+    // Waits on status: the confirmation bridge reports charging first.
     const state = await waitFor(async () => {
       const list = await trpc.charger.list.query();
       const s = list.find((c) => c.id === charger.id)?.state;
-      return s?.isCharging ? s : null;
+      return s?.status === "charging" ? s : null;
     }, { label: "charging after RemoteStart" });
-    expect(state.status).toBe("charging");
+    expect(state.isCharging).toBe(true);
     expect(state.statusDetail).toBe("Charging");
   });
 
@@ -270,6 +271,10 @@ describe("OCPP e2e", () => {
       return id !== undefined && id !== tx ? id : null;
     }, { label: "resumed with a new transaction", timeoutMs: 30_000 });
     expect(newTx).not.toBe(tx);
+
+    // The resumed transaction keeps streaming MeterValues every 10s; left
+    // running it starves the staleness test below of quiet.
+    await stationAndAppIdle(chargerId);
   });
 
   it("Available maps to available with no cable", async () => {
