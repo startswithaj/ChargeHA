@@ -14,20 +14,10 @@ import type { PluginLogEntry } from "../../../hooks/usePluginLogs.ts";
 import { useFreshRowIds } from "../../../hooks/useFreshRowIds.ts";
 import { PAGE_SIZE_OPTIONS } from "./Logs.tsx";
 import styles from "./Logs.module.css";
+import { formatTimestamp } from "./logsTime.ts";
 
 const DEFAULT_DYNAMIC_COLUMNS = 3;
 const MAX_STRING_LENGTH = 40;
-
-function formatTimestamp(ts: string): string {
-  const d = new Date(ts + "Z");
-  return d.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
 
 const LEVEL_COLORS: Record<string, "green" | "yellow" | "red" | "gray"> = {
   info: "green",
@@ -151,6 +141,7 @@ interface PluginLogsTableProps {
   onPageChange: (page: number) => void;
   pageSize: number;
   onPageSizeChange: (size: number) => void;
+  timezone: string;
 }
 
 function ColumnsDropdown(
@@ -242,6 +233,7 @@ function LogRow(
     showTraceId,
     visiblePayloadKeys,
     onClick,
+    timezone,
   }: {
     log: PluginLogEntry;
     isExpanded: boolean;
@@ -252,6 +244,7 @@ function LogRow(
     showTraceId: boolean;
     visiblePayloadKeys: string[];
     onClick: () => void;
+    timezone: string;
   },
 ) {
   const payload = log.payload as Record<string, unknown> | null;
@@ -262,7 +255,9 @@ function LogRow(
         className={fresh ? styles.freshRow : undefined}
         onClick={onClick}
       >
-        <td className={styles.timestamp}>{formatTimestamp(log.timestamp)}</td>
+        <td className={styles.timestamp}>
+          {formatTimestamp(log.timestamp, timezone)}
+        </td>
         <td>
           <Badge size="1" color={LEVEL_COLORS[log.level] ?? "gray"}>
             {log.level}
@@ -353,19 +348,7 @@ function PaginationBar(
   );
 }
 
-export function PluginLogsTable({
-  logs,
-  loading,
-  total,
-  page,
-  onPageChange,
-  pageSize,
-  onPageSizeChange,
-}: PluginLogsTableProps) {
-  const [expandedId, setExpandedId] = useState<number | null>(null);
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const freshIds = useFreshRowIds(logs);
-
+function usePluginLogColumns(logs: PluginLogEntry[]) {
   const allPayloadKeys = useMemo(() => getAllPayloadKeys(logs), [logs]);
 
   // Default columns: origin, message, plus the top N payload keys.
@@ -396,8 +379,44 @@ export function PluginLogsTable({
   const showOrigin = visibleColumns.has("origin");
   const showMessage = visibleColumns.has("message");
   const showTraceId = visibleColumns.has("traceId");
-  const totalColSpan = 3 + (showOrigin ? 1 : 0) + (showMessage ? 1 : 0) +
-    (showTraceId ? 1 : 0) + visiblePayloadKeys.length;
+
+  return {
+    allPayloadKeys,
+    visibleColumns,
+    toggleColumn,
+    visiblePayloadKeys,
+    showOrigin,
+    showMessage,
+    showTraceId,
+    totalColSpan: 3 + (showOrigin ? 1 : 0) + (showMessage ? 1 : 0) +
+      (showTraceId ? 1 : 0) + visiblePayloadKeys.length,
+  };
+}
+
+export function PluginLogsTable({
+  logs,
+  loading,
+  total,
+  page,
+  onPageChange,
+  pageSize,
+  onPageSizeChange,
+  timezone,
+}: PluginLogsTableProps) {
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const freshIds = useFreshRowIds(logs);
+
+  const {
+    allPayloadKeys,
+    visibleColumns,
+    toggleColumn,
+    visiblePayloadKeys,
+    showOrigin,
+    showMessage,
+    showTraceId,
+    totalColSpan,
+  } = usePluginLogColumns(logs);
 
   if (loading && logs.length === 0) {
     return (
@@ -451,6 +470,7 @@ export function PluginLogsTable({
                   showMessage={showMessage}
                   showTraceId={showTraceId}
                   visiblePayloadKeys={visiblePayloadKeys}
+                  timezone={timezone}
                   onClick={() =>
                     setExpandedId(expandedId === log.id ? null : log.id)}
                 />

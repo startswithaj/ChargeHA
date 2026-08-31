@@ -252,6 +252,7 @@ describe("EnergyAdapterManager", () => {
       registry.register(mockPlugin);
       const mockDb = throwingMock<AppDatabase>("AppDatabase", {
         getConfig: () => Promise.resolve("late-config"),
+        insertPluginLog: () => Promise.resolve(),
       });
       const mgr = new EnergyAdapterManager(
         mockDb,
@@ -360,6 +361,7 @@ describe("EnergyAdapterManager", () => {
       registry.register(mockPlugin);
       const mockDb = throwingMock<AppDatabase>("AppDatabase", {
         getConfig: () => Promise.resolve("fail-create"),
+        insertPluginLog: () => Promise.resolve(),
       });
       const mgr = new EnergyAdapterManager(
         mockDb,

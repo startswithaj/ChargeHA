@@ -48,6 +48,11 @@ export class EnergyAdapterManager {
     this.initializationPromise = this.initialize();
   }
 
+  // Plugin id of the currently selected energy adapter, null when none.
+  get activePluginId(): string | null {
+    return this.activeType;
+  }
+
   // True if writing this config key should trigger a reconfigure.
   isRelevantConfigKey(key: string): boolean {
     if (key === ADAPTER_TYPE_KEY) return true;
@@ -141,7 +146,13 @@ export class EnergyAdapterManager {
         `New energy adapter connection failed — will retry on first poll: ${err}`,
       );
     }
+    const previous = this.adapter;
     this.adapter = newAdapter;
+    // The replaced adapter holds a live session; leaving it undisconnected
+    // leaks it.
+    await previous?.disconnect().catch((err) =>
+      this.logger.warn(`Previous energy adapter disconnect failed: ${err}`)
+    );
     this.logger.info(
       `Energy adapter reconfigured to ${newAdapter.constructor.name}`,
     );
@@ -198,6 +209,18 @@ export class EnergyAdapterManager {
     } catch (err) {
       this.logger.warn(
         `Energy plugin "${adapterType}" failed to create adapter: ${err} — falling back to none`,
+      );
+      await this.db.insertPluginLog({
+        pluginId: adapterType,
+        level: "warn",
+        message: `Failed to create adapter — falling back to none: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+        payload: null,
+        origin: null,
+        traceId: null,
+      }).catch((logErr) =>
+        this.logger.error("Failed to persist adapter fallback log:", logErr)
       );
       // Keep the selected type active so later writes to its keys retry the build.
       this.activeType = adapterType;

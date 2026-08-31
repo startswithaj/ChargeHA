@@ -1,5 +1,5 @@
 import { Key, Zap } from "lucide-react";
-import { Card, Link, Switch, Text } from "@radix-ui/themes";
+import { Card, Flex, Link, Switch, Text } from "@radix-ui/themes";
 import { trpc } from "../../../trpc.ts";
 import { version } from "../../../lib/version.ts";
 import {
@@ -17,6 +17,7 @@ import { BatterySettings } from "./BatterySettings.tsx";
 import { TariffSettings } from "./TariffSettings.tsx";
 import { GeneralSettings } from "./GeneralSettings.tsx";
 import { NotificationSettings } from "./NotificationSettings.tsx";
+import { ExportSettingsButton } from "./ExportSettingsButton.tsx";
 
 function EncryptionWarning() {
   return (
@@ -135,6 +136,10 @@ export function Settings() {
 
       {/* ═══ Authentication ═══ */}
       <AuthSettings />
+
+      <Flex justify="center">
+        <ExportSettingsButton />
+      </Flex>
 
       <VersionFooter />
     </div>

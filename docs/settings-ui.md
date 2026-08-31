@@ -1,5 +1,8 @@
 # Settings UI Style Guide
 
+Every pattern below is rendered live at **`/components`** (Components in the
+nav) — open it beside this document to compare a specimen with its spec.
+
 Derived by reading every component under
 `packages/client/src/components/pages/Settings/` plus
 `components/ui/Section.tsx` and `Section.module.css`. This documents what the
@@ -35,6 +38,12 @@ One rule, no exceptions:
   <Button size="2" disabled={!isValid} onClick={onSubmit}>{submitLabel}</Button>
 </div>;
 ```
+
+**The one exception: a branch choice.** When a step offers two ways forward and
+neither cancels — the welcome step's `Full Setup` / `Demo Mode` — the buttons
+are `size="3"`, left-aligned, `gap: 16`, in the order the copy below explains
+them. The test is that no button backs out; if one does, it is a footer and the
+rule above applies.
 
 Cancel is `variant="soft" color="gray"`. Primary is solid (no `variant`), and
 `color="red"` when the action is destructive. `ScheduleDialog.module.css`
@@ -343,7 +352,8 @@ confirmations**, never for editing:
 - `AuthSettings.NoneWarningDialog` — "Remove Authentication?" with
   `<Button variant="soft" color="gray">Cancel</Button>` and
   `<Button color="red">Remove Authentication</Button>`, in
-  `<Flex gap="3" mt="4" justify="end">`, `maxWidth="450px"`.
+  `<Flex gap="2" mt="4" justify="end">` (gap 8, like every other footer),
+  `maxWidth="450px"`.
 
 Non-destructive confirmation is done **inline**, not in a dialog —
 `PresetTemplates` renders an orange banner (`background: var(--orange-a2)`,
@@ -424,7 +434,12 @@ provider cannot be saved.
 - Empty list: `Text size="2" color="gray"` — "No tariff periods configured. Add
   one or load a preset above."
 - Load failure: `Text size="2" color="gray"` with a recovery hint.
-- Mutation error: `Text size="2" color="red"`, placed next to what failed.
+- Mutation or validation error inside a form:
+  **`<FormError message={error} />`** (`components/ui/FormError.tsx`). Never a
+  bare `Text color="red"` — colour alone is not a state, and it announces
+  nothing. `size="1"` by default; `size="2"` on a wizard step or the login form,
+  where the surrounding copy is size 2. A null message renders nothing, so call
+  sites drop `{error && …}`.
 - Action-needed hint: `Text size="1" color="orange"` — "Select your inverter or
   smart meter to start monitoring energy."
 - Panel-level error banner:

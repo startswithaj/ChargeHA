@@ -5,16 +5,6 @@ import { sqliteTimezoneOffset } from "./sqliteHelpers.ts";
 export class StatsRepository {
   constructor(private db: BetterSQLite3Database) {}
 
-  /** Convert an IANA timezone to a UTC offset in hours. */
-  private getTimezoneOffsetHours(timezone: string): number {
-    const now = new Date();
-    const utc = new Date(now.toLocaleString("en-US", { timeZone: "UTC" }));
-    const local = new Date(
-      now.toLocaleString("en-US", { timeZone: timezone }),
-    );
-    return (local.getTime() - utc.getTime()) / (1000 * 60 * 60);
-  }
-
   /** Aggregate vehicle charge readings by hour for a given day (YYYY-MM-DD local). */
   async getStatsDay(
     date: string,

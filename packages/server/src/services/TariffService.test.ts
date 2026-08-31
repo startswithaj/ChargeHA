@@ -5,6 +5,7 @@ import { ServiceError } from "../lib/ServiceError.ts";
 import { AppDatabase } from "../db/AppDatabase.ts";
 import { TariffService } from "./TariffService.ts";
 import { Logger } from "../lib/Logger.ts";
+import { FakeTime } from "@std/testing/time";
 
 describe("TariffService", () => {
   const testLogger = new Logger("TariffService", "error");
@@ -762,5 +763,42 @@ describe("TariffService", () => {
         expect((error as ServiceError).message).toContain("flat");
       }
     });
+  });
+});
+
+describe("TariffService nextRate across a DST transition", () => {
+  const testLogger = new Logger("TariffService", "error");
+  let db: AppDatabase;
+  let tariffService: TariffService;
+  let time: FakeTime;
+
+  beforeEach(async () => {
+    db = new AppDatabase(":memory:");
+    await db.init();
+    tariffService = new TariffService(db, testLogger);
+    time = new FakeTime(new Date("2026-04-04T12:00:00Z"));
+  });
+
+  afterEach(() => {
+    time.restore();
+    db.close();
+  });
+
+  it("counts the extra hour of a 25-hour day", async () => {
+    await db.setConfig("timezone", "Australia/Sydney");
+    await db.setConfig("default_rate_per_kwh", "0.20");
+    await db.createTariffPeriod({
+      label: "Peak",
+      startTime: "06:00",
+      endTime: "22:00",
+      days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+      ratePerKwh: 0.50,
+    });
+
+    const result = await tariffService.getCurrentRate();
+
+    assertExists(result);
+    assertExists(result.nextRate);
+    expect(result.nextRate.startsAt).toBe("2026-04-04T20:00:00.000Z");
   });
 });

@@ -1,15 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  Badge,
-  Button,
-  SegmentedControl,
-  Text,
-  TextField,
-} from "@radix-ui/themes";
+import { Badge, Button, SegmentedControl, TextField } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
 import { SettingsRow } from "../../../hostUi.ts";
 import { useSaveStatus } from "../../../hostUi.ts";
 import { usePluginSettingsHost } from "../../../hostUi.ts";
+import { FormError } from "../../../hostUi.ts";
 
 type AuthMethod = "credentials" | "token";
 
@@ -185,12 +180,10 @@ function TestConnectionRow(
         </Badge>
       )}
       {testMutation.isError && (
-        <Text size="2" color="red">{testMutation.error.message}</Text>
+        <FormError message={testMutation.error.message} />
       )}
       {testMutation.isSuccess && !testMutation.data.success && (
-        <Text size="2" color="red">
-          {testMutation.data.error ?? "Connection failed"}
-        </Text>
+        <FormError message={testMutation.data.error ?? "Connection failed"} />
       )}
     </div>
   );

@@ -149,6 +149,10 @@ export interface ChargerMiddleware {
   startCharging(ctx: CallContext): Promise<boolean>;
   stopCharging(ctx: CallContext): Promise<boolean>;
   setChargeAmps(amps: number, ctx: CallContext): Promise<boolean>;
+  // Mirrors the adapter's optional recovery methods; null = unsupported.
+  supportsRecovery(): boolean;
+  recoverConnection(ctx: CallContext): Promise<string[] | null>;
+  softReset(ctx: CallContext): Promise<boolean | null>;
   // Release device connections/timers on shutdown or rebuild.
   shutdown(): Promise<void>;
 }

@@ -12,6 +12,7 @@ import { trpc } from "../../../trpc.ts";
 import { AddressSearch } from "./HomeLocationParts.tsx";
 import type { StepDef, WizardNext } from "../flow.ts";
 import styles from "./steps.module.css";
+import { FormError } from "../../ui/FormError.tsx";
 
 function QuickActions(
   { vehicles, geo, setCoords }: {
@@ -66,7 +67,7 @@ function StatusMessages(
         <Text size="2" color="gray">{geo.geoLoadingMsg}</Text>
       )}
       {geo.geoStatus === "error" && (
-        <Text size="2" color="red">{geo.geoError}</Text>
+        <FormError message={geo.geoError} size="2" />
       )}
       {hasCoords && (
         <Callout.Root color="green" size="1">

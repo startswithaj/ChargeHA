@@ -1,15 +1,13 @@
 import { z } from "zod";
-import { Logger } from "@chargeha/server/lib/Logger";
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
-import { SigenergyLocalAdapter } from "./SigenergyLocalAdapter.ts";
-import { JsmodbusReader } from "./SigenergyModbusClient.ts";
 import { discoverSigenergy } from "./SigenergyDiscovery.ts";
-import { sigenergyLocalConfigDef } from "./config.ts";
+import { SIGENERGY_DEFAULTS, sigenergyLocalConfigDef } from "./config.ts";
 import {
   createNetworkDiscoveryProcedures,
   createPluginConfigProcedures,
 } from "../../../createPluginConfigProcedures.ts";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
+import type { SigenergyLocalPlugin } from "./SigenergyLocalPlugin.ts";
 
 const discoverInput = z.object({
   subnet: z.string().optional(),
@@ -17,12 +15,15 @@ const discoverInput = z.object({
 
 const testConnectionInput = z.object({
   host: z.string(),
-  port: z.number().optional(),
-  plantUnitId: z.number().optional(),
-  deviceUnitId: z.number().optional(),
+  port: z.number().default(SIGENERGY_DEFAULTS.port),
+  plantUnitId: z.number().default(SIGENERGY_DEFAULTS.plantUnitId),
+  deviceUnitId: z.number().default(SIGENERGY_DEFAULTS.deviceUnitId),
 });
 
-export function createSigenergyLocalRouter(deps: PluginDependencies) {
+export function createSigenergyLocalRouter(
+  deps: PluginDependencies,
+  plugin: Pick<SigenergyLocalPlugin, "testConnection">,
+) {
   return router({
     ...createPluginConfigProcedures(
       deps,
@@ -40,37 +41,6 @@ export function createSigenergyLocalRouter(deps: PluginDependencies) {
 
     testConnection: publicProcedure
       .input(testConnectionInput)
-      .mutation(async ({ input }) => {
-        const logger = new Logger("Sigenergy", "error");
-        const plantUnitId = input.plantUnitId ?? 247;
-        const deviceUnitId = input.deviceUnitId ?? 1;
-        const reader = new JsmodbusReader(
-          input.host,
-          input.port ?? 502,
-          [plantUnitId, deviceUnitId],
-          logger,
-        );
-        const adapter = new SigenergyLocalAdapter(
-          reader,
-          plantUnitId,
-          deviceUnitId,
-          logger,
-        );
-        try {
-          await adapter.connect();
-          const [device, realtime] = await Promise.all([
-            adapter.getDeviceInfo(),
-            adapter.getRealtimeData(),
-          ]);
-          return { success: true as const, device, realtime };
-        } catch (err) {
-          return {
-            success: false as const,
-            error: err instanceof Error ? err.message : "Connection failed",
-          };
-        } finally {
-          await adapter.disconnect();
-        }
-      }),
+      .mutation(({ input }) => plugin.testConnection(input)),
   });
 }

@@ -123,7 +123,6 @@ describe("AuthStep", () => {
     renderAuthStep(makeStepProps({ onAdvance }));
 
     fireEvent.click(screen.getByText("No Authentication"));
-    fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
       expect(mockSetAuthModeMutateAsync).toHaveBeenCalledWith({
@@ -399,7 +398,6 @@ describe("AuthStep", () => {
     renderAuthStep(makeStepProps({ onAdvance }));
 
     fireEvent.click(screen.getByText("No Authentication"));
-    fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
       expect(
@@ -586,7 +584,6 @@ describe("AuthStep", () => {
     );
     assertExists(card);
     fireEvent.keyDown(card, { key: "Enter" });
-    fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() => {
       expect(onAdvance).toHaveBeenCalledTimes(1);

@@ -17,11 +17,16 @@ const DEMO_DISABLED: ReadonlySet<Feature> = new Set([Feature.OidcAuth]);
 declare global {
   interface ImportMetaEnv {
     readonly VITE_DEMO_MODE?: string;
+    readonly DEV?: boolean;
   }
   interface ImportMeta {
     readonly env: ImportMetaEnv;
   }
 }
+
+/** True only under `vite dev`. Read inline so Vite folds it to a literal and
+ *  drops dev-only branches from the production bundle. */
+export const isDev = (): boolean => import.meta.env.DEV === true;
 
 interface PluginOption {
   id: string;

@@ -56,6 +56,7 @@ packages/plugins/
   energy/
     fronius-local/              — Fronius inverter (local HTTP) plugin
     fronius-cloud/              — Fronius Cloud API plugin
+    goodwe-sems/                — GoodWe SEMS Portal (cloud) plugin
   vehicles/
     tesla/                      — Tesla Fleet API plugin (adapter, proxy, tokens, router)
     simulated/                  — Simulated vehicle for dev/demo
@@ -98,6 +99,9 @@ packages/client/src/
     Schedules/               — Charge schedule management
     Settings/                — Auth, inverter, tariff, notification, vehicle config
     Logs/                    — Controller/energy/vehicle logs
+    Components/              — Style guide. Every shipped component on one page,
+                               rendered from static fixtures (no network). At
+                               /components — see docs/settings-ui.md for the rules.
   components/Wizard/         — First-run setup wizard (see Wizard Steps below)
   hooks/                     — React hooks (useVehicles, useStats, etc.)
   lib/                       — Client utilities (stores, tRPC setup, solar allocation)
@@ -111,6 +115,7 @@ devtools/
   quality/                   — Unused file check (see devtools/quality/README.md)
   sap-ocpp-simulator/        — Standalone OCPP charge point (see devtools/sap-ocpp-simulator/README.md)
   sim/                       — Charge simulators + analysis tools (see devtools/sim/README.md)
+  sems-simulator/            — Fake GoodWe SEMS Portal API (see devtools/sems-simulator/README.md)
   tapo-simulator/            — Fake Tapo smart plug (see devtools/tapo-simulator/README.md)
 docs/                        — Architecture docs, setup guides, design notes
 ```
@@ -129,6 +134,9 @@ should not reference specific plugin IDs — interact through registry interface
 
 Plugin routers are merged into the app router dynamically via
 `createAppRouter(pluginRouters)` in `trpc/root.ts`.
+
+A plugin's `index.ts` holds `export ... from` lines only. The class goes in a
+file named after it, `GoodweSemsPlugin.ts`. Enforced by `no-plugin-index-code`.
 
 ## Package Dependencies
 
@@ -177,8 +185,9 @@ registry. If `wizardSteps.ts` imports its option type back out of
 option types live in `pluginOptions.ts` instead.
 
 The same thing happens inside a single plugin. `index.ts` imports `router.ts`,
-so `router.ts` must not import the plugin class back from `index.ts`. Write out
-only the methods the router actually calls:
+so `router.ts` must not import from `index.ts`. `import type` from the class's
+own file is fine — it's erased. For a value, write out only the methods the
+router calls:
 
 ```ts
 // router.ts — NOT `import type { TeslaVehiclePlugin } from "./index.ts"`
@@ -272,6 +281,8 @@ A demo shortcut creates a simulated vehicle and skips plugin-specific config.
 - When a service covers multiple concerns, split into a facade + sub-services
   (e.g. `AuthService` delegates to `AuthLocalService` and `AuthOIDCService`).
 - tRPC routers are thin — validate input, call a service, return the result.
+  Procedure handlers are capped at 15 lines and may not import `index.ts`.
+  Enforced by `no-router-logic`.
 - Core code should not reference specific plugin IDs. Use plugin registry
   interfaces. Plugins access the DB through `PluginDependencies`, not
   `AppDatabase` directly.
@@ -430,6 +441,8 @@ See individual READMEs in each `devtools/` subdirectory for detailed usage:
   testing SSO
 - [Quality Checks](../devtools/quality/README.md) — unused file detection
 - [Simulators](../devtools/sim/README.md) — solar and charge simulations
+- [SEMS Simulator](../devtools/sems-simulator/README.md) — fake GoodWe SEMS
+  Portal API
 - [OCPP Simulator](../devtools/sap-ocpp-simulator/README.md) — standalone charge
   point for local development
 - [Tapo Simulator](../devtools/tapo-simulator/README.md) — fake smart plug for

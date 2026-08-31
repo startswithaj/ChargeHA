@@ -9,6 +9,7 @@
     "jsr:@std/assert@^1.0.17": "1.0.19",
     "jsr:@std/assert@^1.0.19": "1.0.19",
     "jsr:@std/async@^1.1.0": "1.2.0",
+    "jsr:@std/crypto@1": "1.1.0",
     "jsr:@std/data-structures@^1.0.10": "1.0.10",
     "jsr:@std/dotenv@*": "0.225.6",
     "jsr:@std/dotenv@0.225": "0.225.6",
@@ -91,6 +92,9 @@
     },
     "@std/async@1.2.0": {
       "integrity": "c059c6f6d95ca7cc012ae8e8d7164d1697113d54b0b679e4372b354b11c2dee5"
+    },
+    "@std/crypto@1.1.0": {
+      "integrity": "b8d6d0a6377a32b213af2661ed7bf1062d94feac0c57def5526a8e74a95c3ec8"
     },
     "@std/data-structures@1.0.10": {
       "integrity": "f574f86b0e07c69b9edc555fcc814b57d29258bad39fd5a34ba8a80ecf033cfe"
@@ -3879,6 +3883,8 @@
     "dependencies": [
       "jsr:@db/sqlite@0.12",
       "jsr:@std/assert@1",
+      "jsr:@std/crypto@1",
+      "jsr:@std/encoding@1",
       "jsr:@std/expect@^1.0.18",
       "jsr:@std/testing@^1.0.17",
       "jsr:@ts-rex/argon2@^1.0.3",

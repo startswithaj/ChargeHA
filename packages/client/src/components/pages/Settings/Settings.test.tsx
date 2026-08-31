@@ -125,6 +125,31 @@ vi.mock("../../../trpc.ts", () => ({
           }),
         },
       },
+      solar: {
+        get: {
+          useQuery: vi.fn(() => ({ data: {}, isLoading: false, error: null })),
+        },
+      },
+      battery: {
+        get: {
+          useQuery: vi.fn(() => ({ data: {}, isLoading: false, error: null })),
+        },
+      },
+      equipment: {
+        get: {
+          useQuery: vi.fn(() => ({ data: {}, isLoading: false, error: null })),
+        },
+      },
+      system: {
+        get: {
+          useQuery: vi.fn(() => ({ data: {}, isLoading: false, error: null })),
+        },
+      },
+      notification: {
+        get: {
+          useQuery: vi.fn(() => ({ data: {}, isLoading: false, error: null })),
+        },
+      },
     },
     wizard: {
       status: {
@@ -155,6 +180,24 @@ vi.mock("../../../trpc.ts", () => ({
         },
       },
     })),
+    schedule: {
+      list: {
+        useQuery: vi.fn(() => ({
+          data: { schedules: [] },
+          isLoading: false,
+          error: null,
+        })),
+      },
+    },
+    tariff: {
+      list: {
+        useQuery: vi.fn(() => ({
+          data: { periods: [] },
+          isLoading: false,
+          error: null,
+        })),
+      },
+    },
     vehicle: {
       list: {
         // The mock bypasses useQuery's `select`, so this must already be in

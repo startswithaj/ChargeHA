@@ -68,7 +68,7 @@ export function getApplicablePeriodForTime(
     .filter((p) => {
       const start = parseTimeToMinutes(p.startTime);
       const end = parseTimeToMinutes(p.endTime);
-      if (start > end) {
+      if (start >= end) {
         // Overnight period (e.g. 22:00-07:00): matches if current >= start OR current < end
         return minutesSinceMidnight >= start || minutesSinceMidnight < end;
       }

@@ -8,21 +8,38 @@ self-consumption — with advanced scheduling and notifications. Set and forget.
 
 ## Contents
 
+- [Contents](#contents)
 - [Demo](#demo)
 - [ChargeHQ.net](#chargehqnet)
 - [Features](#features)
+  - [Reporting](#reporting)
 - [Supported Integrations](#supported-integrations)
+  - [Coming Soon](#coming-soon)
 - [Notes about Tesla](#notes-about-tesla)
+  - [Onboarding (setup wizard)](#onboarding-setup-wizard)
+  - [Polling cadence (data calls)](#polling-cadence-data-calls)
+  - [Online probe (transition detection)](#online-probe-transition-detection)
+  - [Wake calls](#wake-calls)
+  - [Charge-rate (amps) updates](#charge-rate-amps-updates)
 - [How It Works](#how-it-works)
 - [Quick Start](#quick-start)
-- [Mobile & Home Screen](#mobile--home-screen)
+- [Mobile \& Home Screen](#mobile--home-screen)
 - [Getting Started](#getting-started)
+  - [Docker (recommended)](#docker-recommended)
+  - [Local Development](#local-development)
+  - [Devtools](#devtools)
 - [Environment Variables](#environment-variables)
 - [Database Migrations](#database-migrations)
+  - [Encryption Key](#encryption-key)
 - [Roadmap](#roadmap)
+  - [Smart Charger Support (OCPP)](#smart-charger-support-ocpp)
 - [Tech Stack](#tech-stack)
 - [App Tour Video](#app-tour-video)
 - [Contributing](#contributing)
+  - [Plugin architecture](#plugin-architecture)
+  - [Adding an inverter](#adding-an-inverter)
+  - [Vehicles and chargers](#vehicles-and-chargers)
+  - [Before you open a PR](#before-you-open-a-pr)
 - [Contributors](#contributors)
 
 ## Demo
@@ -80,25 +97,26 @@ ChargeHA is not affiliated with, endorsed by, or associated with ChargeHQ.
 
 ## Supported Integrations
 
-| Category      | Integration           | Details                                                                                                                                                                                                                                                                                                  |
-| ------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Vehicles      | **Tesla**             | Fleet API with virtual key pairing, charge control, wake, and location tracking                                                                                                                                                                                                                          |
-| Vehicles      | **Simulated**         | Demo/dev adapter with adjustable SOC and plug state                                                                                                                                                                                                                                                      |
-| Energy        | **Fronius (local)**   | Direct HTTP polling of inverters on your LAN, with auto-discovery                                                                                                                                                                                                                                        |
-| Energy        | **Fronius (cloud)**   | Remote monitoring via the Fronius Solar API                                                                                                                                                                                                                                                              |
-| Energy        | **Sigenergy (local)** | Direct Modbus TCP integration on your LAN, with auto-discovery; requires Modbus to be enabled by your installer                                                                                                                                                                                          |
-| Energy        | **Enphase (local)**   | Direct HTTPS polling of the Envoy / IQ Gateway on your LAN (firmware 7+), with auto-discovery and token renewal                                                                                                                                                                                          |
-| Chargers      | **OCPP 1.6J**         | Any OCPP 1.6J charger on your LAN — ABB, Wallbox, go-e, Fronius Wattpilot, MG ChargeHub, Ocular, ZJ Beny, Schneider and more. The charger connects to ChargeHA by WebSocket, no cloud account; paired by listening for the charge point ID it announces. See [compatibility list](docs/ocpp-chargers.md) |
-| Chargers      | **Simulated**         | Dev/demo charging point with plug state and adjustable draw                                                                                                                                                                                                                                              |
-| Chargers      | **Tapo P110/115**     | Switches a standard EVSE on and off via a TP-Link smart plug on your LAN, with auto-discovery; requires "Third-Party Compatibility" to be enabled in the Tapo app (Me → Third-Party Services), and an energy-monitoring model — the plug's power reading is how charging is detected                     |
-| Notifications | **Telegram**          | Alerts for charging events, errors, and energy outages                                                                                                                                                                                                                                                   |
-| Auth          | **OIDC**              | Single sign-on via any OpenID Connect provider                                                                                                                                                                                                                                                           |
+| Category      | Integration                      | Details                                                                                                                                                                                                                                                                                                  |
+| ------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Vehicles      | **Tesla**                        | Fleet API with virtual key pairing, charge control, wake, and location tracking                                                                                                                                                                                                                          |
+| Vehicles      | **Simulated**                    | Demo/dev adapter with adjustable SOC and plug state                                                                                                                                                                                                                                                      |
+| Energy        | **Fronius (local)**              | Direct HTTP polling of inverters on your LAN, with auto-discovery                                                                                                                                                                                                                                        |
+| Energy        | **Fronius (cloud)**              | Remote monitoring via the Fronius Solar API                                                                                                                                                                                                                                                              |
+| Energy        | **Sigenergy (local)**            | Direct Modbus TCP integration on your LAN, with auto-discovery; requires Modbus to be enabled by your installer                                                                                                                                                                                          |
+| Energy        | **Enphase (local)**              | Direct HTTPS polling of the Envoy / IQ Gateway on your LAN (firmware 7+), with auto-discovery and token renewal                                                                                                                                                                                          |
+| Energy        | **GoodWe (Cloud / SEMS Portal)** | Remote monitoring via your GoodWe account login; supports both the legacy SEMS Portal and the newer SEMS+ backend; requires a GoodWe HomeKit or smart meter for grid and consumption readings                                                                                                            |
+| Chargers      | **OCPP 1.6J**                    | Any OCPP 1.6J charger on your LAN — ABB, Wallbox, go-e, Fronius Wattpilot, MG ChargeHub, Ocular, ZJ Beny, Schneider and more. The charger connects to ChargeHA by WebSocket, no cloud account; paired by listening for the charge point ID it announces. See [compatibility list](docs/ocpp-chargers.md) |
+| Chargers      | **Simulated**                    | Dev/demo charging point with plug state and adjustable draw                                                                                                                                                                                                                                              |
+| Chargers      | **Tapo P110/115**                | Switches a standard EVSE on and off via a TP-Link smart plug on your LAN, with auto-discovery; requires "Third-Party Compatibility" to be enabled in the Tapo app (Me → Third-Party Services), and an energy-monitoring model — the plug's power reading is how charging is detected                     |
+| Notifications | **Telegram**                     | Alerts for charging events, errors, and energy outages                                                                                                                                                                                                                                                   |
+| Auth          | **OIDC**                         | Single sign-on via any OpenID Connect provider                                                                                                                                                                                                                                                           |
 
 ### Coming Soon
 
-| Category | Integration        | Details                                                                          |
-| -------- | ------------------ | -------------------------------------------------------------------------------- |
-| Energy   | **More inverters** | SolarEdge, Sungrow, GoodWe, and Growatt — the most popular brands beyond Fronius |
+| Category | Integration        | Details                                                                  |
+| -------- | ------------------ | ------------------------------------------------------------------------ |
+| Energy   | **More inverters** | SolarEdge, Sungrow, and Growatt — the most popular brands beyond Fronius |
 
 ## Notes about Tesla
 
@@ -325,6 +343,8 @@ README:
   SSO
 - [Quality Checks](devtools/quality/README.md) — unused file detection
 - [Simulators](devtools/sim/README.md) — solar and charge simulations
+- [SEMS Simulator](devtools/sems-simulator/README.md) — fake GoodWe SEMS Portal
+  cloud API for testing the GoodWe plugin without an account
 - [OCPP Simulator](devtools/sap-ocpp-simulator/README.md) — standalone charge
   point for local development
 
@@ -400,6 +420,13 @@ for how ChargeHA configures a charger's metering and reads 3-phase, and
 Contributions are very welcome — especially **new vehicles, inverters, and
 chargers**. If you own hardware ChargeHA doesn't support yet, adding it is
 usually a weekend's work.
+
+New features will be considered, but not every feature can be included. Feature
+bloat is a real issue in the age of AI, and the codebase cannot stay manageable
+if every vibe-coded feature is merged. ChargeHA has a plugin architecture for
+charger, inverter, and vehicle integrations. I'm open to extending that plugin
+architecture to other, more core features that people can opt into — and to PRs
+along those lines — but the codebase does not have this capability today.
 
 ### Plugin architecture
 
@@ -486,10 +513,15 @@ the same type. Local test rigs live in `devtools/sap-ocpp-simulator/` and
 ### Before you open a PR
 
 - Read [docs/code.md](docs/code.md) for conventions and project layout
+- When running the app in dev, there is a style guide at `/components` that
+  renders every shipped UI component from static fixtures. Use it to see the
+  building blocks before writing plugin client components, and add your new
+  components to it so they stay consistent — see
+  [docs/settings-ui.md](docs/settings-ui.md) for the rules
 - Add tests for your adapter (see the `test-helpers/` folders in existing
   plugins)
 - Run `deno task check:all` — formatting, lint, types, plugin refs, and tests
-  must all pass
+  must all pass.
 
 ## Contributors
 

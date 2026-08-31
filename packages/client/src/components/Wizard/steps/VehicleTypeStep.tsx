@@ -11,6 +11,7 @@ import { demoMode } from "../../../lib/featureFlags.ts";
 import type { StepDef, WizardNext } from "../flow.ts";
 import { OptionCard } from "./OptionCard.tsx";
 import styles from "./steps.module.css";
+import { FormError } from "../../ui/FormError.tsx";
 
 const icons = {
   car: Car,
@@ -159,11 +160,7 @@ function VehicleTypeCards(
         })}
       </div>
 
-      {error && (
-        <Text as="p" size="2" color="red">
-          {error}
-        </Text>
-      )}
+      <FormError message={error} size="2" />
     </div>
   );
 }

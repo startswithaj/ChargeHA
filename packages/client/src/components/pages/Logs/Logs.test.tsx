@@ -79,6 +79,26 @@ vi.mock("../../../trpc.ts", () => ({
         })),
       },
     },
+    log: {
+      pluginLogIds: {
+        useQuery: vi.fn(() => ({
+          data: [],
+          isLoading: false,
+          error: null,
+        })),
+      },
+    },
+    config: {
+      system: {
+        get: {
+          useQuery: vi.fn(() => ({
+            data: { timezone: "Australia/Brisbane" },
+            isLoading: false,
+            error: null,
+          })),
+        },
+      },
+    },
   },
 }));
 

@@ -65,7 +65,7 @@ export function isScheduleActiveNow(
   const startMinutes = toMinutes(schedule.startTime);
   const endMinutes = toMinutes(schedule.endTime);
 
-  if (startMinutes <= endMinutes) {
+  if (startMinutes < endMinutes) {
     // Normal range (e.g. 09:00 - 17:00)
     return currentMinutes >= startMinutes && currentMinutes < endMinutes;
   } else {

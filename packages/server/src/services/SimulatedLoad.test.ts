@@ -129,6 +129,9 @@ describe("simulated load — the four inverter/vehicle combinations", () => {
       startCharging: () => Promise.resolve(true),
       stopCharging: () => Promise.resolve(true),
       setChargeAmps: () => Promise.resolve(true),
+      supportsRecovery: () => false,
+      recoverConnection: () => Promise.resolve(null),
+      softReset: () => Promise.resolve(null),
       shutdown: () => Promise.resolve(),
     };
     const chargerPlugins = new ChargerPluginRegistry();

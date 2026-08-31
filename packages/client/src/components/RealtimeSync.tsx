@@ -20,6 +20,7 @@ export function RealtimeSync() {
           batterySoc: data.batterySoc,
           gridVoltageV: data.gridVoltageV,
           lastUpdated: data.lastUpdated,
+          sourceUpdatedAt: data.sourceUpdatedAt,
           pollFailed: data.pollFailed,
           pollError: data.pollError,
         },

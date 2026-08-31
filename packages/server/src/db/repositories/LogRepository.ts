@@ -319,6 +319,16 @@ export class LogRepository {
     });
   }
 
+  /** Every plugin id that has ever logged — the filter dropdown's option
+   *  list, independent of whatever filter is currently applied. */
+  async getPluginLogIds(): Promise<string[]> {
+    const rows = await this.db
+      .selectDistinct({ pluginId: pluginLogs.pluginId })
+      .from(pluginLogs)
+      .orderBy(asc(pluginLogs.pluginId));
+    return rows.map((row) => row.pluginId);
+  }
+
   async getPluginLogs(opts: {
     limit: number;
     offset: number;

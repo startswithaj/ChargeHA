@@ -72,7 +72,6 @@ export function useVehicleBreakdowns({
   const year = cursor.getFullYear();
   const month = cursor.getMonth() + 1;
   const dateStr = cursorToDateStr(cursor);
-  const tz = useMemo(() => -(new Date().getTimezoneOffset() / 60), []);
 
   const vehicleQueries = trpc.useQueries((t) =>
     entities.map((v) => {
@@ -82,19 +81,18 @@ export function useVehicleBreakdowns({
             {
               date: dateStr,
               vehicleId: v.id,
-              tz,
               resolution: resolution === "15m" ? "15m" : undefined,
             },
             { enabled: !loading },
           );
         case "month":
           return t.stats.month(
-            { year, month, vehicleId: v.id, tz },
+            { year, month, vehicleId: v.id },
             { enabled: !loading },
           );
         case "year":
           return t.stats.year(
-            { year, vehicleId: v.id, tz },
+            { year, vehicleId: v.id },
             { enabled: !loading },
           );
       }

@@ -32,7 +32,9 @@ describe("LogEntryCard", () => {
 
   const renderEntry = (overrides: Record<string, unknown> = {}) => {
     const entry = makeEntry(overrides) as never as ControllerLogEntry;
-    renderWithProviders(<LogEntryCard entry={entry} />);
+    renderWithProviders(
+      <LogEntryCard entry={entry} timezone="Australia/Brisbane" />,
+    );
     fireEvent.click(screen.getByText("Test Car"));
   };
 

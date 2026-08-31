@@ -399,24 +399,30 @@ export class ChargingPointManager {
       // Switch chargers never receive amp commands.
       const alreadyCommanded = entry.lastCommandedAmps === clamped &&
         state.isCharging;
-      if (
-        state.controlMode === "amps" && !alreadyCommanded &&
-        state.chargeAmps !== clamped
-      ) {
-        const ok = await entry.middleware.setChargeAmps(
+      const ampsNeeded = state.controlMode === "amps" && !alreadyCommanded &&
+        state.chargeAmps !== clamped;
+      const sendAmps = () =>
+        entry.middleware.setChargeAmps(
           clamped,
           { ...ctx, origin: `${ctx.origin}:set-amps` },
-        );
-        if (!ok) throw new Error(`setChargeAmps(${clamped}) rejected`);
-      }
-      entry.lastCommandedAmps = clamped;
+        ).catch(() => false);
+      const ampsOk = !ampsNeeded || await sendAmps();
       if (!state.isCharging) {
         const ok = await entry.middleware.startCharging(
           { ...ctx, origin: `${ctx.origin}:start` },
         );
         if (!ok) throw new Error("startCharging rejected");
         this.logger.info(`Started ${id} at ${clamped}A`);
+        if (!ampsOk) {
+          this.logger.warn(
+            `setChargeAmps(${clamped}) rejected before start for ${id}; ` +
+              "limit rides in RemoteStartTransaction",
+          );
+        }
+      } else if (!ampsOk) {
+        throw new Error(`setChargeAmps(${clamped}) rejected`);
       }
+      entry.lastCommandedAmps = clamped;
       this.resetCommandBackoff(id);
       return { success: true };
     } catch (error) {
@@ -834,8 +840,35 @@ export class ChargingPointManager {
         vehicleResolution: resolution.kind,
         controlOwner: controlPath.owner,
         passiveForVehicleId: controlPath.passiveForVehicleId,
+        supportsRecovery: this.chargers.get(row.id)?.middleware
+          .supportsRecovery() ?? false,
       };
     }));
+  }
+
+  async recoverCharger(
+    id: string,
+    ctx: CallContext,
+  ): Promise<{ steps: string[] } | { error: string }> {
+    const entry = this.chargers.get(id);
+    if (!entry) return { error: "Charger not registered" };
+    const steps = await entry.middleware.recoverConnection(ctx);
+    if (steps === null) return { error: "Not supported by this charger" };
+    // Repeated failures build up a long retry delay. Recovery means the user
+    // has fixed the problem, so the next command should run immediately.
+    this.resetCommandBackoff(id);
+    return { steps };
+  }
+
+  async softResetCharger(
+    id: string,
+    ctx: CallContext,
+  ): Promise<{ accepted: boolean } | { error: string }> {
+    const entry = this.chargers.get(id);
+    if (!entry) return { error: "Charger not registered" };
+    const accepted = await entry.middleware.softReset(ctx);
+    if (accepted === null) return { error: "Not supported by this charger" };
+    return { accepted };
   }
 
   isBackedOff(id: string): { backedOff: boolean; remainingMs: number } {

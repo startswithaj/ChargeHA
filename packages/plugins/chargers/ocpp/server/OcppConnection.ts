@@ -13,6 +13,10 @@ export class OcppConnection {
   private readonly pending = new PendingCalls();
   private readonly queue: OcppMessageQueue;
   private transactionCounter = 0;
+  private readonly stoppedTransactionIds = new Set<number>();
+  // OCPP-J permits one outstanding CALL per direction; chargers drop or
+  // misorder overlapping CALLs, so sends are chained.
+  private outbound: Promise<unknown> | null = null;
 
   constructor(
     readonly socket: WebSocket,
@@ -59,6 +63,14 @@ export class OcppConnection {
     this.socket.close();
   }
 
+  noteStoppedTransaction(transactionId: number): void {
+    this.stoppedTransactionIds.add(transactionId);
+  }
+
+  hasStoppedTransaction(transactionId: number): boolean {
+    return this.stoppedTransactionIds.has(transactionId);
+  }
+
   nextTransactionId(): number {
     this.transactionCounter++;
     return this.transactionCounter;
@@ -70,7 +82,30 @@ export class OcppConnection {
     this.transactionCounter = Math.max(this.transactionCounter, transactionId);
   }
 
-  async send(action: string, payload: unknown): Promise<unknown> {
+  send(action: string, payload: unknown): Promise<unknown> {
+    // An idle line dispatches synchronously so the CALL is on the wire (and
+    // visible to callers) before any await.
+    const result = this.outbound === null
+      ? this.dispatch(action, payload)
+      : this.afterOutbound(action, payload);
+    // A predecessor's failure is already delivered to its own caller via
+    // `result`; the chain only needs to know the slot freed up.
+    const tail: Promise<void> = result.catch(() => null).then(() => {
+      if (this.outbound === tail) this.outbound = null;
+    });
+    this.outbound = tail;
+    return result;
+  }
+
+  private async afterOutbound(
+    action: string,
+    payload: unknown,
+  ): Promise<unknown> {
+    await this.outbound?.catch(() => null);
+    return await this.dispatch(action, payload);
+  }
+
+  private async dispatch(action: string, payload: unknown): Promise<unknown> {
     if (this.socket.readyState !== WebSocket.OPEN) {
       throw new Error(`Charger ${this.chargePointId} not connected`);
     }

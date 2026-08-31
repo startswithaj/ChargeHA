@@ -14,6 +14,7 @@ interface LogTableProps {
   onPageChange: (page: number) => void;
   pageSize: number;
   onPageSizeChange: (size: number) => void;
+  timezone: string;
 }
 
 export function LogTable({
@@ -24,6 +25,7 @@ export function LogTable({
   onPageChange,
   pageSize,
   onPageSizeChange,
+  timezone,
 }: LogTableProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const freshIds = useFreshRowIds(logs);
@@ -56,7 +58,7 @@ export function LogTable({
             key={entry.id}
             className={freshIds.has(entry.id) ? styles.freshRow : undefined}
           >
-            <LogEntryCard entry={entry} />
+            <LogEntryCard entry={entry} timezone={timezone} />
           </div>
         ))}
       </div>

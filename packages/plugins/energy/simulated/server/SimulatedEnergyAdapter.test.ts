@@ -9,8 +9,13 @@ describe("SimulatedEnergyAdapter", () => {
   const noon = new Date(2026, 5, 3, 12, 0, 0);
   const midnight = new Date(2026, 5, 3, 0, 0, 0);
 
+  const runnerZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const makeAdapter = (now: () => Date) =>
-    new SimulatedEnergyAdapter({ ...DEFAULT_SOLAR_CONFIG }, log, now);
+    new SimulatedEnergyAdapter(
+      { ...DEFAULT_SOLAR_CONFIG, timezone: runnerZone },
+      log,
+      now,
+    );
 
   describe("pollIntervalSeconds", () => {
     it("is 10 seconds", () => {
@@ -54,5 +59,28 @@ describe("SimulatedEnergyAdapter", () => {
       const b = await makeAdapter(() => nextDay).getRealtimeData();
       expect(a.solarProductionW).not.toBe(b.solarProductionW);
     });
+  });
+});
+
+describe("SimulatedEnergyAdapter time of day", () => {
+  const log = new Logger("SimEnergy", "error");
+  // 02:00 UTC is midday in Brisbane and 22:00 the previous evening in New York.
+  const instant = new Date("2026-08-25T02:00:00Z");
+
+  const solarAt = async (timezone: string) => {
+    const adapter = new SimulatedEnergyAdapter(
+      { ...DEFAULT_SOLAR_CONFIG, timezone },
+      log,
+      () => instant,
+    );
+    return (await adapter.getRealtimeData()).solarProductionW;
+  };
+
+  it("generates solar at midday in the configured zone", async () => {
+    expect(await solarAt("Australia/Brisbane")).toBeGreaterThan(0);
+  });
+
+  it("generates none at night in the configured zone", async () => {
+    expect(await solarAt("America/New_York")).toBe(0);
   });
 });

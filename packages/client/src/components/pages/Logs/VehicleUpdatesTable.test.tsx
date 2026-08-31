@@ -39,6 +39,7 @@ describe("VehicleUpdatesTable", () => {
     pageSize: 50,
     onPageSizeChange: vi.fn(),
     vehicles: [{ id: "v1", name: "Model 3" }],
+    timezone: "Australia/Brisbane",
   };
 
   it("shows loading state when loading with no data", () => {

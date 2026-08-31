@@ -57,12 +57,10 @@ const timeStringSchema: z.ZodString = z.string().regex(
 
 export const statsDayInput: z.ZodType<{
   date: string;
-  tz?: number | undefined;
   vehicleId?: string | undefined;
   resolution?: "15m" | undefined;
 }> = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD"),
-  tz: z.number().min(-14).max(14).optional(),
   vehicleId: z.string().optional(),
   resolution: z.enum(["15m"]).optional(),
 });
@@ -71,23 +69,19 @@ export type StatsDayInput = z.infer<typeof statsDayInput>;
 export const statsMonthInput: z.ZodType<{
   year: number;
   month: number;
-  tz?: number | undefined;
   vehicleId?: string | undefined;
 }> = z.object({
   year: z.number().int(),
   month: z.number().int().min(1).max(12),
-  tz: z.number().min(-14).max(14).optional(),
   vehicleId: z.string().optional(),
 });
 export type StatsMonthInput = z.infer<typeof statsMonthInput>;
 
 export const statsYearInput: z.ZodType<{
   year: number;
-  tz?: number | undefined;
   vehicleId?: string | undefined;
 }> = z.object({
   year: z.number().int(),
-  tz: z.number().min(-14).max(14).optional(),
   vehicleId: z.string().optional(),
 });
 export type StatsYearInput = z.infer<typeof statsYearInput>;

@@ -57,6 +57,18 @@ class StubChargerMiddleware implements ChargerMiddleware {
     this.setAmpsCalls++;
     return Promise.resolve(true);
   }
+  supportsRecovery(): boolean {
+    return false;
+  }
+
+  recoverConnection(_ctx: unknown): Promise<string[] | null> {
+    return Promise.resolve(null);
+  }
+
+  softReset(_ctx: unknown): Promise<boolean | null> {
+    return Promise.resolve(null);
+  }
+
   shutdown(): Promise<void> {
     return Promise.resolve();
   }

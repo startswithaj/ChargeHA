@@ -5,7 +5,7 @@ import { trpc } from "../trpc.ts";
 import { queryClient } from "../lib/trpcSetup.ts";
 import { useRouter } from "../hooks/useRouter.ts";
 import { LoginPage } from "./Login/LoginPage.tsx";
-import { Spinner } from "./ui/Spinner.tsx";
+import { WaitingBars } from "./ui/WaitingBars.tsx";
 
 export interface AuthInfo {
   authMode: string;
@@ -96,7 +96,7 @@ export function AuthGate({ children }: AuthGateProps) {
           minHeight: "100vh",
         }}
       >
-        <Spinner size="lg" />
+        <WaitingBars size="lg" />
       </div>
     );
   }

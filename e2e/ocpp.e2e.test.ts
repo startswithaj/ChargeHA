@@ -142,12 +142,13 @@ describe("OCPP e2e", () => {
 
     // The station auto-sends StartTransaction + StatusNotification(Charging)
     // after accepting RemoteStartTransaction, so the test injects neither.
+    // Waits on status: the confirmation bridge reports charging first.
     const state = await waitFor(async () => {
       const list = await trpc.charger.list.query();
       const s = list.find((c) => c.id === charger.id)?.state;
-      return s?.isCharging ? s : null;
+      return s?.status === "charging" ? s : null;
     }, { label: "charging after RemoteStart" });
-    expect(state.status).toBe("charging");
+    expect(state.isCharging).toBe(true);
     expect(state.statusDetail).toBe("Charging");
   });
 
@@ -241,6 +242,41 @@ describe("OCPP e2e", () => {
     expect(state.isCharging).toBe(false);
   });
 
+  it("resumes after a solar-style stop without resurrecting the dead transaction", async () => {
+    const chargerId = await ocppRowId();
+    await stationAndAppIdle(chargerId);
+    const tx = await startFreshTransaction(chargerId);
+
+    await trpc.charger.setMode.mutate({ id: chargerId, mode: "stop" });
+    await waitFor(
+      async () => await sapTransactionId() === undefined ? true : null,
+      { label: "station ended the transaction" },
+    );
+
+    // StarCharge stays in Finishing with the cable in and flushes a final
+    // MeterValues carrying the dead transaction id — the 22 Aug incident.
+    await injectStatus("Finishing");
+    await vcpSend("MeterValues", meterValuesPayload(0, 2500, tx));
+
+    const finishing = await waitFor(async () => {
+      const s = (await ocppRow())?.state;
+      return s?.status === "finishing" ? s : null;
+    }, { label: "finishing, not faulted, after trailing MeterValues" });
+    expect(finishing.status).toBe("finishing");
+
+    await injectStatus("Preparing");
+    await trpc.charger.setMode.mutate({ id: chargerId, mode: "charge_now" });
+    const newTx = await waitFor(async () => {
+      const id = await sapTransactionId();
+      return id !== undefined && id !== tx ? id : null;
+    }, { label: "resumed with a new transaction", timeoutMs: 30_000 });
+    expect(newTx).not.toBe(tx);
+
+    // The resumed transaction keeps streaming MeterValues every 10s; left
+    // running it starves the staleness test below of quiet.
+    await stationAndAppIdle(chargerId);
+  });
+
   it("Available maps to available with no cable", async () => {
     const state = await waitFor(async () => {
       // Re-injected per attempt too — see the SuspendedEV test above. Also
@@ -290,22 +326,22 @@ describe("OCPP e2e", () => {
     expect(state?.chargePowerKw ?? 0).toBeGreaterThan(0); // loose: timing-safe
   });
 
-  it("stale MeterValues flips the charger to faulted mid-transaction", async () => {
+  it("stale MeterValues shows a detail warning without inventing a fault", async () => {
     // Shrink the meter timeout rather than mock the clock: keeps the check
     // in-band and deterministic.
     await ocppTrpc.plugin.charger.ocpp.setConfig.mutate({
       chargerRowId: await ocppRowId(),
       values: { ocppMeterTimeoutSeconds: "5" },
     });
-    // Staleness only counts while a transaction runs — an idle charger sends
-    // no MeterValues and must not fault. The transaction id rides in on the
-    // MeterValues so the app adopts it.
+    // Adoption is refused while the charger reports Available/Finishing, so
+    // the status must say Charging for the ride-along id to be adopted.
+    await injectStatus("Charging");
     await vcpSend("MeterValues", meterValuesPayload(7200, 2000, 4242));
     const state = await waitFor(async () => {
       const s = (await ocppRow())?.state;
-      return s?.status === "faulted" ? s : null;
-    }, { label: "stale → faulted", timeoutMs: 30_000 });
-    expect(state.statusDetail).toBe("stale (no MeterValues)");
+      return s?.statusDetail === "no recent meter data" ? s : null;
+    }, { label: "stale detail without fault", timeoutMs: 30_000 });
+    expect(state.status).toBe("charging");
     await vcpSend("StopTransaction", {
       transactionId: 4242,
       meterStop: 2000,

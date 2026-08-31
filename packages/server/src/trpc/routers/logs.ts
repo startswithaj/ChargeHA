@@ -30,4 +30,9 @@ export const logsRouter = router({
     .query(async ({ ctx, input }) => {
       return await ctx.logService.getPluginLogs(input);
     }),
+
+  pluginLogIds: publicProcedure
+    .query(async ({ ctx }) => {
+      return await ctx.logService.getPluginLogIds();
+    }),
 });

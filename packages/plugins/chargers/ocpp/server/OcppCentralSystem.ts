@@ -13,8 +13,10 @@ import {
   chargingProfilePayload,
   type ChargingProfileRequest,
   meterValuesReq,
+  remoteStartTxProfile,
   startTransactionReq,
   statusNotificationReq,
+  stopTransactionReq,
 } from "./OcppMessages.ts";
 import { readMeterValueFields } from "./OcppMeterValues.ts";
 import { measurandWarningFor } from "./OcppMeasurands.ts";
@@ -63,9 +65,11 @@ function withCharger(
 // reach plugin-wide operations like pairing.
 export interface OcppChargerHandle {
   getData(): OcppLiveData;
-  remoteStart(): Promise<boolean>;
+  remoteStart(amps?: number): Promise<boolean>;
   remoteStop(): Promise<boolean>;
   setChargingProfiles(profiles: ChargingProfileRequest[]): Promise<boolean>;
+  recoverConnection(): Promise<string[]>;
+  softReset(): Promise<boolean>;
   ping(): Promise<{ latencyMs: number }>;
 }
 
@@ -79,6 +83,11 @@ export class OcppCentralSystem {
   // Separate from `knocking`: every retry refreshes that one, so rate-limiting
   // on it would log a given id exactly once, ever.
   private lastLogged: ChargerStamp | null = null;
+  // Health checks need "down since when", which must survive the connection
+  // object being destroyed. Never-connected ids fall back to process start so
+  // a charger that never dialled in still surfaces after the grace.
+  private readonly startedAt = Date.now();
+  private readonly disconnectedAt = new Map<string, number>();
   // Not per connection: the reconnect it must survive destroys that object.
   private readonly negotiator: OcppMeasurandNegotiator;
   private readonly maxAmpsDetector: OcppMaxAmpsDetector;
@@ -89,6 +98,8 @@ export class OcppCentralSystem {
     // Async because saving a row must take effect on an already-open socket's
     // very next message.
     private readonly hasChargerRow: (chargePointId: string) => Promise<boolean>,
+    private readonly onLiveDataChanged: (chargePointId: string) => void =
+      () => {},
   ) {
     this.negotiator = new OcppMeasurandNegotiator(
       (id, action, payload) => this.send(id, action, payload),
@@ -160,6 +171,7 @@ export class OcppCentralSystem {
     // once the new entry is in the map, so this is the last chance to fail the
     // replaced connection's callers.
     this.connections.get(id)?.close("Charger reconnected");
+    this.disconnectedAt.delete(id);
     const connection = new OcppConnection(socket, id, this.logger, this.dbLog);
     this.connections.set(id, connection);
     // deno-lint-ignore custom-no-param-mutation/no-param-mutation -- WebSocket handler wiring
@@ -175,10 +187,12 @@ export class OcppCentralSystem {
   forCharger(chargePointId: string): OcppChargerHandle {
     return {
       getData: () => this.getData(chargePointId),
-      remoteStart: () => this.remoteStart(chargePointId),
+      remoteStart: (amps) => this.remoteStart(chargePointId, amps),
       remoteStop: () => this.remoteStop(chargePointId),
       setChargingProfiles: (payloads) =>
         this.setChargingProfiles(chargePointId, payloads),
+      recoverConnection: () => this.recoverConnection(chargePointId),
+      softReset: () => this.softReset(chargePointId),
       ping: () => this.ping(chargePointId),
     };
   }
@@ -226,10 +240,13 @@ export class OcppCentralSystem {
     this.connections.clear();
   }
 
-  remoteStart(chargePointId: string): Promise<boolean> {
+  remoteStart(chargePointId: string, amps?: number): Promise<boolean> {
     return this.command(chargePointId, "RemoteStartTransaction", {
       connectorId: 1,
       idTag: "chargeha",
+      ...(amps !== undefined && {
+        chargingProfile: remoteStartTxProfile(amps),
+      }),
     });
   }
 
@@ -293,14 +310,24 @@ export class OcppCentralSystem {
     chargePointId: string,
     profiles: ChargingProfileRequest[],
   ): Promise<boolean> {
+    // Wire order is preserved: OcppConnection.send chains outgoing CALLs, so
+    // mapping without awaiting each still yields one CALL at a time.
     const results = await Promise.all(
       profiles.map((p) =>
         this.send(chargePointId, "SetChargingProfile", p.payload)
       ),
     );
-    const accepted = results.every(isAccepted);
-    this.logOutcome(chargePointId, "SetChargingProfile", accepted, results);
-    if (!accepted) {
+    const rejected = profiles.filter((_, i) => !isAccepted(results[i]));
+    // A rejected TxProfile is advisory when the authoritative tiers landed:
+    // ChargePointMax + TxDefault already steer the charger.
+    const fatal = rejected.filter((p) => p.purpose !== "TxProfile");
+    this.logOutcome(
+      chargePointId,
+      "SetChargingProfile",
+      rejected.length === 0,
+      results,
+    );
+    if (fatal.length > 0) {
       const detail = profiles
         .map((p, i) => `${p.purpose}=${resultStatus(results[i])}`)
         .join(", ");
@@ -311,6 +338,44 @@ export class OcppCentralSystem {
       );
     }
     return true;
+  }
+
+  // User-triggered escape hatch from a disordered state: forget any cached
+  // transaction, wipe stored profiles (including a standing 0A clamp), and
+  // ask the charger to restate the truth.
+  async recoverConnection(chargePointId: string): Promise<string[]> {
+    this.patch(chargePointId, {
+      transactionId: null,
+      meterStartWh: null,
+      lastMeterValuesAt: null,
+    });
+    // Best-effort per step: TriggerMessage is an optional feature profile and
+    // a NotImplemented reply must not abort the rest of the recovery.
+    const attempt = (label: string, action: string, payload: unknown) =>
+      this.send(chargePointId, action, payload)
+        .then((res) => `${label}: ${resultStatus(res)}`)
+        .catch((error) => `${label}: failed (${error})`);
+    const steps = [
+      "cleared cached transaction state",
+      await attempt("cleared charging profiles", "ClearChargingProfile", {}),
+      await attempt("requested status", "TriggerMessage", {
+        requestedMessage: "StatusNotification",
+        connectorId: 1,
+      }),
+      await attempt("requested meter values", "TriggerMessage", {
+        requestedMessage: "MeterValues",
+        connectorId: 1,
+      }),
+    ];
+    this.dbLog.info(`Connection recovery (${chargePointId})`, {
+      payload: { chargePointId, steps },
+    });
+    return steps;
+  }
+
+  // Remote equivalent of the isolation switch.
+  softReset(chargePointId: string): Promise<boolean> {
+    return this.command(chargePointId, "Reset", { type: "Soft" });
   }
 
   private chargerContext(chargePointId: string): string {
@@ -421,6 +486,13 @@ export class OcppCentralSystem {
     await this.maxAmpsDetector.detect(chargePointId);
   }
 
+  // Milliseconds this id has been without a socket; null while connected.
+  disconnectedForMs(chargePointId: string): number | null {
+    if (this.getData(chargePointId).connected) return null;
+    return Date.now() -
+      (this.disconnectedAt.get(chargePointId) ?? this.startedAt);
+  }
+
   detectedMaxAmps(chargePointId: string): number | null {
     return this.maxAmpsDetector.detectedMaxAmps(chargePointId);
   }
@@ -489,8 +561,10 @@ export class OcppCentralSystem {
         return { currentTime: new Date().toISOString() };
       case "StatusNotification": {
         const s = statusNotificationReq.parse(payload);
+        // connectorId 0 is the charge point as a whole; its status must not
+        // overwrite connector 1's (a boot-time Available would mask Charging).
         this.patch(chargePointId, {
-          status: s.status,
+          ...(s.connectorId !== 0 && { status: s.status }),
           errorCode: s.errorCode,
           statusInfo: s.info ?? null,
           vendorErrorCode: s.vendorErrorCode ?? null,
@@ -526,6 +600,17 @@ export class OcppCentralSystem {
         };
       }
       case "StopTransaction": {
+        const stop = stopTransactionReq.safeParse(payload);
+        const connection = this.connections.get(chargePointId);
+        if (stop.success && connection !== undefined) {
+          connection.noteStoppedTransaction(stop.data.transactionId);
+          const current = connection.getData().transactionId;
+          // A replayed offline stop for an old transaction must not kill the
+          // current one.
+          if (current !== null && current !== stop.data.transactionId) {
+            return { idTagInfo: { status: "Accepted" } };
+          }
+        }
         this.patch(chargePointId, {
           transactionId: null,
           meterStartWh: null,
@@ -551,7 +636,11 @@ export class OcppCentralSystem {
     if (transactionId === undefined) return {};
     const connection = this.connections.get(chargePointId);
     if (connection === undefined) return {};
+    // Chargers flush 1-2 final MeterValues after StopTransaction; adopting
+    // that id resurrects a dead transaction (the 22 Aug incident).
+    if (connection.hasStoppedTransaction(transactionId)) return {};
     const data = connection.getData();
+    if (data.status === "Finishing" || data.status === "Available") return {};
     if (data.transactionId === transactionId) return {};
     connection.reserveTransactionId(transactionId);
     // Once per reconnect that lost its StartTransaction, not per MeterValues.
@@ -599,6 +688,7 @@ export class OcppCentralSystem {
     if (connection === undefined || connection.socket !== socket) return;
     connection.close("Charger disconnected");
     this.connections.delete(chargePointId);
+    this.disconnectedAt.set(chargePointId, Date.now());
     this.logger.warn(`Charger ${chargePointId} disconnected`);
     this.dbLog.warn(`Charger ${chargePointId} disconnected`, {
       payload: { chargePointId },
@@ -619,6 +709,7 @@ export class OcppCentralSystem {
 
   private patch(chargePointId: string, delta: Partial<OcppLiveData>): void {
     this.connections.get(chargePointId)?.patch(delta);
+    this.onLiveDataChanged(chargePointId);
   }
 }
 

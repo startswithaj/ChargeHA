@@ -18,6 +18,8 @@ import { useVehicles } from "../../../hooks/useVehicles.ts";
 import { EnergyFlowDiagram } from "../../EnergyFlowDiagram/EnergyFlowDiagram.tsx";
 import { MetricCard } from "../../MetricCard/MetricCard.tsx";
 import { kwhValue, kwValue } from "../../../utils/Format.ts";
+import { localDateStr } from "@chargeha/shared/timezone";
+import { useSiteTimezone } from "../../../hooks/useSiteTimezone.ts";
 import { trpc } from "../../../trpc.ts";
 import {
   chargingEntriesFromPoints,
@@ -149,10 +151,10 @@ function useOverviewData() {
   const cumulative = energyData?.cumulative ?? null;
   const { vehicles } = useVehicles();
 
-  const today = new Date().toISOString().slice(0, 10);
-  const tz = -(new Date().getTimezoneOffset() / 60);
+  const timezone = useSiteTimezone();
+  const today = localDateStr(new Date(), timezone);
   const { data: statsDay = null } = trpc.stats.day.useQuery(
-    { date: today, tz },
+    { date: today },
     { refetchInterval: 60_000 },
   );
   const { data: currentRate = null } = trpc.tariff.currentRate.useQuery(

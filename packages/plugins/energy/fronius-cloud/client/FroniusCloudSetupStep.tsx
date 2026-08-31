@@ -7,8 +7,8 @@ import {
 import { trpc } from "./trpc.ts";
 import { FroniusCloudForm } from "./FroniusCloudForm.tsx";
 
-/** Only the tested-connection branch carries a handler, so there is no
- *  "save without a validated connection" state to guard against. */
+// Only the tested-connection branch carries a handler, so there is no
+// "save without a validated connection" state to guard against.
 function froniusCloudNext(
   validated: { email: string; password: string; pvSystemId: string } | null,
   save: (

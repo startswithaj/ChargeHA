@@ -31,6 +31,7 @@ describe("EnergyReadsTable", () => {
     onPageChange: vi.fn(),
     pageSize: 50,
     onPageSizeChange: vi.fn(),
+    timezone: "Australia/Brisbane",
   };
 
   it("shows loading state when loading with no data", () => {

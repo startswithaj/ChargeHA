@@ -91,10 +91,23 @@ export class PluginDependencies<K extends string = string> {
     );
   }
 
+  // Called by a plugin whose device just pushed new state. Core re-reads the
+  // charger immediately instead of waiting for the next controller loop.
+  refreshChargerState(chargerRowId: string): void {
+    void this.chargingPoints.requestState(chargerRowId, {
+      origin: `plugin:${this.pluginId}:push`,
+      traceId: crypto.randomUUID(),
+    });
+  }
+
   // ── Config / secret (auto-namespaced with `${pluginId}.` prefix) ─────
 
   getConfig(key: K): Promise<string | null> {
     return this.db.getPluginConfig(`${this.prefix}${key}`);
+  }
+
+  async getTimezone(): Promise<string> {
+    return (await this.db.getConfig("timezone")) || "UTC";
   }
 
   setConfig(key: K, value: string | null): Promise<void> {
@@ -107,6 +120,21 @@ export class PluginDependencies<K extends string = string> {
 
   setSecret(key: K, value: string | null): Promise<void> {
     return this.db.storeSecret(`${this.prefix}${key}`, value);
+  }
+
+  // One atomic save for a multi-key config write: all keys land before any
+  // config_changed fires, so adapter rebuilds never see a partial save.
+  setConfigValues(
+    plain: Partial<Record<K, string | null>>,
+    secrets: Partial<Record<K, string | null>>,
+  ): Promise<void> {
+    const prefix = (values: Partial<Record<K, string | null>>) =>
+      Object.fromEntries(
+        Object.entries(values).map((
+          [key, value],
+        ) => [`${this.prefix}${key}`, value as string | null]),
+      );
+    return this.db.setPluginConfigValues(prefix(plain), prefix(secrets));
   }
 
   // ── Charger rows + row-scoped config ─────────────────────────────────

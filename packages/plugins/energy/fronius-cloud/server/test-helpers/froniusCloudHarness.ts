@@ -16,13 +16,13 @@ export interface MockResp {
 
 export interface FetchMock {
   fetchCalls: FetchCall[];
-  /** Override the POST /iam/jwt login response. */
+  // Override the POST /iam/jwt login response.
   setLoginResponse(resp: MockResp): void;
-  /** Override the PATCH /iam/jwt/{refreshToken} refresh response. */
+  // Override the PATCH /iam/jwt/{refreshToken} refresh response.
   setRefreshResponse(resp: MockResp): void;
-  /** Override the response for any URL containing the given path substring. */
+  // Override the response for any URL containing the given path substring.
   setPathResponse(pathSubstring: string, resp: MockResp): void;
-  /** Override the default token expiration returned by login (default: +1h). */
+  // Override the default token expiration returned by login (default: +1h).
   setLoginTokenExpiresIn(ms: number): void;
   restore(): void;
 }

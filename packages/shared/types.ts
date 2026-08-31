@@ -8,6 +8,7 @@ export interface EnergyData {
   batterySoc: number | null; // Battery state of charge (0-100)
   gridVoltageV: number | null; // AC grid voltage (e.g. 230, 240, 120)
   lastUpdated: string; // ISO 8601 timestamp of when this data was fetched
+  sourceUpdatedAt?: string | null;
   // Set by EnergyPoller — true when the adapter poll threw and zeros were
   // substituted. Adapters never set this. Defaults to false when omitted.
   pollFailed?: boolean;
@@ -152,6 +153,12 @@ export type ChargerStatus =
   | "faulted"
   | "finishing"
   | "no_draw"
+  // Device connection just dropped; routine blips self-heal within the
+  // disconnect grace, so this stays calm rather than alarming.
+  | "reconnecting"
+  // Adapter cannot reach the device (socket down past grace). Distinct from
+  // faulted: the charger itself never reported a fault.
+  | "unreachable"
   // No adapter was ever created for this charging point — its config is
   // missing or was rejected. Nothing behind it to report on.
   | "unconfigured";
@@ -189,6 +196,10 @@ export interface ChargerAdapter {
   getChargerState(ctx: CallContext): Promise<ChargerState>;
   // null = push-based (no polling); a number = min seconds between fetches.
   pollIntervalSeconds(): number | null;
+  // Optional way out of a stuck device state. recoverConnection returns
+  // human-readable step results; adapters without recovery omit both.
+  recoverConnection?(ctx: CallContext): Promise<string[]>;
+  softReset?(ctx: CallContext): Promise<boolean>;
 }
 
 // Charging point mode reuses the existing values ("auto"|"charge_now"|"stop").

@@ -141,10 +141,8 @@ describe("isScheduleActiveNow", () => {
         startTime: "00:00",
         endTime: "00:00",
       });
-      // start === end, startMinutes <= endMinutes path:
-      // currentMinutes >= 0 && currentMinutes < 0 → false
       const now = new Date(2025, 0, 8, 12, 0);
-      expect(isScheduleActiveNow(allDay, now, "")).toBe(false);
+      expect(isScheduleActiveNow(allDay, now, "")).toBe(true);
     });
 
     it("handles weekend-only schedule", () => {
@@ -161,5 +159,30 @@ describe("isScheduleActiveNow", () => {
       const wed = new Date(2025, 0, 8, 10, 0);
       expect(isScheduleActiveNow(weekend, wed, "")).toBe(false);
     });
+  });
+});
+
+describe("all-day schedule (start === end)", () => {
+  const allDay = (): EngineSchedule => ({
+    id: "sched-allday",
+    vehicleId: "v1",
+    chargerId: null,
+    scheduleType: "charge",
+    startTime: "00:00",
+    endTime: "00:00",
+    days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+    chargeAmps: 16,
+    chargeLimitPct: 80,
+    enabled: true,
+  });
+
+  it("is active at midnight", () => {
+    const now = new Date(Date.UTC(2025, 0, 8, 0, 0));
+    expect(isScheduleActiveNow(allDay(), now, "UTC")).toBe(true);
+  });
+
+  it("is active at the last minute of the day", () => {
+    const now = new Date(Date.UTC(2025, 0, 8, 23, 59));
+    expect(isScheduleActiveNow(allDay(), now, "UTC")).toBe(true);
   });
 });

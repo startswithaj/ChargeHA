@@ -9,11 +9,7 @@ import type {
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { ChargerRow, VehicleRow } from "../db/types.ts";
 import { ChargerPluginRegistry } from "@chargeha/server/bootstrap/ChargerPluginRegistry";
-import type {
-  ChargerMiddleware,
-  ChargerPlugin,
-  ChargerRowConfig,
-} from "@chargeha/shared/plugins";
+import type { ChargerPlugin, ChargerRowConfig } from "@chargeha/shared/plugins";
 import type { VehicleManager } from "./VehicleManager.ts";
 import type { ConfigService } from "./ConfigService.ts";
 import type { TypedEventEmitter } from "./TypedEventEmitter.ts";
@@ -21,61 +17,7 @@ import { ChargingPointManager } from "./ChargingPointManager.ts";
 import { Logger } from "../lib/Logger.ts";
 import { MockEventEmitter } from "../test-helpers/MockEventEmitter.ts";
 import { throwingMock } from "../test-helpers/throwingMock.ts";
-
-// Controllable ChargerMiddleware stub. Mirrors MockMiddleware's shape for
-// vehicles — tracks calls, lets tests drive responses via mutable fields.
-class StubChargerMiddleware implements ChargerMiddleware {
-  requestStateCalls: CallContext[] = [];
-  startCalls: string[] = [];
-  stopCalls: string[] = [];
-  setAmpsCalls: Array<{ amps: number; origin: string }> = [];
-  shutdownCalls = 0;
-  nextState: ChargerState | null;
-  startResult = true;
-  stopResult = true;
-  setAmpsResult = true;
-  private cached: ChargerState | null = null;
-
-  constructor(nextState: ChargerState | null) {
-    this.nextState = nextState;
-  }
-
-  requestState(ctx: CallContext): Promise<ChargerState | null> {
-    this.requestStateCalls.push(ctx);
-    this.cached = this.nextState ? { ...this.nextState } : null;
-    return Promise.resolve(this.cached);
-  }
-
-  getCachedState(): ChargerState | null {
-    return this.cached;
-  }
-
-  // Seed the cache directly, bypassing requestState — used to test that
-  // getState never triggers a device call.
-  seedCache(state: ChargerState): void {
-    this.cached = { ...state };
-  }
-
-  startCharging(ctx: CallContext): Promise<boolean> {
-    this.startCalls.push(ctx.origin);
-    return Promise.resolve(this.startResult);
-  }
-
-  stopCharging(ctx: CallContext): Promise<boolean> {
-    this.stopCalls.push(ctx.origin);
-    return Promise.resolve(this.stopResult);
-  }
-
-  setChargeAmps(amps: number, ctx: CallContext): Promise<boolean> {
-    this.setAmpsCalls.push({ amps, origin: ctx.origin });
-    return Promise.resolve(this.setAmpsResult);
-  }
-
-  shutdown(): Promise<void> {
-    this.shutdownCalls++;
-    return Promise.resolve();
-  }
-}
+import { StubChargerMiddleware } from "../test-helpers/StubChargerMiddleware.ts";
 
 describe("ChargingPointManager", () => {
   const registerChargerPlugin = (
@@ -597,16 +539,50 @@ describe("ChargingPointManager", () => {
       expect(mw.startCalls).toHaveLength(0);
     });
 
+    it("still starts when the amp command fails and the charger is not charging", async () => {
+      await manager.addCharger(ROW);
+      const mw = middlewares.get(ROW.id);
+      assertExists(mw);
+
+      mw.setAmpsResult = false;
+      const result = await manager.startChargingAt(
+        ROW.id,
+        16,
+        CTX,
+        { ...STATE, isCharging: false, chargeAmps: 0 },
+      );
+
+      expect(result.success).toBe(true);
+      expect(mw.startCalls).toHaveLength(1);
+    });
+
+    it("fails when the amp command is rejected while already charging", async () => {
+      await manager.addCharger(ROW);
+      const mw = middlewares.get(ROW.id);
+      assertExists(mw);
+
+      mw.setAmpsResult = false;
+      const result = await manager.startChargingAt(
+        ROW.id,
+        20,
+        CTX,
+        { ...STATE, isCharging: true, chargeAmps: 16 },
+      );
+
+      expect(result.success).toBe(false);
+      expect(mw.startCalls).toHaveLength(0);
+    });
+
     it("applies command backoff on failure, bypassed by force", async () => {
       await manager.addCharger(ROW);
       const mw = middlewares.get(ROW.id);
       assertExists(mw);
       const startState = { ...STATE, isCharging: false, chargeAmps: 0 };
 
-      mw.setAmpsResult = false;
+      mw.startResult = false;
       await manager.startChargingAt(ROW.id, 16, CTX, startState);
 
-      mw.setAmpsResult = true;
+      mw.startResult = true;
       const blocked = await manager.startChargingAt(
         ROW.id,
         16,

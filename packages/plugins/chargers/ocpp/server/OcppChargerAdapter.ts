@@ -20,7 +20,9 @@ const STATUS_MAP: Record<ChargePointStatus, ChargerStatus> = {
   // Reserved (RFID/app booking) = won't charge right now, not "ready" —
   // statusDetail carries the raw "Reserved" for the UI.
   Reserved: "suspended",
-  Unavailable: "faulted",
+  // Operator-disabled, not a fault — statusDetail carries the raw
+  // "Unavailable".
+  Unavailable: "suspended",
   Faulted: "faulted",
 };
 
@@ -34,6 +36,14 @@ const PLUGGED_STATUSES: ReadonlySet<ChargePointStatus> = new Set([
 ]);
 
 const COMMAND_CONFIRM_MS = 30_000;
+
+// Spec: a TxProfile without an active transaction SHALL be rejected, so it
+// is only sent while the charger says one is running.
+const TX_PROFILE_STATUSES: ReadonlySet<ChargePointStatus> = new Set([
+  "Charging",
+  "SuspendedEV",
+  "SuspendedEVSE",
+]);
 
 export interface OcppAdapterConfig {
   chargerId: string;
@@ -56,6 +66,9 @@ export class OcppChargerAdapter implements ChargerAdapter {
   // the charger rejects the duplicates.
   private pendingCommand: { command: "start" | "stop"; at: number } | null =
     null;
+  // Carried into RemoteStartTransaction so the limit applies from the first
+  // second of the transaction, with no separate profile round trip to order.
+  private lastRequestedAmps: number | null = null;
 
   constructor(
     private readonly config: OcppAdapterConfig,
@@ -73,8 +86,8 @@ export class OcppChargerAdapter implements ChargerAdapter {
   }
 
   async startCharging(ctx: CallContext): Promise<boolean> {
-    this.command("info", "remoteStart", {}, ctx);
-    const ok = await this.cs.remoteStart();
+    this.command("info", "remoteStart", { amps: this.lastRequestedAmps }, ctx);
+    const ok = await this.cs.remoteStart(this.lastRequestedAmps ?? undefined);
     if (ok) this.pendingCommand = { command: "start", at: Date.now() };
     return ok;
   }
@@ -88,7 +101,8 @@ export class OcppChargerAdapter implements ChargerAdapter {
 
   // Three-tier profile per the HA-integration pattern.
   setChargeAmps(amps: number, ctx: CallContext): Promise<boolean> {
-    const tx = this.cs.getData().transactionId ?? undefined;
+    this.lastRequestedAmps = amps;
+    const tx = liveTransactionId(this.cs.getData());
     this.command("debug", "setChargeAmps", {
       amps,
       transactionId: tx ?? null,
@@ -104,6 +118,16 @@ export class OcppChargerAdapter implements ChargerAdapter {
 
   getChargerState(ctx: CallContext): Promise<ChargerState> {
     return Promise.resolve(this.buildState(this.cs.getData(), ctx));
+  }
+
+  recoverConnection(ctx: CallContext): Promise<string[]> {
+    this.command("info", "recoverConnection", {}, ctx);
+    return this.cs.recoverConnection();
+  }
+
+  softReset(ctx: CallContext): Promise<boolean> {
+    this.command("info", "softReset", {}, ctx);
+    return this.cs.softReset();
   }
 
   // Bridges the gap between an accepted start/stop and the charger's own
@@ -173,12 +197,16 @@ export class OcppChargerAdapter implements ChargerAdapter {
     const graceMs = this.config.disconnectGraceSeconds * 1000;
     const socketDown = this.disconnectedSince !== null &&
       Date.now() - this.disconnectedSince >= graceMs;
-    const disconnected = socketDown || meterStale;
-    const status = resolveStatus(disconnected, data.status, charging);
+    const status = resolveStatus(
+      data.connected,
+      socketDown,
+      data.status,
+      charging,
+    );
 
     return {
       chargerId: this.config.chargerId,
-      isCharging: !disconnected && charging,
+      isCharging: !socketDown && charging,
       isPluggedIn: resolvePluggedIn(data.status, charging),
       // Measurand fallback chain: power measurand → register-delta
       // derivation (both in OcppCentralSystem.readMeterValues) → current ×
@@ -193,19 +221,30 @@ export class OcppChargerAdapter implements ChargerAdapter {
       chargerPhases: this.config.phases,
       energyAddedKwh: sessionEnergyKwh(data),
       status,
-      statusDetail: statusDetail(data, disconnected),
+      statusDetail: statusDetail(data, socketDown, meterStale),
       controlMode: "amps",
       lastUpdated: data.lastUpdated,
     };
   }
 }
 
+function liveTransactionId(data: OcppLiveData): number | undefined {
+  if (data.transactionId === null || data.status === null) return undefined;
+  return TX_PROFILE_STATUSES.has(data.status) ? data.transactionId : undefined;
+}
+
 function resolveStatus(
-  disconnected: boolean,
+  connected: boolean,
+  socketDown: boolean,
   status: ChargePointStatus | null,
   charging: boolean,
 ): ChargerStatus {
-  if (disconnected) return "faulted";
+  // "unreachable", never "faulted": only the charger's own StatusNotification
+  // may claim a fault.
+  if (socketDown) return "unreachable";
+  // Down but within grace: the card must never claim a healthy status while
+  // the socket is dead.
+  if (!connected) return "reconnecting";
   // A live session with no status yet is not "available" — that reads as
   // nothing plugged in while energy is flowing.
   if (status === null) return charging ? "charging" : "available";
@@ -255,9 +294,13 @@ function sessionEnergyKwh(data: OcppLiveData): number {
   return Math.max(0, data.energyRegisterWh - data.meterStartWh) / 1000;
 }
 
-function statusDetail(data: OcppLiveData, disconnected: boolean): string {
-  if (!data.connected) return "disconnected";
-  if (disconnected) return "stale (no MeterValues)";
+function statusDetail(
+  data: OcppLiveData,
+  socketDown: boolean,
+  meterStale: boolean,
+): string {
+  if (!data.connected || socketDown) return "disconnected";
+  if (meterStale) return "no recent meter data";
   if (data.status === null) return "connected, no status yet";
   return data.errorCode && data.errorCode !== "NoError"
     ? `${data.status} (${data.errorCode})`

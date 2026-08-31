@@ -6,6 +6,7 @@ export const subscriptionsRouter = router({
   // Single multiplexed SSE subscription for all real-time events. Emits
   // initial state (energy snapshot, vehicle states, vehicle errors) then forwards live events as they occur, each tagged with a `type` field so the
   // client can route them to the correct handler. Uses one EventSource connection instead of one per event type to avoid exhausting the browser's 6-connection-per-origin HTTP/1.1 limit. See SSEEvent type in shared/types.ts for full explanation.
+  // deno-lint-ignore custom-router-logic/no-router-logic -- the generator is the subscription
   onEvents: publicProcedure.subscription(async function* ({ ctx, signal }) {
     const snapshot = ctx.poller.tryGetRealtimeSnapshot();
     if (snapshot) {

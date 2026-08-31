@@ -90,24 +90,21 @@ export function useStats() {
   const [resolution, setResolution] = useState<DayResolution>("1h");
   const [cursor, setCursor] = useState<Date>(() => new Date());
 
-  const tz = useMemo(() => -(new Date().getTimezoneOffset() / 60), []);
-
   const dayQuery = trpc.stats.day.useQuery(
     {
       date: cursorToDateStr(cursor),
-      tz,
       resolution: resolution === "15m" ? "15m" : undefined,
     },
     { enabled: period === "day", placeholderData: keepPreviousData },
   );
 
   const monthQuery = trpc.stats.month.useQuery(
-    { year: cursor.getFullYear(), month: cursor.getMonth() + 1, tz },
+    { year: cursor.getFullYear(), month: cursor.getMonth() + 1 },
     { enabled: period === "month", placeholderData: keepPreviousData },
   );
 
   const yearQuery = trpc.stats.year.useQuery(
-    { year: cursor.getFullYear(), tz },
+    { year: cursor.getFullYear() },
     { enabled: period === "year", placeholderData: keepPreviousData },
   );
 

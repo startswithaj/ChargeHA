@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import { assertExists } from "@std/assert";
 import { expect } from "@std/expect";
 import { FakeTime } from "@std/testing/time";
+import { sql } from "drizzle-orm";
 import { AppDatabase } from "../AppDatabase.ts";
 import type { UpsertChargerInput } from "../types.ts";
 
@@ -251,5 +252,37 @@ describe("ChargerRepository", () => {
 
       expect(await db.chargers.getChargerSecretsRecord("CHG1")).toBeNull();
     });
+  });
+});
+
+describe("updated_at storage format", () => {
+  let db: AppDatabase;
+
+  beforeEach(async () => {
+    db = new AppDatabase(":memory:");
+    await db.init();
+    await db.chargers.upsertCharger({
+      id: "CHG1",
+      name: "Garage Charger",
+      chargerAdapterType: "simulated",
+      chargerConfig: "{}",
+      mode: "auto",
+      priority: 1,
+      vehicleId: null,
+    });
+  });
+
+  afterEach(() => {
+    db.close();
+  });
+
+  it("writes updated_at in SQLite datetime format, not ISO-8601", async () => {
+    await db.chargers.updateChargerMode("CHG1", "stop");
+
+    const rows = await db.db.all<{ updated_at: string }>(
+      sql`SELECT updated_at FROM chargers WHERE id = 'CHG1'`,
+    );
+
+    expect(rows[0].updated_at).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
   });
 });

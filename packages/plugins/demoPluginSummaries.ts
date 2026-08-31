@@ -40,6 +40,12 @@ export const demoEnergyPluginSummaries: DemoEnergyPluginSummary[] = [
     settingsComponentKey: "fronius-cloud-config",
   },
   {
+    id: "goodwe_sems",
+    displayName: "GoodWe (Cloud / SEMS Portal)",
+    vendor: "GoodWe",
+    settingsComponentKey: "goodwe-sems-config",
+  },
+  {
     id: "simulated_energy",
     displayName: "Simulated",
     vendor: "ChargeHA",

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Code, Text, TextField } from "@radix-ui/themes";
 import { trpc } from "./trpc.ts";
 import {
+  FormError,
   NetworkDeviceSearch,
   SettingsRow,
   usePluginSettingsHost,
@@ -90,16 +91,14 @@ function TestResultDisplay(
         </Badge>
       )}
       {testMutation.isError && (
-        <Text size="2" color="red">
-          {testMutation.error instanceof Error
+        <FormError
+          message={testMutation.error instanceof Error
             ? testMutation.error.message
             : "Test failed"}
-        </Text>
+        />
       )}
       {testMutation.isSuccess && !testMutation.data.success && (
-        <Text size="2" color="red">
-          {testMutation.data.error ?? "Connection failed"}
-        </Text>
+        <FormError message={testMutation.data.error ?? "Connection failed"} />
       )}
     </>
   );
