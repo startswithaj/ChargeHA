@@ -42,6 +42,26 @@ const MIN_CHARGE_AMPS = 5;
 const WAKE_POLL_INTERVAL_MS = 15000;
 const WAKE_TIMEOUT_MS = 60000;
 
+// Some Teslas report charger_phases = 2 on three phases, but 2 is genuine on
+// delta/no-neutral supplies — only charger_power separates the two cases.
+// https://github.com/teslamate-org/teslamate/issues/414
+function correctThreePhase(
+  reported: number | null,
+  amps: number,
+  volts: number,
+  powerKw: number | undefined,
+): number | null {
+  if (reported !== 2 || !powerKw) return reported;
+  // Phase-to-neutral only. A line-to-line reading (~400V) makes the ratio
+  // sqrt(3), which looks exactly like two phases.
+  if (volts < 200 || volts > 260) return reported;
+  // charger_power is integer kW, so below ~10A the quantisation swamps it.
+  if (amps < 10) return reported;
+
+  const ratio = powerKw / ((amps * volts) / 1000);
+  return ratio >= 2.6 && ratio <= 3.4 ? 3 : reported;
+}
+
 interface TeslaChargeState {
   battery_level?: number;
   charge_limit_soc?: number;
@@ -152,7 +172,12 @@ export class TeslaAdapter implements VehicleAdapter {
     const chargerVoltage = charge.charger_voltage ?? 0;
     // Reported only while charging; null is "unknown", which the engine
     // resolves from the threePhaseCharger setting.
-    const chargerPhases = charge.charger_phases ?? null;
+    const chargerPhases = correctThreePhase(
+      charge.charger_phases ?? null,
+      chargeAmps,
+      chargerVoltage,
+      charge.charger_power,
+    );
     // Compute from V × I × phases — Tesla's charger_power field rounds to
     // integer kW, which misreports e.g. 1.44 kW as 1 and shows 0 during
     // ramp-up transitions.
