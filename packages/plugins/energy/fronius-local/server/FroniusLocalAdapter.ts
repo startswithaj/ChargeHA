@@ -19,6 +19,19 @@ export class FroniusParseError extends Error {
   }
 }
 
+// Solar API reports SOC per inverter, not on Site. GEN24 < 1.17 reports
+// SOC=0 with Battery_Mode "disabled" when no battery is fitted.
+function averageBatterySoc(
+  inverters: Record<string, { SOC?: number; Battery_Mode?: string }> = {},
+): number | null {
+  const socs = Object.values(inverters)
+    .filter(
+      (inv) => typeof inv.SOC === "number" && inv.Battery_Mode !== "disabled",
+    )
+    .map((inv) => inv.SOC as number);
+  return socs.length ? socs.reduce((a, b) => a + b, 0) / socs.length : null;
+}
+
 export class FroniusLocalAdapter implements EnergySourceAdapter {
   private host: string;
   private meterDeviceId: number;
@@ -86,7 +99,7 @@ export class FroniusLocalAdapter implements EnergySourceAdapter {
       gridPowerW: site.P_Grid ?? 0,
       homeConsumptionW: Math.abs(site.P_Load ?? 0),
       batteryPowerW: site.P_Akku ?? null,
-      batterySoc: site.SOC ?? null,
+      batterySoc: averageBatterySoc(json.Body.Data.Inverters),
       gridVoltageV,
       lastUpdated: new Date().toISOString(),
     };
