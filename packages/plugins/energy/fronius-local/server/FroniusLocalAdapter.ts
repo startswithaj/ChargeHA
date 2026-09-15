@@ -99,8 +99,7 @@ export class FroniusLocalAdapter implements EnergySourceAdapter {
       gridPowerW: site.P_Grid ?? 0,
       homeConsumptionW: Math.abs(site.P_Load ?? 0),
       batteryPowerW: site.P_Akku ?? null,
-      batterySoc: averageBatterySoc(json.Body.Data.Inverters) ?? site.SOC ??
-        null,
+      batterySoc: averageBatterySoc(json.Body.Data.Inverters),
       gridVoltageV,
       lastUpdated: new Date().toISOString(),
     };
