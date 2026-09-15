@@ -71,6 +71,54 @@ describe("FroniusLocalAdapter", () => {
       expect(data.batterySoc).toBeNull();
     });
 
+    const powerFlow = (inverters: unknown, site: unknown) => ({
+      ok: true,
+      status: 200,
+      json: { Body: { Data: { Inverters: inverters, Site: site } } },
+    });
+
+    it("reads battery SOC from the inverter object (GEN24)", async () => {
+      stub.setResponse(
+        "GetPowerFlowRealtimeData",
+        powerFlow({ "1": { Battery_Mode: "normal", SOC: 48.8 } }, {
+          P_Akku: -9217.9,
+          P_Grid: -2278.8,
+          P_Load: 676.8,
+          P_PV: 10941.6,
+        }),
+      );
+      const data = await makeAdapter().getRealtimeData();
+      expect(data.batteryPowerW).toBe(-9217.9);
+      expect(data.batterySoc).toBe(48.8);
+    });
+
+    it("averages SOC across inverters with batteries", async () => {
+      stub.setResponse(
+        "GetPowerFlowRealtimeData",
+        powerFlow({
+          "1": { Battery_Mode: "normal", SOC: 40 },
+          "2": { Battery_Mode: "normal", SOC: 60 },
+          "3": { Battery_Mode: "disabled", SOC: 0 },
+        }, { P_Akku: -500, P_PV: 3000 }),
+      );
+      const data = await makeAdapter().getRealtimeData();
+      expect(data.batterySoc).toBe(50);
+    });
+
+    it("ignores disabled battery SOC on GEN24 without battery", async () => {
+      stub.setResponse(
+        "GetPowerFlowRealtimeData",
+        powerFlow({ "1": { Battery_Mode: "disabled", SOC: 0.0 } }, {
+          P_Akku: null,
+          P_Grid: null,
+          P_Load: null,
+          P_PV: 5671.9,
+        }),
+      );
+      const data = await makeAdapter().getRealtimeData();
+      expect(data.batterySoc).toBeNull();
+    });
+
     it("throws FroniusParseError on missing Site data", async () => {
       stub.setResponse("GetPowerFlowRealtimeData", {
         ok: true,
