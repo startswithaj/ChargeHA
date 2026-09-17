@@ -1,5 +1,6 @@
 import { afterEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
+import { FakeTime } from "@std/testing/time";
 import { assertExists } from "@std/assert";
 import {
   type ControllerCtx,
@@ -110,6 +111,38 @@ describe("ChargeController — commands + backoff", () => {
 
       expect((await ctx.getBackoff()).backedOff).toBe(true);
       expect((await ctx.getBackoff()).remainingMs).toBeGreaterThan(0);
+    });
+
+    it("surfaces a command failure on the vehicle and clears it on recovery", async () => {
+      using fakeTime = new FakeTime();
+      ctx = await setupController(
+        { isCharging: true, chargeAmps: 5 },
+        "charge_now",
+      );
+      ctx.adapter.setChargeAmpsResult = false;
+
+      await ctx.runOneLoop();
+
+      expect(ctx.manager.getVehicleError(VIN)?.message).toContain(
+        "setChargeAmps",
+      );
+      const errorEvents = ctx.trackingEmitter.emitted.filter((e) =>
+        e.type === "vehicle_error"
+      );
+      expect(errorEvents.at(-1)?.data).toMatchObject({
+        vehicleId: VIN,
+        source: "command",
+      });
+
+      ctx.adapter.setChargeAmpsResult = true;
+      fakeTime.tick(31_000);
+      await ctx.runOneLoop();
+
+      expect(ctx.manager.getVehicleError(VIN)).toBeNull();
+      const cleared = ctx.trackingEmitter.emitted.filter((e) =>
+        e.type === "vehicle_error"
+      ).at(-1)?.data;
+      expect(cleared).toMatchObject({ vehicleId: VIN, error: null });
     });
 
     it("handles non-Error thrown objects", async () => {

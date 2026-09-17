@@ -423,10 +423,10 @@ export class ChargingPointManager {
         throw new Error(`setChargeAmps(${clamped}) rejected`);
       }
       entry.lastCommandedAmps = clamped;
-      this.resetCommandBackoff(id);
+      await this.resetCommandBackoff(id);
       return { success: true };
     } catch (error) {
-      this.applyCommandBackoff(id, error);
+      await this.applyCommandBackoff(id, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error),
@@ -453,10 +453,10 @@ export class ChargingPointManager {
       if (!ok) throw new Error("stopCharging rejected");
       entry.lastCommandedAmps = null;
       this.logger.info(`Stopped ${id}`);
-      this.resetCommandBackoff(id);
+      await this.resetCommandBackoff(id);
       return { success: true };
     } catch (error) {
-      this.applyCommandBackoff(id, error);
+      await this.applyCommandBackoff(id, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error),
@@ -882,7 +882,7 @@ export class ChargingPointManager {
     return { backedOff: true, remainingMs };
   }
 
-  private applyCommandBackoff(id: string, error: unknown): void {
+  private async applyCommandBackoff(id: string, error: unknown): Promise<void> {
     const existing = this.commandBackoff.get(id);
     const bs = existing ?? { failures: 0, backoffUntil: null };
     if (!existing) this.commandBackoff.set(id, bs);
@@ -896,13 +896,21 @@ export class ChargingPointManager {
       `Command failed for ${id} (backoff ${backoffSec}s):`,
       error,
     );
+    const vehicleId = await this.resolveVehicleId(id);
+    if (vehicleId === null) return;
+    const name = this.chargers.get(id)?.row.name ?? id;
+    const msg = error instanceof Error ? error.message : String(error);
+    this.vehicleManager.reportVehicleError(vehicleId, name, msg, "command");
   }
 
-  private resetCommandBackoff(id: string): void {
+  private async resetCommandBackoff(id: string): Promise<void> {
     const bs = this.commandBackoff.get(id);
-    if (bs) {
-      bs.failures = 0;
-      bs.backoffUntil = null;
-    }
+    if (!bs) return;
+    const hadFailures = bs.failures > 0;
+    bs.failures = 0;
+    bs.backoffUntil = null;
+    if (!hadFailures) return;
+    const vehicleId = await this.resolveVehicleId(id);
+    if (vehicleId !== null) this.vehicleManager.clearVehicleError(vehicleId);
   }
 }
