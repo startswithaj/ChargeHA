@@ -18,6 +18,7 @@ import {
   statusNotificationReq,
   stopTransactionReq,
 } from "./OcppMessages.ts";
+import { shortId } from "@chargeha/shared/redact";
 import { readMeterValueFields } from "./OcppMeterValues.ts";
 import { measurandWarningFor } from "./OcppMeasurands.ts";
 import { OcppMeasurandNegotiator } from "./OcppMeasurandNegotiator.ts";
@@ -180,7 +181,7 @@ export class OcppCentralSystem {
     socket.onclose = () => this.onClose(id, socket);
     // deno-lint-ignore custom-no-param-mutation/no-param-mutation -- WebSocket handler wiring
     socket.onerror = (event) => this.logger.warn(`OCPP socket error: ${event}`);
-    this.logger.info(`Charger ${id} connected`);
+    this.logger.info(`Charger ${shortId(id)} connected`);
   }
 
   // Adapters take this so they cannot command another charger.

@@ -7,6 +7,7 @@ import { sleep } from "@chargeha/shared/async";
 import type { TeslaTokenManager } from "./TeslaTokenManager.ts";
 import type { Logger } from "@chargeha/server/lib/Logger";
 import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
+import { shortId } from "@chargeha/shared/redact";
 
 async function retryOn(
   fn: () => Promise<Response>,
@@ -138,7 +139,7 @@ export class TeslaAdapter implements VehicleAdapter {
   async connect(ctx: CallContext): Promise<void> {
     try {
       await this.isVehicleOnline(ctx);
-      this.logger.info(`Connected to vehicle ${this.vin}`);
+      this.logger.info(`Connected to vehicle ${shortId(this.vin)}`);
     } catch (error) {
       throw new TeslaConnectionError(
         `Failed to connect to Tesla Fleet API for VIN ${this.vin}`,
@@ -266,11 +267,13 @@ export class TeslaAdapter implements VehicleAdapter {
 
   async wakeVehicle(ctx: CallContext): Promise<boolean> {
     if (await this.isVehicleOnline(ctx)) {
-      this.logger.debug(`Vehicle ${this.vin} is already online, skipping wake`);
+      this.logger.debug(
+        `Vehicle ${shortId(this.vin)} is already online, skipping wake`,
+      );
       return true;
     }
 
-    this.logger.debug(`Waking vehicle ${this.vin}`);
+    this.logger.debug(`Waking vehicle ${shortId(this.vin)}`);
     const fleetBase = await this.tokenManager.getFleetApiBaseUrl();
     const token = await this.tokenManager.getAccessToken();
 
@@ -309,10 +312,10 @@ export class TeslaAdapter implements VehicleAdapter {
     );
 
     if (online) {
-      this.logger.debug(`Vehicle ${this.vin} is now online`);
+      this.logger.debug(`Vehicle ${shortId(this.vin)} is now online`);
       return true;
     }
-    this.logger.debug(`Vehicle ${this.vin} wake timed out`);
+    this.logger.debug(`Vehicle ${shortId(this.vin)} wake timed out`);
     return false;
   }
 
@@ -415,7 +418,9 @@ export class TeslaAdapter implements VehicleAdapter {
     body: Record<string, unknown> | undefined,
     ctx: CallContext,
   ): Promise<{ ok: boolean; reason: string | null }> {
-    this.logger.debug(`Sending command ${command} to vehicle ${this.vin}`);
+    this.logger.debug(
+      `Sending command ${command} to vehicle ${shortId(this.vin)}`,
+    );
     const token = await this.tokenManager.getAccessToken();
     const url =
       `${this.proxyUrl}/api/1/vehicles/${this.vin}/command/${command}`;

@@ -19,7 +19,8 @@
     "./lanAddresses": "./lanAddresses.ts",
     "./solarAttribution": "./solarAttribution.ts",
     "./geocode": "./geocode.ts",
-    "./notifications": "./notificationProviders.ts"
+    "./notifications": "./notificationProviders.ts",
+    "./redact": "./redact.ts"
   },
   "imports": {
     "hono": "jsr:@hono/hono@^4",

@@ -1,4 +1,5 @@
 import type { Logger } from "./Logger.ts";
+import { redactForStdout } from "@chargeha/shared/redact";
 
 // Callback signature for persisting a log entry. Provided by
 // PluginDependencies — plugins never import AppDatabase.
@@ -35,7 +36,11 @@ export class PluginDbLogger {
       origin: opts?.origin ?? null,
       traceId: opts?.traceId ?? null,
     };
-    this.mirrorToStdout(level, message, entry.payload);
+    this.mirrorToStdout(
+      level,
+      message,
+      opts?.payload ? JSON.stringify(redactForStdout(opts.payload)) : null,
+    );
     try {
       await this.persist(entry);
     } catch (error) {
