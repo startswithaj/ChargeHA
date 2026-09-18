@@ -97,7 +97,7 @@ export function PollingBlock() {
       </div>
       <SettingsRow
         label="Active poll interval"
-        help="How often to fetch vehicle data ($0.002 per request) while solar or a schedule could charge the car. This is where most requests happen. Longer intervals cost less but solar tracking reacts more slowly to changes in battery level, charge limit, or the car being unplugged mid-charge."
+        help="How often to fetch vehicle data ($0.002 per request) while solar or a schedule could charge the car. This is where most requests happen. A longer interval costs less, but it can take up to this long for ChargeHA to notice the car has reached a schedule's charge limit or been unplugged, which delays the next vehicle in the queue."
       >
         <MinutesSelect
           label="Active poll interval"
