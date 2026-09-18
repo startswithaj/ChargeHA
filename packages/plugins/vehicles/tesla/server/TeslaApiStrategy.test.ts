@@ -65,6 +65,56 @@ describe("TeslaApiStrategy", () => {
       });
       expect(strategy.staleness(ctx(), state)).toBe(20 * 60 * 1000);
     });
+
+    it("returns 20 min at vehicle limit even with solar", () => {
+      const state = buildVehicleChargeState({
+        batteryLevel: 80,
+        chargeLimit: 80,
+      });
+      expect(strategy.staleness(ctx({ hasSolar: true }), state))
+        .toBe(20 * 60 * 1000);
+    });
+
+    it("returns 10 min at schedule limit when solar can still charge", () => {
+      const state = buildVehicleChargeState({
+        batteryLevel: 70,
+        chargeLimit: 80,
+      });
+      expect(
+        strategy.staleness(
+          ctx({
+            hasSolar: true,
+            hasSchedule: true,
+            scheduleChargeLimitPct: 70,
+          }),
+          state,
+        ),
+      ).toBe(10 * 60 * 1000);
+    });
+
+    it("returns 20 min at schedule limit when only a schedule is active", () => {
+      const state = buildVehicleChargeState({
+        batteryLevel: 70,
+        chargeLimit: 80,
+      });
+      expect(
+        strategy.staleness(
+          ctx({ hasSchedule: true, scheduleChargeLimitPct: 70 }),
+          state,
+        ),
+      ).toBe(20 * 60 * 1000);
+    });
+
+    it("keeps 5 min when online and unplugged even at limit", () => {
+      const state = buildVehicleChargeState({
+        isOnline: true,
+        isPluggedIn: false,
+        batteryLevel: 80,
+        chargeLimit: 80,
+      });
+      expect(strategy.staleness(ctx({ hasSolar: true }), state))
+        .toBe(5 * 60 * 1000);
+    });
   });
 
   describe("isCacheFresh", () => {
@@ -209,6 +259,24 @@ describe("TeslaApiStrategy", () => {
       expect(
         strategy.shouldWake(
           ctx({ hasSchedule: true, scheduleChargeLimitPct: 80 }),
+          state,
+          0,
+        ),
+      ).toBe("schedule");
+    });
+
+    it("wakes for solar at schedule limit while below vehicle limit", () => {
+      const state = buildVehicleChargeState({
+        batteryLevel: 70,
+        chargeLimit: 80,
+      });
+      expect(
+        strategy.shouldWake(
+          ctx({
+            hasSolar: true,
+            hasSchedule: true,
+            scheduleChargeLimitPct: 70,
+          }),
           state,
           0,
         ),

@@ -7,6 +7,7 @@ import type { VehicleRequestContext } from "@chargeha/shared/plugins";
 // |----------------------------|-------------|
 // | No state yet               | 3 min       |
 // | Online + unplugged         | 5 min       |
+// | At charge limit            | 20 min      |
 // | Schedule or solar active   | 10 min      |
 // | Idle (no reason to charge) | 20 min      |
 //
@@ -61,16 +62,9 @@ export class TeslaApiStrategy {
     if (!context.hasSchedule && !context.hasSolar) return null;
     // Not plugged in — Tesla wakes itself on plug-in, free /vehicles check catches it
     if (cachedState && !cachedState.isPluggedIn) return null;
-    // Effective limit = min(vehicle chargeLimit, active schedule's
-    // chargeLimitPct). Don't wake if already at or above it — the engine
-    // would immediately stop charging, wasting $0.02 on the wake.
-    if (cachedState) {
-      const effectiveLimit = Math.min(
-        cachedState.chargeLimit,
-        context.scheduleChargeLimitPct ?? cachedState.chargeLimit,
-      );
-      if (cachedState.batteryLevel >= effectiveLimit) return null;
-    }
+    // Don't wake at or above the limit — the engine would immediately stop
+    // charging, wasting $0.02 on the wake.
+    if (cachedState && this.atChargeLimit(context, cachedState)) return null;
     if ((Date.now() - lastWakeAtMs) < WAKE_COOLDOWN_MS) return null;
     // Schedule takes precedence in the reason label when both are active
     if (context.hasSchedule) return "schedule";
@@ -86,7 +80,27 @@ export class TeslaApiStrategy {
     if (cachedState.isOnline && !cachedState.isPluggedIn) {
       return ONLINE_UNPLUGGED_MS;
     }
+    // Battery only drops while asleep, so a full reading stays valid
+    if (this.atChargeLimit(context, cachedState)) return CANT_CHARGE_MS;
     if (context.hasSolar || context.hasSchedule) return CAN_CHARGE_MS;
     return CANT_CHARGE_MS;
+  }
+
+  // Effective limit = min(vehicle chargeLimit, active schedule's
+  // chargeLimitPct). Solar charges past a schedule's limit up to the
+  // vehicle's own (schedule-limit-reached falls through to solar tracking
+  // in the engine), so the schedule limit only applies when solar is off.
+  private atChargeLimit(
+    context: VehicleRequestContext,
+    cachedState: AdapterVehicleChargeState,
+  ): boolean {
+    if (context.hasSolar) {
+      return cachedState.batteryLevel >= cachedState.chargeLimit;
+    }
+    const limit = Math.min(
+      cachedState.chargeLimit,
+      context.scheduleChargeLimitPct ?? cachedState.chargeLimit,
+    );
+    return cachedState.batteryLevel >= limit;
   }
 }
