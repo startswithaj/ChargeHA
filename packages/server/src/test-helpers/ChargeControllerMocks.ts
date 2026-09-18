@@ -10,6 +10,7 @@ export class MockAdapter {
   vehicleId: string;
   state: VehicleChargeState;
   commands: Array<{ cmd: string; args?: unknown }> = [];
+  getChargeStateCalls = 0;
   startChargingResult = true;
   stopChargingResult = true;
   setChargeAmpsResult = true;
@@ -20,6 +21,7 @@ export class MockAdapter {
   }
 
   getChargeState(_ctx: unknown): Promise<VehicleChargeState> {
+    this.getChargeStateCalls++;
     return Promise.resolve({ ...this.state });
   }
   isVehicleOnline(_ctx: unknown): Promise<boolean> {
