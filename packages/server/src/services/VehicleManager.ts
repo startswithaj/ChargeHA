@@ -15,6 +15,7 @@ import type {
 } from "@chargeha/shared/plugins";
 import { parseDecisionInputs } from "../db/Serialization.ts";
 import { isHome, parseHomeCoords } from "@chargeha/shared/geo";
+import { shortId } from "@chargeha/shared/redact";
 
 const RECENT_LOG_MS = 2 * 60 * 1000; // 2 minutes
 export interface CommandResult {
@@ -95,7 +96,7 @@ export class VehicleManager {
       wasHome: null,
       initialized: false,
     });
-    this.logger.info(`Vehicle registered: ${row.name} (${row.id})`);
+    this.logger.info(`Vehicle registered: ${row.name} (${shortId(row.id)})`);
     this.eventEmitter.emit("vehicles_changed", {});
 
     await this.seedFromRecentLog(row.id, row.name, middleware);
@@ -160,7 +161,7 @@ export class VehicleManager {
     this.vehicles.delete(id);
     this.plugTrackers.delete(id);
     this.vehicleErrors.delete(id);
-    this.logger.info(`Vehicle removed: ${id}`);
+    this.logger.info(`Vehicle removed: ${shortId(id)}`);
   }
 
   // Permanently delete a vehicle: drop live state, delete the row (cascades

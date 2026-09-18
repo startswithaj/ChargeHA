@@ -110,4 +110,35 @@ describe("PluginDbLogger", () => {
       );
     });
   });
+
+  describe("stdout mirror", () => {
+    it("redacts location and VINs on stdout but persists the full payload", async () => {
+      const stdout: string[] = [];
+      const capturing = new (class extends Logger {
+        override info(message: string, ...args: unknown[]): void {
+          stdout.push([message, ...args].join(" "));
+        }
+      })("PluginDbLogger", "info");
+      const calls: Array<{ payload: string | null }> = [];
+      const logger = new PluginDbLogger((entry) => {
+        calls.push(entry);
+        return Promise.resolve();
+      }, capturing);
+
+      const vin = "5YJ3E1EA7KF317000";
+      const payload = {
+        vin,
+        endpoint: `/api/1/vehicles/${vin}/vehicle_data`,
+        response: { drive_state: { latitude: -33.8, longitude: 151.2 } },
+      };
+      await logger.info("GET vehicle_data", { payload });
+
+      expect(calls[0].payload).toBe(JSON.stringify(payload));
+      expect(stdout).toHaveLength(1);
+      expect(stdout[0]).not.toContain(vin);
+      expect(stdout[0]).not.toContain("-33.8");
+      expect(stdout[0]).toContain("…317000");
+      expect(stdout[0]).toContain("[redacted]");
+    });
+  });
 });

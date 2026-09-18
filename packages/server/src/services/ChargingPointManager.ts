@@ -16,6 +16,7 @@ import type { TypedEventEmitter } from "./TypedEventEmitter.ts";
 import type { VehicleManager } from "./VehicleManager.ts";
 import type { ConfigService } from "./ConfigService.ts";
 import type { Logger } from "../lib/Logger.ts";
+import { shortId } from "@chargeha/shared/redact";
 import type {
   ChargerMiddleware,
   ChargerPlugin,
@@ -95,7 +96,7 @@ export class ChargingPointManager {
       lastEmittedAt: null,
       lastPluggedIn: null,
     });
-    this.logger.info(`Charger registered: ${row.name} (${row.id})`);
+    this.logger.info(`Charger registered: ${row.name} (${shortId(row.id)})`);
     this.eventEmitter.emit("chargers_changed", {});
   }
 
@@ -133,7 +134,7 @@ export class ChargingPointManager {
     }
     await this.db.deleteCharger(id);
     await this.db.resequenceChargerPriorities();
-    this.logger.info(`Charger deleted: ${id}`);
+    this.logger.info(`Charger deleted: ${shortId(id)}`);
     const remaining = await this.db.getChargers();
     if (!remaining.some((r) => r.kind === "smart")) {
       await this.setVehicleApiActive(true);
@@ -412,7 +413,7 @@ export class ChargingPointManager {
           { ...ctx, origin: `${ctx.origin}:start` },
         );
         if (!ok) throw new Error("startCharging rejected");
-        this.logger.info(`Started ${id} at ${clamped}A`);
+        this.logger.info(`Started ${shortId(id)} at ${clamped}A`);
         if (!ampsOk) {
           this.logger.warn(
             `setChargeAmps(${clamped}) rejected before start for ${id}; ` +
@@ -452,7 +453,7 @@ export class ChargingPointManager {
       );
       if (!ok) throw new Error("stopCharging rejected");
       entry.lastCommandedAmps = null;
-      this.logger.info(`Stopped ${id}`);
+      this.logger.info(`Stopped ${shortId(id)}`);
       await this.resetCommandBackoff(id);
       return { success: true };
     } catch (error) {
@@ -618,7 +619,9 @@ export class ChargingPointManager {
     const state = this.getState(id);
     if (!state?.isPluggedIn) return;
     entry.heldOpen = true;
-    this.logger.info(`Passive hold: ${id} opened to ${state.chargeAmpsMax}A`);
+    this.logger.info(
+      `Passive hold: ${shortId(id)} opened to ${state.chargeAmpsMax}A`,
+    );
     await this.startChargingAt(id, state.chargeAmpsMax, ctx, state);
   }
 
@@ -893,7 +896,7 @@ export class ChargingPointManager {
     );
     bs.backoffUntil = Date.now() + backoffSec * 1000;
     this.logger.error(
-      `Command failed for ${id} (backoff ${backoffSec}s):`,
+      `Command failed for ${shortId(id)} (backoff ${backoffSec}s):`,
       error,
     );
     const vehicleId = await this.resolveVehicleId(id);

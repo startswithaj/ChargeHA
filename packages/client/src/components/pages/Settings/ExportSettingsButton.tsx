@@ -4,6 +4,7 @@ import { Button, Dialog, Flex, Text } from "@radix-ui/themes";
 import { trpc } from "../../../trpc.ts";
 import { version } from "../../../lib/version.ts";
 import type { NotificationConfig } from "@chargeha/shared/configSections";
+import { shortId } from "@chargeha/shared/redact";
 
 const REDACTED = "***redacted***";
 const SECRET_FIELDS = [
@@ -63,23 +64,25 @@ function useSettingsExport(open: boolean) {
         // config blobs, locations and live state stay out of the export —
         // they can hold VINs, tokens and GPS coordinates.
         vehicles: vehicles.data?.vehicles.map((v) => ({
-          id: v.id,
+          id: shortId(v.id),
           name: v.name,
           adapterType: v.adapterType,
           priority: v.priority,
           mode: v.mode,
         })),
         chargers: chargers.data?.map((c) => ({
-          id: c.id,
+          id: shortId(c.id),
           name: c.name,
           chargerAdapterType: c.chargerAdapterType,
           mode: c.mode,
           priority: c.priority,
-          vehicleId: c.vehicleId,
+          vehicleId: c.vehicleId === null ? null : shortId(c.vehicleId),
           kind: c.kind,
           active: c.active,
         })),
-        schedules: schedules.data?.schedules,
+        schedules: schedules.data?.schedules.map((s) =>
+          s.vehicleId ? { ...s, vehicleId: shortId(s.vehicleId) } : s
+        ),
         tariffs: tariffs.data,
       },
       null,
