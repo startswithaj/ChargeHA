@@ -30,9 +30,9 @@ describe("PollingBlock", () => {
 
   afterEach(() => cleanup());
 
-  it("shows the advanced warning and both intervals", () => {
+  it("shows the advanced badge and both intervals", () => {
     renderWithProviders(<PollingBlock />);
-    expect(screen.getByText(/Advanced\./)).toBeInTheDocument();
+    expect(screen.getByText("Advanced")).toBeInTheDocument();
     expect(screen.getByLabelText("Active poll interval")).toHaveTextContent(
       "10 min (default)",
     );

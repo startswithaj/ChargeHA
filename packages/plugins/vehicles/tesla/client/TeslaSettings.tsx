@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
+  Activity,
   AlertTriangle,
   Car,
   CheckCircle,
@@ -76,13 +77,22 @@ export function PollingBlock() {
       }}
     >
       <div>
-        <Text size="2" weight="medium" style={{ display: "block" }}>
-          Fleet API polling
-        </Text>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 4,
+          }}
+        >
+          <Activity size={14} />
+          <Text size="2" weight="medium">Fleet API polling</Text>
+          <Badge size="1" variant="soft" color="gray">Advanced</Badge>
+        </div>
         <Text size="1" color="gray">
-          Advanced. The defaults keep a 1–2 car setup well inside Tesla's free
-          US$10/month credit. Only change these if your Tesla developer
-          dashboard shows you exceeding it.
+          The defaults keep a 1–2 car setup well inside Tesla's free US$10/month
+          credit. Only change these if your Tesla developer dashboard shows you
+          exceeding it.
         </Text>
       </div>
       <SettingsRow
