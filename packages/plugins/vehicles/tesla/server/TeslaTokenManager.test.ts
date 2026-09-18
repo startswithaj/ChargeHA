@@ -3,6 +3,7 @@ import { expect } from "@std/expect";
 import { assertExists } from "@std/assert";
 import { AppDatabase } from "@chargeha/server/db";
 import { TeslaTokenManager } from "./TeslaTokenManager.ts";
+import { checkTeslaAuthHealth } from "./TeslaVehiclePlugin.ts";
 import { Logger } from "@chargeha/server/lib/Logger";
 import { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import type { VehicleManager } from "@chargeha/server/services/VehicleManager";
@@ -152,6 +153,34 @@ describe("TeslaTokenManager", () => {
       } finally {
         m.stopAutoRefresh();
       }
+    });
+  });
+
+  describe("checkTeslaAuthHealth", () => {
+    const seedVehicle = () =>
+      db.upsertVehicle({
+        id: "VIN123",
+        name: "My Model 3",
+        adapterType: "tesla",
+        priority: 1,
+        config: "{}",
+        mode: "auto",
+      });
+
+    it("is ok when no Tesla vehicle is configured", async () => {
+      expect(await checkTeslaAuthHealth(manager)).toEqual({ status: "ok" });
+    });
+
+    it("is ok when a vehicle is configured and tokens are valid", async () => {
+      await seedVehicle();
+      const expiresAt = new Date(Date.now() + 3600000).toISOString();
+      await seedTokens(db, "access", "refresh", expiresAt);
+      expect(await checkTeslaAuthHealth(manager)).toEqual({ status: "ok" });
+    });
+
+    it("is an error when a vehicle is configured but tokens are gone", async () => {
+      await seedVehicle();
+      expect(await checkTeslaAuthHealth(manager)).toEqual({ status: "error" });
     });
   });
 
