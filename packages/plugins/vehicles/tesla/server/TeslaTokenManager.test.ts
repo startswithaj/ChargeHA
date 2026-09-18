@@ -184,10 +184,66 @@ describe("TeslaTokenManager", () => {
     });
   });
 
+  describe("revoked refresh token", () => {
+    const expired = () => new Date(Date.now() - 1000).toISOString();
+    const rejectingFetch = () =>
+      Promise.resolve(
+        new Response('{"error":"invalid_grant"}', { status: 401 }),
+      );
+
+    it("startAutoRefresh does not throw and clears tokens on 401", async () => {
+      await seedTokens(db, "access", "refresh", expired());
+      const m = new TeslaTokenManager(deps, testLogger, rejectingFetch);
+      try {
+        await m.startAutoRefresh();
+        expect(await m.isAuthenticated()).toBe(false);
+        expect(await db.getPluginConfig("tesla.refresh_token")).toBeFalsy();
+      } finally {
+        m.stopAutoRefresh();
+      }
+    });
+
+    it("getAccessToken stops retrying the dead token", async () => {
+      await seedTokens(db, "access", "refresh", expired());
+      let calls = 0;
+      const countingFetch = () => {
+        calls++;
+        return rejectingFetch();
+      };
+      const m = new TeslaTokenManager(deps, testLogger, countingFetch);
+      try {
+        await expect(m.getAccessToken()).rejects.toThrow(
+          "Token refresh failed (401)",
+        );
+        await expect(m.getAccessToken()).rejects.toThrow(
+          "Tesla not authenticated",
+        );
+        expect(calls).toBe(1);
+      } finally {
+        m.stopAutoRefresh();
+      }
+    });
+
+    it("keeps tokens on a 5xx so the refresh can be retried", async () => {
+      await seedTokens(db, "access", "refresh", expired());
+      const m = new TeslaTokenManager(
+        deps,
+        testLogger,
+        () => Promise.resolve(new Response("down", { status: 503 })),
+      );
+      try {
+        await m.startAutoRefresh();
+        expect(await db.getPluginConfig("tesla.refresh_token")).toBe("refresh");
+      } finally {
+        m.stopAutoRefresh();
+      }
+    });
+  });
+
   describe("getAccessToken", () => {
     it("throws when no tokens exist", async () => {
       await expect(manager.getAccessToken()).rejects.toThrow(
-        "No tokens available",
+        "Tesla not authenticated",
       );
     });
 
