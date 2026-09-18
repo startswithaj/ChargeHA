@@ -69,6 +69,16 @@ export const teslaConfigDef = defineSection({
     schema: z.string(),
     default: "",
   },
+  teslaActivePollMinutes: {
+    key: "active_poll_minutes",
+    schema: z.number().int().min(5).max(30),
+    default: 10,
+  },
+  teslaIdlePollMinutes: {
+    key: "idle_poll_minutes",
+    schema: z.number().int().min(10).max(240),
+    default: 20,
+  },
 });
 
 export type TeslaConfig = SectionType<typeof teslaConfigDef>;

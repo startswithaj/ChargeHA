@@ -105,6 +105,40 @@ describe("TeslaApiStrategy", () => {
       ).toBe(20 * 60 * 1000);
     });
 
+    describe("configured intervals", () => {
+      const intervals = { activeMs: 15 * 60 * 1000, idleMs: 60 * 60 * 1000 };
+
+      it("uses the active interval when solar or schedule is active", () => {
+        const state = buildVehicleChargeState();
+        expect(strategy.staleness(ctx({ hasSolar: true }), state, intervals))
+          .toBe(15 * 60 * 1000);
+      });
+
+      it("uses the idle interval when idle", () => {
+        const state = buildVehicleChargeState();
+        expect(strategy.staleness(ctx(), state, intervals))
+          .toBe(60 * 60 * 1000);
+      });
+
+      it("uses the idle interval at charge limit", () => {
+        const state = buildVehicleChargeState({
+          batteryLevel: 80,
+          chargeLimit: 80,
+        });
+        expect(strategy.staleness(ctx({ hasSolar: true }), state, intervals))
+          .toBe(60 * 60 * 1000);
+      });
+
+      it("never changes the online + unplugged tier", () => {
+        const state = buildVehicleChargeState({
+          isOnline: true,
+          isPluggedIn: false,
+        });
+        expect(strategy.staleness(ctx(), state, intervals))
+          .toBe(5 * 60 * 1000);
+      });
+    });
+
     it("keeps 5 min when online and unplugged even at limit", () => {
       const state = buildVehicleChargeState({
         isOnline: true,

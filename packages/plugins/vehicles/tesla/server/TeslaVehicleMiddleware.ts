@@ -5,7 +5,11 @@ import type {
 } from "@chargeha/shared/plugins";
 import type { Logger } from "@chargeha/server/lib/Logger";
 import type { TeslaAdapter } from "./TeslaAdapter.ts";
-import { TeslaApiStrategy } from "./TeslaApiStrategy.ts";
+import {
+  DEFAULT_POLL_INTERVALS,
+  type PollIntervals,
+  TeslaApiStrategy,
+} from "./TeslaApiStrategy.ts";
 
 // Rate-limit floor for the free /vehicles probe in the polling path.
 // Caps probes at 1/min/vehicle regardless of controller loop config,
@@ -31,7 +35,12 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
   private lastWakeAtMs = 0;
   private lastOnlineCheckAtMs = 0;
 
-  constructor(adapter: TeslaAdapter, logger: Logger) {
+  constructor(
+    adapter: TeslaAdapter,
+    logger: Logger,
+    private readonly getPollIntervals: () => Promise<PollIntervals> = () =>
+      Promise.resolve(DEFAULT_POLL_INTERVALS),
+  ) {
     this.adapter = adapter;
     this.logger = logger;
     this.strategy = new TeslaApiStrategy();
@@ -82,6 +91,7 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
       context,
       this.getCachedState(),
       this.lastFetchAtMs,
+      await this.getPollIntervals(),
     );
     const canUseCache = !context.forceRefresh && cacheFresh;
     const wakeReason = this.strategy.shouldWake(

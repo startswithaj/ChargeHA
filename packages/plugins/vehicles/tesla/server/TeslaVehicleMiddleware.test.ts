@@ -310,6 +310,25 @@ describe("TeslaVehicleMiddleware", () => {
       expect(adapter.getChargeStateCalls).toBe(1);
     });
 
+    it("honours configured poll intervals", async () => {
+      const slow = new TeslaVehicleMiddleware(
+        adapter as unknown as TeslaAdapter,
+        testLogger,
+        () => Promise.resolve({ activeMs: 30 * 60_000, idleMs: 60 * 60_000 }),
+      );
+      await slow.requestState(ctx({ hasSolar: true }));
+      expect(adapter.getChargeStateCalls).toBe(1);
+
+      // 12 min: stale under the 10 min default, fresh under 30 min
+      time.tick(12 * 60_000);
+      await slow.requestState(ctx({ hasSolar: true }));
+      expect(adapter.getChargeStateCalls).toBe(1);
+
+      time.tick(19 * 60_000);
+      await slow.requestState(ctx({ hasSolar: true }));
+      expect(adapter.getChargeStateCalls).toBe(2);
+    });
+
     it("refetches every 5 min while online + unplugged to catch plug-in", async () => {
       // First fetch: car online, cached unplugged. The 5-min staleness rule
       // exists because Tesla sleeps ~5-6 min after plug-in if not charging,
