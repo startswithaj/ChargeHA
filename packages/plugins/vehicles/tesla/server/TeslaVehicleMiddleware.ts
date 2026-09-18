@@ -126,7 +126,6 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
     this.logger.debug(
       `Skip wake: battery=${this.cachedState?.batteryLevel}% limit=${this.cachedState?.chargeLimit}% schedule=${context.hasSchedule} solar=${context.hasSolar} blockout=${context.hasBlockout}`,
     );
-    this.lastFetchAtMs = Date.now();
     return this.getCachedState();
   }
 

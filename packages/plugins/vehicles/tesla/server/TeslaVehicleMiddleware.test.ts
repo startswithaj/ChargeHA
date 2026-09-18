@@ -293,6 +293,23 @@ describe("TeslaVehicleMiddleware", () => {
       expect(middleware.online).toBe(false);
     });
 
+    it("wakes on the tick a schedule starts, even right after a skipped wake", async () => {
+      middleware.seedState(buildVehicleChargeState({ isOnline: false }));
+      adapter.isOnline = false;
+
+      // No reason to wake yet — skip path
+      await middleware.requestState(ctx());
+      expect(adapter.wakeVehicleCalls).toBe(0);
+
+      // Schedule becomes active 2 min later, well inside the 10 min tier.
+      // The skip must not have stamped the cache as fresh.
+      time.tick(2 * 60 * 1000);
+      await middleware.requestState(ctx({ hasSchedule: true }));
+
+      expect(adapter.wakeVehicleCalls).toBe(1);
+      expect(adapter.getChargeStateCalls).toBe(1);
+    });
+
     it("refetches every 5 min while online + unplugged to catch plug-in", async () => {
       // First fetch: car online, cached unplugged. The 5-min staleness rule
       // exists because Tesla sleeps ~5-6 min after plug-in if not charging,
