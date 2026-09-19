@@ -47,7 +47,7 @@ function initVehicleStates(
       batteryLevel: vc.batteryStart,
       chargeLimit: vc.chargeLimit,
       isCharging: false,
-      isPluggedIn: true,
+      isPluggedIn: vc.plugInMinute === undefined,
       isOnline: true,
       chargeAmps: 0,
       chargeAmpsMax: vc.chargeAmpsMax,
@@ -227,6 +227,13 @@ export function runSimulation(
   // deno-lint-ignore custom-no-imperative-loops/no-imperative-loops
   for (const reading of solarDay) {
     simTimestamp += 60_000;
+
+    vehicleConfigs.forEach((vc) => {
+      const state = vehicleStates.get(vc.id);
+      if (state && vc.plugInMinute !== undefined) {
+        state.isPluggedIn = reading.minute >= vc.plugInMinute;
+      }
+    });
 
     const totalChargingW = applyChargingEnergy(vehicleConfigs, vehicleStates);
 

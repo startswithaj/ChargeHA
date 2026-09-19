@@ -9,6 +9,8 @@ export interface VehicleConfig {
   chargeAmpsMin: number;
   chargeAmpsMax: number;
   batteryCapacityKwh: number;
+  // Minute of day the car is plugged in. Omit for plugged in from the start.
+  plugInMinute?: number;
 }
 
 export interface SolarConfig {
