@@ -31,6 +31,11 @@ export class ControllerEngine {
   decide(input: EngineInput): EngineOutput {
     const { config, vehicles, schedules, energy, now, timestamp } = input;
     if (!config.chargingEnabled) {
+      vehicles.forEach((vehicle) => {
+        const cs = this.getControlState(vehicle.id);
+        cs.allocatedAmps = null;
+        cs.displaced = false;
+      });
       const decisions = new Map(
         vehicles.map((vehicle): [string, VehicleDecision] => [vehicle.id, {
           action: "none",
@@ -45,9 +50,16 @@ export class ControllerEngine {
 
     // Pre-compute per-vehicle solar allocation
     const allocation = SolarAllocator.allocate(vehicles, config, energy);
+    // Displacement compares this tick's allocation to last tick's, so it
+    // must run before allocatedAmps is overwritten below.
     vehicles.forEach((vehicle) => {
-      const cs = this.getControlState(vehicle.id);
-      cs.allocatedAmps = allocation.get(vehicle.id) ?? null;
+      this.getControlState(vehicle.id).displaced =
+        config.priorityChargingEnabled &&
+        this.isDisplaced(vehicle, vehicles, allocation);
+    });
+    vehicles.forEach((vehicle) => {
+      this.getControlState(vehicle.id).allocatedAmps =
+        allocation.get(vehicle.id) ?? null;
     });
 
     const decisions = new Map(
@@ -58,6 +70,25 @@ export class ControllerEngine {
     );
 
     return { decisions, controlStates: this.controlStates };
+  }
+
+  // Displaced = fell below minimum while a higher-priority vehicle's share
+  // grew. A solar dip shrinks everyone; only a takeover grows someone above.
+  private isDisplaced(
+    vehicle: EngineVehicleInput,
+    vehicles: EngineVehicleInput[],
+    allocation: Map<string, number>,
+  ): boolean {
+    const myAmps = allocation.get(vehicle.id);
+    if (myAmps === undefined || !vehicle.state) return false;
+    if (myAmps >= vehicle.state.chargeAmpsMin) return false;
+
+    return vehicles.some((other) => {
+      if (other.priority >= vehicle.priority) return false;
+      const before = this.getControlState(other.id).allocatedAmps ?? 0;
+      const now = allocation.get(other.id) ?? 0;
+      return now > before;
+    });
   }
 
   // Read a vehicle's control state (for the orchestrator's event emission).
@@ -540,6 +571,24 @@ export class ControllerEngine {
     // (drop to min amps, then stop) instead of charging on through it.
     const solarKw = energy.solarProductionW / 1000;
     const belowMinGeneration = solarKw < config.minSolarGenerationKw;
+
+    // A decision, not a dip — don't ride it out on grace
+    if (controlState.displaced && state.isCharging) {
+      return {
+        decision: {
+          action: "stop",
+          reason: "displaced",
+          detail: "Stop — solar allocated to a higher-priority vehicle",
+          targetAmps: null,
+        },
+        checks,
+        stateUpdates: {
+          graceStartedAt: null,
+          graceNotified: false,
+          cooldownUntil: timestamp + config.cooldownPeriodMinutes * 60 * 1000,
+        },
+      };
+    }
 
     if (belowMinGeneration || targetAmps < state.chargeAmpsMin) {
       const reason = belowMinGeneration
