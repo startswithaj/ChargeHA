@@ -99,6 +99,8 @@
   flex-wrap: wrap;
   align-items: end;
   gap: 12px;
+  position: relative;
+  padding-right: 40px;
   background: var(--color-panel-solid);
   border: 1px solid var(--gray-4);
   border-radius: 8px;
@@ -185,4 +187,10 @@
 
 .checkResult {
   color: var(--gray-10);
+}
+
+.removeButton {
+  position: absolute;
+  top: 12px;
+  right: 12px;
 }
