@@ -93,11 +93,12 @@ export interface VehicleControlState {
   blockoutChargeNotified: boolean;
   pollingSuspended: boolean;
   // Pre-computed solar allocation for this vehicle. Set each loop by
-  // calculateSolarAllocation, read by processSolarTracking.
-  //   null — allocator skipped it (not eligible, <2 vehicles, no energy)
-  //   0    — eligible, but a higher priority consumed all the solar
-  //   >0   — amps allocated
+  // decide(), read by processSolarTracking. null = allocator skipped it
+  // (not eligible, <2 vehicles, no energy).
   allocatedAmps: number | null;
+  // Allocated below chargeAmpsMin because a higher-priority vehicle took
+  // the solar. Set each loop by decide().
+  displaced: boolean;
   // The debounced target amps being tracked. Set when a small amp change
   // is within the debounce threshold and waiting to settle.
   pendingAmps: number | null;
@@ -118,6 +119,7 @@ export type DecisionReason =
   | "mode_stop"
   | "battery_priority"
   | "grace_period"
+  | "displaced"
   | "cooldown"
   | "no_solar"
   | "charging_disabled"
@@ -196,6 +198,7 @@ export function createControlState(): VehicleControlState {
     blockoutChargeNotified: false,
     pollingSuspended: false,
     allocatedAmps: null,
+    displaced: false,
     pendingAmps: null,
     pendingSince: null,
   };

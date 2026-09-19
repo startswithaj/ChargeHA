@@ -6,6 +6,7 @@ import {
   BASE_ENERGY,
   type ControllerCtx,
   type MultiControllerCtx,
+  REQUEST_CONTEXT,
   setupController,
   setupMultiVehicleController,
 } from "../../test-helpers/ChargeControllerHarness.ts";
@@ -304,6 +305,44 @@ describe("ChargeController — multi-vehicle", () => {
         expect(logA?.action).toBe("start");
         expect(logA?.targetAmps).toBe(15);
         expect(logB?.action).toBe("none");
+      });
+
+      it("stops the lower-priority vehicle the loop a higher-priority one plugs in", async () => {
+        // Loop 1: A unplugged, B charging alone. Loop 2: A plugs in and
+        // waterfall hands it everything. B must stop on the spot — not drop
+        // to min and wait out grace.
+        ctx = await setupMultiVehicleController(
+          [
+            {
+              vin: VIN_A,
+              name: "Car A",
+              priority: 1,
+              state: { isPluggedIn: false },
+            },
+            {
+              vin: VIN_B,
+              name: "Car B",
+              priority: 2,
+              state: { isCharging: true, chargeAmps: 10 },
+            },
+          ],
+          { ...BASE_ENERGY, solarProductionW: 5000, gridPowerW: -800 },
+          PRIORITY_CONFIG,
+        );
+        await ctx.runOneLoop();
+
+        const adapterA = ctx.adapters.get(VIN_A);
+        assertExists(adapterA);
+        adapterA.state.isPluggedIn = true;
+        await ctx.manager.requestState(VIN_A, REQUEST_CONTEXT);
+        await ctx.runOneLoop();
+
+        const logA = await ctx.getLogForVehicle(VIN_A);
+        const logB = await ctx.getLogForVehicle(VIN_B);
+        expect(logA?.action).toBe("start");
+        expect(logB?.action).toBe("stop");
+        expect(logB?.actionDetail).toContain("higher-priority");
+        expect(logB?.actionDetail).not.toContain("grace");
       });
 
       it("polls a queued vehicle at the idle rate until solar frees up", async () => {

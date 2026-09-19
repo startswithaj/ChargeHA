@@ -3,6 +3,7 @@ import {
   BatteryCharging,
   Calendar,
   CloudSun,
+  ListOrdered,
   Plug,
   ShieldBan,
   Sun,
@@ -20,6 +21,7 @@ const VISIBLE_REASONS = new Set([
   "schedule",
   "blockout",
   "grace_period",
+  "displaced",
   "cooldown",
   "battery_priority",
 ]);
@@ -28,6 +30,7 @@ const REASON_ICONS: Record<string, LucideIcon> = {
   schedule: Calendar,
   blockout: ShieldBan,
   grace_period: CloudSun,
+  displaced: ListOrdered,
   cooldown: CloudSun,
   battery_priority: BatteryCharging,
 };
@@ -36,6 +39,7 @@ const REASON_COLORS: Record<string, "blue" | "orange"> = {
   schedule: "blue",
   blockout: "orange",
   grace_period: "orange",
+  displaced: "orange",
   cooldown: "orange",
   battery_priority: "orange",
 };
@@ -54,6 +58,7 @@ const REASON_LABELS: Record<string, (detail: string) => string> = {
       ? `Low solar — grace period (${match[1]})`
       : "Low solar — grace period active";
   },
+  displaced: () => "Stopped — solar went to a higher-priority vehicle",
   cooldown: (detail) => {
     const match = detail.match(/(\d+)s remaining/);
     return match ? `Cooldown — ${match[1]}s remaining` : "Cooldown active";
