@@ -1,4 +1,5 @@
 import { afterEach, describe, it } from "@std/testing/bdd";
+import { assertExists } from "@std/assert";
 import { expect } from "@std/expect";
 import { FakeTime } from "@std/testing/time";
 import {
@@ -303,6 +304,34 @@ describe("ChargeController — multi-vehicle", () => {
         expect(logA?.action).toBe("start");
         expect(logA?.targetAmps).toBe(15);
         expect(logB?.action).toBe("none");
+      });
+
+      it("polls a queued vehicle at the idle rate until solar frees up", async () => {
+        // 3450W → 15A, all to P1. P2 is eligible but gets 0A.
+        ctx = await setupMultiVehicleController(
+          [
+            { vin: VIN_A, name: "Car A", priority: 1 },
+            { vin: VIN_B, name: "Car B", priority: 2 },
+          ],
+          { ...BASE_ENERGY, solarProductionW: 6450, gridPowerW: -3450 },
+          PRIORITY_CONFIG,
+        );
+        using fakeTime = new FakeTime();
+        const adapterB = ctx.adapters.get(VIN_B);
+        assertExists(adapterB);
+
+        await ctx.runOneLoop();
+        const fetchesAfterFirstLoop = adapterB.getChargeStateCalls;
+
+        // 12 min: past the 10 min solar tier, inside the 20 min idle tier.
+        fakeTime.tick(12 * 60_000);
+        await ctx.runOneLoop();
+        expect(adapterB.getChargeStateCalls).toBe(fetchesAfterFirstLoop);
+
+        // 22 min: idle tier expired.
+        fakeTime.tick(10 * 60_000);
+        await ctx.runOneLoop();
+        expect(adapterB.getChargeStateCalls).toBe(fetchesAfterFirstLoop + 1);
       });
 
       it("overflows to priority 2 when priority 1 is at max amps", async () => {

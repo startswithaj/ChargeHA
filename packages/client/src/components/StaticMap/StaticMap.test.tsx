@@ -46,9 +46,9 @@ describe("StaticMap", () => {
       const images = container.querySelectorAll("img");
       // 5 cols x 3 rows = 15 tile images
       expect(images.length).toBe(15);
-      // Each tile points to openstreetmap.org
+      // Each tile points to arcgisonline.com
       const firstSrc = images[0].getAttribute("src") ?? "";
-      expect(firstSrc).toContain("tile.openstreetmap.org");
+      expect(firstSrc).toContain("arcgisonline.com");
     });
 
     it("renders pin element", () => {

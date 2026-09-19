@@ -303,8 +303,19 @@ The first matching rule wins:
 2. **5 min** — the car is online and unplugged. Tight window so we catch a
    plug-in before Tesla puts the car back to sleep. This is checked _before_ the
    solar/schedule case, so it applies even when a schedule is active.
-3. **10 min** — charging is plausible (solar or schedule active).
-4. **20 min** — otherwise.
+3. **Idle interval** (default 20 min) — the battery is at its charge limit. With
+   solar active only the vehicle's own limit counts; a schedule's limit is
+   ignored because solar charges past it.
+4. **Active interval** (default 10 min) — charging is plausible: solar reaching
+   this vehicle, or a schedule active.
+5. **Idle interval** — otherwise.
+
+Solar does not count as reaching a vehicle when it is set to Stop, or when the
+previous controller tick allocated all available solar to higher-priority
+vehicles. Those vehicles sit on the idle interval until that changes.
+
+The active and idle intervals are set under Settings → Tesla → Fleet API
+polling. Rules 1 and 2 are fixed because they protect plug-in detection.
 
 Waking is more restricted than fetching, because a wake costs 10× a data fetch.
 On top of the cache rules, a scheduled wake is suppressed when:
@@ -313,8 +324,8 @@ On top of the cache rules, a scheduled wake is suppressed when:
 - Neither schedule nor solar applies (no reason to top up).
 - The cached state shows the car is unplugged. Tesla wakes itself on plug-in;
   the free `/vehicles` probe will catch it.
-- The battery is already at the effective charge limit (vehicle limit or
-  schedule limit, whichever is lower).
+- The battery is already at the effective charge limit (vehicle limit, or the
+  schedule limit when no solar is active).
 - A wake fired in the last **60 minutes** (cooldown).
 
 Two paths bypass all of the above:

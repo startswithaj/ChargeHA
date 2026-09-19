@@ -17,6 +17,10 @@ import type {
 import { TeslaAdapter } from "./TeslaAdapter.ts";
 import { TeslaChargerMiddleware } from "./TeslaChargerMiddleware.ts";
 import { TeslaVehicleMiddleware } from "./TeslaVehicleMiddleware.ts";
+import {
+  DEFAULT_POLL_INTERVALS,
+  type PollIntervals,
+} from "./TeslaApiStrategy.ts";
 import { TeslaProxyManager } from "./TeslaProxyManager.ts";
 import { TeslaService, type TeslaServiceIo } from "./TeslaService.ts";
 import { TeslaTokenManager } from "./TeslaTokenManager.ts";
@@ -149,7 +153,29 @@ export class TeslaVehiclePlugin implements VehiclePlugin, ChargerPlugin {
       this.deps.log,
       this.deps.dbLog,
     );
-    return new TeslaVehicleMiddleware(adapter, this.deps.log);
+    return new TeslaVehicleMiddleware(
+      adapter,
+      this.deps.log,
+      () => this.readPollIntervals(),
+    );
+  }
+
+  // Read per request so a settings change applies without a restart.
+  private async readPollIntervals(): Promise<PollIntervals> {
+    const minutes = async (key: "active_poll_minutes" | "idle_poll_minutes") =>
+      parseInt((await this.deps.getConfig(key)) ?? "", 10);
+    const [active, idle] = await Promise.all([
+      minutes("active_poll_minutes"),
+      minutes("idle_poll_minutes"),
+    ]);
+    return {
+      activeMs: Number.isFinite(active)
+        ? active * 60_000
+        : DEFAULT_POLL_INTERVALS.activeMs,
+      idleMs: Number.isFinite(idle)
+        ? idle * 60_000
+        : DEFAULT_POLL_INTERVALS.idleMs,
+    };
   }
 
   async createChargerMiddleware(row: ChargerRow): Promise<ChargerMiddleware> {

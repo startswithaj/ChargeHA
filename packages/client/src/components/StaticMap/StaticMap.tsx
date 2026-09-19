@@ -20,6 +20,23 @@ interface StaticMapProps {
   height?: number;
 }
 
+function Attribution() {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: 2,
+        right: 4,
+        fontSize: 9,
+        color: "var(--gray-9)",
+        zIndex: 1,
+      }}
+    >
+      © Esri
+    </div>
+  );
+}
+
 export function StaticMap(
   { latitude, longitude, size, width, height }: StaticMapProps,
 ) {
@@ -87,9 +104,9 @@ export function StaticMap(
             Array.from({ length: cols }, (_, col) => (
               <img
                 key={`${row}-${col}`}
-                src={`https://tile.openstreetmap.org/${zoom}/${startX + col}/${
+                src={`https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/${zoom}/${
                   startY + row
-                }.png`}
+                }/${startX + col}`}
                 alt=""
                 width={256}
                 height={256}
@@ -116,6 +133,7 @@ export function StaticMap(
           zIndex: 1,
         }}
       />
+      {!isSized && <Attribution />}
     </div>
   );
 }

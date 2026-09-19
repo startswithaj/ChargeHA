@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
+  Activity,
   AlertTriangle,
   Car,
   CheckCircle,
@@ -8,7 +9,15 @@ import {
   Key,
   RotateCcw,
 } from "lucide-react";
-import { AlertDialog, Badge, Button, Card, Code, Text } from "@radix-ui/themes";
+import {
+  AlertDialog,
+  Badge,
+  Button,
+  Card,
+  Code,
+  Select,
+  Text,
+} from "@radix-ui/themes";
 import type { VehicleWithState } from "@chargeha/shared";
 import { trpc } from "./trpc.ts";
 import {
@@ -17,7 +26,102 @@ import {
 } from "../shared/publicKeyDomain.ts";
 import { Spinner } from "../../../hostUi.ts";
 import { ErrorBanner } from "../../../hostUi.ts";
+import { SettingsRow } from "../../../hostUi.ts";
 import { TeslaSetupInstructions } from "./TeslaSetupInstructions.tsx";
+import { useTeslaConfig, useTeslaConfigMutation } from "./useTeslaConfig.ts";
+
+const ACTIVE_POLL_OPTIONS = [5, 10, 15, 20, 30];
+const IDLE_POLL_OPTIONS = [10, 20, 30, 60, 120, 240];
+
+function MinutesSelect(
+  { value, options, defaultValue, onChange, label }: {
+    value: number;
+    options: number[];
+    defaultValue: number;
+    onChange: (minutes: number) => void;
+    label: string;
+  },
+) {
+  return (
+    <Select.Root
+      size="2"
+      value={String(value)}
+      onValueChange={(v) => onChange(Number(v))}
+    >
+      <Select.Trigger aria-label={label} />
+      <Select.Content>
+        {options.map((m) => (
+          <Select.Item key={m} value={String(m)}>
+            {m} min{m === defaultValue ? " (default)" : ""}
+          </Select.Item>
+        ))}
+      </Select.Content>
+    </Select.Root>
+  );
+}
+
+export function PollingBlock() {
+  const { data: config } = useTeslaConfig();
+  const mutation = useTeslaConfigMutation();
+  const active = config?.teslaActivePollMinutes ?? 10;
+  const idle = config?.teslaIdlePollMinutes ?? 20;
+  return (
+    <div
+      style={{
+        marginTop: 12,
+        paddingTop: 12,
+        borderTop: "1px solid var(--gray-a4)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+      }}
+    >
+      <div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 4,
+          }}
+        >
+          <Activity size={14} />
+          <Text size="2" weight="medium">Fleet API polling</Text>
+          <Badge size="1" variant="soft" color="gray">Advanced</Badge>
+        </div>
+        <Text size="1" color="gray">
+          The defaults keep a 1–2 car setup well inside Tesla's free US$10/month
+          credit. Only change these if your Tesla developer dashboard shows you
+          exceeding it.
+        </Text>
+      </div>
+      <SettingsRow
+        label="Active poll interval"
+        help="How often to fetch vehicle data ($0.002 per request) while solar or a schedule could charge the car. This is where most requests happen. A longer interval costs less, but it can take up to this long for ChargeHA to notice the car has reached a schedule's charge limit or been unplugged, which delays the next vehicle in the queue."
+      >
+        <MinutesSelect
+          label="Active poll interval"
+          value={active}
+          options={ACTIVE_POLL_OPTIONS}
+          defaultValue={10}
+          onChange={(m) => mutation.mutate({ teslaActivePollMinutes: m })}
+        />
+      </SettingsRow>
+      <SettingsRow
+        label="Idle poll interval"
+        help="How often to fetch vehicle data from a plugged-in car when there is no solar, no active schedule, or it is already at its charge limit. Only matters if the car stays awake while idle (e.g. Sentry Mode) — a sleeping car is never polled. Plug-in detection is not affected."
+      >
+        <MinutesSelect
+          label="Idle poll interval"
+          value={idle}
+          options={IDLE_POLL_OPTIONS}
+          defaultValue={20}
+          onChange={(m) => mutation.mutate({ teslaIdlePollMinutes: m })}
+        />
+      </SettingsRow>
+    </div>
+  );
+}
 
 function useTransitionToAdd(
   { polling, setPolling, teslaAuthQuery, autoAddVehiclesMutation }: {
@@ -490,11 +594,14 @@ function useTeslaSettingsMutations(
       },
     });
   return {
-    connectMutation,
     autoAddVehiclesMutation,
-    addTeslaVehicleMutation,
     resetMutation,
-    checkPairingMutation,
+    pairingChecking: checkPairingMutation.isPending,
+    handleConnect: () =>
+      connectMutation.mutate({ origin: globalThis.location.origin }),
+    handleAddTeslaVehicle: (vin: string, name: string) =>
+      addTeslaVehicleMutation.mutate({ vin, name }),
+    handleCheckPairing: () => checkPairingMutation.mutate(),
   };
 }
 
@@ -517,13 +624,17 @@ export function TeslaSettings(): JSX.Element {
   const teslaVehicles = teslaVehiclesQuery.data ?? [];
   const vehicles = vehiclesQuery.data ?? [];
   const keyPaired = teslaAuth?.keyPaired ?? null;
+  const hasTeslaVehicles = vehicles.some((v: VehicleWithState) =>
+    v.adapterType === "tesla"
+  );
 
   const {
-    connectMutation,
     autoAddVehiclesMutation,
-    addTeslaVehicleMutation,
     resetMutation,
-    checkPairingMutation,
+    pairingChecking,
+    handleConnect,
+    handleAddTeslaVehicle,
+    handleCheckPairing,
   } = useTeslaSettingsMutations({ utils, setPolling });
 
   useTransitionToAdd({
@@ -533,12 +644,6 @@ export function TeslaSettings(): JSX.Element {
     autoAddVehiclesMutation,
   });
 
-  const handleConnect = () =>
-    connectMutation.mutate({ origin: globalThis.location.origin });
-  const handleAddTeslaVehicle = (vin: string, name: string) =>
-    addTeslaVehicleMutation.mutate({ vin, name });
-  const handleCheckPairing = () => checkPairingMutation.mutate();
-  const pairingChecking = checkPairingMutation.isPending;
   const proxyDown = (proxyHealthQuery.data?.warnings ?? []).length > 0;
   const pairingDomain = usePairingDomain();
 
@@ -579,24 +684,23 @@ export function TeslaSettings(): JSX.Element {
       )}
 
       {teslaAvailable && teslaAuth?.authenticated &&
-        teslaVehicles.length === 0 &&
-        vehicles.filter((v: VehicleWithState) => v.adapterType === "tesla")
-            .length === 0 &&
-        (
-          <Text size="2" color="gray">
-            No vehicles found on your Tesla account.
-          </Text>
-        )}
+        teslaVehicles.length === 0 && !hasTeslaVehicles && (
+        <Text size="2" color="gray">
+          No vehicles found on your Tesla account.
+        </Text>
+      )}
 
-      {teslaAvailable && teslaAuth?.authenticated &&
-        vehicles.some((v: VehicleWithState) => v.adapterType === "tesla") && (
-        <KeyPairingBlock
-          keyPaired={keyPaired}
-          pairingChecking={pairingChecking}
-          proxyDown={proxyDown}
-          pairingDomain={pairingDomain}
-          handleCheckPairing={handleCheckPairing}
-        />
+      {teslaAvailable && teslaAuth?.authenticated && hasTeslaVehicles && (
+        <>
+          <KeyPairingBlock
+            keyPaired={keyPaired}
+            pairingChecking={pairingChecking}
+            proxyDown={proxyDown}
+            pairingDomain={pairingDomain}
+            handleCheckPairing={handleCheckPairing}
+          />
+          <PollingBlock />
+        </>
       )}
 
       {teslaAvailable && (
