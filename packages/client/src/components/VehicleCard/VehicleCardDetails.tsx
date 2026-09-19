@@ -59,12 +59,15 @@ const REASON_LABELS: Record<string, (detail: string) => string> = {
     return match ? `Cooldown — ${match[1]}s remaining` : "Cooldown active";
   },
   battery_priority: (detail) => {
-    const match = detail.match(/(\d+)%.*<.*(\d+)%/);
+    const match = detail.match(/(\d+)% < (\d+)%/);
     return match
       ? `Home battery priority (${match[1]}% < ${match[2]}%)`
       : "Waiting for home battery";
   },
 };
+
+export const formatReasonLabel = (reason: string, detail: string): string =>
+  REASON_LABELS[reason]?.(detail) ?? detail;
 
 interface VehicleCardDetailsProps {
   state: VehicleChargeState;
@@ -139,7 +142,7 @@ export function ControllerReasonRow(
     return null;
   }
   const Icon = REASON_ICONS[reason];
-  const label = REASON_LABELS[reason]?.(detail) ?? detail;
+  const label = formatReasonLabel(reason, detail);
   const color = REASON_COLORS[reason] ?? "gray";
   return (
     <div className={layout.detailRow}>

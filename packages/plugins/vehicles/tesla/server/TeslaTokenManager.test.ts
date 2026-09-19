@@ -3,6 +3,7 @@ import { expect } from "@std/expect";
 import { assertExists } from "@std/assert";
 import { AppDatabase } from "@chargeha/server/db";
 import { TeslaTokenManager } from "./TeslaTokenManager.ts";
+import { checkTeslaAuthHealth } from "./TeslaVehiclePlugin.ts";
 import { Logger } from "@chargeha/server/lib/Logger";
 import { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import type { VehicleManager } from "@chargeha/server/services/VehicleManager";
@@ -155,6 +156,34 @@ describe("TeslaTokenManager", () => {
     });
   });
 
+  describe("checkTeslaAuthHealth", () => {
+    const seedVehicle = () =>
+      db.upsertVehicle({
+        id: "VIN123",
+        name: "My Model 3",
+        adapterType: "tesla",
+        priority: 1,
+        config: "{}",
+        mode: "auto",
+      });
+
+    it("is ok when no Tesla vehicle is configured", async () => {
+      expect(await checkTeslaAuthHealth(manager)).toEqual({ status: "ok" });
+    });
+
+    it("is ok when a vehicle is configured and tokens are valid", async () => {
+      await seedVehicle();
+      const expiresAt = new Date(Date.now() + 3600000).toISOString();
+      await seedTokens(db, "access", "refresh", expiresAt);
+      expect(await checkTeslaAuthHealth(manager)).toEqual({ status: "ok" });
+    });
+
+    it("is an error when a vehicle is configured but tokens are gone", async () => {
+      await seedVehicle();
+      expect(await checkTeslaAuthHealth(manager)).toEqual({ status: "error" });
+    });
+  });
+
   describe("getStatus", () => {
     it("returns unauthenticated status when no tokens", async () => {
       const status = await manager.getStatus();
@@ -184,10 +213,66 @@ describe("TeslaTokenManager", () => {
     });
   });
 
+  describe("revoked refresh token", () => {
+    const expired = () => new Date(Date.now() - 1000).toISOString();
+    const rejectingFetch = () =>
+      Promise.resolve(
+        new Response('{"error":"invalid_grant"}', { status: 401 }),
+      );
+
+    it("startAutoRefresh does not throw and clears tokens on 401", async () => {
+      await seedTokens(db, "access", "refresh", expired());
+      const m = new TeslaTokenManager(deps, testLogger, rejectingFetch);
+      try {
+        await m.startAutoRefresh();
+        expect(await m.isAuthenticated()).toBe(false);
+        expect(await db.getPluginConfig("tesla.refresh_token")).toBeFalsy();
+      } finally {
+        m.stopAutoRefresh();
+      }
+    });
+
+    it("getAccessToken stops retrying the dead token", async () => {
+      await seedTokens(db, "access", "refresh", expired());
+      let calls = 0;
+      const countingFetch = () => {
+        calls++;
+        return rejectingFetch();
+      };
+      const m = new TeslaTokenManager(deps, testLogger, countingFetch);
+      try {
+        await expect(m.getAccessToken()).rejects.toThrow(
+          "Token refresh failed (401)",
+        );
+        await expect(m.getAccessToken()).rejects.toThrow(
+          "Tesla not authenticated",
+        );
+        expect(calls).toBe(1);
+      } finally {
+        m.stopAutoRefresh();
+      }
+    });
+
+    it("keeps tokens on a 5xx so the refresh can be retried", async () => {
+      await seedTokens(db, "access", "refresh", expired());
+      const m = new TeslaTokenManager(
+        deps,
+        testLogger,
+        () => Promise.resolve(new Response("down", { status: 503 })),
+      );
+      try {
+        await m.startAutoRefresh();
+        expect(await db.getPluginConfig("tesla.refresh_token")).toBe("refresh");
+      } finally {
+        m.stopAutoRefresh();
+      }
+    });
+  });
+
   describe("getAccessToken", () => {
     it("throws when no tokens exist", async () => {
       await expect(manager.getAccessToken()).rejects.toThrow(
-        "No tokens available",
+        "Tesla not authenticated",
       );
     });
 

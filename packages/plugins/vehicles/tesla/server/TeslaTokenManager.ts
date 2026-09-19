@@ -136,7 +136,9 @@ export class TeslaTokenManager {
 
   async getAccessToken(): Promise<string> {
     const tokens = await this.getTokens();
-    if (!tokens) throw new Error("No tokens available");
+    if (!tokens) {
+      throw new Error("Tesla not authenticated — re-authorize in Settings");
+    }
 
     const expiresAt = new Date(tokens.expiresAt).getTime();
     const now = Date.now();
@@ -202,8 +204,15 @@ export class TeslaTokenManager {
     if (msUntilExpiry > REFRESH_BUFFER_MS) {
       this.scheduleRefresh(msUntilExpiry);
     } else {
-      // Token is expired or within refresh buffer — refresh now
-      await this.refreshTokens();
+      // Token is expired or within refresh buffer — refresh now.
+      // Must never throw: a bad token is a re-auth problem, not a boot failure.
+      try {
+        await this.refreshTokens();
+      } catch (err) {
+        this.logger.error("Startup token refresh failed:", err);
+        // Transient failure (tokens still stored) — retry in a minute.
+        if (await this.getTokens()) this.scheduleRefresh(REFRESH_BUFFER_MS);
+      }
     }
   }
 
@@ -249,6 +258,15 @@ export class TeslaTokenManager {
 
     if (!response.ok) {
       const text = await response.text();
+      // 400/401 = Tesla rejected the refresh token itself (revoked/rotated
+      // elsewhere). Retrying can never succeed; drop it so the app reports
+      // unauthenticated and the user re-authorizes.
+      if (response.status === 400 || response.status === 401) {
+        await this.deleteTokens();
+        this.logger.error(
+          `Refresh token rejected (${response.status}) — cleared tokens, re-authorize Tesla`,
+        );
+      }
       throw new Error(`Token refresh failed (${response.status}): ${text}`);
     }
 

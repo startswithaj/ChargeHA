@@ -55,6 +55,18 @@ export async function checkTeslaProxyHealth(
   }
 }
 
+// Only a problem once a Tesla is configured — an unconfigured plugin is
+// not an error, and the setup wizard already guides the first authorization.
+export async function checkTeslaAuthHealth(
+  tokenManager: TeslaTokenManager,
+): Promise<HealthCheckResult> {
+  const status = await tokenManager.getStatus();
+  if (!status.vehicleConfigured || status.authenticated) {
+    return { status: "ok" };
+  }
+  return { status: "error" };
+}
+
 // Tesla vehicle plugin — owns Tesla OAuth, Fleet API proxy, EC key lifecycle,
 // and vehicle adapter creation. Construction kicks off async startup saved
 // as `startupPromise`, which `shutdown()` awaits so teardown never races a boot.
@@ -245,7 +257,9 @@ export class TeslaVehiclePlugin implements VehiclePlugin, ChargerPlugin {
 
   // Commands need the tesla-http-proxy up and the virtual key paired.
   async getCommandStatus(): Promise<CommandStatus> {
-    const checks = this.getHealthChecks();
+    const checks = this.getHealthChecks().filter((c) =>
+      c.name === "tesla-proxy"
+    );
     const checkResults = checks.length > 0
       ? await Promise.all(checks.map((c) => c.run()))
       : [];
@@ -314,6 +328,14 @@ export class TeslaVehiclePlugin implements VehiclePlugin, ChargerPlugin {
         warningMessage:
           "Vehicle commands will fail. Make sure tesla-http-proxy is running on port 4443.",
         run: () => checkTeslaProxyHealth(deps),
+      },
+      {
+        name: "tesla-auth",
+        timeoutMs: 5000,
+        warningTitle: "Tesla Not Authenticated",
+        warningMessage:
+          "Tesla polling and charging control have stopped. Re-authorize Tesla in Settings.",
+        run: () => checkTeslaAuthHealth(this.teslaTokenManager),
       },
     ];
   }
