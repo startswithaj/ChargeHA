@@ -41,6 +41,10 @@ export class Trace {
     return { check: "plugged_in", result: "no" };
   }
 
+  static pluggedInUnknown(): StepTrace {
+    return { check: "plugged_in", result: "unknown (assuming plugged in)" };
+  }
+
   static home(): StepTrace {
     return { check: "location", result: "home" };
   }

@@ -165,8 +165,9 @@ export class Steps {
   // ---- Preconditions ----
 
   static pluggedIn({ state }: StepContext): EvalResult {
+    if (state.isPluggedIn === true) return pass([Trace.pluggedIn()]);
     // null (unknown) is treated as plugged in — only a definite false blocks.
-    if (state.isPluggedIn !== false) return pass([Trace.pluggedIn()]);
+    if (state.isPluggedIn === null) return pass([Trace.pluggedInUnknown()]);
     return {
       decision: {
         action: "none",

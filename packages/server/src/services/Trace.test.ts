@@ -24,6 +24,10 @@ describe("Trace", () => {
   it("plugged in", () => {
     expect(Trace.pluggedIn()).toEqual({ check: "plugged_in", result: "yes" });
     expect(Trace.unplugged()).toEqual({ check: "plugged_in", result: "no" });
+    expect(Trace.pluggedInUnknown()).toEqual({
+      check: "plugged_in",
+      result: "unknown (assuming plugged in)",
+    });
   });
 
   it("location", () => {
