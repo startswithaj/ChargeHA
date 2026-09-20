@@ -5,6 +5,16 @@ import { EnergyReadsTable } from "./EnergyReadsTable.tsx";
 import { expectPagination } from "./test-helpers/pagination.tsx";
 import type { EnergyReadingEntry } from "../../../hooks/useEnergyReadings.ts";
 
+vi.mock("../../../trpc.ts", () => ({
+  trpc: {
+    tariff: {
+      defaultRate: {
+        useQuery: vi.fn(() => ({ data: { currencySymbol: "€" } })),
+      },
+    },
+  },
+}));
+
 describe("EnergyReadsTable", () => {
   const makeReading = (
     overrides: Partial<EnergyReadingEntry> = {},
@@ -17,7 +27,7 @@ describe("EnergyReadsTable", () => {
       homeConsumptionW: 2800,
       batteryPowerW: 500,
       batterySoc: 72,
-      ratePerKwh: 25.5,
+      ratePerKwh: 0.25,
       pollFailed: 0,
       ...overrides,
     };
@@ -84,12 +94,12 @@ describe("EnergyReadsTable", () => {
     expect(screen.getByText("72%")).toBeTruthy();
   });
 
-  it("renders rate with cents symbol", () => {
-    const reading = makeReading({ ratePerKwh: 25.5 });
+  it("renders rate using the configured currency symbol", () => {
+    const reading = makeReading({ ratePerKwh: 0.255 });
     renderWithProviders(
       <EnergyReadsTable {...defaultProps} readings={[reading]} total={1} />,
     );
-    expect(screen.getByText("25.5¢")).toBeTruthy();
+    expect(screen.getByText("€0.2550")).toBeTruthy();
   });
 
   it("renders all dashes for null optional fields", () => {

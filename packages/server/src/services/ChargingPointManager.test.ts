@@ -134,6 +134,7 @@ describe("ChargingPointManager", () => {
   let vehicleStates: Map<string, VehicleChargeState>;
   let vehicleManager: VehicleManager;
   let gridVoltage: number;
+  let threePhaseCharger: boolean;
   let configService: ConfigService;
   let manager: ChargingPointManager;
 
@@ -215,8 +216,10 @@ describe("ChargingPointManager", () => {
     });
 
     gridVoltage = 230;
+    threePhaseCharger = false;
     configService = throwingMock<ConfigService>("ConfigService", {
-      getSolar: () => Promise.resolve({ ...SOLAR_DEFAULTS, gridVoltage }),
+      getSolar: () =>
+        Promise.resolve({ ...SOLAR_DEFAULTS, gridVoltage, threePhaseCharger }),
     });
 
     manager = new ChargingPointManager(
@@ -404,7 +407,7 @@ describe("ChargingPointManager", () => {
   });
 
   describe("requestState", () => {
-    it("does not derive amps while cachedGridVoltage is null pre-init", async () => {
+    it("does not derive amps while cachedSolar is null pre-init", async () => {
       await manager.addCharger(ROW);
       const mw = middlewares.get(ROW.id);
       assertExists(mw);
@@ -427,6 +430,26 @@ describe("ChargingPointManager", () => {
         chargeAmps: null,
         chargePowerKw: 2.3,
         chargerVoltage: null,
+      };
+
+      const state = await manager.requestState(ROW.id, CTX);
+
+      assertExists(state);
+      expect(state.chargeAmps).toBe(10);
+    });
+
+    it("falls back to threePhaseCharger when the charger reports no phases", async () => {
+      await manager.addCharger(ROW);
+      threePhaseCharger = true;
+      await manager.init();
+      const mw = middlewares.get(ROW.id);
+      assertExists(mw);
+      mw.nextState = {
+        ...STATE,
+        chargeAmps: null,
+        chargePowerKw: 6.9,
+        chargerVoltage: null,
+        chargerPhases: null,
       };
 
       const state = await manager.requestState(ROW.id, CTX);
