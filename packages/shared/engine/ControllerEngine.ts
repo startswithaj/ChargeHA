@@ -34,7 +34,10 @@ export class ControllerEngine {
     const allocation = SolarAllocator.allocate(vehicles, config, energy);
     vehicles.forEach((vehicle) => {
       const cs = this.getControlState(vehicle.id);
-      cs.allocatedAmps = allocation.get(vehicle.id) ?? null;
+      this.controlStates.set(vehicle.id, {
+        ...cs,
+        allocatedAmps: allocation.get(vehicle.id) ?? null,
+      });
     });
 
     const decisions = new Map(
@@ -53,7 +56,7 @@ export class ControllerEngine {
           cs,
           solar: Steps.solarTargets(state, config, energy, cs.allocatedAmps),
         });
-        Object.assign(cs, stateUpdates);
+        this.controlStates.set(vehicle.id, { ...cs, ...stateUpdates });
         return [vehicle.id, decision];
       }),
     );
