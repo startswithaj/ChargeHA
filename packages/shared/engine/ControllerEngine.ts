@@ -31,11 +31,6 @@ export class ControllerEngine {
   decide(input: EngineInput): EngineOutput {
     const { config, vehicles, schedules, energy, now, timestamp } = input;
     if (!config.chargingEnabled) {
-      vehicles.forEach((vehicle) => {
-        const cs = this.getControlState(vehicle.id);
-        cs.allocatedAmps = null;
-        cs.displaced = false;
-      });
       const decisions = new Map(
         vehicles.map((vehicle): [string, VehicleDecision] => [vehicle.id, {
           action: "none",
@@ -50,16 +45,9 @@ export class ControllerEngine {
 
     // Pre-compute per-vehicle solar allocation
     const allocation = SolarAllocator.allocate(vehicles, config, energy);
-    // Displacement compares this tick's allocation to last tick's, so it
-    // must run before allocatedAmps is overwritten below.
     vehicles.forEach((vehicle) => {
-      this.getControlState(vehicle.id).displaced =
-        config.priorityChargingEnabled &&
-        this.isDisplaced(vehicle, vehicles, allocation);
-    });
-    vehicles.forEach((vehicle) => {
-      this.getControlState(vehicle.id).allocatedAmps =
-        allocation.get(vehicle.id) ?? null;
+      const cs = this.getControlState(vehicle.id);
+      cs.allocatedAmps = allocation.get(vehicle.id) ?? null;
     });
 
     const decisions = new Map(
@@ -70,25 +58,6 @@ export class ControllerEngine {
     );
 
     return { decisions, controlStates: this.controlStates };
-  }
-
-  // Displaced = fell below minimum while a higher-priority vehicle's share
-  // grew. A solar dip shrinks everyone; only a takeover grows someone above.
-  private isDisplaced(
-    vehicle: EngineVehicleInput,
-    vehicles: EngineVehicleInput[],
-    allocation: Map<string, number>,
-  ): boolean {
-    const myAmps = allocation.get(vehicle.id);
-    if (myAmps === undefined || !vehicle.state) return false;
-    if (myAmps >= vehicle.state.chargeAmpsMin) return false;
-
-    return vehicles.some((other) => {
-      if (other.priority >= vehicle.priority) return false;
-      const before = this.getControlState(other.id).allocatedAmps ?? 0;
-      const now = allocation.get(other.id) ?? 0;
-      return now > before;
-    });
   }
 
   // Read a vehicle's control state (for the orchestrator's event emission).
@@ -572,22 +541,13 @@ export class ControllerEngine {
     const solarKw = energy.solarProductionW / 1000;
     const belowMinGeneration = solarKw < config.minSolarGenerationKw;
 
-    // A decision, not a dip — don't ride it out on grace
-    if (controlState.displaced && state.isCharging) {
-      return {
-        decision: {
-          action: "stop",
-          reason: "displaced",
-          detail: "Stop — solar allocated to a higher-priority vehicle",
-          targetAmps: null,
-        },
-        checks,
-        stateUpdates: {
-          graceStartedAt: null,
-          graceNotified: false,
-          cooldownUntil: timestamp + config.cooldownPeriodMinutes * 60 * 1000,
-        },
-      };
+    const rawAmps = Math.floor(availableW / (voltage * phases));
+    if (
+      this.isDisplaced(state, config, controlState, rawAmps) &&
+      state.isCharging
+    ) {
+      // A decision, not a dip — don't ride it out on grace
+      return this.stopDisplaced(config, timestamp, checks);
     }
 
     if (belowMinGeneration || targetAmps < state.chargeAmpsMin) {
@@ -709,6 +669,43 @@ export class ControllerEngine {
       },
       checks,
       stateUpdates,
+    };
+  }
+
+  // Below minimum by allocation, not by solar: a higher priority is being
+  // served. Waterfall only — equal mode has no takeover. solar_grid holds min
+  // amps from the grid rather than stopping, so it stays on the normal path.
+  private isDisplaced(
+    state: VehicleChargeState,
+    config: ControllerConfig,
+    controlState: Readonly<VehicleControlState>,
+    rawAmps: number,
+  ): boolean {
+    if (!config.priorityChargingEnabled) return false;
+    if (config.solarTrackingMode !== "solar_only") return false;
+    if (controlState.allocatedAmps === null) return false;
+    return controlState.allocatedAmps < state.chargeAmpsMin &&
+      rawAmps >= state.chargeAmpsMin;
+  }
+
+  private stopDisplaced(
+    config: ControllerConfig,
+    timestamp: number,
+    checks: DecisionCheck[],
+  ): EvalResult {
+    return {
+      decision: {
+        action: "stop",
+        reason: "displaced",
+        detail: "Stop — solar allocated to a higher-priority vehicle",
+        targetAmps: null,
+      },
+      checks,
+      stateUpdates: {
+        graceStartedAt: null,
+        graceNotified: false,
+        cooldownUntil: timestamp + config.cooldownPeriodMinutes * 60 * 1000,
+      },
     };
   }
 

@@ -373,6 +373,43 @@ describe("ChargeController — multi-vehicle", () => {
         expect(adapterB.getChargeStateCalls).toBe(fetchesAfterFirstLoop + 1);
       });
 
+      it("keeps a queued vehicle on the idle rate every loop it waits, not just the first", async () => {
+        // Same setup: 15A all to P1, P2 waits. Being queued is a state that
+        // holds every loop P1 is still taking the solar — the slow poll must
+        // not lapse after the loop the queue formed.
+        ctx = await setupMultiVehicleController(
+          [
+            { vin: VIN_A, name: "Car A", priority: 1 },
+            { vin: VIN_B, name: "Car B", priority: 2 },
+          ],
+          { ...BASE_ENERGY, solarProductionW: 6450, gridPowerW: -3450 },
+          PRIORITY_CONFIG,
+        );
+        using fakeTime = new FakeTime();
+        const adapterB = ctx.adapters.get(VIN_B);
+        assertExists(adapterB);
+
+        await ctx.runOneLoop();
+        const fetches = adapterB.getChargeStateCalls;
+
+        fakeTime.tick(12 * 60_000);
+        await ctx.runOneLoop();
+        expect(adapterB.getChargeStateCalls).toBe(fetches);
+
+        // 17 and 19 min: past the 10 min solar tier, still inside the 20 min
+        // idle tier. Every waiting loop must still be treated as queued.
+        fakeTime.tick(5 * 60_000);
+        await ctx.runOneLoop();
+        expect(adapterB.getChargeStateCalls).toBe(fetches);
+        fakeTime.tick(2 * 60_000);
+        await ctx.runOneLoop();
+        expect(adapterB.getChargeStateCalls).toBe(fetches);
+
+        fakeTime.tick(3 * 60_000);
+        await ctx.runOneLoop();
+        expect(adapterB.getChargeStateCalls).toBe(fetches + 1);
+      });
+
       it("overflows to priority 2 when priority 1 is at max amps", async () => {
         // 9200W → 40A. P1 max=32A, remainder 8A → P2 gets 8A.
         ctx = await setupMultiVehicleController(

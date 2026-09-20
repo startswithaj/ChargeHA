@@ -162,11 +162,14 @@ export class ChargeController {
           config.timezone,
         );
         const isStopped = target.mode === "stop";
-        const displaced = this.engine.getControlState(target.id).displaced;
+        // allocatedAmps === 0 means the allocator ran and a higher priority
+        // took everything — see VehicleControlState.allocatedAmps
+        const solarTakenByHigherPriority =
+          this.engine.getControlState(target.id).allocatedAmps === 0;
         await target.requestState({
           origin: "controller",
           traceId,
-          hasSolar: hasSolar && !isStopped && !displaced,
+          hasSolar: hasSolar && !isStopped && !solarTakenByHigherPriority,
           hasSchedule: activeCharge !== null || hasBlockout,
           hasBlockout,
           scheduleChargeLimitPct: activeCharge?.effective.chargeLimitPct ??
