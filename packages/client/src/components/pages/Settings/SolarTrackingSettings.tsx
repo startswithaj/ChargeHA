@@ -354,8 +354,9 @@ export function SolarTrackingSettings() {
   }, [showSimulation]);
   const { data: energyData } = useEnergyData();
   const voltage = fields?.gridVoltage ?? 230;
+  const phases = fields?.threePhaseCharger ? 3 : 1;
   const kwToAmps = (kw: number) =>
-    Math.round(((kw * 1000) / voltage) * 10) / 10;
+    Math.round(((kw * 1000) / (voltage * phases)) * 10) / 10;
   const currentEnergy = energyData?.realtime ?? null;
   const { schedules } = useSchedules();
   const { data: vehiclesData } = trpc.vehicle.list.useQuery();

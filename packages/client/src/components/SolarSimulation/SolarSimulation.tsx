@@ -451,7 +451,7 @@ function buildPreviewVehicles(
       chargerVoltage: s?.chargerVoltage || 230,
       chargerPhases: SolarAllocator.resolvePhases(
         s?.chargerPhases ?? null,
-        config,
+        config.threePhaseCharger,
       ),
       isCharging: s?.isCharging ?? false,
       chargeAmps: s?.chargeAmps ?? 0,
