@@ -520,8 +520,9 @@ export class ControllerEngine {
       voltage,
       phases,
     );
-    const targetAmps = controlState.allocatedAmps ??
-      Math.floor(availableW / (voltage * phases));
+    // What solar alone could give this vehicle, before allocation
+    const rawAmps = Math.floor(availableW / (voltage * phases));
+    const targetAmps = controlState.allocatedAmps ?? rawAmps;
     const clampedAmps = Math.max(
       state.chargeAmpsMin,
       Math.min(state.chargeAmpsMax, targetAmps),
@@ -540,6 +541,14 @@ export class ControllerEngine {
     // (drop to min amps, then stop) instead of charging on through it.
     const solarKw = energy.solarProductionW / 1000;
     const belowMinGeneration = solarKw < config.minSolarGenerationKw;
+
+    if (
+      state.isCharging &&
+      this.isDisplaced(state, config, controlState, rawAmps)
+    ) {
+      // A decision, not a dip — don't ride it out on grace
+      return this.stopDisplaced(config, timestamp, checks);
+    }
 
     if (belowMinGeneration || targetAmps < state.chargeAmpsMin) {
       const reason = belowMinGeneration
@@ -660,6 +669,43 @@ export class ControllerEngine {
       },
       checks,
       stateUpdates,
+    };
+  }
+
+  // Below minimum by allocation, not by solar: a higher priority is being
+  // served. Waterfall only — equal mode has no takeover. solar_grid holds min
+  // amps from the grid rather than stopping, so it stays on the normal path.
+  private isDisplaced(
+    state: VehicleChargeState,
+    config: ControllerConfig,
+    controlState: Readonly<VehicleControlState>,
+    rawAmps: number,
+  ): boolean {
+    if (!config.priorityChargingEnabled) return false;
+    if (config.solarTrackingMode !== "solar_only") return false;
+    if (controlState.allocatedAmps === null) return false;
+    return controlState.allocatedAmps < state.chargeAmpsMin &&
+      rawAmps >= state.chargeAmpsMin;
+  }
+
+  private stopDisplaced(
+    config: ControllerConfig,
+    timestamp: number,
+    checks: DecisionCheck[],
+  ): EvalResult {
+    return {
+      decision: {
+        action: "stop",
+        reason: "displaced",
+        detail: "Stop — solar allocated to a higher-priority vehicle",
+        targetAmps: null,
+      },
+      checks,
+      stateUpdates: {
+        graceStartedAt: null,
+        graceNotified: false,
+        cooldownUntil: timestamp + config.cooldownPeriodMinutes * 60 * 1000,
+      },
     };
   }
 
