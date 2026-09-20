@@ -135,7 +135,10 @@ export class Steps {
       energy,
       config.gridVoltage,
     );
-    const phases = SolarAllocator.resolvePhases(state.chargerPhases, config);
+    const phases = SolarAllocator.resolvePhases(
+      state.chargerPhases,
+      config.threePhaseCharger,
+    );
     const availableW = SolarAllocator.calculateAvailableSolar(
       config,
       energy,

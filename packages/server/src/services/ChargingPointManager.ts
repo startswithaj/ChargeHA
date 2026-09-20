@@ -9,6 +9,7 @@ import type {
   VehicleResolutionKind,
 } from "@chargeha/shared";
 import { SolarAllocator } from "@chargeha/shared/engine";
+import type { SolarConfig } from "@chargeha/shared/configSections";
 import { linkedChargingPointId } from "@chargeha/shared/chargingPoints";
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { ChargerRow, VehicleRow } from "../db/types.ts";
@@ -65,7 +66,7 @@ export class ChargingPointManager {
   private chargers = new Map<string, ChargerEntry>();
   private commandBackoff = new Map<string, CommandBackoffState>();
   // Cached at init; enrich() runs on hot paths and must not hit the DB.
-  private cachedGridVoltage: number | null = null;
+  private cachedSolar: SolarConfig | null = null;
   // Last good energy reading, cached from energy_update; cleared on a failed
   // poll so enrich() never resolves voltage from a zeroed breadcrumb.
   private latestEnergy: EnergyData | null = null;
@@ -248,32 +249,32 @@ export class ChargingPointManager {
   private enrich(state: ChargerState | null): ChargerState | null {
     if (!state) return null;
     if (state.chargeAmps !== null || state.chargePowerKw === null) return state;
-    if (this.cachedGridVoltage === null) return state;
-    if (state.chargerPhases === null) return state;
+    if (this.cachedSolar === null) return state;
 
     const energy = this.latestEnergy;
     const voltage = SolarAllocator.resolveVoltage(
       state.chargerVoltage,
       energy,
-      this.cachedGridVoltage,
+      this.cachedSolar.gridVoltage,
+    );
+    const phases = SolarAllocator.resolvePhases(
+      state.chargerPhases,
+      this.cachedSolar.threePhaseCharger,
     );
     const watts = state.chargePowerKw * 1000;
     return {
       ...state,
-      chargeAmps: Math.round((watts / (voltage * state.chargerPhases)) * 10) /
-        10,
+      chargeAmps: Math.round((watts / (voltage * phases)) * 10) / 10,
     };
   }
 
   async init(): Promise<void> {
-    const solar = await this.configService.getSolar();
-    this.cachedGridVoltage = solar.gridVoltage;
+    this.cachedSolar = await this.configService.getSolar();
     this.eventEmitter.subscribe("config_changed", async () => {
       // The only remaining consumer here: charger config is row-scoped now
       // (see rebuildMiddlewareFor) and this event carries no row id, so it
-      // rebuilds nothing charger-related — just the cached grid voltage.
-      const updated = await this.configService.getSolar();
-      this.cachedGridVoltage = updated.gridVoltage;
+      // rebuilds nothing charger-related — just the cached solar config.
+      this.cachedSolar = await this.configService.getSolar();
     });
     this.eventEmitter.subscribe("vehicles_changed", async () => {
       await this.syncVehicleChargingPoints();

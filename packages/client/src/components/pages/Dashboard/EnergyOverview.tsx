@@ -17,7 +17,7 @@ import { useEnergyData } from "../../../hooks/useEnergyData.ts";
 import { useVehicles } from "../../../hooks/useVehicles.ts";
 import { EnergyFlowDiagram } from "../../EnergyFlowDiagram/EnergyFlowDiagram.tsx";
 import { MetricCard } from "../../MetricCard/MetricCard.tsx";
-import { kwhValue, kwValue } from "../../../utils/Format.ts";
+import { formatRate, kwhValue, kwValue } from "../../../utils/Format.ts";
 import { localDateStr } from "@chargeha/shared/timezone";
 import { useSiteTimezone } from "../../../hooks/useSiteTimezone.ts";
 import { trpc } from "../../../trpc.ts";
@@ -221,10 +221,7 @@ function formatCurrentRateValue(
 ): string {
   if (!currentRate) return "";
   const sym = currentRate.currencySymbol ?? "$";
-  const rateStr = currentRate.ratePerKwh === Math.round(currentRate.ratePerKwh)
-    ? currentRate.ratePerKwh.toFixed(2)
-    : currentRate.ratePerKwh.toFixed(4);
-  return `${sym}${rateStr}/kWh`;
+  return `${formatRate(currentRate.ratePerKwh, sym)}/kWh`;
 }
 
 function formatCurrentRateSubtitle(
@@ -237,12 +234,9 @@ function formatCurrentRateSubtitle(
 ): string | undefined {
   if (!currentRate?.nextRate) return undefined;
   const sym = currentRate.currencySymbol ?? "$";
-  const nextRate = currentRate.nextRate.ratePerKwh;
-  const nextRateStr = nextRate === Math.round(nextRate)
-    ? nextRate.toFixed(2)
-    : nextRate.toFixed(4);
-  return `Next: ${currentRate.nextRate.label} (${sym}${nextRateStr}) in ${
-    formatTimeUntil(currentRate.nextRate.startsAt)
+  const { label, ratePerKwh, startsAt } = currentRate.nextRate;
+  return `Next: ${label} (${formatRate(ratePerKwh, sym)}) in ${
+    formatTimeUntil(startsAt)
   }`;
 }
 

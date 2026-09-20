@@ -35,10 +35,10 @@ export class SolarAllocator {
   // while charging), and only then does threePhaseCharger decide.
   static resolvePhases(
     chargerPhases: number | null,
-    config: ControllerConfig,
+    threePhaseCharger: boolean,
   ): number {
     if (chargerPhases !== null) return chargerPhases;
-    return config.threePhaseCharger ? 3 : 1;
+    return threePhaseCharger ? 3 : 1;
   }
 
   // Surplus solar in watts, before the safety margin.
@@ -222,7 +222,7 @@ export class SolarAllocator {
         );
         const phases = SolarAllocator.resolvePhases(
           state.chargerPhases,
-          config,
+          config.threePhaseCharger,
         );
         return {
           id: v.id,
