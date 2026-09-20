@@ -28,6 +28,28 @@ describe("Simulator", () => {
     expect(screen.getAllByText(/EV 2/).length).toBeGreaterThan(0);
   });
 
+  it("charges less when a car only plugs in at noon", async () => {
+    renderWithProviders(<Simulator />);
+    const ev1Battery = () => {
+      const stat = screen.getAllByText(/starts/).map((el) =>
+        el.closest("div")?.textContent ?? ""
+      ).find((t) => t.startsWith("EV 1"));
+      return Number(stat?.match(/battery ([\d.]+)%/)?.[1]);
+    };
+
+    fireEvent.click(screen.getByText("Run Simulation"));
+    await waitFor(() => {
+      expect(screen.getByText(/Done in \d+ms/)).toBeInTheDocument();
+    });
+    const allDay = ev1Battery();
+
+    fireEvent.change(screen.getByLabelText("EV 1 plug-in time"), {
+      target: { value: String(12 * 60) },
+    });
+    fireEvent.click(screen.getByText("Run Simulation"));
+    await waitFor(() => expect(ev1Battery()).toBeLessThan(allDay));
+  });
+
   it("removes a charging point down to a minimum of one", () => {
     renderWithProviders(<Simulator />);
 
