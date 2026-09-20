@@ -11,6 +11,8 @@ labels: bug
 - Please enable `LOG_LEVEL=debug` and provide relevant logs: either an export of
   the container's stdout logs, or from the appropriate tab on the `Logs` page in
   the app.
+- If the problem is something you can see in the UI, please include a
+  screenshot.
 
 ### What happened?
 
