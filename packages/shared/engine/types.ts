@@ -8,7 +8,7 @@ import type {
   VehicleChargeState,
   VehicleMode,
 } from "../types.ts";
-import type { DecisionCheck } from "./DecisionChecks.ts";
+import type { StepTrace } from "./Trace.ts";
 
 // ---- Engine input types ----
 
@@ -130,7 +130,7 @@ export interface VehicleDecision {
   reason: DecisionReason;
   detail: string;
   targetAmps: number | null;
-  checks: DecisionCheck[];
+  checks: StepTrace[];
   // When true, polling can be suspended — charging is not possible.
   suspendable?: boolean;
   // Set when a charge schedule's limit was reached and the decision fell through.
@@ -156,7 +156,7 @@ export type ControlStateUpdates = Partial<
   >
 >;
 
-// The subset of VehicleDecision that pipeline steps produce. The caller
+// The subset of VehicleDecision that pipeline steps produce. The runner
 // adds checks, scheduleLimitContext after assembling all steps.
 export type PipelineDecision = Omit<
   VehicleDecision,
@@ -167,7 +167,7 @@ export type PipelineDecision = Omit<
 // is null, the step did not apply — try the next step.
 export interface EvalResult {
   decision: PipelineDecision | null;
-  checks: DecisionCheck[];
+  trace: StepTrace[];
   scheduleLimitContext?: { scheduleLimitPct: number; batteryLevel: number };
   stateUpdates?: ControlStateUpdates;
 }

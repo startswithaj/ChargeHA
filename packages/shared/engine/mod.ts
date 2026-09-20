@@ -1,7 +1,9 @@
 export { SolarAllocator } from "./SolarAllocator.ts";
-export { DecisionChecks } from "./DecisionChecks.ts";
-export type { CheckName, DecisionCheck } from "./DecisionChecks.ts";
+export { Trace } from "./Trace.ts";
+export type { StepTrace, TraceName } from "./Trace.ts";
 export { ControllerEngine } from "./ControllerEngine.ts";
+export { Steps } from "./Steps.ts";
+export type { Step, StepContext } from "./Steps.ts";
 export {
   isScheduleActiveNow,
   scheduleTargets,

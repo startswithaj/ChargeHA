@@ -1,6 +1,6 @@
 import type { DayOfWeek } from "@chargeha/shared";
 import type { SystemAlert } from "./types.ts";
-import type { DecisionCheck } from "@chargeha/shared/engine";
+import type { StepTrace } from "@chargeha/shared/engine";
 import type { DecisionInputs } from "./types.ts";
 
 export function parseDecisionInputs(json: string): DecisionInputs | null {
@@ -11,9 +11,9 @@ export function parseDecisionInputs(json: string): DecisionInputs | null {
   }
 }
 
-export function parseDecisionChecks(json: string): DecisionCheck[] {
+export function parseStepTrace(json: string): StepTrace[] {
   try {
-    return JSON.parse(json) as DecisionCheck[];
+    return JSON.parse(json) as StepTrace[];
   } catch {
     return [];
   }

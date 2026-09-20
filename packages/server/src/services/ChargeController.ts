@@ -10,17 +10,17 @@ import {
 import type { VehicleRequestContext } from "@chargeha/shared/plugins";
 import {
   ControllerEngine,
-  DecisionChecks,
   isScheduleActiveNow,
   scheduleTargets,
   selectActiveChargeSchedule,
+  Trace,
 } from "@chargeha/shared/engine";
 import type {
   ControllerConfig,
-  DecisionCheck,
   DecisionReason,
   EngineOutput,
   EngineVehicleInput,
+  StepTrace,
   VehicleDecision,
 } from "@chargeha/shared/engine";
 import type { AppDatabase } from "../db/AppDatabase.ts";
@@ -49,7 +49,7 @@ interface DecisionLogEntry {
   vehicleName: string;
   mode: VehicleMode;
   inputs: DecisionInputs;
-  checks: DecisionCheck[];
+  checks: StepTrace[];
   action: ControllerAction;
   reason: DecisionReason;
   actionDetail: string;
@@ -449,7 +449,7 @@ export class ChargeController {
       const totalAmps = [...output.decisions.keys()]
         .map((id) => this.engine.getControlState(id).allocatedAmps ?? 0)
         .reduce((sum, a) => sum + a, 0);
-      checks.push(DecisionChecks.solarAllocation(
+      checks.push(Trace.solarAllocation(
         cs.allocatedAmps,
         totalAmps,
         mode,

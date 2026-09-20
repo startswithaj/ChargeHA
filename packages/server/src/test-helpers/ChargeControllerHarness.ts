@@ -11,7 +11,7 @@ import type {
 } from "@chargeha/shared";
 import type { ConfigKey, CoreConfigKey } from "@chargeha/shared/schemas";
 import type { DayOfWeek } from "@chargeha/shared";
-import type { DecisionCheck } from "@chargeha/shared/engine";
+import type { StepTrace } from "@chargeha/shared/engine";
 import type { VehicleRow } from "../db/types.ts";
 import { AppDatabase } from "../db/AppDatabase.ts";
 import { VehicleManager } from "../services/VehicleManager.ts";
@@ -134,13 +134,13 @@ type ControllerLogRow = Awaited<
 >["rows"][0];
 type ParsedControllerLog =
   & ControllerLogRow
-  & { inputs: unknown; checks: DecisionCheck[] };
+  & { inputs: unknown; checks: StepTrace[] };
 
 function parseLog(row: ControllerLogRow): ParsedControllerLog {
   return {
     ...row,
     inputs: JSON.parse(row.inputsJson),
-    checks: JSON.parse(row.checksJson) as DecisionCheck[],
+    checks: JSON.parse(row.checksJson) as StepTrace[],
   };
 }
 

@@ -116,7 +116,7 @@ vi.mock("../../../hooks/useToast.tsx", async (importOriginal) => ({
 }));
 
 describe("Logs", () => {
-  // The wire shape `ControllerLogEntry` carries strict enums (`CheckName`,
+  // The wire shape `ControllerLogEntry` carries strict enums (`TraceName`,
   // `ControllerAction`) and a fully-populated `config`. Tests intentionally
   // exercise unknown actions / partial configs / arbitrary check names, so the
   // factory returns the loose test shape and `setLogs` widens through `as never`

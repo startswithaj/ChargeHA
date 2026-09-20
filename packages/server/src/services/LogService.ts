@@ -1,8 +1,5 @@
 import type { AppDatabase } from "../db/AppDatabase.ts";
-import {
-  parseDecisionChecks,
-  parseDecisionInputs,
-} from "../db/Serialization.ts";
+import { parseDecisionInputs, parseStepTrace } from "../db/Serialization.ts";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -52,7 +49,7 @@ export class LogService {
       vehicleName: row.vehicleName,
       mode: row.mode,
       inputs: parseDecisionInputs(row.inputsJson),
-      checks: parseDecisionChecks(row.checksJson),
+      checks: parseStepTrace(row.checksJson),
       action: row.action,
       actionDetail: row.actionDetail,
       targetAmps: row.targetAmps,
