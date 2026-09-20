@@ -5,12 +5,16 @@ import { useFreshRowIds } from "../../../hooks/useFreshRowIds.ts";
 import { PAGE_SIZE_OPTIONS } from "./Logs.tsx";
 import styles from "./Logs.module.css";
 import { formatTimestamp } from "./logsTime.ts";
+import { formatRate } from "../../../utils/Format.ts";
+import { trpc } from "../../../trpc.ts";
 
 function fmt(w: number): string {
   return `${Math.round(w).toLocaleString()}W`;
 }
 
-function ReadingCells({ r }: { r: EnergyReadingEntry }) {
+function ReadingCells(
+  { r, currencySymbol }: { r: EnergyReadingEntry; currencySymbol: string },
+) {
   if (r.pollFailed) {
     return (
       <td colSpan={6}>
@@ -28,7 +32,7 @@ function ReadingCells({ r }: { r: EnergyReadingEntry }) {
       <td>{r.batteryPowerW !== null ? fmt(r.batteryPowerW) : "—"}</td>
       <td>{r.batterySoc !== null ? `${r.batterySoc}%` : "—"}</td>
       <td>
-        {r.ratePerKwh !== null ? `${r.ratePerKwh}¢` : "—"}
+        {r.ratePerKwh !== null ? formatRate(r.ratePerKwh, currencySymbol) : "—"}
       </td>
     </>
   );
@@ -57,6 +61,8 @@ export function EnergyReadsTable({
 }: EnergyReadsTableProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const freshIds = useFreshRowIds(readings);
+  const { data: defaultRate } = trpc.tariff.defaultRate.useQuery();
+  const currencySymbol = defaultRate?.currencySymbol ?? "$";
 
   if (loading && readings.length === 0) {
     return (
@@ -99,7 +105,7 @@ export function EnergyReadsTable({
                 <td className={styles.timestamp}>
                   {formatTimestamp(r.timestamp, timezone)}
                 </td>
-                <ReadingCells r={r} />
+                <ReadingCells r={r} currencySymbol={currencySymbol} />
               </tr>
             ))}
           </tbody>
