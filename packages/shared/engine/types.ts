@@ -162,13 +162,16 @@ export type ControlStateUpdates = Partial<
 // adds checks after assembling all steps.
 export type PipelineDecision = Omit<VehicleDecision, "checks">;
 
-// Result of an evaluation step in the decision pipeline. When `decision`
-// is null, the step did not apply — try the next step.
-export interface EvalResult {
-  decision: PipelineDecision | null;
-  trace: StepTrace[];
-  stateUpdates?: ControlStateUpdates;
-}
+// Result of an evaluation step in the decision pipeline. A step either
+// passes — try the next step — or decides, and only a decision carries
+// control-state changes.
+export type EvalResult =
+  | { decision: null; trace: StepTrace[] }
+  | {
+    decision: PipelineDecision;
+    trace: StepTrace[];
+    stateUpdates?: ControlStateUpdates;
+  };
 
 // Result from the amp debounce calculation. The caller applies
 // pendingAmps/pendingSince to the VehicleControlState.

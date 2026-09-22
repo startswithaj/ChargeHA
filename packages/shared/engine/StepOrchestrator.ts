@@ -3,12 +3,6 @@ import type { Step, StepContext } from "./Steps.ts";
 import type { StepTrace } from "./Trace.ts";
 import type { ControlStateUpdates, VehicleDecision } from "./types.ts";
 
-// What the runner collects across steps until one decides.
-interface Collected {
-  checks: StepTrace[];
-  stateUpdates: ControlStateUpdates;
-}
-
 // Final decision plus the control-state changes the engine applies.
 export interface StepRunResult {
   decision: VehicleDecision;
@@ -35,27 +29,24 @@ export class StepOrchestrator {
   ];
 
   static run(ctx: StepContext): StepRunResult {
-    return StepOrchestrator.runFrom(ctx, 0, { checks: [], stateUpdates: {} });
+    return StepOrchestrator.runFrom(ctx, 0, []);
   }
 
   private static runFrom(
     ctx: StepContext,
     index: number,
-    acc: Collected,
+    collected: StepTrace[],
   ): StepRunResult {
     const step = StepOrchestrator.ORDER[index];
     if (!step) throw new Error("Step pipeline ended without a decision");
     const result = step(ctx);
-    const next: Collected = {
-      checks: [...acc.checks, ...result.trace],
-      stateUpdates: { ...acc.stateUpdates, ...result.stateUpdates },
-    };
+    const checks = [...collected, ...result.trace];
     if (!result.decision) {
-      return StepOrchestrator.runFrom(ctx, index + 1, next);
+      return StepOrchestrator.runFrom(ctx, index + 1, checks);
     }
     return {
-      decision: { ...result.decision, checks: next.checks },
-      stateUpdates: next.stateUpdates,
+      decision: { ...result.decision, checks },
+      stateUpdates: result.stateUpdates ?? {},
     };
   }
 }
