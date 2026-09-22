@@ -22,6 +22,7 @@ describe("ControllerEngine", () => {
         mode: "auto",
         priority: 1,
         state: null,
+        activeSchedule: null,
       }];
       const output = engine.decide(input);
       const d = output.decisions.get("V1");
@@ -436,7 +437,7 @@ describe("ControllerEngine", () => {
       const output = engine.decide({
         config: makeConfig(),
         vehicles: [v1, v2],
-        schedules: [],
+        activeBlockout: null,
         energy: makeEnergy({ gridPowerW: -5000 }),
         now: new Date("2026-01-01T12:00:00Z"),
         timestamp: Date.now(),
@@ -457,7 +458,7 @@ describe("ControllerEngine", () => {
       const output = engine.decide({
         config: makeConfig({ priorityChargingEnabled: true }),
         vehicles: [v1, v2],
-        schedules: [],
+        activeBlockout: null,
         energy: makeEnergy({ gridPowerW: -2000 }),
         now: new Date("2026-01-01T12:00:00Z"),
         timestamp: Date.now(),
@@ -667,21 +668,23 @@ describe("ControllerEngine", () => {
         enabled: true,
       };
 
-      engine.decide({
-        ...makeInput({
+      engine.decide(
+        makeInput({
           vehicle: { state: { isCharging: true } },
           configOverrides: { timezone: "UTC" },
+          now,
+          schedules: [blockout],
         }),
-        now,
-        schedules: [blockout],
-      });
+      );
       expect(engine.getControlState("V1").blockoutChargeNotified).toBe(true);
 
-      engine.decide({
-        ...makeInput({ configOverrides: { timezone: "UTC" } }),
-        now,
-        schedules: [blockout],
-      });
+      engine.decide(
+        makeInput({
+          configOverrides: { timezone: "UTC" },
+          now,
+          schedules: [blockout],
+        }),
+      );
       expect(engine.getControlState("V1").blockoutChargeNotified).toBe(false);
     });
   });
@@ -694,7 +697,7 @@ describe("ControllerEngine", () => {
       const output = engine.decide({
         config: makeConfig({ solarReference: "gross" }),
         vehicles: [v1, v2],
-        schedules: [],
+        activeBlockout: null,
         energy: makeEnergy({ solarProductionW: 5000, gridPowerW: 500 }),
         now: new Date("2026-01-01T12:00:00Z"),
         timestamp: Date.now(),

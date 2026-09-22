@@ -1,12 +1,10 @@
 import type { EnergyData, VehicleChargeState } from "../types.ts";
+import { scheduleLimitReached } from "./Schedules.ts";
+import type { ActiveChargeSchedule } from "./Schedules.ts";
 import { SolarAllocator } from "./SolarAllocator.ts";
+import type { SolarTargets } from "./SolarAllocator.ts";
 import { Trace } from "./Trace.ts";
 import type { StepTrace } from "./Trace.ts";
-import {
-  isScheduleActiveNow,
-  selectActiveChargeSchedule,
-} from "./Schedules.ts";
-import type { ActiveChargeSchedule } from "./Schedules.ts";
 import type {
   ControllerConfig,
   ControlStateUpdates,
@@ -16,21 +14,7 @@ import type {
   EvalResult,
   PipelineDecision,
   VehicleControlState,
-  VehicleDecision,
 } from "./types.ts";
-
-// Solar numbers shared by every solar step. Null when solar tracking is
-// disabled or there is no energy data.
-export interface SolarTargets {
-  voltage: number;
-  phases: number;
-  solarKw: number;
-  availableW: number;
-  targetAmps: number;
-  clampedAmps: number;
-  belowMinGeneration: boolean;
-  belowMinAmps: boolean;
-}
 
 // Everything a step may read. Built once per vehicle per loop; steps never
 // mutate it — control state changes come back as `stateUpdates`.
@@ -38,7 +22,7 @@ export interface StepContext {
   vehicle: EngineVehicleInput;
   state: VehicleChargeState;
   config: ControllerConfig;
-  schedules: EngineSchedule[];
+  activeBlockout: EngineSchedule | null;
   energy: EnergyData | null;
   now: Date;
   timestamp: number;
@@ -47,19 +31,6 @@ export interface StepContext {
 }
 
 export type Step = (ctx: StepContext) => EvalResult;
-
-// What the runner collects across steps until one decides.
-interface Collected {
-  checks: StepTrace[];
-  stateUpdates: ControlStateUpdates;
-  scheduleLimitPct?: number;
-}
-
-// Final decision plus the control-state changes the engine applies.
-export interface StepRunResult {
-  decision: VehicleDecision;
-  stateUpdates: ControlStateUpdates;
-}
 
 const pass = (trace: StepTrace[] = []): EvalResult => ({
   decision: null,
@@ -71,99 +42,9 @@ const graceReset = (): ControlStateUpdates => ({
   graceNotified: false,
 });
 
+// Pure decision steps. Every public static is a Step; ordering lives in
+// StepOrchestrator.
 export class Steps {
-  // Evaluated in order. The first step to return a decision ends the run.
-  static readonly ORDER: readonly Step[] = [
-    Steps.pluggedIn,
-    Steps.atHome,
-    Steps.batteryAtLimit,
-    Steps.mode,
-    Steps.blockout,
-    Steps.chargeSchedule,
-    Steps.batteryPriority,
-    Steps.solarTrackingGate,
-    Steps.minSolarGeneration,
-    Steps.minExcessSolar,
-    Steps.insufficientSolar,
-    Steps.cooldown,
-    Steps.sufficientSolar,
-    Steps.idle,
-  ];
-
-  static run(ctx: StepContext): StepRunResult {
-    return Steps.runFrom(ctx, 0, {
-      checks: [],
-      stateUpdates: {},
-      scheduleLimitPct: undefined,
-    });
-  }
-
-  private static runFrom(
-    ctx: StepContext,
-    index: number,
-    acc: Collected,
-  ): StepRunResult {
-    const step = Steps.ORDER[index];
-    if (!step) throw new Error("Step pipeline ended without a decision");
-    const result = step(ctx);
-    const next: Collected = {
-      checks: [...acc.checks, ...result.trace],
-      stateUpdates: { ...acc.stateUpdates, ...result.stateUpdates },
-      scheduleLimitPct: acc.scheduleLimitPct ?? result.scheduleLimitPct,
-    };
-    if (!result.decision) return Steps.runFrom(ctx, index + 1, next);
-    return {
-      decision: {
-        ...result.decision,
-        checks: next.checks,
-        scheduleLimitPct: next.scheduleLimitPct,
-      },
-      stateUpdates: next.stateUpdates,
-    };
-  }
-
-  static solarTargets(
-    state: VehicleChargeState,
-    config: ControllerConfig,
-    energy: EnergyData | null,
-    allocatedAmps: number | null,
-  ): SolarTargets | null {
-    if (!config.solarTrackingEnabled || !energy) return null;
-    const voltage = SolarAllocator.resolveVoltage(
-      state.chargerVoltage,
-      energy,
-      config.gridVoltage,
-    );
-    const phases = SolarAllocator.resolvePhases(
-      state.chargerPhases,
-      config.threePhaseCharger,
-    );
-    const availableW = SolarAllocator.calculateAvailableSolar(
-      config,
-      energy,
-      state,
-      voltage,
-      phases,
-    );
-    const targetAmps = allocatedAmps ??
-      Math.floor(availableW / (voltage * phases));
-    const clampedAmps = Math.max(
-      state.chargeAmpsMin,
-      Math.min(state.chargeAmpsMax, targetAmps),
-    );
-    const solarKw = energy.solarProductionW / 1000;
-    return {
-      voltage,
-      phases,
-      solarKw,
-      availableW,
-      targetAmps,
-      clampedAmps,
-      belowMinGeneration: solarKw < config.minSolarGenerationKw,
-      belowMinAmps: targetAmps < state.chargeAmpsMin,
-    };
-  }
-
   // ---- Preconditions ----
 
   static pluggedIn({ state }: StepContext): EvalResult {
@@ -262,51 +143,32 @@ export class Steps {
 
   // ---- Schedules ----
 
-  static blockout({ state, config, schedules, now }: StepContext): EvalResult {
-    const active = schedules.find(
-      (s) =>
-        s.scheduleType === "blockout" && s.enabled &&
-        isScheduleActiveNow(s, now, config.timezone),
-    );
-    if (!active) return pass([Trace.blockoutNone()]);
+  static blockout({ state, activeBlockout }: StepContext): EvalResult {
+    if (!activeBlockout) return pass([Trace.blockoutNone()]);
     return {
       decision: {
         action: state.isCharging ? "stop" : "none",
         reason: "blockout",
         detail: state.isCharging
-          ? `Stop — blockout schedule active (${active.startTime}-${active.endTime})`
+          ? `Stop — blockout schedule active (${activeBlockout.startTime}-${activeBlockout.endTime})`
           : "Blocked by blockout schedule",
         targetAmps: null,
         suspendable: !state.isCharging,
       },
-      trace: [Trace.blockoutActive(active)],
+      trace: [Trace.blockoutActive(activeBlockout)],
       // The orchestrator reads this flag to decide whether to emit the
       // blockout charge notification event
       stateUpdates: { blockoutChargeNotified: state.isCharging },
     };
   }
 
-  static chargeSchedule(
-    { vehicle, state, config, schedules, now }: StepContext,
-  ): EvalResult {
-    const active = selectActiveChargeSchedule(
-      schedules,
-      vehicle,
-      now,
-      config.timezone,
-    );
+  static chargeSchedule({ vehicle, state }: StepContext): EvalResult {
+    const active = vehicle.activeSchedule;
     if (!active) return pass([Trace.scheduleNone()]);
     const effective = active.effective;
 
-    if (
-      effective.chargeLimitPct !== null &&
-      state.batteryLevel >= effective.chargeLimitPct
-    ) {
-      return {
-        decision: null,
-        trace: [Trace.scheduleLimitReached(effective, state.batteryLevel)],
-        scheduleLimitPct: effective.chargeLimitPct,
-      };
+    if (scheduleLimitReached(active, state.batteryLevel) !== undefined) {
+      return pass([Trace.scheduleLimitReached(effective, state.batteryLevel)]);
     }
 
     const amps = effective.chargeAmps ?? state.chargeAmpsMax;

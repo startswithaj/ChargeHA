@@ -1,6 +1,6 @@
 import { SolarAllocator } from "./SolarAllocator.ts";
 import { Trace } from "./Trace.ts";
-import { Steps } from "./Steps.ts";
+import { StepOrchestrator } from "./StepOrchestrator.ts";
 import type {
   EngineInput,
   EngineOutput,
@@ -16,7 +16,7 @@ export class ControllerEngine {
   private controlStates = new Map<string, VehicleControlState>();
 
   decide(input: EngineInput): EngineOutput {
-    const { config, vehicles, schedules, energy, now, timestamp } = input;
+    const { config, vehicles, activeBlockout, energy, now, timestamp } = input;
     if (!config.chargingEnabled) {
       const decisions = new Map(
         vehicles.map((vehicle): [string, VehicleDecision] => [vehicle.id, {
@@ -45,16 +45,21 @@ export class ControllerEngine {
         const { state } = vehicle;
         if (!state) return [vehicle.id, noState()];
         const cs = this.getControlState(vehicle.id);
-        const { decision, stateUpdates } = Steps.run({
+        const { decision, stateUpdates } = StepOrchestrator.run({
           vehicle,
           state,
           config,
-          schedules,
+          activeBlockout,
           energy,
           now,
           timestamp,
           cs,
-          solar: Steps.solarTargets(state, config, energy, cs.allocatedAmps),
+          solar: SolarAllocator.targets(
+            state,
+            config,
+            energy,
+            cs.allocatedAmps,
+          ),
         });
         this.controlStates.set(vehicle.id, { ...cs, ...stateUpdates });
         return [vehicle.id, decision];
