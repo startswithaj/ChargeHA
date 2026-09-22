@@ -134,7 +134,7 @@ export interface VehicleDecision {
   // When true, polling can be suspended — charging is not possible.
   suspendable?: boolean;
   // Set when a charge schedule's limit was reached and the decision fell through.
-  scheduleLimitContext?: { scheduleLimitPct: number; batteryLevel: number };
+  scheduleLimitPct?: number;
 }
 
 export interface EngineOutput {
@@ -157,10 +157,10 @@ export type ControlStateUpdates = Partial<
 >;
 
 // The subset of VehicleDecision that pipeline steps produce. The runner
-// adds checks, scheduleLimitContext after assembling all steps.
+// adds checks, scheduleLimitPct after assembling all steps.
 export type PipelineDecision = Omit<
   VehicleDecision,
-  "checks" | "scheduleLimitContext"
+  "checks" | "scheduleLimitPct"
 >;
 
 // Result of an evaluation step in the decision pipeline. When `decision`
@@ -168,7 +168,7 @@ export type PipelineDecision = Omit<
 export interface EvalResult {
   decision: PipelineDecision | null;
   trace: StepTrace[];
-  scheduleLimitContext?: { scheduleLimitPct: number; batteryLevel: number };
+  scheduleLimitPct?: number;
   stateUpdates?: ControlStateUpdates;
 }
 

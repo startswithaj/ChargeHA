@@ -82,7 +82,7 @@ describe("ControllerEngine — schedules", () => {
       const d = output.decisions.get("V1");
       // Schedule limit reached at 85% >= 80%, falls through to solar tracking
       expect(d?.action).toBe("start");
-      expect(d?.scheduleLimitContext?.scheduleLimitPct).toBe(80);
+      expect(d?.scheduleLimitPct).toBe(80);
     });
   });
 
@@ -204,7 +204,7 @@ describe("ControllerEngine — schedules", () => {
       );
       // Limit reached at 85% >= 80%, so the schedule step no longer decides.
       expect(d?.reason).not.toBe("schedule");
-      expect(d?.scheduleLimitContext?.scheduleLimitPct).toBe(80);
+      expect(d?.scheduleLimitPct).toBe(80);
     });
 
     it("applies the strictest limit when both schedules carry one", () => {
@@ -218,7 +218,7 @@ describe("ControllerEngine — schedules", () => {
         { batteryLevel: 75, isCharging: true, chargeAmps: 32 },
         "2026-01-01T03:00:00Z",
       );
-      expect(d?.scheduleLimitContext?.scheduleLimitPct).toBe(70);
+      expect(d?.scheduleLimitPct).toBe(70);
     });
 
     describe("partial overlap", () => {
@@ -237,7 +237,7 @@ describe("ControllerEngine — schedules", () => {
         const d = decide(both, { batteryLevel: 85 }, "2026-01-01T01:00:00Z");
         expect(d?.action).toBe("start");
         expect(d?.targetAmps).toBe(32);
-        expect(d?.scheduleLimitContext).toBeUndefined();
+        expect(d?.scheduleLimitPct).toBeUndefined();
       });
 
       it("merged inside the shared window — charger amps, vehicle limit", () => {
@@ -250,7 +250,7 @@ describe("ControllerEngine — schedules", () => {
           { batteryLevel: 85 },
           "2026-01-01T04:00:00Z",
         );
-        expect(limited?.scheduleLimitContext?.scheduleLimitPct).toBe(80);
+        expect(limited?.scheduleLimitPct).toBe(80);
       });
 
       it("vehicle only after the shared window — its own amps and limit", () => {

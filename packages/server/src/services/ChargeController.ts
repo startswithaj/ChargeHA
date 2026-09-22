@@ -56,7 +56,7 @@ interface DecisionLogEntry {
   targetAmps: number | null;
   suspendable?: boolean;
   // Set when a charge schedule's limit was reached and the decision fell through.
-  scheduleLimitContext?: { scheduleLimitPct: number; batteryLevel: number };
+  scheduleLimitPct?: number;
 }
 
 // One controllable unit for the loop: a charging point.
@@ -468,7 +468,7 @@ export class ChargeController {
       actionDetail: decision.detail,
       targetAmps: decision.targetAmps,
       suspendable: decision.suspendable,
-      scheduleLimitContext: decision.scheduleLimitContext,
+      scheduleLimitPct: decision.scheduleLimitPct,
     };
 
     this.emitControllerStatus(target.id, entry);
@@ -599,7 +599,7 @@ export class ChargeController {
         reason: justHitLimit ? "battery_at_limit" : entry.reason,
         batteryLevel: preState?.batteryLevel,
         chargeLimit: preState?.chargeLimit,
-        scheduleLimitContext: entry.scheduleLimitContext,
+        scheduleLimitPct: entry.scheduleLimitPct,
       });
     }
 

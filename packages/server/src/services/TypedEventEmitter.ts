@@ -55,7 +55,7 @@ export interface EventMap {
     reason: DecisionReason;
     batteryLevel?: number;
     chargeLimit?: number;
-    scheduleLimitContext?: { scheduleLimitPct: number; batteryLevel: number };
+    scheduleLimitPct?: number;
   };
   controller_external_charge: {
     vehicleId: string;

@@ -52,7 +52,7 @@ export type Step = (ctx: StepContext) => EvalResult;
 interface Collected {
   checks: StepTrace[];
   stateUpdates: ControlStateUpdates;
-  scheduleLimitContext?: VehicleDecision["scheduleLimitContext"];
+  scheduleLimitPct?: number;
 }
 
 // Final decision plus the control-state changes the engine applies.
@@ -94,7 +94,7 @@ export class Steps {
     return Steps.runFrom(ctx, 0, {
       checks: [],
       stateUpdates: {},
-      scheduleLimitContext: undefined,
+      scheduleLimitPct: undefined,
     });
   }
 
@@ -109,15 +109,14 @@ export class Steps {
     const next: Collected = {
       checks: [...acc.checks, ...result.trace],
       stateUpdates: { ...acc.stateUpdates, ...result.stateUpdates },
-      scheduleLimitContext: acc.scheduleLimitContext ??
-        result.scheduleLimitContext,
+      scheduleLimitPct: acc.scheduleLimitPct ?? result.scheduleLimitPct,
     };
     if (!result.decision) return Steps.runFrom(ctx, index + 1, next);
     return {
       decision: {
         ...result.decision,
         checks: next.checks,
-        scheduleLimitContext: next.scheduleLimitContext,
+        scheduleLimitPct: next.scheduleLimitPct,
       },
       stateUpdates: next.stateUpdates,
     };
@@ -306,10 +305,7 @@ export class Steps {
       return {
         decision: null,
         trace: [Trace.scheduleLimitReached(effective, state.batteryLevel)],
-        scheduleLimitContext: {
-          scheduleLimitPct: effective.chargeLimitPct,
-          batteryLevel: state.batteryLevel,
-        },
+        scheduleLimitPct: effective.chargeLimitPct,
       };
     }
 
