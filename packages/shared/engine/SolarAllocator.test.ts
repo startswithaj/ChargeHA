@@ -76,6 +76,7 @@ describe("SolarAllocator", () => {
       vehicleName: `EV ${id}`,
       ...overrides,
     },
+    activeSchedule: null,
   });
 
   describe("resolveVoltage", () => {

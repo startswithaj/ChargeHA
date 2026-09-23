@@ -5,8 +5,10 @@ import {
   CloudSun,
   ListOrdered,
   Plug,
+  PlugZap,
   ShieldBan,
   Sun,
+  Unplug,
   Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -87,6 +89,38 @@ interface VehicleCardDetailsProps {
   allocationStatus: string | null;
   controllerReason: string | null;
   controllerDetail: string | null;
+  chargerStatus: { status: string; statusDetail: string | null } | null;
+}
+
+const sentenceCase = (text: string) =>
+  text.charAt(0).toUpperCase() + text.slice(1);
+
+export function ChargerStatusRow(
+  { chargerStatus }: {
+    chargerStatus: { status: string; statusDetail: string | null } | null;
+  },
+) {
+  if (!chargerStatus) return null;
+  if (chargerStatus.status === "no_draw") {
+    return (
+      <div className={layout.detailRow}>
+        <Unplug size={14} />
+        <Text size="1" color="gray">
+          No draw — vehicle may be absent, finished, or paused
+          {chargerStatus.statusDetail ? ` (${chargerStatus.statusDetail})` : ""}
+        </Text>
+      </div>
+    );
+  }
+  if (!chargerStatus.statusDetail) return null;
+  return (
+    <div className={layout.detailRow}>
+      <PlugZap size={14} />
+      <Text size="1" color="gray">
+        {sentenceCase(chargerStatus.statusDetail)}
+      </Text>
+    </div>
+  );
 }
 
 function formatMinutes(minutes: number): string {
@@ -247,6 +281,7 @@ export function VehicleCardDetails({
   allocationStatus,
   controllerReason,
   controllerDetail,
+  chargerStatus,
 }: VehicleCardDetailsProps) {
   return (
     <>
@@ -290,6 +325,7 @@ export function VehicleCardDetails({
           </>
         )}
         <TimeToFullRow state={state} chargeLimitPercent={chargeLimitPercent} />
+        <ChargerStatusRow chargerStatus={chargerStatus} />
       </div>
 
       <div className={styles.controls}>

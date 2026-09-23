@@ -43,7 +43,7 @@ packages/shared/
   schemas.ts                 — Zod schemas shared between server and client
   configSections.ts          — Config section definitions + key registry
   engine/                    — Pure charging logic (ControllerEngine, SolarAllocator,
-                               DecisionChecks, Schedules)
+                               Trace, Steps, Schedules)
   simulation/                — Simulation helpers (solar curve generation, run harness)
   test-factories.ts          — Shared test factories (buildVehicleChargeState, etc.)
 packages/plugins/

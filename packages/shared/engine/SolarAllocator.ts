@@ -1,6 +1,21 @@
 import type { EnergyData, VehicleChargeState } from "../types.ts";
 import type { ControllerConfig, EngineVehicleInput } from "./types.ts";
 
+// Solar numbers shared by every solar step. Null when solar tracking is
+// disabled or there is no energy data.
+export interface SolarTargets {
+  voltage: number;
+  phases: number;
+  solarKw: number;
+  availableW: number;
+  // What solar alone could give this vehicle, before allocation
+  rawAmps: number;
+  targetAmps: number;
+  clampedAmps: number;
+  belowMinGeneration: boolean;
+  belowMinAmps: boolean;
+}
+
 // Eligible vehicle enriched with resolved electrical parameters.
 export interface AllocationEntry {
   id: string;
@@ -18,6 +33,49 @@ interface AllocationContext {
 }
 
 export class SolarAllocator {
+  static targets(
+    state: VehicleChargeState,
+    config: ControllerConfig,
+    energy: EnergyData | null,
+    allocatedAmps: number | null,
+  ): SolarTargets | null {
+    if (!config.solarTrackingEnabled || !energy) return null;
+    const voltage = SolarAllocator.resolveVoltage(
+      state.chargerVoltage,
+      energy,
+      config.gridVoltage,
+    );
+    const phases = SolarAllocator.resolvePhases(
+      state.chargerPhases,
+      config.threePhaseCharger,
+    );
+    const availableW = SolarAllocator.calculateAvailableSolar(
+      config,
+      energy,
+      state,
+      voltage,
+      phases,
+    );
+    const rawAmps = Math.floor(availableW / (voltage * phases));
+    const targetAmps = allocatedAmps ?? rawAmps;
+    const clampedAmps = Math.max(
+      state.chargeAmpsMin,
+      Math.min(state.chargeAmpsMax, targetAmps),
+    );
+    const solarKw = energy.solarProductionW / 1000;
+    return {
+      voltage,
+      phases,
+      solarKw,
+      availableW,
+      rawAmps,
+      targetAmps,
+      clampedAmps,
+      belowMinGeneration: solarKw < config.minSolarGenerationKw,
+      belowMinAmps: targetAmps < state.chargeAmpsMin,
+    };
+  }
+
   // Resolve charger voltage: trust the reading if present and >= 100V,
   // otherwise fall back to the inverter grid reading, then the user's configured value.
   static resolveVoltage(

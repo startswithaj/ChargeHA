@@ -10,22 +10,24 @@ describe("ControllerEngine — schedules", () => {
     it("charges at schedule amps when charge schedule is active", () => {
       const engine = new ControllerEngine();
       const now = new Date("2026-01-01T03:00:00Z");
-      const output = engine.decide({
-        ...makeInput({ configOverrides: { timezone: "UTC" } }),
-        now,
-        schedules: [{
-          id: "s1",
-          vehicleId: null,
-          chargerId: null,
-          scheduleType: "charge",
-          startTime: "02:00",
-          endTime: "06:00",
-          days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
-          chargeAmps: 16,
-          chargeLimitPct: null,
-          enabled: true,
-        }],
-      });
+      const output = engine.decide(
+        makeInput({
+          configOverrides: { timezone: "UTC" },
+          now,
+          schedules: [{
+            id: "s1",
+            vehicleId: null,
+            chargerId: null,
+            scheduleType: "charge",
+            startTime: "02:00",
+            endTime: "06:00",
+            days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+            chargeAmps: 16,
+            chargeLimitPct: null,
+            enabled: true,
+          }],
+        }),
+      );
       const d = output.decisions.get("V1");
       expect(d?.action).toBe("start");
       expect(d?.targetAmps).toBe(16);
@@ -34,55 +36,58 @@ describe("ControllerEngine — schedules", () => {
     it("stops when blockout schedule is active", () => {
       const engine = new ControllerEngine();
       const now = new Date("2026-01-01T03:00:00Z");
-      const output = engine.decide({
-        ...makeInput({
+      const output = engine.decide(
+        makeInput({
           vehicle: { state: { isCharging: true, chargeAmps: 10 } },
           configOverrides: { timezone: "UTC" },
+          now,
+          schedules: [{
+            id: "s1",
+            vehicleId: null,
+            chargerId: null,
+            scheduleType: "blockout",
+            startTime: "02:00",
+            endTime: "06:00",
+            days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+            chargeAmps: null,
+            chargeLimitPct: null,
+            enabled: true,
+          }],
         }),
-        now,
-        schedules: [{
-          id: "s1",
-          vehicleId: null,
-          chargerId: null,
-          scheduleType: "blockout",
-          startTime: "02:00",
-          endTime: "06:00",
-          days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
-          chargeAmps: null,
-          chargeLimitPct: null,
-          enabled: true,
-        }],
-      });
+      );
       expect(output.decisions.get("V1")?.action).toBe("stop");
     });
 
     it("falls through to solar when schedule charge limit is reached", () => {
       const engine = new ControllerEngine();
       const now = new Date("2026-01-01T03:00:00Z");
-      const output = engine.decide({
-        ...makeInput({
+      const output = engine.decide(
+        makeInput({
           vehicle: { state: { batteryLevel: 85 } },
           energyOverrides: { gridPowerW: -5000 },
           configOverrides: { timezone: "UTC" },
+          now,
+          schedules: [{
+            id: "s1",
+            vehicleId: null,
+            chargerId: null,
+            scheduleType: "charge",
+            startTime: "02:00",
+            endTime: "06:00",
+            days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+            chargeAmps: 16,
+            chargeLimitPct: 80,
+            enabled: true,
+          }],
         }),
-        now,
-        schedules: [{
-          id: "s1",
-          vehicleId: null,
-          chargerId: null,
-          scheduleType: "charge",
-          startTime: "02:00",
-          endTime: "06:00",
-          days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
-          chargeAmps: 16,
-          chargeLimitPct: 80,
-          enabled: true,
-        }],
-      });
+      );
       const d = output.decisions.get("V1");
       // Schedule limit reached at 85% >= 80%, falls through to solar tracking
       expect(d?.action).toBe("start");
-      expect(d?.scheduleLimitContext?.scheduleLimitPct).toBe(80);
+      expect(d?.checks).toContainEqual({
+        check: "charge_schedule",
+        result: expect.stringContaining("limit reached (85% >= 80%)"),
+      });
     });
   });
 
@@ -90,50 +95,50 @@ describe("ControllerEngine — schedules", () => {
     it("adjusts amps when schedule amps differ from current", () => {
       const engine = new ControllerEngine();
       const now = new Date("2026-01-01T03:00:00Z");
-      const output = engine.decide({
-        ...makeInput({
+      const output = engine.decide(
+        makeInput({
           vehicle: { state: { isCharging: true, chargeAmps: 10 } },
           configOverrides: { timezone: "UTC" },
+          now,
+          schedules: [{
+            id: "s1",
+            vehicleId: null,
+            chargerId: null,
+            scheduleType: "charge",
+            startTime: "02:00",
+            endTime: "06:00",
+            days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+            chargeAmps: 16,
+            chargeLimitPct: null,
+            enabled: true,
+          }],
         }),
-        now,
-        schedules: [{
-          id: "s1",
-          vehicleId: null,
-          chargerId: null,
-          scheduleType: "charge",
-          startTime: "02:00",
-          endTime: "06:00",
-          days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
-          chargeAmps: 16,
-          chargeLimitPct: null,
-          enabled: true,
-        }],
-      });
+      );
       expect(output.decisions.get("V1")?.action).toBe("adjust_amps");
     });
 
     it("returns none when already at schedule amps", () => {
       const engine = new ControllerEngine();
       const now = new Date("2026-01-01T03:00:00Z");
-      const output = engine.decide({
-        ...makeInput({
+      const output = engine.decide(
+        makeInput({
           vehicle: { state: { isCharging: true, chargeAmps: 16 } },
           configOverrides: { timezone: "UTC" },
+          now,
+          schedules: [{
+            id: "s1",
+            vehicleId: null,
+            chargerId: null,
+            scheduleType: "charge",
+            startTime: "02:00",
+            endTime: "06:00",
+            days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+            chargeAmps: 16,
+            chargeLimitPct: null,
+            enabled: true,
+          }],
         }),
-        now,
-        schedules: [{
-          id: "s1",
-          vehicleId: null,
-          chargerId: null,
-          scheduleType: "charge",
-          startTime: "02:00",
-          endTime: "06:00",
-          days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
-          chargeAmps: 16,
-          chargeLimitPct: null,
-          enabled: true,
-        }],
-      });
+      );
       expect(output.decisions.get("V1")?.action).toBe("none");
     });
   });
@@ -161,14 +166,14 @@ describe("ControllerEngine — schedules", () => {
       state: Partial<VehicleChargeState>,
       at: string,
     ) =>
-      new ControllerEngine().decide({
-        ...makeInput({
+      new ControllerEngine().decide(
+        makeInput({
           vehicle: { ...point, state },
           configOverrides: { timezone: "UTC" },
+          now: new Date(at),
+          schedules,
         }),
-        now: new Date(at),
-        schedules,
-      }).decisions.get("CP1");
+      ).decisions.get("CP1");
 
     const chargerSched = sched({ id: "s-charger", chargerId: "CP1" });
     const vehicleSched = sched({
@@ -204,7 +209,10 @@ describe("ControllerEngine — schedules", () => {
       );
       // Limit reached at 85% >= 80%, so the schedule step no longer decides.
       expect(d?.reason).not.toBe("schedule");
-      expect(d?.scheduleLimitContext?.scheduleLimitPct).toBe(80);
+      expect(d?.checks).toContainEqual({
+        check: "charge_schedule",
+        result: expect.stringContaining("limit reached (85% >= 80%)"),
+      });
     });
 
     it("applies the strictest limit when both schedules carry one", () => {
@@ -218,7 +226,10 @@ describe("ControllerEngine — schedules", () => {
         { batteryLevel: 75, isCharging: true, chargeAmps: 32 },
         "2026-01-01T03:00:00Z",
       );
-      expect(d?.scheduleLimitContext?.scheduleLimitPct).toBe(70);
+      expect(d?.checks).toContainEqual({
+        check: "charge_schedule",
+        result: expect.stringContaining("limit reached (75% >= 70%)"),
+      });
     });
 
     describe("partial overlap", () => {
@@ -237,7 +248,10 @@ describe("ControllerEngine — schedules", () => {
         const d = decide(both, { batteryLevel: 85 }, "2026-01-01T01:00:00Z");
         expect(d?.action).toBe("start");
         expect(d?.targetAmps).toBe(32);
-        expect(d?.scheduleLimitContext).toBeUndefined();
+        expect(d?.checks).not.toContainEqual({
+          check: "charge_schedule",
+          result: expect.stringContaining("limit reached"),
+        });
       });
 
       it("merged inside the shared window — charger amps, vehicle limit", () => {
@@ -250,7 +264,10 @@ describe("ControllerEngine — schedules", () => {
           { batteryLevel: 85 },
           "2026-01-01T04:00:00Z",
         );
-        expect(limited?.scheduleLimitContext?.scheduleLimitPct).toBe(80);
+        expect(limited?.checks).toContainEqual({
+          check: "charge_schedule",
+          result: expect.stringContaining("limit reached (85% >= 80%)"),
+        });
       });
 
       it("vehicle only after the shared window — its own amps and limit", () => {
@@ -335,44 +352,48 @@ describe("ControllerEngine — schedules", () => {
     it("does not match when day is wrong", () => {
       const engine = new ControllerEngine();
       const now = new Date("2026-01-01T03:00:00Z"); // Thursday
-      const output = engine.decide({
-        ...makeInput({ configOverrides: { timezone: "UTC" } }),
-        now,
-        schedules: [{
-          id: "s1",
-          vehicleId: null,
-          chargerId: null,
-          scheduleType: "charge",
-          startTime: "02:00",
-          endTime: "06:00",
-          days: ["mon", "tue", "wed"],
-          chargeAmps: 16,
-          chargeLimitPct: null,
-          enabled: true,
-        }],
-      });
+      const output = engine.decide(
+        makeInput({
+          configOverrides: { timezone: "UTC" },
+          now,
+          schedules: [{
+            id: "s1",
+            vehicleId: null,
+            chargerId: null,
+            scheduleType: "charge",
+            startTime: "02:00",
+            endTime: "06:00",
+            days: ["mon", "tue", "wed"],
+            chargeAmps: 16,
+            chargeLimitPct: null,
+            enabled: true,
+          }],
+        }),
+      );
       expect(output.decisions.get("V1")?.detail).not.toContain("schedule");
     });
 
     it("matches overnight schedule spanning midnight", () => {
       const engine = new ControllerEngine();
       const now = new Date("2026-01-01T23:30:00Z");
-      const output = engine.decide({
-        ...makeInput({ configOverrides: { timezone: "UTC" } }),
-        now,
-        schedules: [{
-          id: "s1",
-          vehicleId: null,
-          chargerId: null,
-          scheduleType: "charge",
-          startTime: "22:00",
-          endTime: "06:00",
-          days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
-          chargeAmps: 10,
-          chargeLimitPct: null,
-          enabled: true,
-        }],
-      });
+      const output = engine.decide(
+        makeInput({
+          configOverrides: { timezone: "UTC" },
+          now,
+          schedules: [{
+            id: "s1",
+            vehicleId: null,
+            chargerId: null,
+            scheduleType: "charge",
+            startTime: "22:00",
+            endTime: "06:00",
+            days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+            chargeAmps: 10,
+            chargeLimitPct: null,
+            enabled: true,
+          }],
+        }),
+      );
       expect(output.decisions.get("V1")?.action).toBe("start");
       expect(output.decisions.get("V1")?.targetAmps).toBe(10);
     });
@@ -381,22 +402,24 @@ describe("ControllerEngine — schedules", () => {
       const engine = new ControllerEngine();
       const now = new Date();
       const hours = now.getHours();
-      const output = engine.decide({
-        ...makeInput({ configOverrides: { timezone: "" } }),
-        now,
-        schedules: [{
-          id: "s1",
-          vehicleId: null,
-          chargerId: null,
-          scheduleType: "charge",
-          startTime: `${String(hours).padStart(2, "0")}:00`,
-          endTime: `${String((hours + 1) % 24).padStart(2, "0")}:00`,
-          days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
-          chargeAmps: 12,
-          chargeLimitPct: null,
-          enabled: true,
-        }],
-      });
+      const output = engine.decide(
+        makeInput({
+          configOverrides: { timezone: "" },
+          now,
+          schedules: [{
+            id: "s1",
+            vehicleId: null,
+            chargerId: null,
+            scheduleType: "charge",
+            startTime: `${String(hours).padStart(2, "0")}:00`,
+            endTime: `${String((hours + 1) % 24).padStart(2, "0")}:00`,
+            days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+            chargeAmps: 12,
+            chargeLimitPct: null,
+            enabled: true,
+          }],
+        }),
+      );
       expect(output.decisions.get("V1")?.action).toBe("start");
     });
   });

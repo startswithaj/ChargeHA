@@ -250,6 +250,10 @@ export function VehicleCardSection() {
           gridPowerW={-1180}
           atHome
           allocationStatus="Charging on surplus solar"
+          chargerStatus={{
+            status: "charging",
+            statusDetail: "SOC 64.7%/80%, 32A",
+          }}
         />
       </StackedSpecimen>
       <StackedSpecimen label="unplugged · away · commands disabled">

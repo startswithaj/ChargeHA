@@ -194,7 +194,8 @@ describe("NotificationListener", () => {
         ...VEH,
         actionDetail: "Reached limit",
         reason: "schedule",
-        scheduleLimitContext: { scheduleLimitPct: 80, batteryLevel: 80 },
+        batteryLevel: 80,
+        scheduleLimitPct: 80,
       });
       expect(notificationService.notifications[0].message).toContain(
         "Stopped at 80%. Reached schedule limit (80%)",

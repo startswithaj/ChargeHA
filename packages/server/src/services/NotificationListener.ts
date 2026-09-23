@@ -187,10 +187,10 @@ export class NotificationListener {
       return;
     }
 
-    const ctx = data.scheduleLimitContext;
-    const prefix = ctx
-      ? `Stopped at ${ctx.batteryLevel}%. Reached schedule limit (${ctx.scheduleLimitPct}%). `
-      : "";
+    const prefix =
+      data.scheduleLimitPct !== undefined && data.batteryLevel !== undefined
+        ? `Stopped at ${data.batteryLevel}%. Reached schedule limit (${data.scheduleLimitPct}%). `
+        : "";
     this.notificationService.notify(
       "charge_stopped",
       "Charging Stopped",

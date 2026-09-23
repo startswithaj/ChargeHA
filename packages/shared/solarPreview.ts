@@ -5,7 +5,12 @@ import type {
   VehicleChargeState,
   VehicleMode,
 } from "./types.ts";
-import { ControllerEngine, SolarAllocator } from "./engine/mod.ts";
+import {
+  ControllerEngine,
+  selectActiveBlockout,
+  selectActiveChargeSchedule,
+  SolarAllocator,
+} from "./engine/mod.ts";
 import type {
   ControllerConfig,
   DecisionReason,
@@ -165,6 +170,29 @@ function attributionBudgetKw(
   return SolarAllocator.resolveAvailableW(config, energy, addBackW) / 1000;
 }
 
+function toEngineVehicle(
+  v: PreviewVehicle,
+  state: VehicleChargeState | null,
+  schedules: EngineSchedule[],
+  now: Date,
+  timezone: string,
+): EngineVehicleInput {
+  return {
+    id: v.id,
+    vehicleId: v.id,
+    name: v.name,
+    mode: v.mode,
+    priority: v.priority,
+    state,
+    activeSchedule: selectActiveChargeSchedule(
+      schedules,
+      { id: v.id, vehicleId: v.id },
+      now,
+      timezone,
+    ),
+  };
+}
+
 export function previewSolarAllocation(
   config: ControllerConfig,
   vehicles: PreviewVehicle[],
@@ -178,20 +206,21 @@ export function previewSolarAllocation(
   const vehicleStates = new Map(
     vehicles.map((v) => [v.id, toVehicleChargeState(v, nowIso)] as const),
   );
-  const engineVehicles: EngineVehicleInput[] = vehicles.map((v) => ({
-    id: v.id,
-    vehicleId: v.id,
-    name: v.name,
-    mode: v.mode,
-    priority: v.priority,
-    state: vehicleStates.get(v.id) ?? null,
-  }));
+  const engineVehicles = vehicles.map((v) =>
+    toEngineVehicle(
+      v,
+      vehicleStates.get(v.id) ?? null,
+      schedules,
+      now,
+      config.timezone,
+    )
+  );
 
   const engine = new ControllerEngine();
   const output = engine.decide({
     config,
     vehicles: engineVehicles,
-    schedules,
+    activeBlockout: selectActiveBlockout(schedules, now, config.timezone),
     energy,
     now,
     timestamp: now.getTime(),

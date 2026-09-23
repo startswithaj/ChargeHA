@@ -10,17 +10,20 @@ import {
 import type { VehicleRequestContext } from "@chargeha/shared/plugins";
 import {
   ControllerEngine,
-  DecisionChecks,
   isScheduleActiveNow,
+  scheduleLimitReached,
   scheduleTargets,
+  selectActiveBlockout,
   selectActiveChargeSchedule,
+  Trace,
 } from "@chargeha/shared/engine";
 import type {
+  ActiveChargeSchedule,
   ControllerConfig,
-  DecisionCheck,
   DecisionReason,
   EngineOutput,
   EngineVehicleInput,
+  StepTrace,
   VehicleDecision,
 } from "@chargeha/shared/engine";
 import type { AppDatabase } from "../db/AppDatabase.ts";
@@ -49,14 +52,12 @@ interface DecisionLogEntry {
   vehicleName: string;
   mode: VehicleMode;
   inputs: DecisionInputs;
-  checks: DecisionCheck[];
+  checks: StepTrace[];
   action: ControllerAction;
   reason: DecisionReason;
   actionDetail: string;
   targetAmps: number | null;
   suspendable?: boolean;
-  // Set when a charge schedule's limit was reached and the decision fell through.
-  scheduleLimitContext?: { scheduleLimitPct: number; batteryLevel: number };
 }
 
 // One controllable unit for the loop: a charging point.
@@ -75,6 +76,12 @@ interface ControlTarget {
     state: VehicleChargeState,
   ): Promise<unknown>;
   stop(ctx: CallContext, state: VehicleChargeState): Promise<unknown>;
+}
+
+// A target paired with the engine input built from it this loop.
+interface LoopTarget {
+  target: ControlTarget;
+  vehicle: EngineVehicleInput;
 }
 
 export class ChargeController {
@@ -148,13 +155,16 @@ export class ChargeController {
 
     const hasSolar = energy !== null &&
       energy.solarProductionW >= config.minSolarGenerationKw * 1000;
-    const hasBlockout = schedules.some(
-      (s) => this.isActiveBlockout(s, now, config.timezone),
+    const activeBlockout = selectActiveBlockout(
+      schedules,
+      now,
+      config.timezone,
     );
+    const hasBlockout = activeBlockout !== null;
 
     // Request fresh state for each target via its middleware
-    const engineVehicles: EngineVehicleInput[] = await Promise.all(
-      targets.map(async (target) => {
+    const loopTargets: LoopTarget[] = await Promise.all(
+      targets.map(async (target): Promise<LoopTarget> => {
         const activeCharge = selectActiveChargeSchedule(
           schedules,
           target,
@@ -177,12 +187,16 @@ export class ChargeController {
         });
         const state = await target.getState();
         return {
-          id: target.id,
-          vehicleId: target.vehicleId,
-          name: target.name,
-          mode: target.mode,
-          priority: target.priority,
-          state,
+          target,
+          vehicle: {
+            id: target.id,
+            vehicleId: target.vehicleId,
+            name: target.name,
+            mode: target.mode,
+            priority: target.priority,
+            state,
+            activeSchedule: activeCharge,
+          },
         };
       }),
     );
@@ -192,20 +206,21 @@ export class ChargeController {
 
     const output = this.engine.decide({
       config,
-      vehicles: engineVehicles,
-      schedules,
+      vehicles: loopTargets.map((t) => t.vehicle),
+      activeBlockout,
       energy,
       now,
       timestamp: Date.now(),
     });
 
-    const logEntries: ControllerLogInput[] = await targets.reduce(
-      async (prevPromise, target) => {
+    const logEntries: ControllerLogInput[] = await loopTargets.reduce(
+      async (prevPromise, { target, vehicle }) => {
         const acc = await prevPromise;
         const decision = output.decisions.get(target.id);
         if (!decision) return acc;
         const logInput = await this.processTargetDecision(
           target,
+          vehicle.activeSchedule,
           decision,
           output,
           config,
@@ -425,6 +440,7 @@ export class ChargeController {
   // commands, polling suspension, event emission, transition tracking.
   private async processTargetDecision(
     target: ControlTarget,
+    activeSchedule: ActiveChargeSchedule | null,
     decision: VehicleDecision,
     output: EngineOutput,
     config: ControllerConfig,
@@ -454,7 +470,7 @@ export class ChargeController {
       const totalAmps = [...output.decisions.keys()]
         .map((id) => this.engine.getControlState(id).allocatedAmps ?? 0)
         .reduce((sum, a) => sum + a, 0);
-      checks.push(DecisionChecks.solarAllocation(
+      checks.push(Trace.solarAllocation(
         cs.allocatedAmps,
         totalAmps,
         mode,
@@ -473,7 +489,6 @@ export class ChargeController {
       actionDetail: decision.detail,
       targetAmps: decision.targetAmps,
       suspendable: decision.suspendable,
-      scheduleLimitContext: decision.scheduleLimitContext,
     };
 
     this.emitControllerStatus(target.id, entry);
@@ -493,6 +508,7 @@ export class ChargeController {
     } else {
       this.emitControllerEvents(
         target,
+        activeSchedule,
         preState,
         postState,
         entry,
@@ -548,6 +564,7 @@ export class ChargeController {
   // postState — state after commands (may differ from preState)
   private emitControllerEvents(
     target: ControlTarget,
+    activeSchedule: ActiveChargeSchedule | null,
     preState: VehicleChargeState | null,
     postState: VehicleChargeState | null,
     entry: DecisionLogEntry,
@@ -597,6 +614,10 @@ export class ChargeController {
       : false;
     const justHitLimit = nowAtLimit && !wasAtLimit;
     if (entry.action === "stop" || justHitLimit) {
+      const scheduleLimitPct = preState
+        ? scheduleLimitReached(activeSchedule, preState.batteryLevel)
+        : undefined;
+
       this.eventEmitter.emit("controller_charge_stopped", {
         vehicleId: target.id,
         vehicleName: target.name,
@@ -604,7 +625,7 @@ export class ChargeController {
         reason: justHitLimit ? "battery_at_limit" : entry.reason,
         batteryLevel: preState?.batteryLevel,
         chargeLimit: preState?.chargeLimit,
-        scheduleLimitContext: entry.scheduleLimitContext,
+        scheduleLimitPct,
       });
     }
 
@@ -711,15 +732,6 @@ export class ChargeController {
     if (!s.enabled || !isScheduleActiveNow(s, now, timezone)) return false;
     if (s.scheduleType === "blockout") return true;
     return scheduleTargets(s, target);
-  }
-
-  private isActiveBlockout(
-    s: ScheduleRow,
-    now: Date,
-    timezone: string,
-  ): boolean {
-    return s.scheduleType === "blockout" && s.enabled &&
-      isScheduleActiveNow(s, now, timezone);
   }
 
   private async loadConfig(): Promise<ControllerConfig> {
