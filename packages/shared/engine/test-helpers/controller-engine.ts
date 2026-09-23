@@ -1,6 +1,11 @@
+import {
+  selectActiveBlockout,
+  selectActiveChargeSchedule,
+} from "../Schedules.ts";
 import type {
   ControllerConfig,
   EngineInput,
+  EngineSchedule,
   EngineVehicleInput,
 } from "../types.ts";
 import type { EnergyData, VehicleChargeState } from "../../types.ts";
@@ -81,6 +86,7 @@ export const makeVehicle = (
     mode: "auto",
     priority: 1,
     state,
+    activeSchedule: null,
     ...vehicleOverrides,
   };
 };
@@ -99,22 +105,41 @@ export const makeEnergy = (
 });
 
 export const makeInput = (
-  overrides?: Partial<EngineInput> & {
+  overrides?: Partial<Omit<EngineInput, "activeBlockout">> & {
     vehicle?: Omit<Partial<EngineVehicleInput>, "state"> & {
       state?: Partial<VehicleChargeState> | null;
     };
+    // Raw schedules, resolved into activeBlockout / activeSchedule the way
+    // the controller does.
+    schedules?: EngineSchedule[];
     energyOverrides?: Partial<EnergyData>;
     configOverrides?: Partial<ControllerConfig>;
   },
 ): EngineInput => {
-  const { vehicle, energyOverrides, configOverrides, ...inputOverrides } =
-    overrides ?? {};
+  const {
+    vehicle,
+    schedules = [],
+    energyOverrides,
+    configOverrides,
+    ...inputOverrides
+  } = overrides ?? {};
+  const config = makeConfig(configOverrides);
+  const now = inputOverrides.now ?? new Date("2026-01-01T12:00:00Z");
+  const base = makeVehicle(vehicle);
   return {
-    config: makeConfig(configOverrides),
-    vehicles: [makeVehicle(vehicle)],
-    schedules: [],
+    config,
+    vehicles: [{
+      ...base,
+      activeSchedule: selectActiveChargeSchedule(
+        schedules,
+        base,
+        now,
+        config.timezone,
+      ),
+    }],
+    activeBlockout: selectActiveBlockout(schedules, now, config.timezone),
     energy: makeEnergy(energyOverrides),
-    now: new Date("2026-01-01T12:00:00Z"),
+    now,
     timestamp: Date.now(),
     ...inputOverrides,
   };

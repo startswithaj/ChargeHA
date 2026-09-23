@@ -247,12 +247,13 @@ export function runSimulation(
       priority: vc.priority,
       state: vehicleStates.get(vc.id) ?? null,
       isHome: true,
+      activeSchedule: null,
     }));
 
     const output = engine.decide({
       config,
       vehicles,
-      schedules: [],
+      activeBlockout: null,
       energy: {
         solarProductionW: reading.solarW,
         gridPowerW: battery.gridPowerW,

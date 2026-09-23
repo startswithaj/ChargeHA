@@ -152,3 +152,23 @@ export function selectActiveChargeSchedule(
     merged: contributors.length > 1,
   };
 }
+
+export function selectActiveBlockout(
+  schedules: EngineSchedule[],
+  now: Date,
+  timezone: string,
+): EngineSchedule | null {
+  return schedules.find((s) =>
+    s.scheduleType === "blockout" && s.enabled &&
+    isScheduleActiveNow(s, now, timezone)
+  ) ?? null;
+}
+
+// The schedule limit the battery has met, or undefined.
+export function scheduleLimitReached(
+  active: ActiveChargeSchedule | null,
+  batteryLevel: number,
+): number | undefined {
+  const limit = active?.effective.chargeLimitPct ?? null;
+  return limit !== null && batteryLevel >= limit ? limit : undefined;
+}

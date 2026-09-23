@@ -8,7 +8,8 @@ import type {
   VehicleChargeState,
   VehicleMode,
 } from "../types.ts";
-import type { DecisionCheck } from "./DecisionChecks.ts";
+import type { ActiveChargeSchedule } from "./Schedules.ts";
+import type { StepTrace } from "./Trace.ts";
 
 // ---- Engine input types ----
 
@@ -47,6 +48,8 @@ export interface EngineVehicleInput {
   mode: VehicleMode;
   priority: number;
   state: VehicleChargeState | null;
+  // Charge schedule covering this target now. Resolved by the caller.
+  activeSchedule: ActiveChargeSchedule | null;
 }
 
 // Schedule fields the engine needs. Mirrors ScheduleRow minus DB
@@ -68,7 +71,8 @@ export interface EngineSchedule {
 export interface EngineInput {
   config: ControllerConfig;
   vehicles: EngineVehicleInput[];
-  schedules: EngineSchedule[];
+  // Blockout in force now. Global, not per target. Resolved by the caller.
+  activeBlockout: EngineSchedule | null;
   energy: EnergyData | null;
   now: Date;
   // Monotonic timestamp in ms (replaces Date.now() calls inside the engine).
@@ -130,11 +134,9 @@ export interface VehicleDecision {
   reason: DecisionReason;
   detail: string;
   targetAmps: number | null;
-  checks: DecisionCheck[];
+  checks: StepTrace[];
   // When true, polling can be suspended — charging is not possible.
   suspendable?: boolean;
-  // Set when a charge schedule's limit was reached and the decision fell through.
-  scheduleLimitContext?: { scheduleLimitPct: number; batteryLevel: number };
 }
 
 export interface EngineOutput {
@@ -156,21 +158,20 @@ export type ControlStateUpdates = Partial<
   >
 >;
 
-// The subset of VehicleDecision that pipeline steps produce. The caller
-// adds checks, scheduleLimitContext after assembling all steps.
-export type PipelineDecision = Omit<
-  VehicleDecision,
-  "checks" | "scheduleLimitContext"
->;
+// The subset of VehicleDecision that pipeline steps produce. The runner
+// adds checks after assembling all steps.
+export type PipelineDecision = Omit<VehicleDecision, "checks">;
 
-// Result of an evaluation step in the decision pipeline. When `decision`
-// is null, the step did not apply — try the next step.
-export interface EvalResult {
-  decision: PipelineDecision | null;
-  checks: DecisionCheck[];
-  scheduleLimitContext?: { scheduleLimitPct: number; batteryLevel: number };
-  stateUpdates?: ControlStateUpdates;
-}
+// Result of an evaluation step in the decision pipeline. A step either
+// passes — try the next step — or decides, and only a decision carries
+// control-state changes.
+export type EvalResult =
+  | { decision: null; trace: StepTrace[] }
+  | {
+    decision: PipelineDecision;
+    trace: StepTrace[];
+    stateUpdates?: ControlStateUpdates;
+  };
 
 // Result from the amp debounce calculation. The caller applies
 // pendingAmps/pendingSince to the VehicleControlState.
