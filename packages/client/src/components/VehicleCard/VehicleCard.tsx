@@ -56,24 +56,6 @@ interface VehicleCardProps {
   chargingPoint?: { name: string } | null;
 }
 
-function ChargerStatusLine(
-  { chargerStatus }: {
-    chargerStatus: { status: string; statusDetail: string | null } | null;
-  },
-) {
-  if (!chargerStatus) return null;
-  if (chargerStatus.status === "no_draw") {
-    return (
-      <Text size="2" color="gray">
-        No draw — vehicle may be absent, finished, or paused
-        {chargerStatus.statusDetail ? ` (${chargerStatus.statusDetail})` : ""}
-      </Text>
-    );
-  }
-  if (!chargerStatus.statusDetail) return null;
-  return <Text size="1" color="gray">{chargerStatus.statusDetail}</Text>;
-}
-
 const MODE_LABELS: Record<VehicleMode, string> = {
   auto: "Auto",
   charge_now: "Charge Now",
@@ -433,8 +415,6 @@ export function VehicleCard({
         <Text size="2">{getStatusText(state, mode, atHome)}</Text>
       </div>
 
-      <ChargerStatusLine chargerStatus={chargerStatus ?? null} />
-
       {/* Spacer when unplugged so the card has room for the map below. */}
       {!state.isPluggedIn && <div style={{ height: 20 }} />}
 
@@ -447,6 +427,7 @@ export function VehicleCard({
           allocationStatus={allocationStatus ?? null}
           controllerReason={controllerReason ?? null}
           controllerDetail={controllerDetail ?? null}
+          chargerStatus={chargerStatus ?? null}
           commandPending={commandPending}
           onStartCharging={onStartCharging}
           onStopCharging={onStopCharging}

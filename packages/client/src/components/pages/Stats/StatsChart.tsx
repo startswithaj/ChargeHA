@@ -254,10 +254,14 @@ function useChartClickHandler(
   period: StatsPeriod,
   dateCursor: Date,
   onDrillDown: (period: StatsPeriod, date: Date) => void,
+  resolution: DayResolution,
+  setResolution: (r: DayResolution) => void,
 ) {
   return useCallback((e: { activeLabel?: string }) => {
     if (!e?.activeLabel) return;
-    if (period === "month") {
+    if (period === "day") {
+      if (resolution === "1h") setResolution("15m");
+    } else if (period === "month") {
       const day = parseInt(e.activeLabel, 10);
       if (!isNaN(day)) {
         onDrillDown(
@@ -271,7 +275,7 @@ function useChartClickHandler(
         onDrillDown("month", new Date(dateCursor.getFullYear(), monthIndex, 1));
       }
     }
-  }, [period, dateCursor, onDrillDown]);
+  }, [period, dateCursor, onDrillDown, resolution, setResolution]);
 }
 
 function buildBucketDatum(
@@ -468,11 +472,14 @@ export function StatsChart({
   // Month view: 28-31 buckets, show every 5th
   // Year view: 12 buckets, show all
   const tickInterval = computeTickInterval(period, resolution);
-  const canDrillDown = period === "month" || period === "year";
+  const canDrillDown = period === "month" || period === "year" ||
+    (period === "day" && resolution === "1h");
   const handleChartClick = useChartClickHandler(
     period,
     dateCursor,
     onDrillDown,
+    resolution,
+    setResolution,
   );
 
   return (
