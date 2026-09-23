@@ -32,6 +32,11 @@ interface AllocationContext {
   availableW: number;
 }
 
+// Headroom a not-yet-charging vehicle must clear above its minimum before
+// joining the split. In watts so a three-phase car isn't held to three times
+// the surplus a single-phase one is. 460W is 2A at 230V single-phase.
+const ADMISSION_HEADROOM_W = 460;
+
 export class SolarAllocator {
   static targets(
     state: VehicleChargeState,
@@ -192,7 +197,7 @@ export class SolarAllocator {
     // Find the largest group of highest-priority vehicles where the
     // per-vehicle split meets every vehicle's chargeAmpsMin.
     // Hysteresis: vehicles already charging only need chargeAmpsMin to stay,
-    // but new vehicles need chargeAmpsMin + 2A headroom to be included.
+    // but new vehicles need ADMISSION_HEADROOM_W above it to be included.
     // This prevents oscillation at the split boundary.
     const groupSizes = Array.from(
       { length: eligible.length },
@@ -201,7 +206,9 @@ export class SolarAllocator {
     const canSplit = (n: number) => {
       const perV = Math.floor(totalAmps / n);
       return eligible.slice(0, n).every((e) => {
-        const buffer = e.state.isCharging ? 0 : 2;
+        const buffer = e.state.isCharging
+          ? 0
+          : Math.ceil(ADMISSION_HEADROOM_W / (e.voltage * e.phases));
         return perV >= e.state.chargeAmpsMin + buffer;
       });
     };

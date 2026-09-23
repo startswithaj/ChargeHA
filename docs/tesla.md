@@ -339,6 +339,37 @@ Two paths bypass all of the above:
 
 ---
 
+## Min amps
+
+Set `Min amps` for each Tesla charging point in Settings > My Equipment > Tesla.
+The range is 1-5A. The default is 5A.
+
+This is the lowest current ChargeHA requests. Below this value, charging stops
+instead of going lower.
+
+5A is the minimum shown by the Tesla phone app. Tesla does not document a
+minimum for the `set_charging_amps` Fleet API command. Third parties report that
+a three-phase charger accepts 2A per phase, about 1.4kW instead of about 3.5kW
+at 5A. This is unverified and may depend on firmware.
+
+If the car accepts a lower-current command but charges at 5A anyway, no error
+occurs. ChargeHA caches the current it requested. The car can draw more power
+than ChargeHA expects. That extra power comes from the grid or home battery
+while the car still displays as solar charging.
+
+ChargeHA also calculates each charging point's solar-versus-grid split from the
+cached current. The dashboard and recorded statistics attribute the unaccounted
+power to household consumption instead of the car.
+
+The next vehicle data poll, usually within minutes, replaces the cached value
+with the real `charge_amps`. If the surplus no longer covers the real draw,
+charging stops.
+
+If you set `Min amps` below 5A, check that the car actually accepts that value.
+The Tesla app's charging screen shows the real amps.
+
+---
+
 ## Troubleshooting
 
 ### "We don't recognize this redirect_uri" / "redirect_uri is not registered"

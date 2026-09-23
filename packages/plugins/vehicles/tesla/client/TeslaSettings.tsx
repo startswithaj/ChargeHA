@@ -28,6 +28,7 @@ import { Spinner } from "../../../hostUi.ts";
 import { ErrorBanner } from "../../../hostUi.ts";
 import { SettingsRow } from "../../../hostUi.ts";
 import { TeslaSetupInstructions } from "./TeslaSetupInstructions.tsx";
+import { TeslaChargerFields } from "./TeslaChargerFields.tsx";
 import { useTeslaConfig, useTeslaConfigMutation } from "./useTeslaConfig.ts";
 
 const ACTIVE_POLL_OPTIONS = [5, 10, 15, 20, 30];
@@ -308,30 +309,36 @@ function TeslaVehiclesList(
           <div
             key={v.vin}
             style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
               padding: "6px 10px",
               borderRadius: 6,
               background: "var(--gray-a2)",
             }}
           >
-            <div>
-              <Text size="2" weight="medium">{v.name}</Text>
-              <Text size="1" color="gray" style={{ display: "block" }}>
-                {v.vin}
-              </Text>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <div>
+                <Text size="2" weight="medium">{v.name}</Text>
+                <Text size="1" color="gray" style={{ display: "block" }}>
+                  {v.vin}
+                </Text>
+              </div>
+              {alreadyAdded && <Badge color="green" size="1">Added</Badge>}
+              {!alreadyAdded && (
+                <Button
+                  size="1"
+                  variant="soft"
+                  onClick={() => handleAddTeslaVehicle(v.vin, v.name)}
+                >
+                  Add
+                </Button>
+              )}
             </div>
-            {alreadyAdded && <Badge color="green" size="1">Added</Badge>}
-            {!alreadyAdded && (
-              <Button
-                size="1"
-                variant="soft"
-                onClick={() => handleAddTeslaVehicle(v.vin, v.name)}
-              >
-                Add
-              </Button>
-            )}
+            {alreadyAdded && <TeslaChargerFields vin={v.vin} />}
           </div>
         );
       })}

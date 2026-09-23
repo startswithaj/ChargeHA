@@ -8,7 +8,11 @@ import {
 import { publicProcedure, router } from "../../../../server/src/trpc/trpc.ts";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import { TESLA_SECRET_KEYS, teslaConfigDef } from "./config.ts";
-import { createPluginConfigProcedures } from "../../../createPluginConfigProcedures.ts";
+import {
+  createChargerConfigProcedures,
+  createPluginConfigProcedures,
+} from "../../../createPluginConfigProcedures.ts";
+import { teslaChargerConfigDef } from "./chargerConfig.ts";
 import type { TeslaVehiclePlugin } from "./TeslaVehiclePlugin.ts";
 
 type TeslaRouterPlugin = Pick<
@@ -41,6 +45,10 @@ export function createTeslaRouter(
 ) {
   return router({
     ...createPluginConfigProcedures(deps, teslaConfigDef, TESLA_SECRET_KEYS),
+
+    charger: router(
+      createChargerConfigProcedures(deps, teslaChargerConfigDef, []),
+    ),
 
     teslaStatus: publicProcedure.query(() => {
       return plugin.teslaTokenManager.getStatus();
