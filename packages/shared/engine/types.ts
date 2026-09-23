@@ -118,6 +118,7 @@ export type DecisionReason =
   | "mode_stop"
   | "battery_priority"
   | "grace_period"
+  | "displaced"
   | "cooldown"
   | "no_solar"
   | "charging_disabled"
