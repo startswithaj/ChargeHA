@@ -64,6 +64,7 @@ describe("Tesla Plugin Router", () => {
       await db.setPluginConfig("tesla.region", "na");
     }
 
+    const rebuilt: string[] = [];
     const eventEmitter = new TypedEventEmitter();
     const vehicleRegistry = new VehiclePluginRegistry();
     const energyRegistry = new EnergyPluginRegistry();
@@ -78,7 +79,13 @@ describe("Tesla Plugin Router", () => {
       vehicleManager,
       chargingPoints: throwingMock<ChargingPointManager>(
         "ChargingPointManager",
-        { ensureVehicleChargingPoint: () => Promise.resolve() },
+        {
+          ensureVehicleChargingPoint: () => Promise.resolve(),
+          rebuildMiddlewareFor: (id: string) => {
+            rebuilt.push(id);
+            return Promise.resolve();
+          },
+        },
       ),
       tunnel: {
         getUrl: () => null,
@@ -116,6 +123,7 @@ describe("Tesla Plugin Router", () => {
       caller,
       db,
       plugin,
+      rebuilt,
       cleanup: async () => {
         // Plugin startup is fire-and-forget in the ctor. Await its shutdown
         // (which itself awaits startupPromise) before closing the DB so no
@@ -405,6 +413,51 @@ describe("Tesla Plugin Router", () => {
       } finally {
         await mockedCtx.cleanup();
       }
+    });
+  });
+
+  describe("tesla.charger config", () => {
+    const CHARGER_ID = "cp-VIN123";
+
+    const seedChargingPoint = async () => {
+      await ctx.db.upsertCharger({
+        id: CHARGER_ID,
+        name: "Model Y",
+        chargerAdapterType: "tesla",
+        vehicleId: "VIN123",
+        kind: "vehicle_api",
+      });
+    };
+
+    it("defaults the minimum amps to the Tesla app's floor", async () => {
+      await seedChargingPoint();
+      const config = await ctx.caller.plugin.vehicle.tesla.charger.getConfig({
+        chargerRowId: CHARGER_ID,
+      });
+      expect(config.teslaMinAmps).toBe("5");
+    });
+
+    it("stores a lower minimum and rebuilds the charging point", async () => {
+      await seedChargingPoint();
+      await ctx.caller.plugin.vehicle.tesla.charger.setConfig({
+        chargerRowId: CHARGER_ID,
+        values: { teslaMinAmps: "2" },
+      });
+      const config = await ctx.caller.plugin.vehicle.tesla.charger.getConfig({
+        chargerRowId: CHARGER_ID,
+      });
+      expect(config.teslaMinAmps).toBe("2");
+      expect(ctx.rebuilt).toEqual([CHARGER_ID]);
+    });
+
+    it("rejects a minimum above the Tesla app's floor", async () => {
+      await seedChargingPoint();
+      await expect(
+        ctx.caller.plugin.vehicle.tesla.charger.setConfig({
+          chargerRowId: CHARGER_ID,
+          values: { teslaMinAmps: "7" },
+        }),
+      ).rejects.toThrow();
     });
   });
 });

@@ -447,4 +447,51 @@ describe("SolarAllocator", () => {
       expect(result.get("v2")).toBe(20);
     });
   });
+
+  describe("equal", () => {
+    it("keeps a charging vehicle sole recipient when the split would starve an idle one", () => {
+      const energy = { ...BASE_ENERGY, gridPowerW: -2530 };
+      const vehicles = [
+        makeVehicle("v1", 1, { isCharging: true, chargeAmps: 0 }),
+        makeVehicle("v2", 2),
+      ];
+      const result = SolarAllocator.equal(vehicles, BASE_CONFIG, energy);
+      // 11A total. v2 is idle, so it needs 5 + 2 = 7A; the 5A split fails.
+      expect(result.get("v1")).toBe(11);
+      expect(result.get("v2")).toBe(0);
+    });
+
+    it("admits an idle vehicle once the split clears its headroom", () => {
+      const energy = { ...BASE_ENERGY, gridPowerW: -3220 };
+      const vehicles = [
+        makeVehicle("v1", 1, { isCharging: true, chargeAmps: 0 }),
+        makeVehicle("v2", 2),
+      ];
+      const result = SolarAllocator.equal(vehicles, BASE_CONFIG, energy);
+      // 14A total → 7A each, which meets v2's 5 + 2.
+      expect(result.get("v1")).toBe(7);
+      expect(result.get("v2")).toBe(7);
+    });
+
+    it("scales the headroom down on three phases", () => {
+      const energy = {
+        ...BASE_ENERGY,
+        solarProductionW: 6000,
+        gridPowerW: -4140,
+      };
+      const threePhase = { chargerPhases: 3, chargeAmpsMin: 2 };
+      const vehicles = [
+        makeVehicle("v1", 1, {
+          ...threePhase,
+          isCharging: true,
+          chargeAmps: 0,
+        }),
+        makeVehicle("v2", 2, threePhase),
+      ];
+      const result = SolarAllocator.equal(vehicles, BASE_CONFIG, energy);
+      // 6A total across 3 phases. Idle v2 needs 2 + 1 = 3A, not 2 + 2.
+      expect(result.get("v1")).toBe(3);
+      expect(result.get("v2")).toBe(3);
+    });
+  });
 });

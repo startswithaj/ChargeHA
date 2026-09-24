@@ -8,6 +8,7 @@ import type { TeslaTokenManager } from "./TeslaTokenManager.ts";
 import type { Logger } from "@chargeha/server/lib/Logger";
 import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import { shortId } from "@chargeha/shared/redact";
+import { DEFAULT_MIN_AMPS } from "./chargerConfig.ts";
 
 async function retryOn(
   fn: () => Promise<Response>,
@@ -35,9 +36,6 @@ export class TeslaApiError extends Error {
     this.statusCode = statusCode;
   }
 }
-
-// Tesla hardware minimum charging amps
-const MIN_CHARGE_AMPS = 5;
 
 // Wake-up polling config
 const WAKE_POLL_INTERVAL_MS = 15000;
@@ -205,7 +203,7 @@ export class TeslaAdapter implements VehicleAdapter {
       isOnline: response.state === "online",
       chargeAmps,
       chargeAmpsMax: charge.charge_current_request_max ?? 0,
-      chargeAmpsMin: MIN_CHARGE_AMPS,
+      chargeAmpsMin: DEFAULT_MIN_AMPS,
       chargePowerKw: chargerPowerKw,
       chargerVoltage,
       chargerPhases,

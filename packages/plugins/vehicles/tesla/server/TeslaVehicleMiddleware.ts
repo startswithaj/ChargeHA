@@ -5,6 +5,7 @@ import type {
 } from "@chargeha/shared/plugins";
 import type { Logger } from "@chargeha/server/lib/Logger";
 import type { TeslaAdapter } from "./TeslaAdapter.ts";
+import { DEFAULT_MIN_AMPS } from "./chargerConfig.ts";
 import {
   DEFAULT_POLL_INTERVALS,
   type PollIntervals,
@@ -31,6 +32,9 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
   private cachedState: Omit<AdapterVehicleChargeState, "isOnline"> | null =
     null;
   private lastKnownOnline = false;
+  // The vehicle_api charger row owns the floor; the adapter cannot see row
+  // config. Held here so both roles report the same number.
+  private minAmps = DEFAULT_MIN_AMPS;
   private lastFetchAtMs = 0;
   private lastWakeAtMs = 0;
   private lastOnlineCheckAtMs = 0;
@@ -50,10 +54,17 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
     return this.lastKnownOnline;
   }
 
+  setMinAmps(amps: number): void {
+    this.minAmps = amps;
+  }
+
   getCachedState(): AdapterVehicleChargeState | null {
-    return this.cachedState
-      ? { ...this.cachedState, isOnline: this.lastKnownOnline }
-      : null;
+    if (!this.cachedState) return null;
+    return {
+      ...this.cachedState,
+      isOnline: this.lastKnownOnline,
+      chargeAmpsMin: this.minAmps,
+    };
   }
 
   seedState(state: AdapterVehicleChargeState): void {

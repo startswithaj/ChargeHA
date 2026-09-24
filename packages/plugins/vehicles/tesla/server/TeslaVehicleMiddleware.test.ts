@@ -52,6 +52,22 @@ describe("TeslaVehicleMiddleware", () => {
       expect(state).not.toBeNull();
       expect(state?.batteryLevel).toBe(60);
     });
+
+    it("reports the default minimum amps until told otherwise", async () => {
+      await middleware.requestState(ctx());
+      expect(middleware.getCachedState()?.chargeAmpsMin).toBe(5);
+    });
+
+    it("reports the minimum amps set by the charging point", async () => {
+      middleware.setMinAmps(2);
+      await middleware.requestState(ctx());
+      expect(middleware.getCachedState()?.chargeAmpsMin).toBe(2);
+    });
+
+    it("stays null when the minimum is set before any fetch", () => {
+      middleware.setMinAmps(2);
+      expect(middleware.getCachedState()).toBeNull();
+    });
   });
 
   describe("seedState", () => {

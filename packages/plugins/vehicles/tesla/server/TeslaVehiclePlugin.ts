@@ -1,6 +1,8 @@
 /// <reference lib="deno.ns" />
 import { TRPCError } from "@trpc/server";
 import type { ChargerRow, VehicleRow } from "@chargeha/shared";
+import type { ChargerRowConfig } from "@chargeha/shared/plugins";
+import { deserializeSection } from "@chargeha/shared/configSections";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import { generateEcKeyPair } from "@chargeha/server/lib/Encryption";
 import type {
@@ -25,6 +27,7 @@ import { TeslaProxyManager } from "./TeslaProxyManager.ts";
 import { TeslaService, type TeslaServiceIo } from "./TeslaService.ts";
 import { TeslaTokenManager } from "./TeslaTokenManager.ts";
 import { TESLA_SECRET_KEYS, teslaConfigDef } from "./config.ts";
+import { teslaChargerConfigDef } from "./chargerConfig.ts";
 import { createTeslaHttpRoutes } from "./routes.ts";
 import { createTeslaRouter } from "./router.ts";
 
@@ -178,7 +181,10 @@ export class TeslaVehiclePlugin implements VehiclePlugin, ChargerPlugin {
     };
   }
 
-  async createChargerMiddleware(row: ChargerRow): Promise<ChargerMiddleware> {
+  async createChargerMiddleware(
+    row: ChargerRow,
+    resolved: ChargerRowConfig,
+  ): Promise<ChargerMiddleware> {
     if (row.vehicleId === null) {
       throw new Error(`Tesla charger row ${row.id} has no vehicleId`);
     }
@@ -189,10 +195,13 @@ export class TeslaVehiclePlugin implements VehiclePlugin, ChargerPlugin {
         `No Tesla vehicle ${row.vehicleId} for charger ${row.id}`,
       );
     }
-    return new TeslaChargerMiddleware(
-      row,
-      await this.sharedMiddleware(vehicle),
+    const shared = await this.sharedMiddleware(vehicle);
+    const { teslaMinAmps } = deserializeSection(
+      teslaChargerConfigDef,
+      resolved.config,
     );
+    shared.setMinAmps(Number(teslaMinAmps));
+    return new TeslaChargerMiddleware(row, shared);
   }
 
   async shutdown(): Promise<void> {
