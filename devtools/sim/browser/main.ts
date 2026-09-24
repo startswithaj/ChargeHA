@@ -179,6 +179,19 @@ setTimeout(() => (window as any).runSim(), 100);
     const ev1CapacityKwh = intVal("ev1Capacity", 75);
     const ev2Start = intVal("ev2Start", 60);
     const ev2CapacityKwh = intVal("ev2Capacity", 75);
+    const plugInMinute = (id: string): number | undefined => {
+      const v = parseFloat(
+        (document.getElementById(id) as HTMLInputElement).value,
+      );
+      return Number.isNaN(v) ? undefined : Math.round(v * 60);
+    };
+    const batteryCapacityKwh = floatVal("batteryKwh", 0);
+    const batteryStartSoc = floatVal("batterySoc", 50);
+    const batteryMaxRateKw = floatVal("batteryMaxKw", 5);
+    const batteryPriorityEnabled =
+      (document.getElementById("batteryPriority") as HTMLSelectElement)
+        .value === "on";
+    const batteryPriorityLimit = intVal("batteryPriorityLimit", 20);
     const ampDebounceThreshold = intVal("ampDebounceThreshold", 2);
     const ampDebounceSettleMinutes = intVal("ampDebounceSettleMinutes", 3);
 
@@ -189,6 +202,7 @@ setTimeout(() => (window as any).runSim(), 100);
         priority: 1,
         batteryStart: ev1Start,
         batteryCapacityKwh: ev1CapacityKwh,
+        plugInMinute: plugInMinute("ev1PlugIn"),
       }),
       makeDefaultVehicleConfig({
         id: "SIM_V2",
@@ -196,6 +210,7 @@ setTimeout(() => (window as any).runSim(), 100);
         priority: 2,
         batteryStart: ev2Start,
         batteryCapacityKwh: ev2CapacityKwh,
+        plugInMinute: plugInMinute("ev2PlugIn"),
       }),
     ].slice(0, vehicleCount);
 
@@ -216,6 +231,11 @@ setTimeout(() => (window as any).runSim(), 100);
       sunset,
       ampDebounceThreshold,
       ampDebounceSettleMinutes,
+      batteryCapacityKwh,
+      batteryMaxRateKw,
+      batteryStartSoc,
+      batteryPriorityEnabled,
+      batteryPriorityLimit,
     });
     const elapsed = Math.round(performance.now() - start);
 

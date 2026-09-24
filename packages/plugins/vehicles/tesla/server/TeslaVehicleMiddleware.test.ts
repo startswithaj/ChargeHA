@@ -52,6 +52,22 @@ describe("TeslaVehicleMiddleware", () => {
       expect(state).not.toBeNull();
       expect(state?.batteryLevel).toBe(60);
     });
+
+    it("reports the default minimum amps until told otherwise", async () => {
+      await middleware.requestState(ctx());
+      expect(middleware.getCachedState()?.chargeAmpsMin).toBe(5);
+    });
+
+    it("reports the minimum amps set by the charging point", async () => {
+      middleware.setMinAmps(2);
+      await middleware.requestState(ctx());
+      expect(middleware.getCachedState()?.chargeAmpsMin).toBe(2);
+    });
+
+    it("stays null when the minimum is set before any fetch", () => {
+      middleware.setMinAmps(2);
+      expect(middleware.getCachedState()).toBeNull();
+    });
   });
 
   describe("seedState", () => {
@@ -291,6 +307,42 @@ describe("TeslaVehicleMiddleware", () => {
       const state = await middleware.requestState(ctx());
       expect(state?.batteryLevel).toBe(55);
       expect(middleware.online).toBe(false);
+    });
+
+    it("wakes on the tick a schedule starts, even right after a skipped wake", async () => {
+      middleware.seedState(buildVehicleChargeState({ isOnline: false }));
+      adapter.isOnline = false;
+
+      // No reason to wake yet — skip path
+      await middleware.requestState(ctx());
+      expect(adapter.wakeVehicleCalls).toBe(0);
+
+      // Schedule becomes active 2 min later, well inside the 10 min tier.
+      // The skip must not have stamped the cache as fresh.
+      time.tick(2 * 60 * 1000);
+      await middleware.requestState(ctx({ hasSchedule: true }));
+
+      expect(adapter.wakeVehicleCalls).toBe(1);
+      expect(adapter.getChargeStateCalls).toBe(1);
+    });
+
+    it("honours configured poll intervals", async () => {
+      const slow = new TeslaVehicleMiddleware(
+        adapter as unknown as TeslaAdapter,
+        testLogger,
+        () => Promise.resolve({ activeMs: 30 * 60_000, idleMs: 60 * 60_000 }),
+      );
+      await slow.requestState(ctx({ hasSolar: true }));
+      expect(adapter.getChargeStateCalls).toBe(1);
+
+      // 12 min: stale under the 10 min default, fresh under 30 min
+      time.tick(12 * 60_000);
+      await slow.requestState(ctx({ hasSolar: true }));
+      expect(adapter.getChargeStateCalls).toBe(1);
+
+      time.tick(19 * 60_000);
+      await slow.requestState(ctx({ hasSolar: true }));
+      expect(adapter.getChargeStateCalls).toBe(2);
     });
 
     it("refetches every 5 min while online + unplugged to catch plug-in", async () => {

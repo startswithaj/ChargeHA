@@ -1,10 +1,12 @@
 import { afterEach, describe, it } from "@std/testing/bdd";
+import { assertExists } from "@std/assert";
 import { expect } from "@std/expect";
 import { FakeTime } from "@std/testing/time";
 import {
   BASE_ENERGY,
   type ControllerCtx,
   type MultiControllerCtx,
+  REQUEST_CONTEXT,
   setupController,
   setupMultiVehicleController,
 } from "../../test-helpers/ChargeControllerHarness.ts";
@@ -303,6 +305,109 @@ describe("ChargeController — multi-vehicle", () => {
         expect(logA?.action).toBe("start");
         expect(logA?.targetAmps).toBe(15);
         expect(logB?.action).toBe("none");
+      });
+
+      it("stops the lower-priority vehicle the loop a higher-priority one plugs in", async () => {
+        // Loop 1: A unplugged, B charging alone. Loop 2: A plugs in and
+        // waterfall hands it everything. B must stop on the spot — not drop
+        // to min and wait out grace.
+        ctx = await setupMultiVehicleController(
+          [
+            {
+              vin: VIN_A,
+              name: "Car A",
+              priority: 1,
+              state: { isPluggedIn: false },
+            },
+            {
+              vin: VIN_B,
+              name: "Car B",
+              priority: 2,
+              state: { isCharging: true, chargeAmps: 10 },
+            },
+          ],
+          { ...BASE_ENERGY, solarProductionW: 5000, gridPowerW: -800 },
+          PRIORITY_CONFIG,
+        );
+        await ctx.runOneLoop();
+
+        const adapterA = ctx.adapters.get(VIN_A);
+        assertExists(adapterA);
+        adapterA.state.isPluggedIn = true;
+        await ctx.manager.requestState(VIN_A, REQUEST_CONTEXT);
+        await ctx.runOneLoop();
+
+        const logA = await ctx.getLogForVehicle(VIN_A);
+        const logB = await ctx.getLogForVehicle(VIN_B);
+        expect(logA?.action).toBe("start");
+        expect(logB?.action).toBe("stop");
+        expect(logB?.actionDetail).toContain("higher-priority");
+        expect(logB?.actionDetail).not.toContain("grace");
+      });
+
+      it("polls a queued vehicle at the idle rate until solar frees up", async () => {
+        // 3450W → 15A, all to P1. P2 is eligible but gets 0A.
+        ctx = await setupMultiVehicleController(
+          [
+            { vin: VIN_A, name: "Car A", priority: 1 },
+            { vin: VIN_B, name: "Car B", priority: 2 },
+          ],
+          { ...BASE_ENERGY, solarProductionW: 6450, gridPowerW: -3450 },
+          PRIORITY_CONFIG,
+        );
+        using fakeTime = new FakeTime();
+        const adapterB = ctx.adapters.get(VIN_B);
+        assertExists(adapterB);
+
+        await ctx.runOneLoop();
+        const fetchesAfterFirstLoop = adapterB.getChargeStateCalls;
+
+        // 12 min: past the 10 min solar tier, inside the 20 min idle tier.
+        fakeTime.tick(12 * 60_000);
+        await ctx.runOneLoop();
+        expect(adapterB.getChargeStateCalls).toBe(fetchesAfterFirstLoop);
+
+        // 22 min: idle tier expired.
+        fakeTime.tick(10 * 60_000);
+        await ctx.runOneLoop();
+        expect(adapterB.getChargeStateCalls).toBe(fetchesAfterFirstLoop + 1);
+      });
+
+      it("keeps a queued vehicle on the idle rate every loop it waits, not just the first", async () => {
+        // Same setup: 15A all to P1, P2 waits. Waiting behind a higher
+        // priority holds every loop P1 is still taking the solar — the slow
+        // poll must not lapse after the first loop.
+        ctx = await setupMultiVehicleController(
+          [
+            { vin: VIN_A, name: "Car A", priority: 1 },
+            { vin: VIN_B, name: "Car B", priority: 2 },
+          ],
+          { ...BASE_ENERGY, solarProductionW: 6450, gridPowerW: -3450 },
+          PRIORITY_CONFIG,
+        );
+        using fakeTime = new FakeTime();
+        const adapterB = ctx.adapters.get(VIN_B);
+        assertExists(adapterB);
+
+        await ctx.runOneLoop();
+        const fetches = adapterB.getChargeStateCalls;
+
+        fakeTime.tick(12 * 60_000);
+        await ctx.runOneLoop();
+        expect(adapterB.getChargeStateCalls).toBe(fetches);
+
+        // 17 and 19 min: past the 10 min solar tier, still inside the 20 min
+        // idle tier. Every waiting loop must still poll slowly.
+        fakeTime.tick(5 * 60_000);
+        await ctx.runOneLoop();
+        expect(adapterB.getChargeStateCalls).toBe(fetches);
+        fakeTime.tick(2 * 60_000);
+        await ctx.runOneLoop();
+        expect(adapterB.getChargeStateCalls).toBe(fetches);
+
+        fakeTime.tick(3 * 60_000);
+        await ctx.runOneLoop();
+        expect(adapterB.getChargeStateCalls).toBe(fetches + 1);
       });
 
       it("overflows to priority 2 when priority 1 is at max amps", async () => {

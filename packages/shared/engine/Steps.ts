@@ -286,6 +286,38 @@ export class Steps {
     };
   }
 
+  // Below minimum by allocation, not by solar: a higher priority is being
+  // served. Waterfall only — equal mode has no takeover. solar_grid holds min
+  // amps from the grid rather than stopping, so it stays on the normal path.
+  static displaced(
+    { state, config, timestamp, cs, solar }: StepContext,
+  ): EvalResult {
+    if (!solar || !state.isCharging) return pass();
+    if (!config.priorityChargingEnabled) return pass();
+    if (config.solarTrackingMode !== "solar_only") return pass();
+    if (cs.allocatedAmps === null) return pass();
+    if (
+      cs.allocatedAmps >= state.chargeAmpsMin ||
+      solar.rawAmps < state.chargeAmpsMin
+    ) {
+      return pass();
+    }
+    // A decision, not a dip — don't ride it out on grace
+    return {
+      decision: {
+        action: "stop",
+        reason: "displaced",
+        detail: "Stop — solar allocated to a higher-priority vehicle",
+        targetAmps: null,
+      },
+      trace: [],
+      stateUpdates: {
+        ...graceReset(),
+        cooldownUntil: timestamp + config.cooldownPeriodMinutes * 60 * 1000,
+      },
+    };
+  }
+
   static insufficientSolar(
     { state, config, timestamp, cs, solar }: StepContext,
   ): EvalResult {

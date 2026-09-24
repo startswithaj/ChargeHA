@@ -166,13 +166,20 @@ recommended OAuth scopes and a manual (no-wizard) setup path.
 
 ### Polling cadence (data calls)
 
-- **Every 10 minutes** when the vehicle should be charging — i.e. a schedule is
-  active or there is excess solar. This applies whether the car is already
-  charging or still needs to be started.
-- **Every 20 minutes** when there is no reason to charge (overnight, no
-  schedule, no excess solar).
-- **Every 3 minutes** when we have no cached state yet (just after startup or
-  plug-in).
+- **Every 10 minutes** (configurable, 5–30) when the vehicle could be charging —
+  a schedule is active or there is excess solar reaching it. This applies
+  whether the car is already charging or still needs to be started.
+- **Every 20 minutes** (configurable, 10–240) when there is no reason to charge:
+  overnight, no schedule, no excess solar, the battery is already at its charge
+  limit, the vehicle is set to Stop, or a higher-priority vehicle is taking all
+  the solar.
+- **Every 5 minutes** when the car is online and unplugged, so a plug-in is
+  caught before Tesla puts the car to sleep. Not configurable.
+- **Every 3 minutes** when we have no cached state yet (just after startup).
+
+Both intervals are under **Settings → Tesla → Fleet API polling** (Advanced).
+The defaults keep a 1–2 car setup inside the free credit; only change them if
+your Tesla developer dashboard shows you exceeding it.
 
 Consequences:
 

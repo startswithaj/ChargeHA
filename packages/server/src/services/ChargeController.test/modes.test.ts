@@ -4,6 +4,7 @@
 
 import { afterEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
+import { FakeTime } from "@std/testing/time";
 import {
   BASE_ENERGY,
   type ControllerCtx,
@@ -35,6 +36,19 @@ describe("ChargeController — modes", () => {
       expect(ctx.adapter.commands).toEqual([]);
       const log = await ctx.getLastLogParsed();
       expect(log?.action).toBe("none");
+    });
+
+    it("polls a stopped vehicle at the idle rate even with solar", async () => {
+      ctx = await setupController({}, "stop");
+      using fakeTime = new FakeTime();
+
+      await ctx.runOneLoop();
+      const fetches = ctx.adapter.getChargeStateCalls;
+
+      // 12 min: past the 10 min solar tier, inside the 20 min idle tier.
+      fakeTime.tick(12 * 60_000);
+      await ctx.runOneLoop();
+      expect(ctx.adapter.getChargeStateCalls).toBe(fetches);
     });
   });
 

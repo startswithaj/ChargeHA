@@ -1,6 +1,8 @@
 /// <reference lib="deno.ns" />
 import { TRPCError } from "@trpc/server";
 import type { ChargerRow, VehicleRow } from "@chargeha/shared";
+import type { ChargerRowConfig } from "@chargeha/shared/plugins";
+import { deserializeSection } from "@chargeha/shared/configSections";
 import type { PluginDependencies } from "@chargeha/server/bootstrap/PluginDependencies";
 import { generateEcKeyPair } from "@chargeha/server/lib/Encryption";
 import type {
@@ -17,10 +19,15 @@ import type {
 import { TeslaAdapter } from "./TeslaAdapter.ts";
 import { TeslaChargerMiddleware } from "./TeslaChargerMiddleware.ts";
 import { TeslaVehicleMiddleware } from "./TeslaVehicleMiddleware.ts";
+import {
+  DEFAULT_POLL_INTERVALS,
+  type PollIntervals,
+} from "./TeslaApiStrategy.ts";
 import { TeslaProxyManager } from "./TeslaProxyManager.ts";
 import { TeslaService, type TeslaServiceIo } from "./TeslaService.ts";
 import { TeslaTokenManager } from "./TeslaTokenManager.ts";
 import { TESLA_SECRET_KEYS, teslaConfigDef } from "./config.ts";
+import { teslaChargerConfigDef } from "./chargerConfig.ts";
 import { createTeslaHttpRoutes } from "./routes.ts";
 import { createTeslaRouter } from "./router.ts";
 
@@ -149,10 +156,35 @@ export class TeslaVehiclePlugin implements VehiclePlugin, ChargerPlugin {
       this.deps.log,
       this.deps.dbLog,
     );
-    return new TeslaVehicleMiddleware(adapter, this.deps.log);
+    return new TeslaVehicleMiddleware(
+      adapter,
+      this.deps.log,
+      () => this.readPollIntervals(),
+    );
   }
 
-  async createChargerMiddleware(row: ChargerRow): Promise<ChargerMiddleware> {
+  // Read per request so a settings change applies without a restart.
+  private async readPollIntervals(): Promise<PollIntervals> {
+    const minutes = async (key: "active_poll_minutes" | "idle_poll_minutes") =>
+      parseInt((await this.deps.getConfig(key)) ?? "", 10);
+    const [active, idle] = await Promise.all([
+      minutes("active_poll_minutes"),
+      minutes("idle_poll_minutes"),
+    ]);
+    return {
+      activeMs: Number.isFinite(active)
+        ? active * 60_000
+        : DEFAULT_POLL_INTERVALS.activeMs,
+      idleMs: Number.isFinite(idle)
+        ? idle * 60_000
+        : DEFAULT_POLL_INTERVALS.idleMs,
+    };
+  }
+
+  async createChargerMiddleware(
+    row: ChargerRow,
+    resolved: ChargerRowConfig,
+  ): Promise<ChargerMiddleware> {
     if (row.vehicleId === null) {
       throw new Error(`Tesla charger row ${row.id} has no vehicleId`);
     }
@@ -163,10 +195,13 @@ export class TeslaVehiclePlugin implements VehiclePlugin, ChargerPlugin {
         `No Tesla vehicle ${row.vehicleId} for charger ${row.id}`,
       );
     }
-    return new TeslaChargerMiddleware(
-      row,
-      await this.sharedMiddleware(vehicle),
+    const shared = await this.sharedMiddleware(vehicle);
+    const { teslaMinAmps } = deserializeSection(
+      teslaChargerConfigDef,
+      resolved.config,
     );
+    shared.setMinAmps(Number(teslaMinAmps));
+    return new TeslaChargerMiddleware(row, shared);
   }
 
   async shutdown(): Promise<void> {

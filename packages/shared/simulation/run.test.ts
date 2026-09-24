@@ -58,6 +58,22 @@ describe("runSimulation", () => {
     expect(finalBattery).toBeLessThanOrEqual(vehicle.chargeLimit);
   });
 
+  it("keeps a car idle until its plugInMinute", () => {
+    const noon = 12 * 60;
+    const vehicle = makeDefaultVehicleConfig({
+      id: "V1",
+      name: "Late Arrival",
+      batteryStart: 20,
+      plugInMinute: noon,
+    });
+    const { results } = runSimulation(sunnyDayOptions([vehicle]));
+
+    const before = results.filter((r) => r.minute < noon);
+    const after = results.filter((r) => r.minute >= noon);
+    expect(before.every((r) => !r.vehicles[0].isCharging)).toBe(true);
+    expect(after.some((r) => r.vehicles[0].isCharging)).toBe(true);
+  });
+
   it("splits solar surplus across two charging points by priority when waterfall allocation is enabled", () => {
     const highPriority = makeDefaultVehicleConfig({
       id: "V1",

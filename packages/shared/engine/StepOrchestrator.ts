@@ -22,6 +22,7 @@ export class StepOrchestrator {
     Steps.solarTrackingGate,
     Steps.minSolarGeneration,
     Steps.minExcessSolar,
+    Steps.displaced,
     Steps.insufficientSolar,
     Steps.cooldown,
     Steps.sufficientSolar,

@@ -21,6 +21,7 @@ export const GATED_QUERIES: readonly string[] = [
   // Tesla — disabled in the wizard, no tesla vehicle ever exists.
   "plugin.vehicle.tesla.encryptionStatus",
   "plugin.vehicle.tesla.getConfig",
+  "plugin.vehicle.tesla.charger.getConfig",
   "plugin.vehicle.tesla.listVehicles",
   "plugin.vehicle.tesla.proxyHealth",
   "plugin.vehicle.tesla.teslaStatus",
@@ -58,6 +59,7 @@ export const GATED_MUTATIONS = [
   "plugin.vehicle.tesla.selectVehicle",
   "plugin.vehicle.tesla.selectVehicles",
   "plugin.vehicle.tesla.setConfig",
+  "plugin.vehicle.tesla.charger.setConfig",
   // Fronius — disabled in the wizard, never the active adapter.
   "plugin.energy.fronius_cloud.setConfig",
   "plugin.energy.fronius_cloud.testConnection",

@@ -5,7 +5,12 @@ import type {
 } from "@chargeha/shared/plugins";
 import type { Logger } from "@chargeha/server/lib/Logger";
 import type { TeslaAdapter } from "./TeslaAdapter.ts";
-import { TeslaApiStrategy } from "./TeslaApiStrategy.ts";
+import { DEFAULT_MIN_AMPS } from "./chargerConfig.ts";
+import {
+  DEFAULT_POLL_INTERVALS,
+  type PollIntervals,
+  TeslaApiStrategy,
+} from "./TeslaApiStrategy.ts";
 
 // Rate-limit floor for the free /vehicles probe in the polling path.
 // Caps probes at 1/min/vehicle regardless of controller loop config,
@@ -27,11 +32,19 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
   private cachedState: Omit<AdapterVehicleChargeState, "isOnline"> | null =
     null;
   private lastKnownOnline = false;
+  // The vehicle_api charger row owns the floor; the adapter cannot see row
+  // config. Held here so both roles report the same number.
+  private minAmps = DEFAULT_MIN_AMPS;
   private lastFetchAtMs = 0;
   private lastWakeAtMs = 0;
   private lastOnlineCheckAtMs = 0;
 
-  constructor(adapter: TeslaAdapter, logger: Logger) {
+  constructor(
+    adapter: TeslaAdapter,
+    logger: Logger,
+    private readonly getPollIntervals: () => Promise<PollIntervals> = () =>
+      Promise.resolve(DEFAULT_POLL_INTERVALS),
+  ) {
     this.adapter = adapter;
     this.logger = logger;
     this.strategy = new TeslaApiStrategy();
@@ -41,10 +54,17 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
     return this.lastKnownOnline;
   }
 
+  setMinAmps(amps: number): void {
+    this.minAmps = amps;
+  }
+
   getCachedState(): AdapterVehicleChargeState | null {
-    return this.cachedState
-      ? { ...this.cachedState, isOnline: this.lastKnownOnline }
-      : null;
+    if (!this.cachedState) return null;
+    return {
+      ...this.cachedState,
+      isOnline: this.lastKnownOnline,
+      chargeAmpsMin: this.minAmps,
+    };
   }
 
   seedState(state: AdapterVehicleChargeState): void {
@@ -82,6 +102,7 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
       context,
       this.getCachedState(),
       this.lastFetchAtMs,
+      await this.getPollIntervals(),
     );
     const canUseCache = !context.forceRefresh && cacheFresh;
     const wakeReason = this.strategy.shouldWake(
@@ -126,7 +147,6 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
     this.logger.debug(
       `Skip wake: battery=${this.cachedState?.batteryLevel}% limit=${this.cachedState?.chargeLimit}% schedule=${context.hasSchedule} solar=${context.hasSolar} blockout=${context.hasBlockout}`,
     );
-    this.lastFetchAtMs = Date.now();
     return this.getCachedState();
   }
 

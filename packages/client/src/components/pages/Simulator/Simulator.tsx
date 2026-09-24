@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { Button, Heading, Text, Tooltip } from "@radix-ui/themes";
-import { X } from "lucide-react";
+import { Button, Heading, IconButton, Text, Tooltip } from "@radix-ui/themes";
+import { Trash2 } from "lucide-react";
 import {
   type ControllerEvent,
   DEFAULT_SOLAR_CONFIG,
@@ -12,6 +12,12 @@ import {
 } from "@chargeha/shared/simulation";
 import styles from "./Simulator.module.css";
 import { FormError } from "../../ui/FormError.tsx";
+
+function minutesToTime(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
 
 // Loaded lazily via dynamic import
 type ChartJs = typeof import("chart.js");
@@ -740,21 +746,27 @@ function ChargingPointRow(
         min={1}
         max={32}
       />
+      <PlugInInput
+        name={vehicle.name}
+        plugInMinute={vehicle.plugInMinute}
+        onChange={(v) => update("plugInMinute", v)}
+      />
       <Tooltip
         content={canRemove
           ? "Remove charging point"
           : "At least one charging point is required"}
       >
-        <Button
+        <IconButton
+          className={styles.removeButton}
           size="1"
-          variant="soft"
+          variant="ghost"
           color="red"
           disabled={!canRemove}
           onClick={remove}
           aria-label={`Remove ${vehicle.name}`}
         >
-          <X size={14} />
-        </Button>
+          <Trash2 size={14} />
+        </IconButton>
       </Tooltip>
     </div>
   );
@@ -929,6 +941,49 @@ function SimControls({
   );
 }
 
+const PLUG_IN_OPTIONS = Array.from(
+  { length: (22 - 5) * 2 + 1 },
+  (_, i) => 5 * 60 + i * 30,
+);
+
+function PlugInInput(
+  { name, plugInMinute, onChange }: {
+    name: string;
+    plugInMinute: number | undefined;
+    onChange: (v: number | undefined) => void;
+  },
+) {
+  return (
+    <div className={styles.control}>
+      <label>
+        Plugged In
+        <Tooltip content="Time the car is plugged in. All day = plugged in from midnight.">
+          <Text
+            size="1"
+            color="gray"
+            style={{ cursor: "help", marginLeft: 4 }}
+          >
+            &#9432;
+          </Text>
+        </Tooltip>
+      </label>
+      <select
+        aria-label={`${name} plug-in time`}
+        value={plugInMinute === undefined ? "all" : String(plugInMinute)}
+        onChange={(e) =>
+          onChange(
+            e.target.value === "all" ? undefined : Number(e.target.value),
+          )}
+      >
+        <option value="all">All day</option>
+        {PLUG_IN_OPTIONS.map((m) => (
+          <option key={m} value={m}>{minutesToTime(m)}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function NumInput({
   label,
   value,
@@ -957,7 +1012,11 @@ function NumInput({
         {label}
         {help && (
           <Tooltip content={help}>
-            <Text size="1" color="gray" style={{ cursor: "help" }}>
+            <Text
+              size="1"
+              color="gray"
+              style={{ cursor: "help", marginLeft: 4 }}
+            >
               &#9432;
             </Text>
           </Tooltip>
