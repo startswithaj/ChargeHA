@@ -427,6 +427,35 @@ describe("ControllerEngine", () => {
       }));
       expect(output.decisions.get("V1")?.action).toBe("start");
     });
+
+    it("reports an averaged SOC to one decimal", () => {
+      const engine = new ControllerEngine();
+      const output = engine.decide(makeInput({
+        configOverrides: {
+          batteryPriorityEnabled: true,
+          batteryPriorityLimit: 100,
+        },
+        energyOverrides: { batterySoc: 96.23333333333335 },
+      }));
+      expect(output.decisions.get("V1")?.detail).toBe(
+        "Waiting for home battery (96.2% < 100%)",
+      );
+    });
+
+    it("holds a battery that displays as the limit but has not reached it", () => {
+      const engine = new ControllerEngine();
+      const output = engine.decide(makeInput({
+        configOverrides: {
+          batteryPriorityEnabled: true,
+          batteryPriorityLimit: 100,
+        },
+        energyOverrides: { batterySoc: 99.96 },
+      }));
+      expect(output.decisions.get("V1")?.action).toBe("none");
+      expect(output.decisions.get("V1")?.detail).toBe(
+        "Waiting for home battery (99.9% < 100%)",
+      );
+    });
   });
 
   describe("allocation", () => {

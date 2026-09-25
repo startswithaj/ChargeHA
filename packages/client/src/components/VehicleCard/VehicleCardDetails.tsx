@@ -46,36 +46,6 @@ const REASON_COLORS: Record<string, "blue" | "orange"> = {
   battery_priority: "orange",
 };
 
-const REASON_LABELS: Record<string, (detail: string) => string> = {
-  schedule: (detail) => {
-    const match = detail.match(/schedule (\d{2}:\d{2}-\d{2}:\d{2})/);
-    return match
-      ? `Charging on schedule (${match[1]})`
-      : "Charging on schedule";
-  },
-  blockout: () => "Blockout schedule active",
-  grace_period: (detail) => {
-    const match = detail.match(/(\d+s\/\d+s)/);
-    return match
-      ? `Low solar — grace period (${match[1]})`
-      : "Low solar — grace period active";
-  },
-  displaced: () => "Stopped — solar went to a higher-priority vehicle",
-  cooldown: (detail) => {
-    const match = detail.match(/(\d+)s remaining/);
-    return match ? `Cooldown — ${match[1]}s remaining` : "Cooldown active";
-  },
-  battery_priority: (detail) => {
-    const match = detail.match(/(\d+)% < (\d+)%/);
-    return match
-      ? `Home battery priority (${match[1]}% < ${match[2]}%)`
-      : "Waiting for home battery";
-  },
-};
-
-export const formatReasonLabel = (reason: string, detail: string): string =>
-  REASON_LABELS[reason]?.(detail) ?? detail;
-
 interface VehicleCardDetailsProps {
   state: VehicleChargeState;
   disabled: boolean;
@@ -181,12 +151,11 @@ export function ControllerReasonRow(
     return null;
   }
   const Icon = REASON_ICONS[reason];
-  const label = formatReasonLabel(reason, detail);
   const color = REASON_COLORS[reason] ?? "gray";
   return (
     <div className={layout.detailRow}>
       {Icon && <Icon size={14} />}
-      <Text size="1" color={color}>{label}</Text>
+      <Text size="1" color={color}>{detail}</Text>
     </div>
   );
 }

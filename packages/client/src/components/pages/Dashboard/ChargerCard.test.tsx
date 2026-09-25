@@ -231,9 +231,8 @@ describe("ChargerCard", () => {
     expect(screen.queryByText(/16\.13/)).not.toBeInTheDocument();
   });
 
-  // The same formatted row the vehicle card uses, rather than the raw
-  // controller string.
-  it("formats a controller reason it has phrasing for", () => {
+  // The same row the vehicle card uses — the controller writes the sentence.
+  it("shows the controller's own detail for a reason it renders", () => {
     render(
       <Theme>
         <ChargerCard
@@ -243,7 +242,7 @@ describe("ChargerCard", () => {
           state={STATE}
           solarW={0}
           gridW={0}
-          controllerDetail="schedule 22:00-06:00"
+          controllerDetail="Start charging at 16A (schedule 22:00-06:00)"
           controllerReason="schedule"
           vehicleResolution="none"
           resolvedVehicleName={null}
@@ -251,9 +250,8 @@ describe("ChargerCard", () => {
       </Theme>,
     );
 
-    expect(screen.getByText("Charging on schedule (22:00-06:00)"))
+    expect(screen.getByText("Start charging at 16A (schedule 22:00-06:00)"))
       .toBeInTheDocument();
-    expect(screen.queryByText("schedule 22:00-06:00")).not.toBeInTheDocument();
   });
 
   it("falls back to the raw detail for a reason it has no phrasing for", () => {

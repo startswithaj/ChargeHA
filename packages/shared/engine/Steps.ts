@@ -195,16 +195,18 @@ export class Steps {
     const limit = config.batteryPriorityLimit;
     if (soc === null) return pass([Trace.batteryPriorityNoData()]);
     if (soc >= limit) return pass([Trace.batteryPriorityOk(soc, limit)]);
+    // Rounded down: 99.96 becomes 99.9, not 100 — "100% < 100%" reads as a bug.
+    const shownSoc = Math.floor(soc * 10) / 10;
     return {
       decision: {
         action: state.isCharging ? "stop" : "none",
         reason: "battery_priority",
         detail: state.isCharging
-          ? `Stop — battery priority (${soc}% < ${limit}%)`
-          : `Waiting for home battery (${soc}% < ${limit}%)`,
+          ? `Stop — home battery priority (${shownSoc}% < ${limit}%)`
+          : `Waiting for home battery (${shownSoc}% < ${limit}%)`,
         targetAmps: null,
       },
-      trace: [Trace.batteryPriorityHold(soc, limit)],
+      trace: [Trace.batteryPriorityHold(shownSoc, limit)],
     };
   }
 

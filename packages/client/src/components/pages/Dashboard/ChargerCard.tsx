@@ -1,9 +1,9 @@
 import { Badge, Button, Card, Flex, Link, Text } from "@radix-ui/themes";
 import {
-  Activity,
   ArrowUpDown,
   BatteryCharging,
   Car,
+  Cpu,
   Plug,
   PlugZap,
   Power,
@@ -460,7 +460,7 @@ export function ChargerCard(
           detail={controllerDetail}
         />
         {!isVisibleReason(controllerReason) && controllerDetail && (
-          <DetailRow icon={Activity}>{controllerDetail}</DetailRow>
+          <DetailRow icon={Cpu}>{controllerDetail}</DetailRow>
         )}
         <DeviceStatusRow state={state} />
         {state?.status === "unreachable" && (
