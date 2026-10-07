@@ -1,5 +1,10 @@
+import {
+  chargeCurrentAmps,
+  chargePowerKilowatts,
+} from "@chargeha/shared/chargePower";
 import type { QueryHandler } from "./types.ts";
 import type { DemoCharger, DemoState, DemoVehicle } from "../demoState.ts";
+import { DEMO_PHASES, DEMO_VOLTAGE } from "../demoState.ts";
 import { currentSnapshot } from "../demoTick.ts";
 import { demoNow } from "../demoClock.ts";
 import {
@@ -8,7 +13,6 @@ import {
 } from "../chargingPoints.ts";
 
 const CREATED_AT = "2026-01-01T00:00:00.000Z";
-const VOLTAGE = 230;
 
 const linkedChargerState = (v: DemoVehicle, now: string) => ({
   chargerId: linkedChargingPointId(v.id),
@@ -17,9 +21,11 @@ const linkedChargerState = (v: DemoVehicle, now: string) => ({
   chargeAmps: v.isCharging ? v.chargeAmps : 0,
   chargeAmpsMax: 32,
   chargeAmpsMin: 5,
-  chargePowerKw: v.isCharging ? (v.chargeAmps * VOLTAGE) / 1000 : 0,
-  chargerVoltage: VOLTAGE,
-  chargerPhases: 1,
+  chargePowerKw: v.isCharging
+    ? chargePowerKilowatts(v.chargeAmps, DEMO_VOLTAGE, DEMO_PHASES)
+    : 0,
+  chargerVoltage: DEMO_VOLTAGE,
+  chargerPhases: DEMO_PHASES,
   energyAddedKwh: 0,
   status: v.isCharging ? ("charging" as const) : ("available" as const),
   statusDetail: null,
@@ -37,7 +43,10 @@ const simDrawAmps = (state: DemoState, c: DemoCharger): number => {
   const snap = currentSnapshot(state, demoNow());
   const surplusW = snap.realtime.solarProductionW -
     snap.realtime.homeConsumptionW;
-  const amps = Math.min(carMaxAmps, Math.floor(surplusW / VOLTAGE));
+  const amps = Math.min(
+    carMaxAmps,
+    Math.floor(chargeCurrentAmps(surplusW, DEMO_VOLTAGE, DEMO_PHASES)),
+  );
   return amps >= MIN_AMPS ? amps : 0;
 };
 
@@ -53,9 +62,9 @@ const simChargerState = (state: DemoState, c: DemoCharger, now: string) => {
     chargeAmps: amps,
     chargeAmpsMax: 32,
     chargeAmpsMin: MIN_AMPS,
-    chargePowerKw: (amps * VOLTAGE) / 1000,
-    chargerVoltage: VOLTAGE,
-    chargerPhases: 1,
+    chargePowerKw: chargePowerKilowatts(amps, DEMO_VOLTAGE, DEMO_PHASES),
+    chargerVoltage: DEMO_VOLTAGE,
+    chargerPhases: DEMO_PHASES,
     energyAddedKwh: 0,
     status: statusOf(on, pluggedIn, drawing),
     statusDetail: null,

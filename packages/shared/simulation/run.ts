@@ -1,4 +1,5 @@
 import type { VehicleChargeState } from "../types.ts";
+import { chargePowerKilowatts, chargePowerWatts } from "../chargePower.ts";
 import { ControllerEngine } from "../engine/mod.ts";
 import type { ControllerConfig, EngineVehicleInput } from "../engine/mod.ts";
 
@@ -13,6 +14,7 @@ import type {
 } from "./types.ts";
 
 const VOLTAGE = 230;
+const PHASES = 1;
 
 function buildControllerConfig(opts: SimulationOptions): ControllerConfig {
   return {
@@ -54,7 +56,7 @@ function initVehicleStates(
       chargeAmpsMin: vc.chargeAmpsMin,
       chargePowerKw: 0,
       chargerVoltage: VOLTAGE,
-      chargerPhases: 1,
+      chargerPhases: PHASES,
       energyAddedKwh: 0,
       minutesToFull: 0,
       chargePortOpen: true,
@@ -78,12 +80,13 @@ function applyChargingEnergy(
   for (const vc of vehicleConfigs) {
     const state = vehicleStates.get(vc.id);
     if (state && state.isCharging && state.chargeAmps > 0) {
-      const kwh = (state.chargeAmps * VOLTAGE) / 1000 / 60;
+      const watts = chargePowerWatts(state.chargeAmps, VOLTAGE, PHASES);
+      const kwh = watts / 1000 / 60;
       state.batteryLevel = Math.min(
         state.chargeLimit,
         state.batteryLevel + (kwh / vc.batteryCapacityKwh) * 100,
       );
-      totalChargingW += state.chargeAmps * VOLTAGE;
+      totalChargingW += watts;
     }
   }
   return totalChargingW;
@@ -104,7 +107,11 @@ function applyDecisions(
       const wasCharging = vState.isCharging;
       vState.isCharging = true;
       vState.chargeAmps = decision.targetAmps ?? vState.chargeAmpsMin;
-      vState.chargePowerKw = (vState.chargeAmps * VOLTAGE) / 1000;
+      vState.chargePowerKw = chargePowerKilowatts(
+        vState.chargeAmps,
+        VOLTAGE,
+        PHASES,
+      );
       if (!wasCharging || decision.action === "adjust_amps") {
         return [{
           minute: reading.minute,
@@ -151,7 +158,9 @@ function snapshotVehicleResults(
     const isCharging = state?.isCharging ?? false;
     return {
       chargeAmps,
-      chargePowerW: isCharging ? chargeAmps * VOLTAGE : 0,
+      chargePowerW: isCharging
+        ? chargePowerWatts(chargeAmps, VOLTAGE, PHASES)
+        : 0,
       isCharging,
       batteryLevel: state?.batteryLevel ?? 0,
     };

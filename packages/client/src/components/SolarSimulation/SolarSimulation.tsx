@@ -12,7 +12,9 @@ import { RotateCcw } from "lucide-react";
 import { useRouter } from "../../hooks/useRouter.ts";
 import type { DayOfWeek, EnergyData, Schedule } from "@chargeha/shared";
 import type { VehicleWithState } from "@chargeha/shared";
-import { type ControllerConfig, SolarAllocator } from "@chargeha/shared/engine";
+import type { ControllerConfig } from "@chargeha/shared/engine";
+import { resolvePhases, resolveVoltage } from "@chargeha/shared/chargePower";
+import { roundTo } from "@chargeha/shared/round";
 import {
   previewSolarAllocation,
   type PreviewVehicle,
@@ -448,8 +450,12 @@ function buildPreviewVehicles(
       chargeLimit: s?.chargeLimit ?? 80,
       chargeAmpsMin: s?.chargeAmpsMin || 5,
       chargeAmpsMax: s?.chargeAmpsMax || 16,
-      chargerVoltage: s?.chargerVoltage || 230,
-      chargerPhases: SolarAllocator.resolvePhases(
+      chargerVoltage: resolveVoltage(
+        s?.chargerVoltage ?? null,
+        null,
+        config.gridVoltage,
+      ),
+      chargerPhases: resolvePhases(
         s?.chargerPhases ?? null,
         config.threePhaseCharger,
       ),
@@ -465,16 +471,16 @@ function useSolarSimState(
   const defaults = computeSimDefaults(currentEnergy);
 
   const [solarKw, setSolarKw] = useState(
-    Math.round(defaults.solarKw * 10) / 10,
+    roundTo(defaults.solarKw, 1),
   );
   const [consumptionKw, setConsumptionKw] = useState(
-    Math.round(defaults.consumptionKw * 10) / 10,
+    roundTo(defaults.consumptionKw, 1),
   );
   const [batterySoc, setBatterySoc] = useState<number | null>(
     defaults.batterySoc,
   );
   const [batteryPowerKw, setBatteryPowerKw] = useState(
-    Math.round(defaults.batteryPowerKw * 10) / 10,
+    roundTo(defaults.batteryPowerKw, 1),
   );
   const [simulatedTime, setSimulatedTime] = useState(getCurrentTime);
   const [simulatedDay, setSimulatedDay] = useState<DayOfWeek>(getCurrentDay);
@@ -516,10 +522,10 @@ function useSolarSimState(
   );
 
   const handleReset = () => {
-    setSolarKw(Math.round(defaults.solarKw * 10) / 10);
-    setConsumptionKw(Math.round(defaults.consumptionKw * 10) / 10);
+    setSolarKw(roundTo(defaults.solarKw, 1));
+    setConsumptionKw(roundTo(defaults.consumptionKw, 1));
     setBatterySoc(defaults.batterySoc);
-    setBatteryPowerKw(Math.round(defaults.batteryPowerKw * 10) / 10);
+    setBatteryPowerKw(roundTo(defaults.batteryPowerKw, 1));
     setVehicleOverrides({});
     setSimulatedTime(getCurrentTime());
     setSimulatedDay(getCurrentDay());

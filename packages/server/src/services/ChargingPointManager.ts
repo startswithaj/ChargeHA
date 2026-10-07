@@ -8,7 +8,13 @@ import type {
   VehicleChargeState,
   VehicleResolutionKind,
 } from "@chargeha/shared";
-import { SolarAllocator } from "@chargeha/shared/engine";
+import {
+  chargeCurrentAmps,
+  chargePowerKilowatts,
+  resolvePhases,
+  resolveVoltage,
+} from "@chargeha/shared/chargePower";
+import { roundTo } from "@chargeha/shared/round";
 import type { SolarConfig } from "@chargeha/shared/configSections";
 import { linkedChargingPointId } from "@chargeha/shared/chargingPoints";
 import type { AppDatabase } from "../db/AppDatabase.ts";
@@ -32,7 +38,7 @@ const watts = (kw: number | null | undefined): number => (kw ?? 0) * 1000;
 interface ChargerEntry {
   row: ChargerRow;
   middleware: ChargerMiddleware;
-  lastEmittedAt: string | null;
+  lastEmittedJson: string | null;
   lastPluggedIn: boolean | null;
   lastResolved?: string | null;
   // What we last asked for — the engine compares against this, not the
@@ -94,7 +100,7 @@ export class ChargingPointManager {
     this.chargers.set(row.id, {
       row,
       middleware,
-      lastEmittedAt: null,
+      lastEmittedJson: null,
       lastPluggedIn: null,
     });
     this.logger.info(`Charger registered: ${row.name} (${shortId(row.id)})`);
@@ -193,8 +199,9 @@ export class ChargingPointManager {
     if (!entry) return null;
     try {
       const state = this.enrich(await entry.middleware.requestState(ctx));
-      if (state && state.lastUpdated !== entry.lastEmittedAt) {
-        entry.lastEmittedAt = state.lastUpdated;
+      const json = JSON.stringify(state);
+      if (state && json !== entry.lastEmittedJson) {
+        entry.lastEmittedJson = json;
         this.eventEmitter.emit("charger_update", {
           ...state,
           chargerName: entry.row.name,
@@ -209,7 +216,7 @@ export class ChargingPointManager {
           error instanceof Error ? error.message : String(error)
         }`,
       );
-      return this.enrich(entry.middleware.getCachedState() ?? null);
+      return this.getState(id);
     }
   }
 
@@ -233,8 +240,7 @@ export class ChargingPointManager {
     await this.setMode(entry.row.id, "auto", ctx);
   }
 
-  // A point with no adapter still has a row and a card, but nothing to
-  // drive. Reads the cache directly — enrich() derives amps we never use.
+  // A point with no adapter still has a row and a card, but nothing to drive.
   isControllable(id: string): boolean {
     const entry = this.chargers.get(id);
     return entry !== undefined &&
@@ -247,25 +253,30 @@ export class ChargingPointManager {
   }
 
   private enrich(state: ChargerState | null): ChargerState | null {
-    if (!state) return null;
-    if (state.chargeAmps !== null || state.chargePowerKw === null) return state;
-    if (this.cachedSolar === null) return state;
-
-    const energy = this.latestEnergy;
-    const voltage = SolarAllocator.resolveVoltage(
+    if (!state || this.cachedSolar === null) return state;
+    const voltage = resolveVoltage(
       state.chargerVoltage,
-      energy,
+      this.latestEnergy,
       this.cachedSolar.gridVoltage,
     );
-    const phases = SolarAllocator.resolvePhases(
+    const phases = resolvePhases(
       state.chargerPhases,
       this.cachedSolar.threePhaseCharger,
     );
-    const watts = state.chargePowerKw * 1000;
-    return {
-      ...state,
-      chargeAmps: Math.round((watts / (voltage * phases)) * 10) / 10,
-    };
+    const { chargeAmps, chargePowerKw } = state;
+    const onlyPowerReported = chargeAmps === null && chargePowerKw !== null;
+    const onlyAmpsReported = chargePowerKw === null && chargeAmps !== null;
+    if (onlyPowerReported) {
+      const amps = chargeCurrentAmps(watts(chargePowerKw), voltage, phases);
+      return { ...state, chargeAmps: roundTo(amps, 1) };
+    }
+    if (onlyAmpsReported) {
+      const kw = state.isCharging
+        ? chargePowerKilowatts(chargeAmps, voltage, phases)
+        : 0;
+      return { ...state, chargePowerKw: roundTo(kw, 2) };
+    }
+    return state;
   }
 
   async init(): Promise<void> {
@@ -769,9 +780,7 @@ export class ChargingPointManager {
       [...this.chargers].map(async ([id, entry]) => {
         const path = await this.getControlPath(id, selfDriven);
         return {
-          // Raw cached state rather than getState(): enrich() reads the energy
-          // snapshot back, and this figure is about to feed the energy adapter.
-          powerW: watts(entry.middleware.getCachedState()?.chargePowerKw),
+          powerW: watts(this.getState(id)?.chargePowerKw),
           // Declared by the plugin behind this point, whichever kind it is —
           // a vehicle_api point is the car's own API and a smart point is the
           // charger, and either can be a simulation that moves no

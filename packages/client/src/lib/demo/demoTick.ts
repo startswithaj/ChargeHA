@@ -6,10 +6,20 @@ import type { CumulativeEnergyData, EnergyData } from "@chargeha/shared";
 import { generateSolarDay } from "@chargeha/shared/simulation";
 import type { SolarConfig } from "@chargeha/shared/simulation";
 import { deserializeSection } from "@chargeha/shared/configSections";
+import {
+  chargeCurrentAmps,
+  chargePowerKilowatts,
+  chargePowerWatts,
+} from "@chargeha/shared/chargePower";
 import { simulatedEnergyConfigDef } from "../../../../plugins/energy/simulated/server/config.ts";
 import type { DemoReading } from "./series.ts";
 import type { DemoSchedule, DemoState, DemoVehicle } from "./demoState.ts";
-import { getDemoState, updateDemoStateLive } from "./demoState.ts";
+import {
+  DEMO_PHASES,
+  DEMO_VOLTAGE,
+  getDemoState,
+  updateDemoStateLive,
+} from "./demoState.ts";
 import { minuteOfDay, timeToMinutes } from "./demoDates.ts";
 import { hash01 } from "./hash.ts";
 import { isActiveNow } from "./handlers/schedule.ts";
@@ -17,7 +27,6 @@ import type { SSEEvent } from "@chargeha/shared";
 
 const TICK_INTERVAL_MS = 3000;
 const INTERVAL_H = 0.25; // 15-min buckets
-const GRID_VOLTAGE_V = 230;
 const MIN_AMPS = 5;
 const MAX_AMPS = 32;
 const TICK_HOURS = TICK_INTERVAL_MS / 3_600_000;
@@ -128,10 +137,11 @@ interface Decision {
   drawW: number;
 }
 
-const charge = (amps: number): Decision =>
-  amps > 0
-    ? { isCharging: true, amps, drawW: amps * GRID_VOLTAGE_V }
-    : { isCharging: false, amps: 0, drawW: 0 };
+const charge = (amps: number): Decision => {
+  if (amps <= 0) return { isCharging: false, amps: 0, drawW: 0 };
+  const drawW = chargePowerWatts(amps, DEMO_VOLTAGE, DEMO_PHASES);
+  return { isCharging: true, amps, drawW };
+};
 
 const decideCharge = (
   v: DemoVehicle,
@@ -149,7 +159,9 @@ const decideCharge = (
   // Auto mode: a blockout suppresses; an active charge window forces; else solar.
   if (blocked) return idle;
   if (schedule) return charge(clampAmps(schedule.chargeAmps ?? MAX_AMPS));
-  return charge(clampAmps(remainingExcessW / GRID_VOLTAGE_V));
+  return charge(
+    clampAmps(chargeCurrentAmps(remainingExcessW, DEMO_VOLTAGE, DEMO_PHASES)),
+  );
 };
 
 // Honours schedules (blockout suppresses, an active charge window forces)
@@ -216,7 +228,7 @@ export const currentSnapshot = (
       homeConsumptionW: homeW,
       batteryPowerW: null,
       batterySoc: null,
-      gridVoltageV: GRID_VOLTAGE_V,
+      gridVoltageV: DEMO_VOLTAGE,
       lastUpdated: iso,
     },
     cumulative: cumulativeToday(readings, minute),
@@ -230,8 +242,8 @@ export const currentSnapshot = (
 
 const advanceSoc = (v: DemoVehicle): DemoVehicle => {
   if (!v.isCharging) return v;
-  const deltaPct = (v.chargeAmps * GRID_VOLTAGE_V * TICK_HOURS) /
-    (v.batteryCapacityKwh * 1000) * 100;
+  const kw = chargePowerKilowatts(v.chargeAmps, DEMO_VOLTAGE, DEMO_PHASES);
+  const deltaPct = kw * TICK_HOURS / v.batteryCapacityKwh * 100;
   return {
     ...v,
     socPercent: Math.min(v.chargeLimitPercent, v.socPercent + deltaPct),

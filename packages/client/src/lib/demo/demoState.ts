@@ -9,6 +9,9 @@ import { loadDemoSeries } from "./demoSeriesLoader.ts";
 import { OFFPEAK_RATE, PEAK_RATE } from "./demoTariff.ts";
 import { loadPersisted, savePersisted } from "./demoPersistence.ts";
 
+export const DEMO_VOLTAGE = 230;
+export const DEMO_PHASES = 1;
+
 export type DemoVehicleMode = "auto" | "charge_now" | "stop";
 
 export interface DemoVehicle {

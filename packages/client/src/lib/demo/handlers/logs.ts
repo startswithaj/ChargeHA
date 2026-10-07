@@ -1,5 +1,6 @@
 import type { QueryHandler } from "./types.ts";
 import type { DemoState } from "../demoState.ts";
+import { DEMO_VOLTAGE } from "../demoState.ts";
 import { dateForOffset } from "../demoDates.ts";
 import { demoNow } from "../demoClock.ts";
 
@@ -53,7 +54,6 @@ const energyReads = (s: DemoState) =>
     })
     .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 
-const CHARGER_VOLTAGE_V = 230;
 const CHARGE_AMPS_MAX = 32;
 
 /** Synthesize vehicle-update rows from the series' per-vehicle charge entries
@@ -86,7 +86,7 @@ const vehicleUpdates = (s: DemoState) => {
             chargePowerKw: powerKw,
             chargeAmps: c.amps,
             chargeAmpsMax: CHARGE_AMPS_MAX,
-            chargerVoltage: CHARGER_VOLTAGE_V,
+            chargerVoltage: DEMO_VOLTAGE,
             energyAddedKwh: 0,
             minutesToFull: powerKw > 0
               ? Math.round(remainingKwh / powerKw * 60)

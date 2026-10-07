@@ -3,6 +3,8 @@ import { ChevronDown, ChevronRight, FlaskConical, Sun } from "lucide-react";
 import { Button, Select, Slider, Switch, Text } from "@radix-ui/themes";
 import type { VehicleWithState } from "@chargeha/shared";
 import type { ControllerConfig } from "@chargeha/shared/engine";
+import { chargeCurrentAmps, resolvePhases } from "@chargeha/shared/chargePower";
+import { roundTo } from "@chargeha/shared/round";
 import {
   useBatteryConfig,
   useChargingConfig,
@@ -276,7 +278,7 @@ function SolarHardwareRows(
       </SettingsRow>
       <SettingsRow
         label="Three-phase charger"
-        help="Enable if your charger is wired for 3-phase power. The solar algorithm divides available watts by voltage x phases to calculate amps — if the vehicle misreports phases as 1, the controller will overshoot by 3x without this setting."
+        help="Enable if your charger is wired for 3-phase power."
       >
         <Switch
           size="2"
@@ -354,9 +356,9 @@ export function SolarTrackingSettings() {
   }, [showSimulation]);
   const { data: energyData } = useEnergyData();
   const voltage = fields?.gridVoltage ?? 230;
-  const phases = fields?.threePhaseCharger ? 3 : 1;
+  const phases = resolvePhases(null, fields?.threePhaseCharger ?? false);
   const kwToAmps = (kw: number) =>
-    Math.round(((kw * 1000) / (voltage * phases)) * 10) / 10;
+    roundTo(chargeCurrentAmps(kw * 1000, voltage, phases), 1);
   const currentEnergy = energyData?.realtime ?? null;
   const { schedules } = useSchedules();
   const { data: vehiclesData } = trpc.vehicle.list.useQuery();

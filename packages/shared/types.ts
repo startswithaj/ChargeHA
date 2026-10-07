@@ -168,8 +168,7 @@ export interface ChargerState {
   isCharging: boolean;
   // null = this charger type cannot observe cable state (smart plugs).
   isPluggedIn: boolean | null;
-  // Measured fields: null = not measured, never zero. Core derives amps
-  // from measured watts when null (see ChargingPointManager).
+  // Measured fields: null = not measured, never zero.
   chargeAmps: number | null;
   chargeAmpsMax: number;
   chargeAmpsMin: number;

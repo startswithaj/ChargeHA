@@ -15,6 +15,7 @@ import type {
   StatsResponse,
   VehicleSocSnapshot,
 } from "@chargeha/shared";
+import { roundTo } from "@chargeha/shared/round";
 import type { DayResolution } from "../../../hooks/useStats.ts";
 import { formatCost } from "../../../utils/Format.ts";
 import styles from "./Stats.module.css";
@@ -285,25 +286,29 @@ function buildBucketDatum(
   resolution: DayResolution,
   vehicleSoc: ChartDatum["vehicleSoc"] | undefined,
 ): ChartDatum {
-  const solarToCar = Math.round(((cb?.solarWh ?? 0) / 1000) * 100) / 100;
-  const solarToHome = Math.round(
-    (Math.max(0, eb.solarWh - (cb?.solarWh ?? 0)) / 1000) * 100,
-  ) / 100;
-  const gridToCar = Math.round(((cb?.gridWh ?? 0) / 1000) * 100) / 100;
-  const gridToHome = Math.round(
-    (Math.max(0, eb.gridWh - (cb?.gridWh ?? 0)) / 1000) * 100,
-  ) / 100;
-  const solarProduction = Math.round((eb.solarProductionWh / 1000) * 100) / 100;
-  const solarToGrid = Math.round(
-    Math.max(0, solarProduction - solarToHome - solarToCar) * 100,
-  ) / 100;
+  const solarToCar = roundTo((cb?.solarWh ?? 0) / 1000, 2);
+  const solarToHome = roundTo(
+    Math.max(0, eb.solarWh - (cb?.solarWh ?? 0)) / 1000,
+    2,
+  );
+  const gridToCar = roundTo((cb?.gridWh ?? 0) / 1000, 2);
+  const gridToHome = roundTo(
+    Math.max(0, eb.gridWh - (cb?.gridWh ?? 0)) / 1000,
+    2,
+  );
+  const solarProduction = roundTo(eb.solarProductionWh / 1000, 2);
+  const solarToGrid = roundTo(
+    Math.max(0, solarProduction - solarToHome - solarToCar),
+    2,
+  );
   const energyCost = eb.costCents ?? 0;
   const chargeCost = cb?.costCents ?? 0;
   const gridToCarCostCents = chargeCost;
   const gridToHomeCostCents = Math.max(0, energyCost - chargeCost);
-  const totalConsumption = Math.round(
-    (solarToHome + solarToCar + gridToHome + gridToCar) * 100,
-  ) / 100;
+  const totalConsumption = roundTo(
+    solarToHome + solarToCar + gridToHome + gridToCar,
+    2,
+  );
   return {
     label: period === "day" && resolution !== "15m"
       ? `${eb.label}:00`

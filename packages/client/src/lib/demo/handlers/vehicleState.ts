@@ -1,7 +1,8 @@
+import { chargePowerKilowatts } from "@chargeha/shared/chargePower";
 import type { DemoVehicle } from "../demoState.ts";
+import { DEMO_PHASES, DEMO_VOLTAGE } from "../demoState.ts";
 
 export const SYDNEY = { latitude: -33.8688, longitude: 151.2093 };
-const VOLTAGE = 230;
 
 /** Build the live charge-state object (VehicleState) from a demo vehicle. */
 export const buildVehicleState = (v: DemoVehicle, now: string) => ({
@@ -14,9 +15,11 @@ export const buildVehicleState = (v: DemoVehicle, now: string) => ({
   chargeAmps: v.isCharging ? v.chargeAmps : 0,
   chargeAmpsMax: 32,
   chargeAmpsMin: 5,
-  chargePowerKw: v.isCharging ? (v.chargeAmps * VOLTAGE) / 1000 : 0,
-  chargerVoltage: VOLTAGE,
-  chargerPhases: 1,
+  chargePowerKw: v.isCharging
+    ? chargePowerKilowatts(v.chargeAmps, DEMO_VOLTAGE, DEMO_PHASES)
+    : 0,
+  chargerVoltage: DEMO_VOLTAGE,
+  chargerPhases: DEMO_PHASES,
   energyAddedKwh: 0,
   minutesToFull: 0,
   chargePortOpen: v.isPluggedIn,

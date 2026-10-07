@@ -1,4 +1,8 @@
 import type { AppDatabase } from "../AppDatabase.ts";
+import {
+  chargeCurrentAmps,
+  chargePowerWatts,
+} from "@chargeha/shared/chargePower";
 
 // Demo seed profile — populates the database with realistic-looking data so
 // the dashboard, stats, and logs pages look populated. All timestamps are relative (last 48 hours) so data always looks fresh.
@@ -8,6 +12,8 @@ const VEHICLE_1_ID = "SIM-DEMO-001";
 const VEHICLE_1_NAME = "Model 3 SR+";
 const VEHICLE_2_ID = "SIM-DEMO-002";
 const VEHICLE_2_NAME = "Model Y LR";
+const SEED_VOLTAGE = 230;
+const SEED_PHASES = 1;
 
 // ---- Helpers ----
 
@@ -69,8 +75,8 @@ async function seedConfigAndVehicles(db: AppDatabase): Promise<void> {
     config: JSON.stringify({
       batteryCapacityKwh: 60,
       maxChargeRateKw: 11,
-      voltage: 230,
-      phases: 1,
+      voltage: SEED_VOLTAGE,
+      phases: SEED_PHASES,
       initialSocPercent: 72,
       chargeLimitPercent: 80,
       vehicleName: VEHICLE_1_NAME,
@@ -86,8 +92,8 @@ async function seedConfigAndVehicles(db: AppDatabase): Promise<void> {
     config: JSON.stringify({
       batteryCapacityKwh: 75,
       maxChargeRateKw: 11,
-      voltage: 230,
-      phases: 1,
+      voltage: SEED_VOLTAGE,
+      phases: SEED_PHASES,
       initialSocPercent: 45,
       chargeLimitPercent: 90,
       vehicleName: VEHICLE_2_NAME,
@@ -159,9 +165,13 @@ function seedChargeReadings(
       const solarW = getSolarW(utcH, minute);
       if (solarW < 1500) return;
       const excess = Math.max(0, solarW - 500);
-      const chargeW = Math.min(excess, 16 * 230);
-      if (chargeW < 5 * 230) return;
-      const chargeAmps = Math.round(chargeW / 230);
+      const maxW = chargePowerWatts(16, SEED_VOLTAGE, SEED_PHASES);
+      const minW = chargePowerWatts(5, SEED_VOLTAGE, SEED_PHASES);
+      const chargeW = Math.min(excess, maxW);
+      if (chargeW < minW) return;
+      const chargeAmps = Math.round(
+        chargeCurrentAmps(chargeW, SEED_VOLTAGE, SEED_PHASES),
+      );
       const solarContribution = Math.min(chargeW, excess);
       const gridContribution = Math.max(0, chargeW - solarContribution);
       const batteryLevel = Math.min(80, 30 + Math.round(i * 0.02));
@@ -292,9 +302,14 @@ function seedControllerLogs(
 ): void {
   CONTROLLER_LOG_ENTRIES.forEach((entry) => {
     const ts = hoursAgo(entry.hoursBack);
+    const chargeW = chargePowerWatts(
+      entry.amps ?? 0,
+      SEED_VOLTAGE,
+      SEED_PHASES,
+    );
     const inputs = JSON.stringify({
-      solarProductionW: entry.amps ? entry.amps * 230 + 500 : 200,
-      gridPowerW: entry.amps ? -((entry.amps * 230 + 500) - 800) : 600,
+      solarProductionW: entry.amps ? chargeW + 500 : 200,
+      gridPowerW: entry.amps ? -((chargeW + 500) - 800) : 600,
       homeConsumptionW: 800,
       batteryLevel: 55,
       isHome: true,

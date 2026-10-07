@@ -185,6 +185,28 @@ describe("VehicleManager", () => {
       expect(updateEvents).toHaveLength(1);
     });
 
+    it("emits vehicle_update when the state changes without a new reading", async () => {
+      await manager.addVehicle(VEHICLE_ROW);
+      await manager.requestState("VIN1", REQUEST_CONTEXT);
+      const mw = middlewares.get("VIN1");
+      assertExists(mw);
+      mw.nextState = { ...mw.nextState, chargeAmps: 10 };
+
+      await manager.requestState("VIN1", REQUEST_CONTEXT);
+
+      const updates = emitter.events.filter((e) => e.type === "vehicle_update");
+      expect(updates).toHaveLength(2);
+    });
+
+    it("does not re-emit an unchanged state", async () => {
+      await manager.addVehicle(VEHICLE_ROW);
+      await manager.requestState("VIN1", REQUEST_CONTEXT);
+      await manager.requestState("VIN1", REQUEST_CONTEXT);
+
+      const updates = emitter.events.filter((e) => e.type === "vehicle_update");
+      expect(updates).toHaveLength(1);
+    });
+
     it("reports error when middleware throws", async () => {
       await manager.addVehicle(VEHICLE_ROW);
       const mw = middlewares.get("VIN1");

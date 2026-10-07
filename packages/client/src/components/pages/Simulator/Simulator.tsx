@@ -10,6 +10,7 @@ import {
   type SimulationOutput,
   type VehicleConfig,
 } from "@chargeha/shared/simulation";
+import { chargePowerWatts } from "@chargeha/shared/chargePower";
 import styles from "./Simulator.module.css";
 import { FormError } from "../../ui/FormError.tsx";
 
@@ -410,7 +411,7 @@ function useChartRefs() {
 
 function buildNoteLines(config: SimConfig): string {
   const rateLines = config.vehicles.map((v) => {
-    const maxChargeW = v.chargeAmpsMax * VOLTAGE;
+    const maxChargeW = chargePowerWatts(v.chargeAmpsMax, VOLTAGE, 1);
     const rate = (maxChargeW / v.batteryCapacityKwh / 10).toFixed(1);
     return `${v.name}: ${maxChargeW}W max, ${rate}%/hr at max`;
   });

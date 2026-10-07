@@ -4,6 +4,7 @@ import { cleanup, fireEvent, screen } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { renderWithProviders } from "../../test-utils.tsx";
 import type { VehicleChargeState } from "@chargeha/shared";
+import { buildChargerState } from "@chargeha/shared/test-factories";
 import { VehicleCard } from "./VehicleCard.tsx";
 
 vi.mock("../StaticMap/StaticMap.tsx", () => ({
@@ -85,6 +86,18 @@ describe("VehicleCard", () => {
   ])("status text %s", (_label, state, expected) => {
     renderVC({ state: makeVehicleState(state) });
     expect(screen.getByText(expected)).toBeInTheDocument();
+  });
+
+  it("shows the charging point's power over the car's own figure", () => {
+    renderVC({
+      state: makeVehicleState({ isCharging: true, chargePowerKw: 7 }),
+      chargerStatus: buildChargerState({
+        isCharging: true,
+        chargePowerKw: 6.6,
+        status: "charging",
+      }),
+    });
+    expect(screen.getByText("Auto - Charging at 6.6 kW")).toBeInTheDocument();
   });
 
   it("renders Stop Charging button when charging", () => {

@@ -158,7 +158,6 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
       this.cachedState = {
         ...this.cachedState,
         isCharging: true,
-        lastUpdated: new Date().toISOString(),
       };
       // Expire the cache so the next tick fetches vehicle_data: the car only
       // reports real charger voltage/phases while charging, and stale
@@ -181,7 +180,6 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
         isCharging: false,
         chargePowerKw: 0,
         chargeAmps: 0,
-        lastUpdated: new Date().toISOString(),
       };
       this.logger.debug("stopCharging confirmed — updated cache");
     } else if (!ok) {
@@ -198,7 +196,6 @@ export class TeslaVehicleMiddleware implements VehicleMiddleware {
       this.cachedState = {
         ...this.cachedState,
         chargeAmps: amps,
-        lastUpdated: new Date().toISOString(),
       };
       this.logger.debug(`setChargeAmps confirmed — cache amps=${amps}`);
     } else if (!ok) {

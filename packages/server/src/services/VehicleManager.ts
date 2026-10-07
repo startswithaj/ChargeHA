@@ -50,7 +50,7 @@ export class VehicleManager {
       source: "fetch" | "command";
     }
   >();
-  private lastEmittedUpdatedAt = new Map<string, string>();
+  private lastEmittedJson = new Map<string, string>();
   private readonly db: AppDatabase;
   private readonly eventEmitter: TypedEventEmitter;
   private readonly logger: Logger;
@@ -191,8 +191,9 @@ export class VehicleManager {
 
       this.detectTransitions(vehicleId, state);
 
-      if (this.lastEmittedUpdatedAt.get(vehicleId) !== state.lastUpdated) {
-        this.lastEmittedUpdatedAt.set(vehicleId, state.lastUpdated);
+      const json = JSON.stringify(state);
+      if (this.lastEmittedJson.get(vehicleId) !== json) {
+        this.lastEmittedJson.set(vehicleId, json);
         this.eventEmitter.emit("vehicle_update", state);
       }
 

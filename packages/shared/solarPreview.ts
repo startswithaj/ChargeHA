@@ -5,6 +5,7 @@ import type {
   VehicleChargeState,
   VehicleMode,
 } from "./types.ts";
+import { chargePowerKilowatts } from "./chargePower.ts";
 import {
   ControllerEngine,
   selectActiveBlockout,
@@ -119,7 +120,11 @@ function toVehicleChargeState(
     chargeAmps,
     chargeAmpsMax: v.chargeAmpsMax,
     chargeAmpsMin: v.chargeAmpsMin,
-    chargePowerKw: (chargeAmps * v.chargerVoltage * v.chargerPhases) / 1000,
+    chargePowerKw: chargePowerKilowatts(
+      chargeAmps,
+      v.chargerVoltage,
+      v.chargerPhases,
+    ),
     chargerVoltage: v.chargerVoltage,
     chargerPhases: v.chargerPhases,
     energyAddedKwh: 0,
@@ -193,6 +198,24 @@ function toEngineVehicle(
   };
 }
 
+function skippedResult(
+  v: PreviewVehicle,
+  reason: string,
+  reasonCode: DecisionReason,
+): PreviewVehicleResult {
+  return {
+    id: v.id,
+    name: v.name,
+    action: "skipped",
+    reason,
+    reasonCode,
+    allocatedAmps: 0,
+    allocatedKw: 0,
+    solarKw: 0,
+    gridKw: 0,
+  };
+}
+
 export function previewSolarAllocation(
   config: ControllerConfig,
   vehicles: PreviewVehicle[],
@@ -236,17 +259,7 @@ export function previewSolarAllocation(
       const decision = output.decisions.get(v.id);
       const state = vehicleStates.get(v.id);
       if (!decision || !state) {
-        return {
-          id: v.id,
-          name: v.name,
-          action: "skipped",
-          reason: "No vehicle state",
-          reasonCode: "no_state",
-          allocatedAmps: 0,
-          allocatedKw: 0,
-          solarKw: 0,
-          gridKw: 0,
-        };
+        return skippedResult(v, "No vehicle state", "no_state");
       }
 
       const startsOrAdjusts = decision.action === "start" ||
@@ -255,21 +268,15 @@ export function previewSolarAllocation(
       const isCharging = startsOrAdjusts || staysCharging;
 
       if (!isCharging) {
-        return {
-          id: v.id,
-          name: v.name,
-          action: "skipped",
-          reason: decision.detail,
-          reasonCode: decision.reason,
-          allocatedAmps: 0,
-          allocatedKw: 0,
-          solarKw: 0,
-          gridKw: 0,
-        };
+        return skippedResult(v, decision.detail, decision.reason);
       }
 
       const amps = decision.targetAmps ?? state.chargeAmps;
-      const allocatedKw = (amps * v.chargerVoltage * v.chargerPhases) / 1000;
+      const allocatedKw = chargePowerKilowatts(
+        amps,
+        v.chargerVoltage,
+        v.chargerPhases,
+      );
       const solarKw = Math.min(remaining.kw, allocatedKw);
       remaining.kw -= solarKw;
       const gridKw = allocatedKw - solarKw;

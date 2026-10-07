@@ -4,6 +4,7 @@ import type {
   ChargerState,
   ChargerStatus,
 } from "@chargeha/shared";
+import { chargePowerKilowatts } from "@chargeha/shared/chargePower";
 import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 import type { OcppChargerHandle } from "./OcppCentralSystem.ts";
 import type { OcppLiveData } from "./OcppTypes.ts";
@@ -286,7 +287,7 @@ function derivedPowerKw(data: OcppLiveData, phases: number): number | null {
     return (data.currentSumA * data.voltageV) / 1000;
   }
   if (data.currentA === null) return null;
-  return (data.currentA * data.voltageV * phases) / 1000;
+  return chargePowerKilowatts(data.currentA, data.voltageV, phases);
 }
 
 function sessionEnergyKwh(data: OcppLiveData): number {

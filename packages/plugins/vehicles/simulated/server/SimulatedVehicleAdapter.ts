@@ -4,6 +4,8 @@ import type {
   SimulationControls,
   VehicleAdapter,
 } from "@chargeha/shared";
+import { chargePowerKilowatts } from "@chargeha/shared/chargePower";
+import { roundTo } from "@chargeha/shared/round";
 import type { Logger } from "@chargeha/server/lib/Logger";
 import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 
@@ -107,7 +109,7 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
 
     const state = {
       vehicleId: this.id,
-      batteryLevel: Math.round(this.socPercent * 10) / 10,
+      batteryLevel: roundTo(this.socPercent, 1),
       chargeLimit: this.chargeLimit,
       isCharging: this.isCharging,
       isPluggedIn: this.isPluggedIn,
@@ -115,10 +117,10 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
       chargeAmps: this.isCharging ? this.chargeAmps : 0,
       chargeAmpsMax: this.config.maxAmps,
       chargeAmpsMin: this.config.minAmps,
-      chargePowerKw: Math.round(powerKw * 100) / 100,
+      chargePowerKw: roundTo(powerKw, 2),
       chargerVoltage: this.config.voltage,
       chargerPhases: this.config.phases,
-      energyAddedKwh: Math.round(this.energyAddedKwh * 100) / 100,
+      energyAddedKwh: roundTo(this.energyAddedKwh, 2),
       minutesToFull,
       chargePortOpen: this.isPluggedIn,
       vehicleName: this.config.vehicleName,
@@ -177,7 +179,7 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
       {
         payload: {
           vehicleId: this.id,
-          socPercent: Math.round(this.socPercent * 10) / 10,
+          socPercent: roundTo(this.socPercent, 1),
         },
         origin: ctx.origin,
         traceId: ctx.traceId,
@@ -278,8 +280,11 @@ export class SimulatedVehicleAdapter implements VehicleAdapter {
   }
 
   private calculatePowerKw(): number {
-    const powerKw = (this.chargeAmps * this.config.voltage *
-      this.config.phases) / 1000;
+    const powerKw = chargePowerKilowatts(
+      this.chargeAmps,
+      this.config.voltage,
+      this.config.phases,
+    );
     return Math.min(powerKw, this.config.maxChargeRateKw);
   }
 

@@ -4,9 +4,11 @@ import type {
   ChargerState,
   ChargerStatus,
 } from "@chargeha/shared";
+import { chargePowerKilowatts } from "@chargeha/shared/chargePower";
 import type { PluginDbLogger } from "@chargeha/server/lib/PluginDbLogger";
 
 const VOLTAGE = 230;
+const PHASES = 1;
 
 interface SimState {
   on: boolean;
@@ -87,9 +89,9 @@ export class SimulatedChargerAdapter implements ChargerAdapter {
       chargeAmps: amps,
       chargeAmpsMax: 32,
       chargeAmpsMin: 6,
-      chargePowerKw: (amps * VOLTAGE) / 1000,
+      chargePowerKw: chargePowerKilowatts(amps, VOLTAGE, PHASES),
       chargerVoltage: VOLTAGE,
-      chargerPhases: 1,
+      chargerPhases: PHASES,
       energyAddedKwh: s.energyAddedKwh,
       status: this.status(amps),
       statusDetail: `simulated: ${
@@ -146,7 +148,7 @@ export class SimulatedChargerAdapter implements ChargerAdapter {
   private tick(): void {
     const now = Date.now();
     const hours = (now - this.state.lastTickMs) / 3_600_000;
-    const kw = (this.drawAmps() * VOLTAGE) / 1000;
+    const kw = chargePowerKilowatts(this.drawAmps(), VOLTAGE, PHASES);
     this.state = {
       ...this.state,
       energyAddedKwh: this.state.energyAddedKwh + kw * hours,

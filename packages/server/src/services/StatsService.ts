@@ -1,5 +1,6 @@
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import { offsetHoursAt } from "@chargeha/shared/timezone";
+import { roundTo } from "@chargeha/shared/round";
 import type {
   EnergyBucket,
   SolarProductionPoint,
@@ -372,9 +373,10 @@ export class StatsService {
         const s = solarMap.get(`${d}-${q}`);
         return {
           x: d + q * 0.25,
-          solarProductionKwh: Math.round(
-            ((s?.solarProductionWh ?? 0) * 4 / 1000) * 100,
-          ) / 100,
+          solarProductionKwh: roundTo(
+            (s?.solarProductionWh ?? 0) * 4 / 1000,
+            2,
+          ),
         };
       })
     );
@@ -395,9 +397,10 @@ export class StatsService {
         return {
           // Map week 0-52 to month position 1-12
           x: 1 + (w / 52) * 11,
-          solarProductionKwh: Math.round(
-            ((s?.solarProductionWh ?? 0) * (52 / 12) / 1000) * 100,
-          ) / 100,
+          solarProductionKwh: roundTo(
+            (s?.solarProductionWh ?? 0) * (52 / 12) / 1000,
+            2,
+          ),
         };
       },
     );

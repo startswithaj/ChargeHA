@@ -42,6 +42,9 @@ packages/shared/
                                ChargerPlugin, EnergyPlugin, middleware interfaces)
   schemas.ts                 — Zod schemas shared between server and client
   configSections.ts          — Config section definitions + key registry
+  chargePower.ts             — Resolves charger voltage and phases; works out
+                               power from current and current from power.
+  round.ts                   — roundTo(value, decimals) for decimal rounding.
   engine/                    — Pure charging logic (ControllerEngine, SolarAllocator,
                                Trace, Steps, Schedules)
   simulation/                — Simulation helpers (solar curve generation, run harness)

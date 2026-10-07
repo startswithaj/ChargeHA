@@ -4,6 +4,7 @@ import {
   runSimulation,
 } from "@chargeha/shared/simulation";
 import type { SimResult } from "@chargeha/shared/simulation";
+import { chargePowerWatts } from "@chargeha/shared/chargePower";
 
 declare const Chart: any;
 
@@ -239,7 +240,7 @@ setTimeout(() => (window as any).runSim(), 100);
     });
     const elapsed = Math.round(performance.now() - start);
 
-    const maxChargeW = 32 * VOLTAGE;
+    const maxChargeW = chargePowerWatts(32, VOLTAGE, 1);
     const noteLines = [
       `Max charge rate: ${maxChargeW}W (32A × ${VOLTAGE}V, 1 phase)`,
       `EV 1: ${(maxChargeW / ev1CapacityKwh / 10).toFixed(1)}%/hr at max`,

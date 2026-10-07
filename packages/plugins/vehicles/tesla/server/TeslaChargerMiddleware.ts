@@ -69,7 +69,7 @@ export class TeslaChargerMiddleware implements ChargerMiddleware {
       chargeAmps: state.chargeAmps,
       chargeAmpsMax: state.chargeAmpsMax,
       chargeAmpsMin: state.chargeAmpsMin,
-      chargePowerKw: state.chargePowerKw,
+      chargePowerKw: null,
       chargerVoltage: state.chargerVoltage,
       chargerPhases: state.chargerPhases,
       energyAddedKwh: state.energyAddedKwh,
