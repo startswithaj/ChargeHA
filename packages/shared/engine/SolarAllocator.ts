@@ -1,4 +1,10 @@
 import type { EnergyData, VehicleChargeState } from "../types.ts";
+import {
+  chargeCurrentAmps,
+  chargePowerWatts,
+  resolvePhases,
+  resolveVoltage,
+} from "../chargePower.ts";
 import type { ControllerConfig, EngineVehicleInput } from "./types.ts";
 
 // Solar numbers shared by every solar step. Null when solar tracking is
@@ -45,12 +51,12 @@ export class SolarAllocator {
     allocatedAmps: number | null,
   ): SolarTargets | null {
     if (!config.solarTrackingEnabled || !energy) return null;
-    const voltage = SolarAllocator.resolveVoltage(
+    const voltage = resolveVoltage(
       state.chargerVoltage,
       energy,
       config.gridVoltage,
     );
-    const phases = SolarAllocator.resolvePhases(
+    const phases = resolvePhases(
       state.chargerPhases,
       config.threePhaseCharger,
     );
@@ -61,7 +67,7 @@ export class SolarAllocator {
       voltage,
       phases,
     );
-    const rawAmps = Math.floor(availableW / (voltage * phases));
+    const rawAmps = Math.floor(chargeCurrentAmps(availableW, voltage, phases));
     const targetAmps = allocatedAmps ?? rawAmps;
     const clampedAmps = Math.max(
       state.chargeAmpsMin,
@@ -79,29 +85,6 @@ export class SolarAllocator {
       belowMinGeneration: solarKw < config.minSolarGenerationKw,
       belowMinAmps: targetAmps < state.chargeAmpsMin,
     };
-  }
-
-  // Resolve charger voltage: trust the reading if present and >= 100V,
-  // otherwise fall back to the inverter grid reading, then the user's configured value.
-  static resolveVoltage(
-    chargerVoltage: number | null,
-    energy: EnergyData | null,
-    gridVoltage: number,
-  ): number {
-    if (chargerVoltage !== null && chargerVoltage >= 100) return chargerVoltage;
-    return energy?.gridVoltageV ?? gridVoltage;
-  }
-
-  // A reported phase count is ground truth and always wins — OCPP's per-charger
-  // setting is a wiring fact and must not be second-guessed by an install-wide
-  // flag. null means the adapter cannot observe it (Tesla reports phases only
-  // while charging), and only then does threePhaseCharger decide.
-  static resolvePhases(
-    chargerPhases: number | null,
-    threePhaseCharger: boolean,
-  ): number {
-    if (chargerPhases !== null) return chargerPhases;
-    return threePhaseCharger ? 3 : 1;
   }
 
   // Surplus solar in watts, before the safety margin.
@@ -138,7 +121,7 @@ export class SolarAllocator {
     phases: number,
   ): number {
     if (config.consumptionExcludesCharging || !state.isCharging) return 0;
-    return state.chargeAmps * voltage * phases;
+    return chargePowerWatts(state.chargeAmps, voltage, phases);
   }
 
   // Available watts after the reference mode and safety margin are applied.
@@ -206,9 +189,9 @@ export class SolarAllocator {
     const canSplit = (n: number) => {
       const perV = Math.floor(totalAmps / n);
       return eligible.slice(0, n).every((e) => {
-        const buffer = e.state.isCharging
-          ? 0
-          : Math.ceil(ADMISSION_HEADROOM_W / (e.voltage * e.phases));
+        const buffer = e.state.isCharging ? 0 : Math.ceil(
+          chargeCurrentAmps(ADMISSION_HEADROOM_W, e.voltage, e.phases),
+        );
         return perV >= e.state.chargeAmpsMin + buffer;
       });
     };
@@ -280,12 +263,12 @@ export class SolarAllocator {
       )
       .map((v) => {
         const state = v.state;
-        const voltage = SolarAllocator.resolveVoltage(
+        const voltage = resolveVoltage(
           state.chargerVoltage,
           energy,
           config.gridVoltage,
         );
-        const phases = SolarAllocator.resolvePhases(
+        const phases = resolvePhases(
           state.chargerPhases,
           config.threePhaseCharger,
         );
@@ -317,7 +300,7 @@ export class SolarAllocator {
     );
 
     const { voltage: refV, phases: refP } = eligible[0];
-    const totalAmps = Math.floor(availableW / (refV * refP));
+    const totalAmps = Math.floor(chargeCurrentAmps(availableW, refV, refP));
 
     return { eligible, totalAmps, availableW };
   }

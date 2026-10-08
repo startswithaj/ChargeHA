@@ -33,7 +33,7 @@ describe("TeslaAdapter", () => {
         charging_state: "Charging",
         charge_amps: 16,
         charge_current_request_max: 32,
-        charger_power: 7,
+        charger_power: 4,
         charger_voltage: 240,
         charger_phases: 1,
         charge_energy_added: 12.5,
@@ -122,7 +122,7 @@ describe("TeslaAdapter", () => {
       expect(state.chargeAmps).toBe(16);
       expect(state.chargeAmpsMax).toBe(32);
       expect(state.chargeAmpsMin).toBe(5);
-      expect(state.chargePowerKw).toBe(3.84);
+      expect(state.chargePowerKw).toBe(4);
       expect(state.chargerVoltage).toBe(240);
       expect(state.chargerPhases).toBe(1);
       expect(state.energyAddedKwh).toBe(12.5);
@@ -218,7 +218,7 @@ describe("TeslaAdapter", () => {
     });
   });
 
-  describe("three-phase correction", () => {
+  describe("phase count", () => {
     const chargeStateWith = async (overrides: Record<string, unknown>) => {
       responseOverrides.set(`/api/1/vehicles/${VIN}/vehicle_data`, {
         status: 200,
@@ -235,67 +235,6 @@ describe("TeslaAdapter", () => {
       return await adapter.getChargeState(c("test:phases"));
     };
 
-    it("corrects a reported 2 to 3 when power confirms three phases", async () => {
-      const s = await chargeStateWith({
-        charge_amps: 16,
-        charger_voltage: 240,
-        charger_phases: 2,
-        charger_power: 11,
-      });
-      expect(s.chargerPhases).toBe(3);
-      expect(s.chargePowerKw).toBe(11.52);
-    });
-
-    it("keeps a reported 2 when power confirms two phases", async () => {
-      const s = await chargeStateWith({
-        charge_amps: 16,
-        charger_voltage: 230,
-        charger_phases: 2,
-        charger_power: 7,
-      });
-      expect(s.chargerPhases).toBe(2);
-    });
-
-    it("ignores a line-to-line voltage reading", async () => {
-      const s = await chargeStateWith({
-        charge_amps: 16,
-        charger_voltage: 415,
-        charger_phases: 2,
-        charger_power: 11,
-      });
-      expect(s.chargerPhases).toBe(2);
-    });
-
-    it("ignores currents below the quantisation floor", async () => {
-      const s = await chargeStateWith({
-        charge_amps: 8,
-        charger_voltage: 240,
-        charger_phases: 2,
-        charger_power: 6,
-      });
-      expect(s.chargerPhases).toBe(2);
-    });
-
-    it("rejects an implausibly high ratio from a stale power reading", async () => {
-      const s = await chargeStateWith({
-        charge_amps: 10,
-        charger_voltage: 230,
-        charger_phases: 2,
-        charger_power: 9,
-      });
-      expect(s.chargerPhases).toBe(2);
-    });
-
-    it("leaves a reported 1 untouched", async () => {
-      const s = await chargeStateWith({
-        charge_amps: 16,
-        charger_voltage: 240,
-        charger_phases: 1,
-        charger_power: 11,
-      });
-      expect(s.chargerPhases).toBe(1);
-    });
-
     it("leaves an unreported phase count as null", async () => {
       const s = await chargeStateWith({
         charge_amps: 16,
@@ -306,23 +245,8 @@ describe("TeslaAdapter", () => {
       expect(s.chargerPhases).toBeNull();
     });
 
-    it("keeps a reported 2 when charger_power is absent", async () => {
-      const s = await chargeStateWith({
-        charge_amps: 16,
-        charger_voltage: 240,
-        charger_phases: 2,
-        charger_power: undefined,
-      });
-      expect(s.chargerPhases).toBe(2);
-    });
-
-    it("does not correct a derated three-phase car", async () => {
-      const s = await chargeStateWith({
-        charge_amps: 16,
-        charger_voltage: 240,
-        charger_phases: 2,
-        charger_power: 8,
-      });
+    it("passes a reported 2 through for core to resolve", async () => {
+      const s = await chargeStateWith({ charger_phases: 2 });
       expect(s.chargerPhases).toBe(2);
     });
   });

@@ -10,6 +10,7 @@ import type {
   TariffBreakdownEntry,
   VehicleSocSnapshot,
 } from "@chargeha/shared";
+import { roundTo } from "@chargeha/shared/round";
 import type {
   DemoChargeEntry,
   DemoReading,
@@ -365,7 +366,7 @@ const monthlySolarLine = (
         .reduce((s, r) => s + r.solarW * intervalH, 0);
       return {
         x: d + q * 0.25,
-        solarProductionKwh: Math.round((wh * 4 / 1000) * 100) / 100,
+        solarProductionKwh: roundTo(wh * 4 / 1000, 2),
       };
     });
   });
@@ -418,8 +419,7 @@ const yearlySolarLine = (
   }, new Map<number, number>());
   return Array.from({ length: 53 }, (_, w) => ({
     x: 1 + (w / 52) * 11,
-    solarProductionKwh:
-      Math.round(((byWeek.get(w) ?? 0) * (52 / 12) / 1000) * 100) / 100,
+    solarProductionKwh: roundTo((byWeek.get(w) ?? 0) * (52 / 12) / 1000, 2),
   }));
 };
 

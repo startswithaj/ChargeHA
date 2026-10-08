@@ -251,7 +251,7 @@ export function VehicleCardSection() {
           atHome
           allocationStatus="Charging on surplus solar"
           chargerStatus={{
-            status: "charging",
+            ...chargerCardState,
             statusDetail: "SOC 64.7%/80%, 32A",
           }}
         />

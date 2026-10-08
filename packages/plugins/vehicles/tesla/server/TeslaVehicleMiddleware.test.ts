@@ -401,6 +401,18 @@ describe("TeslaVehicleMiddleware", () => {
       });
     });
 
+    commandCases.forEach(([label, run]) => {
+      it(`leaves lastUpdated alone after ${label}`, async () => {
+        await middleware.requestState(ctx());
+        const fetchedAt = middleware.getCachedState()?.lastUpdated;
+        time.tick(5_000);
+
+        await run();
+
+        expect(middleware.getCachedState()?.lastUpdated).toBe(fetchedAt);
+      });
+    });
+
     it("performs a free online check before every command", async () => {
       await middleware.startCharging(cc("test:start"));
       expect(adapter.isVehicleOnlineCalls).toBe(1);

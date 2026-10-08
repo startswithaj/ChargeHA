@@ -18,6 +18,8 @@
     "./geo": "./geo.ts",
     "./lanAddresses": "./lanAddresses.ts",
     "./solarAttribution": "./solarAttribution.ts",
+    "./chargePower": "./chargePower.ts",
+    "./round": "./round.ts",
     "./geocode": "./geocode.ts",
     "./notifications": "./notificationProviders.ts",
     "./redact": "./redact.ts"

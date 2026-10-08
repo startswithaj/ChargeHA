@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button, Text, Tooltip } from "@radix-ui/themes";
-import type { VehicleChargeState } from "@chargeha/shared";
+import type { ChargerState, VehicleChargeState } from "@chargeha/shared";
 import { ampsRange, ampsValue, kwValue } from "../../utils/Format.ts";
 import { Spinner } from "../ui/Spinner.tsx";
 import layout from "../ui/CardLayout.module.css";
@@ -59,7 +59,7 @@ interface VehicleCardDetailsProps {
   allocationStatus: string | null;
   controllerReason: string | null;
   controllerDetail: string | null;
-  chargerStatus: { status: string; statusDetail: string | null } | null;
+  chargerStatus: ChargerState | null;
 }
 
 const sentenceCase = (text: string) =>
@@ -67,7 +67,7 @@ const sentenceCase = (text: string) =>
 
 export function ChargerStatusRow(
   { chargerStatus }: {
-    chargerStatus: { status: string; statusDetail: string | null } | null;
+    chargerStatus: ChargerState | null;
   },
 ) {
   if (!chargerStatus) return null;

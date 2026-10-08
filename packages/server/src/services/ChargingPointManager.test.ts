@@ -407,76 +407,25 @@ describe("ChargingPointManager", () => {
   });
 
   describe("requestState", () => {
-    it("does not derive amps while cachedSolar is null pre-init", async () => {
+    it("emits charger_update only when the state changes", async () => {
       await manager.addCharger(ROW);
       const mw = middlewares.get(ROW.id);
       assertExists(mw);
-      mw.nextState = { ...STATE, chargeAmps: null, chargePowerKw: 2.3 };
-
-      const state = await manager.requestState(ROW.id, CTX);
-
-      assertExists(state);
-      expect(state.chargeAmps).toBeNull();
-    });
-
-    it("derives amps from watts via resolveVoltage using cachedGridVoltage", async () => {
-      await manager.addCharger(ROW);
-      gridVoltage = 230;
-      await manager.init();
-      const mw = middlewares.get(ROW.id);
-      assertExists(mw);
-      mw.nextState = {
-        ...STATE,
-        chargeAmps: null,
-        chargePowerKw: 2.3,
-        chargerVoltage: null,
-      };
-
-      const state = await manager.requestState(ROW.id, CTX);
-
-      assertExists(state);
-      expect(state.chargeAmps).toBe(10);
-    });
-
-    it("falls back to threePhaseCharger when the charger reports no phases", async () => {
-      await manager.addCharger(ROW);
-      threePhaseCharger = true;
-      await manager.init();
-      const mw = middlewares.get(ROW.id);
-      assertExists(mw);
-      mw.nextState = {
-        ...STATE,
-        chargeAmps: null,
-        chargePowerKw: 6.9,
-        chargerVoltage: null,
-        chargerPhases: null,
-      };
-
-      const state = await manager.requestState(ROW.id, CTX);
-
-      assertExists(state);
-      expect(state.chargeAmps).toBe(10);
-    });
-
-    it("emits charger_update only when lastUpdated changes", async () => {
-      await manager.addCharger(ROW);
-      const mw = middlewares.get(ROW.id);
-      assertExists(mw);
+      const updates = () =>
+        emitter.events.filter((e) => e.type === "charger_update");
 
       mw.nextState = { ...STATE, lastUpdated: "t1" };
       await manager.requestState(ROW.id, CTX);
       await manager.requestState(ROW.id, CTX);
-
-      expect(
-        emitter.events.filter((e) => e.type === "charger_update"),
-      ).toHaveLength(1);
+      expect(updates()).toHaveLength(1);
 
       mw.nextState = { ...STATE, lastUpdated: "t2" };
       await manager.requestState(ROW.id, CTX);
+      expect(updates()).toHaveLength(2);
 
-      expect(
-        emitter.events.filter((e) => e.type === "charger_update"),
-      ).toHaveLength(2);
+      mw.nextState = { ...STATE, lastUpdated: "t2", chargeAmps: 10 };
+      await manager.requestState(ROW.id, CTX);
+      expect(updates()).toHaveLength(3);
     });
   });
 

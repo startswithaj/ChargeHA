@@ -1,3 +1,5 @@
+import { roundTo } from "@chargeha/shared/round";
+
 export function kwValue(watts: number): string {
   const abs = Math.abs(watts);
   if (abs >= 1000) {
@@ -78,7 +80,7 @@ export function formatRate(
   ratePerKwh: number,
   currencySymbol: string,
 ): string {
-  const twoDecimal = Math.round(ratePerKwh * 100) / 100;
+  const twoDecimal = roundTo(ratePerKwh, 2);
   if (ratePerKwh === twoDecimal) {
     return `${currencySymbol}${ratePerKwh.toFixed(2)}`;
   }

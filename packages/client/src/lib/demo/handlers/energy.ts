@@ -4,11 +4,11 @@ import { deserializeSection } from "@chargeha/shared/configSections";
 import { demoEnergyPluginSummaries } from "@chargeha/plugins/demoPluginSummaries";
 import { simulatedEnergyConfigDef } from "../../../../../plugins/energy/simulated/server/config.ts";
 import type { DemoState } from "../demoState.ts";
+import { DEMO_VOLTAGE } from "../demoState.ts";
 import { currentSnapshot } from "../demoTick.ts";
 import { dateForOffset } from "../demoDates.ts";
 import { demoNow } from "../demoClock.ts";
 
-const GRID_VOLTAGE_V = 230;
 const BUCKETS_PER_DAY = 96;
 
 type DatedReading = EnergyData & { timestamp: string };
@@ -31,7 +31,7 @@ const datedReadings = (s: DemoState, limit: number): DatedReading[] => {
           homeConsumptionW: r.homeW,
           batteryPowerW: null,
           batterySoc: null,
-          gridVoltageV: GRID_VOLTAGE_V,
+          gridVoltageV: DEMO_VOLTAGE,
           lastUpdated: ts,
           timestamp: ts,
         };

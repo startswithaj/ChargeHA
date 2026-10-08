@@ -10,7 +10,11 @@ import {
   Zap,
 } from "lucide-react";
 import { Badge, Button, Callout, Card, Skeleton, Text } from "@radix-ui/themes";
-import type { VehicleChargeState, VehicleMode } from "@chargeha/shared";
+import type {
+  ChargerState,
+  VehicleChargeState,
+  VehicleMode,
+} from "@chargeha/shared";
 import { formatRelativeTime } from "../../utils/Format.ts";
 import { StaticMap } from "../StaticMap/StaticMap.tsx";
 import { Spinner } from "../ui/Spinner.tsx";
@@ -47,7 +51,7 @@ interface VehicleCardProps {
   pollingSuspendReason?: string | null;
   controllerReason?: string | null;
   controllerDetail?: string | null;
-  chargerStatus?: { status: string; statusDetail: string | null } | null;
+  chargerStatus?: ChargerState | null;
   // Data-only vehicle: charging is owned by a smart charger, so no
   // mode/start/stop/amps controls render.
   readOnly?: boolean;
@@ -64,15 +68,14 @@ const MODE_LABELS: Record<VehicleMode, string> = {
 
 function getStatusText(
   state: VehicleChargeState,
+  powerKw: number,
   mode: VehicleMode,
   atHome: boolean | null | undefined,
 ): string {
   const label = MODE_LABELS[mode];
   const homeSuffix = atHome ? " - Home" : "";
   if (state.isCharging) {
-    return `${label} - Charging at ${
-      state.chargePowerKw.toFixed(1)
-    } kW${homeSuffix}`;
+    return `${label} - Charging at ${powerKw.toFixed(1)} kW${homeSuffix}`;
   }
   if (state.isPluggedIn) return `${label} - Plugged In${homeSuffix}`;
   return `${label} - Unplugged${homeSuffix}`;
@@ -372,6 +375,7 @@ export function VehicleCard({
   const lastUpdatedText = state.lastUpdated
     ? formatRelativeTime(new Date(state.lastUpdated))
     : null;
+  const powerKw = chargerStatus?.chargePowerKw ?? state.chargePowerKw;
 
   return (
     <Card
@@ -412,7 +416,7 @@ export function VehicleCard({
       {/* Status */}
       <div className={layout.status}>
         <StatusIcon state={state} />
-        <Text size="2">{getStatusText(state, mode, atHome)}</Text>
+        <Text size="2">{getStatusText(state, powerKw, mode, atHome)}</Text>
       </div>
 
       {/* Spacer when unplugged so the card has room for the map below. */}

@@ -2,6 +2,7 @@
 // Usage: `buildVehicleChargeState({ batteryLevel: 95 })` — override only what matters for your test.
 import type {
   BlockoutSchedule,
+  ChargerState,
   ChargeSchedule,
   EnergyData,
   VehicleChargeState,
@@ -46,6 +47,28 @@ export function buildVehicleChargeState(
     latitude: null,
     longitude: null,
     isHome: null,
+    ...overrides,
+  };
+}
+
+export function buildChargerState(
+  overrides: Partial<ChargerState> = {},
+): ChargerState {
+  return {
+    chargerId: "charger-test",
+    isCharging: false,
+    isPluggedIn: true,
+    chargeAmps: 0,
+    chargeAmpsMax: 32,
+    chargeAmpsMin: 6,
+    chargePowerKw: 0,
+    chargerVoltage: 230,
+    chargerPhases: 1,
+    energyAddedKwh: 0,
+    status: "available",
+    statusDetail: null,
+    controlMode: "amps",
+    lastUpdated: "2026-01-01T00:00:00.000Z",
     ...overrides,
   };
 }

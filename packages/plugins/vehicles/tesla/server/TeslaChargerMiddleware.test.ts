@@ -142,6 +142,12 @@ describe("TeslaChargerMiddleware", () => {
         "SOC 55%/90%, 12A",
       );
     });
+
+    it("leaves power null for core to derive from amps", () => {
+      const { shared } = buildSharedStub(buildState({ isCharging: true }));
+      const middleware = new TeslaChargerMiddleware(buildRow(), shared);
+      expect(middleware.getCachedState()?.chargePowerKw).toBeNull();
+    });
   });
 
   describe("getCachedState", () => {
