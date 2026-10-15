@@ -834,12 +834,13 @@ function HomeBatterySection(
           help="The inverter's charge/discharge power limit — how fast the battery can charge or discharge, independent of its capacity."
         />
         <NumInput
-          label="Start SoC %"
+          label="Midnight SoC %"
           value={config.batteryStartSoc}
           onChange={(v) => set("batteryStartSoc", v)}
           step={5}
           min={0}
           max={100}
+          help="Battery level at 00:00. Overnight home load drains it, so it may be empty by sunrise."
         />
         <div className={styles.control}>
           <label>Battery Priority</label>
