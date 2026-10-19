@@ -47,8 +47,8 @@ interface AllocationContext {
 const ADMISSION_HEADROOM_W = 460;
 
 // Export proves the battery is charging at full speed, so keep 300 W of it.
-// In the sim that sends 1.3–2.7 kWh/day to the grid while the battery fills,
-// and the car slows the battery's charging for 2–14 min/day.
+// Less lets meter jitter give the car the battery's share; more sends extra
+// solar to the grid.
 const BATTERY_PRIORITY_BUFFER_W = 300;
 
 export class SolarAllocator {
