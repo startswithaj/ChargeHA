@@ -29,9 +29,9 @@ adapters — so results match what the real controller would decide.
   allocation mode (equal / waterfall).
 - Home battery: capacity, start SOC, max rate, battery priority.
 - Per charging point: name, priority, battery start %, charge limit, battery
-  kWh, min/max amps, **plug-in time** (all day, or a clock time the car arrives
-  — for testing what happens when a higher-priority car shows up while another
-  is already charging).
+  kWh, min/max amps, phases (1 or 3), **plug-in time** (all day, or a clock time
+  the car arrives — for testing what happens when a higher-priority car shows up
+  while another is already charging).
 - Output: per-minute chart, starts/stops/final battery per vehicle, decision
   log.
 
@@ -48,7 +48,7 @@ Any change to control logic goes through here first. No exceptions.
 
 - `devtools/sim/cli.ts` — prints per-minute data and stats. Flags:
   `--vehicles=2 --waterfall --seed=N --battery-kwh=13.5 --battery-soc=20
-  --battery-priority --csv`.
+  --battery-priority --phases=3 --csv`.
 - `devtools/sim/browser/` — `cd devtools/sim/browser && deno run -A npm:vite`.
   Same inputs as the Simulator page, plain HTML. Not type-checked by `check:all`
   (the directory is excluded), so keep it in step with `SimulationOptions` by

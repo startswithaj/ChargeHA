@@ -8,6 +8,7 @@
  *      deno run -A devtools/sim/cli.ts --waterfall
  *      deno run -A devtools/sim/cli.ts --seed=123
  *      deno run -A devtools/sim/cli.ts --battery-kwh=13.5 --battery-soc=20
+ *      deno run -A devtools/sim/cli.ts --phases=3
  */
 
 import {
@@ -39,6 +40,7 @@ const priorityLimitArg = Deno.args.find((a) =>
 const batteryPriorityLimit = priorityLimitArg
   ? parseInt(priorityLimitArg.split("=")[1])
   : 20;
+const phases = Deno.args.includes("--phases=3") ? 3 : 1;
 
 const VEHICLE_NAMES = ["EV 1", "EV 2"].slice(0, vehicleCount);
 
@@ -48,12 +50,14 @@ const vehicles = [
     name: "EV 1",
     priority: 1,
     batteryStart: 40,
+    phases,
   }),
   makeDefaultVehicleConfig({
     id: "SIM_V2",
     name: "EV 2",
     priority: 2,
     batteryStart: 60,
+    phases,
   }),
 ].slice(0, vehicleCount);
 

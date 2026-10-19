@@ -24,6 +24,9 @@ deno run -A devtools/sim/cli.ts --vehicles=2
 # CSV output
 deno run -A devtools/sim/cli.ts --csv
 
+# Three-phase charging points
+deno run -A devtools/sim/cli.ts --phases=3
+
 # Battery priority: cars only get solar the battery can't take
 deno run -A devtools/sim/cli.ts --vehicles=2 --peak-kw=15 --battery-kwh=15 --battery-soc=0 --battery-priority --battery-priority-limit=80 --csv
 

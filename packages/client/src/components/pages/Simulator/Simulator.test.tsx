@@ -1,15 +1,27 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "../../../test-utils.tsx";
 import { Simulator } from "./Simulator.tsx";
 
 describe("Simulator", () => {
+  beforeEach(() => localStorage.clear());
+
   it("starts with two charging points and lets a new one be added", () => {
     renderWithProviders(<Simulator />);
 
     expect(screen.getAllByLabelText("Name")).toHaveLength(2);
 
     fireEvent.click(screen.getByText("+ Add Charging Point"));
+
+    expect(screen.getAllByLabelText("Name")).toHaveLength(3);
+  });
+
+  it("keeps the setup after a reload", () => {
+    const { unmount } = renderWithProviders(<Simulator />);
+    fireEvent.click(screen.getByText("+ Add Charging Point"));
+    unmount();
+
+    renderWithProviders(<Simulator />);
 
     expect(screen.getAllByLabelText("Name")).toHaveLength(3);
   });
@@ -48,6 +60,19 @@ describe("Simulator", () => {
     });
     fireEvent.click(screen.getByText("Run Simulation"));
     await waitFor(() => expect(ev1Battery()).toBeLessThan(allDay));
+  });
+
+  it("charges a three-phase charging point at three times the power", async () => {
+    renderWithProviders(<Simulator />);
+
+    fireEvent.change(screen.getByLabelText("EV 1 phases"), {
+      target: { value: "3" },
+    });
+    fireEvent.click(screen.getByText("Run Simulation"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/EV 1: 22080W max/)).toBeInTheDocument();
+    });
   });
 
   it("removes a charging point down to a minimum of one", () => {
