@@ -227,8 +227,8 @@ export class NotificationListener {
   private onLowSolar(data: EventMap["controller_low_solar"]): void {
     this.notificationService.notify(
       "low_solar",
-      "Grace Period Started — Low Solar",
-      `${data.vehicleName} is entering a ${data.gracePeriodMinutes}-minute grace period. If solar does not return above the minimum amps, charging will stop.`,
+      "Grace Period Started — Not Enough Excess Solar",
+      `${data.vehicleName} is entering a ${data.gracePeriodMinutes}-minute grace period. If excess solar does not return above the minimum amps, charging will stop.`,
       vehicleOpts(data),
     );
   }

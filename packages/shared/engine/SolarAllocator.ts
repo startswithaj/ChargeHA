@@ -14,6 +14,9 @@ export interface SolarTargets {
   phases: number;
   solarKw: number;
   availableW: number;
+  // Export-based rather than total panel output: excess mode, or gross mode
+  // while battery priority holds
+  fromExcess: boolean;
   // What solar alone could give this vehicle, before allocation
   rawAmps: number;
   targetAmps: number;
@@ -43,6 +46,11 @@ interface AllocationContext {
 // the surplus a single-phase one is. 460W is 2A at 230V single-phase.
 const ADMISSION_HEADROOM_W = 460;
 
+// Export proves the battery is charging at full speed, so keep 300 W of it.
+// In the sim that sends 1.3–2.7 kWh/day to the grid while the battery fills,
+// and the car slows the battery's charging for 2–14 min/day.
+const BATTERY_PRIORITY_BUFFER_W = 300;
+
 export class SolarAllocator {
   static targets(
     state: VehicleChargeState,
@@ -67,6 +75,8 @@ export class SolarAllocator {
       voltage,
       phases,
     );
+    const fromExcess = config.solarReference === "excess" ||
+      SolarAllocator.batteryPriorityHolding(config, energy);
     const rawAmps = Math.floor(chargeCurrentAmps(availableW, voltage, phases));
     const targetAmps = allocatedAmps ?? rawAmps;
     const clampedAmps = Math.max(
@@ -79,6 +89,7 @@ export class SolarAllocator {
       phases,
       solarKw,
       availableW,
+      fromExcess,
       rawAmps,
       targetAmps,
       clampedAmps,
@@ -132,6 +143,18 @@ export class SolarAllocator {
     addBackW: number,
   ): number {
     const marginW = config.solarMarginKw * 1000;
+
+    // Below the battery priority limit the car only gets solar the home
+    // battery can't take, in either reference mode. No export means the
+    // battery can still use all of it.
+    if (SolarAllocator.batteryPriorityHolding(config, energy)) {
+      if (SolarAllocator.surplusW(energy, 0) <= 0) return 0;
+      return Math.max(
+        0,
+        SolarAllocator.surplusW(energy, addBackW) -
+          Math.max(marginW, BATTERY_PRIORITY_BUFFER_W),
+      );
+    }
 
     // Gross mode: total panel output, as-is. No add-back — panel output never
     // had the car's draw subtracted from it, so adding it would double-count.
@@ -239,6 +262,14 @@ export class SolarAllocator {
     );
 
     return allocations;
+  }
+
+  private static batteryPriorityHolding(
+    config: ControllerConfig,
+    energy: EnergyData,
+  ): boolean {
+    return config.batteryPriorityEnabled && energy.batterySoc !== null &&
+      energy.batterySoc < config.batteryPriorityLimit;
   }
 
   // Filter eligible vehicles, compute total available amps. Returns null

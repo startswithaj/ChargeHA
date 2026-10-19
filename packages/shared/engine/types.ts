@@ -185,6 +185,15 @@ export interface DebounceResult {
   pendingSince: number | null;
 }
 
+// Where a vehicle is in its grace period. A grace period not started yet
+// starts now, so it reads as 0s elapsed.
+export interface GraceProgress {
+  startedAt: number;
+  expired: boolean;
+  elapsedSec: number;
+  graceSec: number;
+}
+
 // ---- Factory ----
 
 export function createControlState(): VehicleControlState {

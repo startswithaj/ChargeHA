@@ -4,6 +4,7 @@ import type { SolarTargets } from "./SolarAllocator.ts";
 import type {
   ControllerConfig,
   DebounceResult,
+  GraceProgress,
   PipelineDecision,
   VehicleControlState,
 } from "./types.ts";
@@ -48,6 +49,22 @@ export class StepHelpers {
       adjust: `Charging ${suffix}`,
       none: `Charging ${suffix}`,
     });
+  }
+
+  static graceProgress(
+    config: ControllerConfig,
+    timestamp: number,
+    cs: Readonly<VehicleControlState>,
+  ): GraceProgress {
+    const startedAt = cs.graceStartedAt ?? timestamp;
+    const elapsedMs = timestamp - startedAt;
+    const graceMs = config.gracePeriodMinutes * 60 * 1000;
+    return {
+      startedAt,
+      expired: elapsedMs >= graceMs,
+      elapsedSec: Math.round(elapsedMs / 1000),
+      graceSec: Math.round(graceMs / 1000),
+    };
   }
 
   static debounceAmps(
@@ -110,7 +127,8 @@ export class StepHelpers {
         solar.solarKw.toFixed(2)
       } kW < ${config.minSolarGenerationKw} kW)`;
     }
-    return `insufficient solar (${
+    const kind = solar.fromExcess ? "excess solar" : "solar";
+    return `insufficient ${kind} (${
       Math.round(solar.availableW)
     }W → ${solar.targetAmps}A < min ${state.chargeAmpsMin}A)`;
   }

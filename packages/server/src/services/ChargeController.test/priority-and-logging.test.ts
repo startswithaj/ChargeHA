@@ -1,6 +1,7 @@
 import { afterEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { assertExists } from "@std/assert";
+import { FakeTime } from "@std/testing/time";
 import {
   BASE_ENERGY,
   type ControllerCtx,
@@ -22,12 +23,21 @@ describe("ChargeController — priority + logging + lifecycle", () => {
       ctx = await setupController(
         { isCharging: true },
         "auto",
-        { ...BASE_ENERGY, batterySoc: 40 },
+        { ...BASE_ENERGY, batterySoc: 40, gridPowerW: 0 },
         {
           battery_priority_enabled: "true",
           battery_priority_limit: "80",
+          grace_period_minutes: "1",
         },
       );
+
+      using fakeTime = new FakeTime();
+
+      // Loop 1: export gone — grace period starts.
+      await ctx.runOneLoop();
+
+      // Loop 2: grace expires — battery priority stops the car.
+      fakeTime.tick(90_000);
       await ctx.runOneLoop();
 
       expect(ctx.adapter.commands).toContainEqual({ cmd: "stop" });

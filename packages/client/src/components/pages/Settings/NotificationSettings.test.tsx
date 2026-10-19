@@ -473,7 +473,7 @@ describe("NotificationSettings", () => {
     "External Charge Detected",
     "Vehicle Plugged In",
     "Vehicle Unplugged",
-    "Low Solar",
+    "Not Enough Excess Solar",
     "Schedule Activated",
     "Safety Trip",
   ])("renders %s event toggle when provider is selected", (label) => {

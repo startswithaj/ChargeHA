@@ -184,7 +184,9 @@ export class Steps {
 
   // ---- Home battery ----
 
-  static batteryPriority({ state, config, energy }: StepContext): EvalResult {
+  static batteryPriority(
+    { state, config, energy, timestamp, cs, solar }: StepContext,
+  ): EvalResult {
     if (!config.batteryPriorityEnabled) {
       return pass([Trace.batteryPriorityDisabled()]);
     }
@@ -195,6 +197,25 @@ export class Steps {
     if (soc >= limit) return pass([Trace.batteryPriorityOk(soc, limit)]);
     // Rounded down: 99.96 becomes 99.9, not 100 — "100% < 100%" reads as a bug.
     const shownSoc = Math.floor(soc * 10) / 10;
+    // Solar is capped to what the battery can't take (resolveAvailableW), so
+    // enough for min amps means the battery is at full rate. Allocated amps:
+    // a car given nothing must not reach the solar+grid fallback.
+    if (solar && solar.targetAmps >= state.chargeAmpsMin) {
+      return pass([Trace.batteryPriorityExport(shownSoc, limit)]);
+    }
+    // Export dips whenever the battery can take more. Ride it out on the
+    // normal grace period instead of stopping on every dip.
+    if (
+      solar && state.isCharging &&
+      !StepHelpers.graceProgress(config, timestamp, cs).expired
+    ) {
+      return pass([Trace.batteryPriorityGrace(shownSoc, limit)]);
+    }
+    // Cooldown like a solar grace-expiry stop, or the car restarts within
+    // minutes and the start/stop churn can trip the Overseer.
+    const cooldown = state.isCharging
+      ? { cooldownUntil: timestamp + config.cooldownPeriodMinutes * 60 * 1000 }
+      : {};
     return {
       decision: {
         action: state.isCharging ? "stop" : "none",
@@ -205,6 +226,7 @@ export class Steps {
         targetAmps: null,
       },
       trace: [Trace.batteryPriorityHold(shownSoc, limit)],
+      stateUpdates: { ...graceReset(), ...cooldown },
     };
   }
 
@@ -357,13 +379,10 @@ export class Steps {
     }
 
     // Start grace period if not already started
-    const graceStartedAt = cs.graceStartedAt ?? timestamp;
-    const graceMs = config.gracePeriodMinutes * 60 * 1000;
-    const elapsed = timestamp - graceStartedAt;
-    const elapsedSec = Math.round(elapsed / 1000);
-    const graceSec = Math.round(graceMs / 1000);
+    const grace = StepHelpers.graceProgress(config, timestamp, cs);
+    const { startedAt, expired, elapsedSec, graceSec } = grace;
 
-    if (elapsed >= graceMs) {
+    if (expired) {
       trace.push(Trace.graceExpired(elapsedSec, graceSec));
       if (config.solarTrackingMode === "solar_grid") {
         return {
@@ -400,7 +419,7 @@ export class Steps {
           targetAmps: state.chargeAmpsMin,
         },
         trace,
-        stateUpdates: { graceStartedAt },
+        stateUpdates: { graceStartedAt: startedAt },
       };
     }
     return {
@@ -411,7 +430,7 @@ export class Steps {
         targetAmps: null,
       },
       trace,
-      stateUpdates: { graceStartedAt },
+      stateUpdates: { graceStartedAt: startedAt },
     };
   }
 

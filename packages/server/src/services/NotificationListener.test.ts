@@ -243,9 +243,9 @@ describe("NotificationListener", () => {
       });
       const n = notificationService.notifications[0];
       expect(n.eventType).toBe("low_solar");
-      expect(n.title).toBe("Grace Period Started — Low Solar");
+      expect(n.title).toBe("Grace Period Started — Not Enough Excess Solar");
       expect(n.message).toBe(
-        "Test Car is entering a 5-minute grace period. If solar does not return above the minimum amps, charging will stop.",
+        "Test Car is entering a 5-minute grace period. If excess solar does not return above the minimum amps, charging will stop.",
       );
     });
   });

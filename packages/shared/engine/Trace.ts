@@ -107,6 +107,20 @@ export class Trace {
     };
   }
 
+  static batteryPriorityExport(batterySoc: number, limit: number): StepTrace {
+    return {
+      check: "battery_priority",
+      result: `using export (${batterySoc}% < ${limit}%)`,
+    };
+  }
+
+  static batteryPriorityGrace(batterySoc: number, limit: number): StepTrace {
+    return {
+      check: "battery_priority",
+      result: `grace (${batterySoc}% < ${limit}%)`,
+    };
+  }
+
   static batteryPriorityNoData(): StepTrace {
     return { check: "battery_priority", result: "no battery data" };
   }

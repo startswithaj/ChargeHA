@@ -71,6 +71,14 @@ describe("Trace", () => {
       check: "battery_priority",
       result: "ok (60% >= 50%)",
     });
+    expect(Trace.batteryPriorityExport(30, 50)).toEqual({
+      check: "battery_priority",
+      result: "using export (30% < 50%)",
+    });
+    expect(Trace.batteryPriorityGrace(30, 50)).toEqual({
+      check: "battery_priority",
+      result: "grace (30% < 50%)",
+    });
     expect(Trace.batteryPriorityNoData()).toEqual({
       check: "battery_priority",
       result: "no battery data",
