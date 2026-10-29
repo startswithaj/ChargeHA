@@ -97,7 +97,7 @@ export interface DeviceInfo {
 export interface EnergySourceAdapter {
   connect(): Promise<void>;
   disconnect(): Promise<void>;
-  getRealtimeData(): Promise<EnergyData>;
+  getRealtimeData(signal?: AbortSignal): Promise<EnergyData>;
   getDeviceInfo(): Promise<DeviceInfo>;
   pollIntervalSeconds(): number;
 }

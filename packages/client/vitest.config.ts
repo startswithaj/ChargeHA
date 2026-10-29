@@ -16,6 +16,7 @@ export default defineConfig({
     include: [
       "src/**/*.test.{ts,tsx}",
       "../plugins/**/client/**/*.test.{ts,tsx}",
+      "../plugins/*.test.tsx",
     ],
     css: {
       modules: {

@@ -1,3 +1,12 @@
+import type { JSX } from "react";
+
+export interface PluginGallery {
+  id: string;
+  title: string;
+  description: string;
+  specimens: { label: string; Component: () => JSX.Element }[];
+}
+
 export interface EnergyPluginOption {
   id: string;
   label: string;

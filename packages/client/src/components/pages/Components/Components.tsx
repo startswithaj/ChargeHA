@@ -30,6 +30,7 @@ import {
 } from "./CardSections.tsx";
 import { ErrorSection } from "./ErrorSection.tsx";
 import { DiscoverySection } from "./DiscoverySection.tsx";
+import { PluginSections } from "./PluginSections.tsx";
 import styles from "./Components.module.css";
 
 interface Entry {
@@ -138,6 +139,15 @@ const GROUPS: Group[] = [
         id: "actions",
         label: "Action alignment",
         render: () => <ActionAlignmentSection />,
+      },
+      {
+        id: "plugin-components",
+        label: "Plugin components",
+        render: () => (
+          <div id="plugin-components">
+            <PluginSections />
+          </div>
+        ),
       },
       { id: "forms", label: "Forms", render: () => <FormSection /> },
     ],
