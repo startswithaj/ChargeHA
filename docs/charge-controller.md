@@ -91,7 +91,11 @@ This is where the main logic lives. The checks run in priority order:
    solar tracking instead.
 
 3. **Battery priority** — If enabled and the home battery SoC is below the
-   configured threshold, stop charging to let the home battery charge first.
+   configured threshold, the car only gets solar the battery can't take. A home
+   battery only exports once it is charging at full rate, so the car charges
+   from that export and waits otherwise. The car always leaves 300 W going to
+   the grid, so export keeps showing the battery is at full rate. If export
+   stops while charging, the grace period runs, then charging stops.
 
 4. **Solar tracking** — The main solar-following logic (see below).
 

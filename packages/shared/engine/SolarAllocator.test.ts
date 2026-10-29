@@ -290,6 +290,66 @@ describe("SolarAllocator", () => {
     });
   });
 
+  describe("resolveAvailableW — battery priority", () => {
+    const config = {
+      ...BASE_CONFIG,
+      batteryPriorityEnabled: true,
+      batteryPriorityLimit: 80,
+    };
+
+    it("gives nothing while the battery takes all the solar", () => {
+      const energy = {
+        ...BASE_ENERGY,
+        gridPowerW: 0,
+        batteryPowerW: -3000,
+        batterySoc: 40,
+      };
+      expect(SolarAllocator.resolveAvailableW(config, energy, 2300)).toBe(0);
+    });
+
+    it("gives export plus the car's own draw, less 300 W left on the grid", () => {
+      const energy = {
+        ...BASE_ENERGY,
+        gridPowerW: -600,
+        batteryPowerW: -3000,
+        batterySoc: 40,
+      };
+      expect(SolarAllocator.resolveAvailableW(config, energy, 2300)).toBe(2600);
+    });
+
+    it("uses the solar margin when it is bigger than the buffer", () => {
+      const energy = {
+        ...BASE_ENERGY,
+        gridPowerW: -2000,
+        batteryPowerW: -3000,
+        batterySoc: 40,
+      };
+      const margin = { ...config, solarMarginKw: 1 };
+      expect(SolarAllocator.resolveAvailableW(margin, energy, 0)).toBe(1000);
+    });
+
+    it("uses export, not panel output, in gross mode", () => {
+      const energy = {
+        ...BASE_ENERGY,
+        gridPowerW: -1000,
+        batteryPowerW: -3000,
+        batterySoc: 40,
+      };
+      const gross = { ...config, solarReference: "gross" as const };
+      expect(SolarAllocator.resolveAvailableW(gross, energy, 0)).toBe(700);
+    });
+
+    it("is unchanged once the battery reaches the limit", () => {
+      const energy = {
+        ...BASE_ENERGY,
+        gridPowerW: 0,
+        batteryPowerW: -3000,
+        batterySoc: 80,
+      };
+      expect(SolarAllocator.resolveAvailableW(config, energy, 2300)).toBe(2300);
+    });
+  });
+
   describe("waterfall", () => {
     it("returns empty map when no energy data", () => {
       const vehicles = [makeVehicle("v1", 1), makeVehicle("v2", 2)];

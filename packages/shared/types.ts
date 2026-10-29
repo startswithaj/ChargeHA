@@ -320,9 +320,9 @@ export const NOTIFICATION_EVENTS: NotificationEventInfo[] = [
   },
   {
     key: "low_solar",
-    label: "Low Solar",
+    label: "Not Enough Excess Solar",
     description:
-      "Solar dropped below threshold, grace period started (can be noisy)",
+      "Excess solar dropped below the minimum, grace period started (can be noisy)",
   },
   {
     key: "schedule_activated",

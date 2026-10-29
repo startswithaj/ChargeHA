@@ -58,6 +58,24 @@ describe("runSimulation", () => {
     expect(finalBattery).toBeLessThanOrEqual(vehicle.chargeLimit);
   });
 
+  it("charges a three-phase car at three times the power per amp", () => {
+    const vehicle = makeDefaultVehicleConfig({
+      id: "V1",
+      name: "EV 1",
+      batteryStart: 30,
+      phases: 3,
+    });
+    const { results } = runSimulation(sunnyDayOptions([vehicle]));
+
+    const charging = results.filter((r) => r.vehicles[0].isCharging);
+    expect(charging.length).toBeGreaterThan(0);
+    charging.forEach((r) => {
+      expect(r.vehicles[0].chargePowerW).toBe(
+        r.vehicles[0].chargeAmps * 230 * 3,
+      );
+    });
+  });
+
   it("keeps a car idle until its plugInMinute", () => {
     const noon = 12 * 60;
     const vehicle = makeDefaultVehicleConfig({

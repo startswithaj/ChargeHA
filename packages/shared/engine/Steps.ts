@@ -1,18 +1,16 @@
 import type { EnergyData, VehicleChargeState } from "../types.ts";
 import { scheduleLimitReached } from "./Schedules.ts";
-import type { ActiveChargeSchedule } from "./Schedules.ts";
 import { SolarAllocator } from "./SolarAllocator.ts";
 import type { SolarTargets } from "./SolarAllocator.ts";
+import { StepHelpers } from "./StepHelpers.ts";
 import { Trace } from "./Trace.ts";
 import type { StepTrace } from "./Trace.ts";
 import type {
   ControllerConfig,
   ControlStateUpdates,
-  DebounceResult,
   EngineSchedule,
   EngineVehicleInput,
   EvalResult,
-  PipelineDecision,
   VehicleControlState,
 } from "./types.ts";
 
@@ -42,7 +40,7 @@ const graceReset = (): ControlStateUpdates => ({
   graceNotified: false,
 });
 
-// Pure decision steps. Every public static is a Step; ordering lives in
+// Pure decision steps. Every static is a Step; ordering lives in
 // StepOrchestrator.
 export class Steps {
   // ---- Preconditions ----
@@ -130,7 +128,7 @@ export class Steps {
       case "charge_now": {
         const amps = state.chargeAmpsMax;
         return {
-          decision: Steps.chargeAt(state, amps, "charge_now", {
+          decision: StepHelpers.chargeAt(state, amps, "charge_now", {
             start: `Start charging at ${amps}A (charge_now)`,
             adjust: `Adjust to ${amps}A (charge_now)`,
             none: `Already charging at ${amps}A (charge_now)`,
@@ -172,9 +170,9 @@ export class Steps {
     }
 
     const amps = effective.chargeAmps ?? state.chargeAmpsMax;
-    const merged = Steps.mergedSuffix(active);
+    const merged = StepHelpers.mergedSuffix(active);
     return {
-      decision: Steps.chargeAt(state, amps, "schedule", {
+      decision: StepHelpers.chargeAt(state, amps, "schedule", {
         start:
           `Start charging at ${amps}A (schedule ${effective.startTime}-${effective.endTime}${merged})`,
         adjust: `Adjust to ${amps}A (schedule${merged})`,
@@ -186,7 +184,9 @@ export class Steps {
 
   // ---- Home battery ----
 
-  static batteryPriority({ state, config, energy }: StepContext): EvalResult {
+  static batteryPriority(
+    { state, config, energy, timestamp, cs, solar }: StepContext,
+  ): EvalResult {
     if (!config.batteryPriorityEnabled) {
       return pass([Trace.batteryPriorityDisabled()]);
     }
@@ -197,6 +197,25 @@ export class Steps {
     if (soc >= limit) return pass([Trace.batteryPriorityOk(soc, limit)]);
     // Rounded down: 99.96 becomes 99.9, not 100 — "100% < 100%" reads as a bug.
     const shownSoc = Math.floor(soc * 10) / 10;
+    // Solar is capped to what the battery can't take (resolveAvailableW), so
+    // enough for min amps means the battery is at full rate. Allocated amps:
+    // a car given nothing must not reach the solar+grid fallback.
+    if (solar && solar.targetAmps >= state.chargeAmpsMin) {
+      return pass([Trace.batteryPriorityExport(shownSoc, limit)]);
+    }
+    // Export dips whenever the battery can take more. Ride it out on the
+    // normal grace period instead of stopping on every dip.
+    if (
+      solar && state.isCharging &&
+      !StepHelpers.graceProgress(config, timestamp, cs).expired
+    ) {
+      return pass([Trace.batteryPriorityGrace(shownSoc, limit)]);
+    }
+    // Cooldown like a solar grace-expiry stop, or the car restarts within
+    // minutes and the start/stop churn can trip the Overseer.
+    const cooldown = state.isCharging
+      ? { cooldownUntil: timestamp + config.cooldownPeriodMinutes * 60 * 1000 }
+      : {};
     return {
       decision: {
         action: state.isCharging ? "stop" : "none",
@@ -207,6 +226,7 @@ export class Steps {
         targetAmps: null,
       },
       trace: [Trace.batteryPriorityHold(shownSoc, limit)],
+      stateUpdates: { ...graceReset(), ...cooldown },
     };
   }
 
@@ -336,12 +356,12 @@ export class Steps {
     // handles every other case — so put the dip through the grace period
     // (drop to min amps, then stop) instead of charging on through it.
     if (!solar.belowMinGeneration && !solar.belowMinAmps) return pass(trace);
-    const reason = Steps.insufficientReason(solar, state, config);
+    const reason = StepHelpers.insufficientReason(solar, state, config);
 
     if (!state.isCharging) {
       if (config.solarTrackingMode === "solar_grid") {
         return {
-          decision: Steps.solarGridFallback(state, reason),
+          decision: StepHelpers.solarGridFallback(state, reason),
           trace,
           stateUpdates: graceReset(),
         };
@@ -359,17 +379,14 @@ export class Steps {
     }
 
     // Start grace period if not already started
-    const graceStartedAt = cs.graceStartedAt ?? timestamp;
-    const graceMs = config.gracePeriodMinutes * 60 * 1000;
-    const elapsed = timestamp - graceStartedAt;
-    const elapsedSec = Math.round(elapsed / 1000);
-    const graceSec = Math.round(graceMs / 1000);
+    const grace = StepHelpers.graceProgress(config, timestamp, cs);
+    const { startedAt, expired, elapsedSec, graceSec } = grace;
 
-    if (elapsed >= graceMs) {
+    if (expired) {
       trace.push(Trace.graceExpired(elapsedSec, graceSec));
       if (config.solarTrackingMode === "solar_grid") {
         return {
-          decision: Steps.solarGridFallback(state, reason),
+          decision: StepHelpers.solarGridFallback(state, reason),
           trace,
           stateUpdates: graceReset(),
         };
@@ -402,7 +419,7 @@ export class Steps {
           targetAmps: state.chargeAmpsMin,
         },
         trace,
-        stateUpdates: { graceStartedAt },
+        stateUpdates: { graceStartedAt: startedAt },
       };
     }
     return {
@@ -413,7 +430,7 @@ export class Steps {
         targetAmps: null,
       },
       trace,
-      stateUpdates: { graceStartedAt },
+      stateUpdates: { graceStartedAt: startedAt },
     };
   }
 
@@ -438,7 +455,7 @@ export class Steps {
     { state, config, timestamp, cs, solar }: StepContext,
   ): EvalResult {
     if (!solar) return pass();
-    const debounce = Steps.debounceAmps(
+    const debounce = StepHelpers.debounceAmps(
       state,
       cs,
       config,
@@ -451,7 +468,7 @@ export class Steps {
       : [];
     const solarW = Math.round(solar.availableW);
     return {
-      decision: Steps.chargeAt(state, amps, "solar_tracking", {
+      decision: StepHelpers.chargeAt(state, amps, "solar_tracking", {
         start: `Start charging at ${amps}A (solar tracking)`,
         adjust: `Adjust to ${amps}A (solar: ${solarW}W)`,
         none: `Already charging at ${amps}A (solar: ${solarW}W)`,
@@ -481,110 +498,5 @@ export class Steps {
       },
       trace: [],
     };
-  }
-
-  // Start / adjust / no-op depending on whether the vehicle is already
-  // charging at `amps`.
-  private static chargeAt(
-    state: VehicleChargeState,
-    amps: number,
-    reason: PipelineDecision["reason"],
-    detail: { start: string; adjust: string; none: string },
-  ): PipelineDecision {
-    if (!state.isCharging) {
-      return {
-        action: "start",
-        reason,
-        detail: detail.start,
-        targetAmps: amps,
-      };
-    }
-    if (state.chargeAmps !== amps) {
-      return {
-        action: "adjust_amps",
-        reason,
-        detail: detail.adjust,
-        targetAmps: amps,
-      };
-    }
-    return { action: "none", reason, detail: detail.none, targetAmps: amps };
-  }
-
-  private static solarGridFallback(
-    state: VehicleChargeState,
-    reason: string,
-  ): PipelineDecision {
-    const suffix =
-      `at ${state.chargeAmpsMin}A from grid — ${reason} (solar+grid mode)`;
-    return Steps.chargeAt(state, state.chargeAmpsMin, "solar_tracking", {
-      start: `Start charging ${suffix}`,
-      adjust: `Charging ${suffix}`,
-      none: `Charging ${suffix}`,
-    });
-  }
-
-  private static debounceAmps(
-    state: VehicleChargeState,
-    cs: Readonly<VehicleControlState>,
-    config: ControllerConfig,
-    targetAmps: number,
-    timestamp: number,
-  ): DebounceResult {
-    const currentAmps = state.chargeAmps;
-    const immediate = {
-      amps: targetAmps,
-      pendingAmps: null,
-      pendingSince: null,
-    };
-
-    // Starting from not charging — jump directly to target
-    if (!state.isCharging) return immediate;
-    // No change needed
-    if (targetAmps === currentAmps) return immediate;
-    // Large change — apply immediately
-    if (Math.abs(targetAmps - currentAmps) > config.ampDebounceThreshold) {
-      return immediate;
-    }
-    // Small change — debounce until target is stable
-    if (cs.pendingAmps !== targetAmps) {
-      return {
-        amps: currentAmps,
-        pendingAmps: targetAmps,
-        pendingSince: timestamp,
-      };
-    }
-    // Target has been stable — check if long enough
-    const settleMs = config.ampDebounceSettleMinutes * 60_000;
-    const elapsed = timestamp - (cs.pendingSince ?? timestamp);
-    if (elapsed >= settleMs) return immediate;
-    return {
-      amps: currentAmps,
-      pendingAmps: cs.pendingAmps,
-      pendingSince: cs.pendingSince,
-    };
-  }
-
-  // Suffix appended to a schedule decision's detail when two or more
-  // overlapping schedules were merged. Empty for the ordinary single-schedule case so existing log text is unchanged.
-  private static mergedSuffix(active: ActiveChargeSchedule): string {
-    if (!active.merged) return "";
-    const pct = active.effective.chargeLimitPct;
-    if (pct === null) return " merged";
-    return ` merged, limit ${pct}%`;
-  }
-
-  private static insufficientReason(
-    solar: SolarTargets,
-    state: VehicleChargeState,
-    config: ControllerConfig,
-  ): string {
-    if (solar.belowMinGeneration) {
-      return `solar generation below minimum (${
-        solar.solarKw.toFixed(2)
-      } kW < ${config.minSolarGenerationKw} kW)`;
-    }
-    return `insufficient solar (${
-      Math.round(solar.availableW)
-    }W → ${solar.targetAmps}A < min ${state.chargeAmpsMin}A)`;
   }
 }

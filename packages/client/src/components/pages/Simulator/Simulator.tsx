@@ -13,6 +13,7 @@ import {
 import { chargePowerWatts } from "@chargeha/shared/chargePower";
 import styles from "./Simulator.module.css";
 import { FormError } from "../../ui/FormError.tsx";
+import { getStored, setStored } from "../../../lib/storage.ts";
 
 function minutesToTime(minutes: number): string {
   const h = Math.floor(minutes / 60);
@@ -100,6 +101,8 @@ const DEFAULTS: SimConfig = {
   batteryPriorityEnabled: false,
   batteryPriorityLimit: 20,
 };
+
+const STORAGE_KEY = "simulator.config";
 
 const VOLTAGE = 230;
 
@@ -411,7 +414,7 @@ function useChartRefs() {
 
 function buildNoteLines(config: SimConfig): string {
   const rateLines = config.vehicles.map((v) => {
-    const maxChargeW = chargePowerWatts(v.chargeAmpsMax, VOLTAGE, 1);
+    const maxChargeW = chargePowerWatts(v.chargeAmpsMax, VOLTAGE, v.phases);
     const rate = (maxChargeW / v.batteryCapacityKwh / 10).toFixed(1);
     return `${v.name}: ${maxChargeW}W max, ${rate}%/hr at max`;
   });
@@ -547,7 +550,18 @@ function buildBatteryChartData(
 }
 
 export function Simulator() {
-  const [config, setConfig] = useState<SimConfig>(DEFAULTS);
+  // Spread over the defaults so fields added after a save still get a value.
+  const [config, setConfig] = useState<SimConfig>(() => {
+    const stored = getStored<Partial<SimConfig>>(STORAGE_KEY, {});
+    return {
+      ...DEFAULTS,
+      ...stored,
+      vehicles: stored.vehicles?.map((v) => makeDefaultVehicleConfig(v)) ??
+        DEFAULTS.vehicles,
+    };
+  });
+
+  useEffect(() => setStored(STORAGE_KEY, config), [config]);
 
   const set = useCallback(
     <K extends keyof SimConfig>(key: K, value: SimConfig[K]) => {
@@ -747,6 +761,11 @@ function ChargingPointRow(
         min={1}
         max={32}
       />
+      <PhasesInput
+        name={vehicle.name}
+        phases={vehicle.phases}
+        onChange={(v) => update("phases", v)}
+      />
       <PlugInInput
         name={vehicle.name}
         plugInMinute={vehicle.plugInMinute}
@@ -834,12 +853,13 @@ function HomeBatterySection(
           help="The inverter's charge/discharge power limit — how fast the battery can charge or discharge, independent of its capacity."
         />
         <NumInput
-          label="Start SoC %"
+          label="Midnight SoC %"
           value={config.batteryStartSoc}
           onChange={(v) => set("batteryStartSoc", v)}
           step={5}
           min={0}
           max={100}
+          help="Battery level at 00:00. Overnight home load drains it, so it may be empty by sunrise."
         />
         <div className={styles.control}>
           <label>Battery Priority</label>
@@ -946,6 +966,28 @@ const PLUG_IN_OPTIONS = Array.from(
   { length: (22 - 5) * 2 + 1 },
   (_, i) => 5 * 60 + i * 30,
 );
+
+function PhasesInput(
+  { name, phases, onChange }: {
+    name: string;
+    phases: 1 | 3;
+    onChange: (v: 1 | 3) => void;
+  },
+) {
+  return (
+    <div className={styles.control}>
+      <label>Phases</label>
+      <select
+        aria-label={`${name} phases`}
+        value={String(phases)}
+        onChange={(e) => onChange(e.target.value === "3" ? 3 : 1)}
+      >
+        <option value="1">1</option>
+        <option value="3">3</option>
+      </select>
+    </div>
+  );
+}
 
 function PlugInInput(
   { name, plugInMinute, onChange }: {
