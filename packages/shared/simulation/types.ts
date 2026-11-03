@@ -8,6 +8,7 @@ export interface VehicleConfig {
   chargeLimit: number;
   chargeAmpsMin: number;
   chargeAmpsMax: number;
+  phases: 1 | 3;
   batteryCapacityKwh: number;
   // Minute of day the car is plugged in. Omit for plugged in from the start.
   plugInMinute?: number;
@@ -57,6 +58,7 @@ export function makeDefaultVehicleConfig(
     chargeLimit: 100,
     chargeAmpsMin: 5,
     chargeAmpsMax: 32,
+    phases: 1,
     batteryCapacityKwh: 75,
     ...overrides,
   };

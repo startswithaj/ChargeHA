@@ -37,7 +37,7 @@ export function BatterySettings() {
       icon={<Battery size={18} />}
       title="Battery"
       badge="Beta"
-      description="This does not control your home battery — it controls EV charging based on battery state. When enabled, EV charging is held until your home battery reaches a minimum charge level, letting the battery fill first before excess solar is sent to your vehicle. Requires a home battery reporting SOC through your inverter — if no battery is detected, this setting has no effect."
+      description="This does not control your home battery — it controls EV charging based on battery state. When enabled, your home battery fills first — until it reaches a minimum charge level, your vehicle only gets solar the battery can't take. Requires a home battery reporting SOC through your inverter — if no battery is detected, this setting has no effect."
       saveStatus={saveStatus}
       isDirty={isDirty}
       onSave={save}
@@ -45,7 +45,7 @@ export function BatterySettings() {
     >
       <SettingsRow
         label="Battery priority enabled"
-        help="When enabled, EV charging is paused until your home battery reaches the priority limit below. Once the battery is charged to that level, excess solar will be allocated to vehicle charging."
+        help="When enabled, your vehicle only gets solar your home battery can't take, less 300 W kept going to the grid, until the battery reaches the priority limit below. Once the battery is charged to that level, excess solar will be allocated to vehicle charging."
       >
         <Switch
           size="2"
@@ -56,7 +56,7 @@ export function BatterySettings() {
 
       <SettingsRow
         label="Battery priority limit"
-        help="Your home battery must reach this charge level before EV charging begins. Higher values give the battery more time to fill first."
+        help="Below this charge level, your vehicle only gets solar your home battery can't take. Higher values give the battery more time to fill first."
       >
         <div
           style={{

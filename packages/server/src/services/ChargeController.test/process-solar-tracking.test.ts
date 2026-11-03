@@ -34,7 +34,7 @@ describe("ChargeController — processSolarTracking", () => {
 
       const log = await ctx.getLastLogParsed();
       expect(log?.action).toBe("none");
-      expect(log?.actionDetail).toContain("insufficient solar");
+      expect(log?.actionDetail).toContain("insufficient excess solar");
     });
 
     it("prevents restart during cooldown period", async () => {

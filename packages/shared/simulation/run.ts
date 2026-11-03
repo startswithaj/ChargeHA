@@ -14,7 +14,6 @@ import type {
 } from "./types.ts";
 
 const VOLTAGE = 230;
-const PHASES = 1;
 
 function buildControllerConfig(opts: SimulationOptions): ControllerConfig {
   return {
@@ -56,7 +55,7 @@ function initVehicleStates(
       chargeAmpsMin: vc.chargeAmpsMin,
       chargePowerKw: 0,
       chargerVoltage: VOLTAGE,
-      chargerPhases: PHASES,
+      chargerPhases: vc.phases,
       energyAddedKwh: 0,
       minutesToFull: 0,
       chargePortOpen: true,
@@ -80,7 +79,7 @@ function applyChargingEnergy(
   for (const vc of vehicleConfigs) {
     const state = vehicleStates.get(vc.id);
     if (state && state.isCharging && state.chargeAmps > 0) {
-      const watts = chargePowerWatts(state.chargeAmps, VOLTAGE, PHASES);
+      const watts = chargePowerWatts(state.chargeAmps, VOLTAGE, vc.phases);
       const kwh = watts / 1000 / 60;
       state.batteryLevel = Math.min(
         state.chargeLimit,
@@ -110,7 +109,7 @@ function applyDecisions(
       vState.chargePowerKw = chargePowerKilowatts(
         vState.chargeAmps,
         VOLTAGE,
-        PHASES,
+        vc.phases,
       );
       if (!wasCharging || decision.action === "adjust_amps") {
         return [{
@@ -159,7 +158,7 @@ function snapshotVehicleResults(
     return {
       chargeAmps,
       chargePowerW: isCharging
-        ? chargePowerWatts(chargeAmps, VOLTAGE, PHASES)
+        ? chargePowerWatts(chargeAmps, VOLTAGE, vc.phases)
         : 0,
       isCharging,
       batteryLevel: state?.batteryLevel ?? 0,

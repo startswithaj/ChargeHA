@@ -69,8 +69,8 @@ ChargeHA is not affiliated with, endorsed by, or associated with ChargeHQ.
   out cloud cover
 - **Solar + grid fallback** — optionally draw from the grid at minimum amps when
   solar is insufficient, instead of stopping entirely
-- **Home battery priority** — hold EV charging until your home battery reaches a
-  configured state-of-charge threshold
+- **Home battery priority** — until your home battery reaches a configured
+  state-of-charge threshold, the EV only gets solar the battery can't take
 - **Charge scheduling** — time-based schedules with day-of-week selection,
   per-vehicle amperage, and target charge limits
 - **Blockout schedules** — prevent charging during peak tariff windows
@@ -238,8 +238,8 @@ evaluates each charging point through a priority pipeline:
    limit?
 2. **Blockout schedules** — stop if inside a blockout window
 3. **Charge schedules** — charge at the scheduled amps if a schedule is active
-4. **Battery priority** — hold if home battery SOC is below the configured
-   threshold
+4. **Battery priority** — below the configured home battery SOC, only use solar
+   the battery can't take
 5. **Solar tracking** — calculate available solar and convert to amps
 6. **Fallback** — stop charging if none of the above apply
 

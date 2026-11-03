@@ -8,6 +8,7 @@
  *      deno run -A devtools/sim/cli.ts --waterfall
  *      deno run -A devtools/sim/cli.ts --seed=123
  *      deno run -A devtools/sim/cli.ts --battery-kwh=13.5 --battery-soc=20
+ *      deno run -A devtools/sim/cli.ts --phases=3
  */
 
 import {
@@ -31,6 +32,15 @@ const batteryStartSoc = batterySocArg
   ? parseFloat(batterySocArg.split("=")[1])
   : 50;
 const batteryPriority = Deno.args.includes("--battery-priority");
+const peakKwArg = Deno.args.find((a) => a.startsWith("--peak-kw="));
+const peakSolarKw = peakKwArg ? parseFloat(peakKwArg.split("=")[1]) : 8;
+const priorityLimitArg = Deno.args.find((a) =>
+  a.startsWith("--battery-priority-limit=")
+);
+const batteryPriorityLimit = priorityLimitArg
+  ? parseInt(priorityLimitArg.split("=")[1])
+  : 20;
+const phases = Deno.args.includes("--phases=3") ? 3 : 1;
 
 const VEHICLE_NAMES = ["EV 1", "EV 2"].slice(0, vehicleCount);
 
@@ -40,12 +50,14 @@ const vehicles = [
     name: "EV 1",
     priority: 1,
     batteryStart: 40,
+    phases,
   }),
   makeDefaultVehicleConfig({
     id: "SIM_V2",
     name: "EV 2",
     priority: 2,
     batteryStart: 60,
+    phases,
   }),
 ].slice(0, vehicleCount);
 
@@ -56,7 +68,7 @@ const { results } = runSimulation({
   minGenKw: "1",
   graceMin: "6",
   cooldownMin: "15",
-  peakSolarKw: 8,
+  peakSolarKw,
   minExcessKw: "",
   cloudiness: 30,
   storms: 0,
@@ -67,7 +79,7 @@ const { results } = runSimulation({
   batteryMaxRateKw: 5,
   batteryStartSoc,
   batteryPriorityEnabled: batteryPriority,
-  batteryPriorityLimit: 20,
+  batteryPriorityLimit,
 });
 
 function printCsv(results: SimResult[]): void {
@@ -78,9 +90,16 @@ function printCsv(results: SimResult[]): void {
     `${name}_battery`,
   ]);
   console.log(
-    ["time", "solarW", "homeW", "gridW", "excessW", ...vehicleHeaders].join(
-      ",",
-    ),
+    [
+      "time",
+      "solarW",
+      "homeW",
+      "gridW",
+      "excessW",
+      "batteryW",
+      "batterySoc",
+      ...vehicleHeaders,
+    ].join(","),
   );
 
   results.forEach((r) => {
@@ -94,7 +113,16 @@ function printCsv(results: SimResult[]): void {
       ];
     });
     console.log(
-      [r.time, r.solarW, r.homeW, r.gridW, r.excessW, ...vehicleCols].join(","),
+      [
+        r.time,
+        r.solarW,
+        r.homeW,
+        r.gridW,
+        r.excessW,
+        r.batteryW,
+        r.batterySoc.toFixed(1),
+        ...vehicleCols,
+      ].join(","),
     );
   });
 }

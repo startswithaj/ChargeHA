@@ -53,7 +53,15 @@ export class Overseer {
 
       // Count transitions per vehicle and find the first one to trip
       const trippable = [...byVehicle.entries()]
-        .map(([vehicleId, actions]) => {
+        .map(([vehicleId, vehicleRows]) => {
+          // A stop before the first start ended a cycle that began outside the
+          // window, so counting it would trip after two cycles instead of three
+          const firstStart = vehicleRows.findIndex((row) =>
+            row.action === "start"
+          );
+          const actions = firstStart === -1
+            ? []
+            : vehicleRows.slice(firstStart);
           const { transitions, cycles } = actions.slice(1).reduce(
             (acc, action, i) => {
               if (action.action !== actions[i].action) {

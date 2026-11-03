@@ -186,7 +186,7 @@ describe("ChargeController — solar basics", () => {
 
       const log = await ctx.getLastLogParsed();
       // Should NOT be in grace period — should see sufficient solar
-      expect(log?.actionDetail).not.toContain("insufficient solar");
+      expect(log?.actionDetail).not.toContain("insufficient excess solar");
       expect(log?.actionDetail).not.toContain("Grace period");
     });
 
@@ -204,7 +204,7 @@ describe("ChargeController — solar basics", () => {
       const log = await ctx.getLastLogParsed();
       // Should see insufficient solar / grace period
       expect(
-        log?.actionDetail.includes("insufficient solar") ||
+        log?.actionDetail.includes("insufficient excess solar") ||
           log?.actionDetail.includes("Grace period"),
       ).toBe(true);
     });

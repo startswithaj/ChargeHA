@@ -130,8 +130,8 @@ describe("ChargeController — multi-vehicle", () => {
 
       const totalTargetAmps = (logA?.targetAmps ?? 0) + (logB?.targetAmps ?? 0);
       expect(totalTargetAmps).toBeLessThanOrEqual(16);
-      expect(logA?.actionDetail).not.toContain("insufficient solar");
-      expect(logB?.actionDetail).not.toContain("insufficient solar");
+      expect(logA?.actionDetail).not.toContain("insufficient excess solar");
+      expect(logB?.actionDetail).not.toContain("insufficient excess solar");
     });
 
     it("does not cause both vehicles to cycle on and off together", async () => {
@@ -164,10 +164,10 @@ describe("ChargeController — multi-vehicle", () => {
       const logA = await ctx.getLogForVehicle(VIN_A);
       const logB = await ctx.getLogForVehicle(VIN_B);
 
-      expect(logA?.actionDetail).not.toContain("insufficient solar");
+      expect(logA?.actionDetail).not.toContain("insufficient excess solar");
       expect(logA?.actionDetail).not.toContain("Grace period");
       expect(logA?.targetAmps).toBeGreaterThanOrEqual(5);
-      expect(logB?.actionDetail).toContain("insufficient solar");
+      expect(logB?.actionDetail).toContain("insufficient excess solar");
     });
 
     it("excluded vehicle stops after grace period expires", async () => {
@@ -496,7 +496,7 @@ describe("ChargeController — multi-vehicle", () => {
 
         expect(logA?.targetAmps).toBe(32);
         expect(logB?.action).toBe("none");
-        expect(logB?.actionDetail).toContain("insufficient solar");
+        expect(logB?.actionDetail).toContain("insufficient excess solar");
       });
 
       it("uses equal split when priority charging is disabled", async () => {

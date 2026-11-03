@@ -117,6 +117,29 @@ describe("ControllerEngine", () => {
       expect(d?.action).toBe("none");
     });
 
+    it("says excess solar when tracking export", () => {
+      const engine = new ControllerEngine();
+      const output = engine.decide(makeInput({
+        vehicle: { state: { isCharging: true, chargeAmps: 10 } },
+        energyOverrides: { solarProductionW: 3000, gridPowerW: 2000 },
+      }));
+      expect(output.decisions.get("V1")?.detail).toContain(
+        "insufficient excess solar (300W → 1A < min 5A)",
+      );
+    });
+
+    it("says solar when tracking total panel output", () => {
+      const engine = new ControllerEngine();
+      const output = engine.decide(makeInput({
+        configOverrides: { solarReference: "gross" },
+        vehicle: { state: { isCharging: true, chargeAmps: 10 } },
+        energyOverrides: { solarProductionW: 1100, gridPowerW: 2000 },
+      }));
+      expect(output.decisions.get("V1")?.detail).toContain(
+        "insufficient solar (1100W → 4A < min 5A)",
+      );
+    });
+
     it("starts grace period when solar drops below minimum amps while charging", () => {
       const engine = new ControllerEngine();
       const baseTimestamp = Date.now();
@@ -397,64 +420,6 @@ describe("ControllerEngine", () => {
 
       const d = output.decisions.get("V1");
       expect(d?.action).toBe("none");
-    });
-  });
-
-  describe("battery priority", () => {
-    it("stops when home battery is below priority limit", () => {
-      const engine = new ControllerEngine();
-      const output = engine.decide(makeInput({
-        configOverrides: {
-          batteryPriorityEnabled: true,
-          batteryPriorityLimit: 50,
-        },
-        vehicle: { state: { isCharging: true, chargeAmps: 10 } },
-        energyOverrides: { batterySoc: 30 },
-      }));
-      const d = output.decisions.get("V1");
-      expect(d?.action).toBe("stop");
-      expect(d?.detail).toContain("battery priority");
-    });
-
-    it("proceeds when home battery is above priority limit", () => {
-      const engine = new ControllerEngine();
-      const output = engine.decide(makeInput({
-        configOverrides: {
-          batteryPriorityEnabled: true,
-          batteryPriorityLimit: 50,
-        },
-        energyOverrides: { batterySoc: 60, gridPowerW: -5000 },
-      }));
-      expect(output.decisions.get("V1")?.action).toBe("start");
-    });
-
-    it("reports an averaged SOC to one decimal", () => {
-      const engine = new ControllerEngine();
-      const output = engine.decide(makeInput({
-        configOverrides: {
-          batteryPriorityEnabled: true,
-          batteryPriorityLimit: 100,
-        },
-        energyOverrides: { batterySoc: 96.23333333333335 },
-      }));
-      expect(output.decisions.get("V1")?.detail).toBe(
-        "Waiting for home battery (96.2% < 100%)",
-      );
-    });
-
-    it("holds a battery that displays as the limit but has not reached it", () => {
-      const engine = new ControllerEngine();
-      const output = engine.decide(makeInput({
-        configOverrides: {
-          batteryPriorityEnabled: true,
-          batteryPriorityLimit: 100,
-        },
-        energyOverrides: { batterySoc: 99.96 },
-      }));
-      expect(output.decisions.get("V1")?.action).toBe("none");
-      expect(output.decisions.get("V1")?.detail).toBe(
-        "Waiting for home battery (99.9% < 100%)",
-      );
     });
   });
 

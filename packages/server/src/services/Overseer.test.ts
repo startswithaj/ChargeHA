@@ -119,6 +119,38 @@ describe("Overseer", () => {
       expect(safetyTrips).toHaveLength(0);
     });
 
+    it("does not trip on two full cycles after an earlier stop", async () => {
+      await seedStateChanges("VIN1", "Car 1", [
+        "stop",
+        "start",
+        "stop",
+        "start",
+        "stop",
+      ]);
+
+      await testable(overseer).check();
+
+      expect(await db.getConfig("charging_enabled")).toBeNull();
+      expect(safetyTrips).toHaveLength(0);
+    });
+
+    it("trips on three full cycles after an earlier stop", async () => {
+      await seedStateChanges("VIN1", "Car 1", [
+        "stop",
+        "start",
+        "stop",
+        "start",
+        "stop",
+        "start",
+        "stop",
+      ]);
+
+      await testable(overseer).check();
+
+      expect(await db.getConfig("charging_enabled")).toBe("false");
+      expect(safetyTrips).toHaveLength(1);
+    });
+
     it("only trips once per check even with multiple oscillating vehicles", async () => {
       await seedStateChanges("VIN1", "Car 1", [
         "start",

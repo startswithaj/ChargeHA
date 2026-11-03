@@ -250,11 +250,35 @@ describe("ChargeController — processAutoMode", () => {
       expect(log?.action).toBe("start");
     });
 
+    it("charges from export the home battery can't take", async () => {
+      ctx = await setupController(
+        { isCharging: false },
+        "auto",
+        { ...BASE_ENERGY, batterySoc: 40, gridPowerW: -3000 },
+        {
+          battery_priority_enabled: "true",
+          battery_priority_limit: "80",
+        },
+      );
+      await ctx.runOneLoop();
+
+      const log = await ctx.getLastLogParsed();
+      assertExists(log);
+      expect(
+        log.checks.some(
+          (c) =>
+            c.check === "battery_priority" &&
+            c.result.includes("using export"),
+        ),
+      ).toBe(true);
+      expect(log?.action).toBe("start");
+    });
+
     it("returns waiting when below limit and not charging", async () => {
       ctx = await setupController(
         { isCharging: false },
         "auto",
-        { ...BASE_ENERGY, batterySoc: 40 },
+        { ...BASE_ENERGY, batterySoc: 40, gridPowerW: 0 },
         {
           battery_priority_enabled: "true",
           battery_priority_limit: "80",

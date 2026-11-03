@@ -35,6 +35,10 @@ So a sequence of `start, stop, start, stop` = 3 transitions, which is within the
 limit. Add one more (`start, stop, start, stop, start`) = 4 transitions, which
 triggers a trip.
 
+A `stop` before the vehicle's first `start` in the window is ignored. It ended a
+cycle that began before the window, so counting it would trip after two full
+cycles instead of three.
+
 ### Safety gate
 
 The overseer only trips when the last logged action for the vehicle is `stop`.
