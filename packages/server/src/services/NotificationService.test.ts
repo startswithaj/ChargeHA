@@ -131,6 +131,45 @@ describe("NotificationService", () => {
         "recovered after 15 minutes",
       );
     });
+
+    it("adds a reminder while charging is off after a safety trip", async () => {
+      await db.setConfig("notification_provider", "mock");
+      await db.setConfig("notification_enabled_events", "vehicle_plugged_in");
+      await db.setConfig("charging_disabled_reason", "safety_trip");
+
+      await service.notify(
+        "vehicle_plugged_in",
+        "Plugged In",
+        "Car 1 plugged in.",
+      );
+
+      expect(provider.sentPayloads[0].message).toBe(
+        "Car 1 plugged in.\n\nCharging is still disabled after a safety trip. Re-enable it in Settings.",
+      );
+    });
+
+    it("adds no reminder when the user turned charging off", async () => {
+      await db.setConfig("notification_provider", "mock");
+      await db.setConfig("notification_enabled_events", "vehicle_plugged_in");
+      await db.setConfig("charging_disabled_reason", "user");
+
+      await service.notify(
+        "vehicle_plugged_in",
+        "Plugged In",
+        "Car 1 plugged in.",
+      );
+
+      expect(provider.sentPayloads[0].message).toBe("Car 1 plugged in.");
+    });
+
+    it("leaves the safety trip message itself unchanged", async () => {
+      await db.setConfig("notification_provider", "mock");
+      await db.setConfig("charging_disabled_reason", "safety_trip");
+
+      await service.notify("safety_trip", "Safety Trip", "Charging disabled.");
+
+      expect(provider.sentPayloads[0].message).toBe("Charging disabled.");
+    });
   });
 
   describe("sendTest", () => {

@@ -1,5 +1,6 @@
 import type { AppDatabase } from "../db/AppDatabase.ts";
 import type { SystemAlert } from "../db/types.ts";
+import type { ConfigService } from "./ConfigService.ts";
 import type { TypedEventEmitter } from "./TypedEventEmitter.ts";
 import type { Logger } from "../lib/Logger.ts";
 
@@ -9,16 +10,19 @@ const MAX_TRANSITIONS = 3;
 
 export class Overseer {
   private readonly db: AppDatabase;
+  private readonly configService: ConfigService;
   private readonly eventEmitter: TypedEventEmitter;
   private readonly logger: Logger;
   private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     db: AppDatabase,
+    configService: ConfigService,
     eventEmitter: TypedEventEmitter,
     logger: Logger,
   ) {
     this.db = db;
+    this.configService = configService;
     this.eventEmitter = eventEmitter;
     this.logger = logger;
     this.start();
@@ -41,10 +45,10 @@ export class Overseer {
       // Ignore transitions that already caused a previous trip.
       // Without this, re-enabling charging would immediately re-trip
       // because the same transitions are still within the window.
-      const tripAt = await this.db.getConfig("oscillation_trip_at");
+      const { oscillationTripAt } = await this.configService.getInternal();
       const rows = await this.db.getRecentStateChanges(
         WINDOW_MINUTES,
-        tripAt ?? undefined,
+        oscillationTripAt || undefined,
       );
       if (rows.length === 0) return;
 
@@ -96,12 +100,6 @@ export class Overseer {
       `SAFETY TRIP — ${vehicleName} (${vehicleId}) had ${cycles} start/stop cycles in the last ${WINDOW_MINUTES} minutes. Disabling charging.`,
     );
 
-    await this.db.setConfig("charging_enabled", "false");
-    // Use SQLite datetime format to match controller_logs.timestamp
-    await this.db.setConfig(
-      "oscillation_trip_at",
-      new Date().toISOString().replace("T", " ").replace(/\.\d+Z$/, ""),
-    );
     const alert: SystemAlert = {
       message:
         `Charging disabled: ${vehicleName} had ${cycles} start/stop cycles in ${WINDOW_MINUTES} minutes, which may indicate oscillation. Re-enable charging from Settings when ready.`,
@@ -109,7 +107,14 @@ export class Overseer {
       vehicleId,
       vehicleName,
     };
-    await this.db.setConfig("system_alert", JSON.stringify(alert));
+    await this.configService.disableChargingForSafetyTrip(alert);
+    // Use SQLite datetime format to match controller_logs.timestamp
+    await this.configService.setInternal({
+      oscillationTripAt: new Date().toISOString().replace("T", " ").replace(
+        /\.\d+Z$/,
+        "",
+      ),
+    });
 
     this.eventEmitter.emit("safety_trip", {
       vehicleId,

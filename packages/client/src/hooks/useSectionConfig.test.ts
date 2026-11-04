@@ -9,11 +9,13 @@ import { createTestQueryClient } from "../test-utils.tsx";
 
 const {
   mockInvalidate,
+  mockSystemAlertInvalidate,
   mockUseQuery,
   mockUseMutation,
   capturedOptsRef,
 } = vi.hoisted(() => {
   const mockInvalidate = vi.fn();
+  const mockSystemAlertInvalidate = vi.fn();
   const mockUseQuery = vi.fn(() => ({ data: undefined, isLoading: false }));
   const capturedOptsRef: {
     current: {
@@ -32,7 +34,13 @@ const {
       return { mutate: vi.fn(), mutateAsync: vi.fn() };
     },
   );
-  return { mockInvalidate, mockUseQuery, mockUseMutation, capturedOptsRef };
+  return {
+    mockInvalidate,
+    mockSystemAlertInvalidate,
+    mockUseQuery,
+    mockUseMutation,
+    capturedOptsRef,
+  };
 });
 
 vi.mock("../trpc.ts", () => {
@@ -54,6 +62,7 @@ vi.mock("../trpc.ts", () => {
           equipment: { get: { invalidate: mockInvalidate } },
           system: { get: { invalidate: mockInvalidate } },
           notification: { get: { invalidate: mockInvalidate } },
+          systemAlert: { invalidate: mockSystemAlertInvalidate },
         },
       }),
       config: {
@@ -195,5 +204,16 @@ describe("config mutation hooks", () => {
         vi.useRealTimers();
       });
     });
+  });
+
+  it("useChargingConfigMutation onSuccess refetches the system alert", () => {
+    mockSystemAlertInvalidate.mockClear();
+    renderHook(() => useChargingConfigMutation(), { wrapper: createWrapper() });
+
+    act(() => {
+      capturedOptsRef.current.onSuccess?.();
+    });
+
+    expect(mockSystemAlertInvalidate).toHaveBeenCalled();
   });
 });

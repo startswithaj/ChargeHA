@@ -11,6 +11,9 @@ import {
   PROVIDER_CONFIG_FIELDS,
 } from "./notification-providers/types.ts";
 
+const SAFETY_TRIP_REMINDER =
+  "Charging is still disabled after a safety trip. Re-enable it in Settings.";
+
 /** Maps typed prop names (e.g. "notificationTelegramBotToken") to their DB
  *  key literal (e.g. "notification_telegram_bot_token"). Both sides are
  *  derived from notificationConfigDef so renames stay in sync. */
@@ -79,7 +82,7 @@ export class NotificationService {
         return;
       }
 
-      await provider.send(payload);
+      await provider.send(await this.withSafetyTripReminder(payload));
 
       this.logger.info(`Sent ${eventType} via ${providerType}`);
     } catch (error) {
@@ -135,6 +138,18 @@ export class NotificationService {
     };
 
     await provider.send(payload);
+  }
+
+  private async withSafetyTripReminder(
+    payload: NotificationPayload,
+  ): Promise<NotificationPayload> {
+    if (payload.eventType === "safety_trip") return payload;
+    const reason = await this.db.getConfig("charging_disabled_reason");
+    if (reason !== "safety_trip") return payload;
+    return {
+      ...payload,
+      message: `${payload.message}\n\n${SAFETY_TRIP_REMINDER}`,
+    };
   }
 
   getProviderTypes(): string[] {

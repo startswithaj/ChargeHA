@@ -389,6 +389,24 @@ describe("Dashboard", () => {
     expect(screen.queryByText("Safety Alert")).not.toBeInTheDocument();
   });
 
+  it("opens Settings from the alert", async () => {
+    const onNavigateSettings = vi.fn();
+    h.setSystemAlert({
+      message: "Charging disabled",
+      timestamp: new Date().toISOString(),
+      vehicleId: "VIN1",
+      vehicleName: "Test Car",
+    });
+
+    h.render({ onNavigateSettings });
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Open Settings/i }),
+    );
+
+    expect(onNavigateSettings).toHaveBeenCalled();
+  });
+
   it("shows plugin warning when health check fails", async () => {
     h.setPluginWarnings([{
       title: "Proxy Unreachable",
