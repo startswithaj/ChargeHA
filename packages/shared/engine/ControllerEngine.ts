@@ -2,6 +2,7 @@ import { SolarAllocator } from "./SolarAllocator.ts";
 import { Trace } from "./Trace.ts";
 import { StepOrchestrator } from "./StepOrchestrator.ts";
 import type {
+  ControlStateUpdates,
   EngineInput,
   EngineOutput,
   VehicleControlState,
@@ -18,6 +19,7 @@ export class ControllerEngine {
   decide(input: EngineInput): EngineOutput {
     const { config, vehicles, activeBlockout, energy, now, timestamp } = input;
     if (!config.chargingEnabled) {
+      vehicles.forEach((vehicle) => this.commit(vehicle.id));
       const decisions = new Map(
         vehicles.map((vehicle): [string, VehicleDecision] => [vehicle.id, {
           action: "none",
@@ -43,7 +45,10 @@ export class ControllerEngine {
     const decisions = new Map(
       vehicles.map((vehicle): [string, VehicleDecision] => {
         const { state } = vehicle;
-        if (!state) return [vehicle.id, noState()];
+        if (!state) {
+          this.commit(vehicle.id);
+          return [vehicle.id, noState()];
+        }
         const cs = this.getControlState(vehicle.id);
         const { decision, stateUpdates } = StepOrchestrator.run({
           vehicle,
@@ -61,7 +66,7 @@ export class ControllerEngine {
             cs.allocatedAmps,
           ),
         });
-        this.controlStates.set(vehicle.id, { ...cs, ...stateUpdates });
+        this.commit(vehicle.id, stateUpdates);
         return [vehicle.id, decision];
       }),
     );
@@ -76,6 +81,17 @@ export class ControllerEngine {
     const cs = createControlState();
     this.controlStates.set(vehicleId, cs);
     return cs;
+  }
+
+  // Grace lasts one loop unless the grace step renews it, so no other rule
+  // can leave a stale start time behind.
+  private commit(vehicleId: string, updates: ControlStateUpdates = {}): void {
+    this.controlStates.set(vehicleId, {
+      ...this.getControlState(vehicleId),
+      graceStartedAt: null,
+      graceNotified: false,
+      ...updates,
+    });
   }
 }
 

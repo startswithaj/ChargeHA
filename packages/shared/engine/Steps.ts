@@ -8,7 +8,6 @@ import { Trace } from "./Trace.ts";
 import type { StepTrace } from "./Trace.ts";
 import type {
   ControllerConfig,
-  ControlStateUpdates,
   EngineSchedule,
   EngineVehicleInput,
   EvalResult,
@@ -34,11 +33,6 @@ export type Step = (ctx: StepContext) => EvalResult;
 const pass = (trace: StepTrace[] = []): EvalResult => ({
   decision: null,
   trace,
-});
-
-const graceReset = (): ControlStateUpdates => ({
-  graceStartedAt: null,
-  graceNotified: false,
 });
 
 // Pure decision steps. Every static is a Step; ordering lives in
@@ -225,7 +219,7 @@ export class Steps {
         targetAmps: null,
       },
       trace: [Trace.batteryPriorityHold(shownSoc, limit)],
-      stateUpdates: { ...graceReset(), ...cooldown },
+      stateUpdates: cooldown,
     };
   }
 
@@ -268,7 +262,6 @@ export class Steps {
         suspendable: !state.isCharging,
       },
       trace,
-      stateUpdates: state.isCharging ? graceReset() : undefined,
     };
   }
 
@@ -333,7 +326,6 @@ export class Steps {
       },
       trace: [],
       stateUpdates: {
-        ...graceReset(),
         cooldownUntil: timestamp + config.cooldownPeriodMinutes * 60 * 1000,
       },
     };
@@ -362,7 +354,6 @@ export class Steps {
         return {
           decision: StepHelpers.solarGridFallback(state, reason),
           trace,
-          stateUpdates: graceReset(),
         };
       }
       return {
@@ -373,7 +364,6 @@ export class Steps {
           targetAmps: null,
         },
         trace,
-        stateUpdates: graceReset(),
       };
     }
 
@@ -387,7 +377,6 @@ export class Steps {
         return {
           decision: StepHelpers.solarGridFallback(state, reason),
           trace,
-          stateUpdates: graceReset(),
         };
       }
       // Solar Only: stop charging and start cooldown
@@ -400,7 +389,6 @@ export class Steps {
         },
         trace,
         stateUpdates: {
-          ...graceReset(),
           cooldownUntil: timestamp + config.cooldownPeriodMinutes * 60 * 1000,
         },
       };
@@ -418,7 +406,10 @@ export class Steps {
           targetAmps: state.chargeAmpsMin,
         },
         trace,
-        stateUpdates: { graceStartedAt: startedAt },
+        stateUpdates: {
+          graceStartedAt: startedAt,
+          graceNotified: cs.graceNotified,
+        },
       };
     }
     return {
@@ -429,13 +420,16 @@ export class Steps {
         targetAmps: null,
       },
       trace,
-      stateUpdates: { graceStartedAt: startedAt },
+      stateUpdates: {
+        graceStartedAt: startedAt,
+        graceNotified: cs.graceNotified,
+      },
     };
   }
 
   // Don't restart if recently stopped
-  static cooldown({ timestamp, cs, solar }: StepContext): EvalResult {
-    if (!solar) return pass();
+  static cooldown({ state, timestamp, cs, solar }: StepContext): EvalResult {
+    if (!solar || state.isCharging) return pass();
     if (!cs.cooldownUntil || timestamp >= cs.cooldownUntil) return pass();
     const remainingSec = Math.round((cs.cooldownUntil - timestamp) / 1000);
     return {
@@ -446,7 +440,6 @@ export class Steps {
         targetAmps: null,
       },
       trace: [Trace.cooldown(remainingSec)],
-      stateUpdates: graceReset(),
     };
   }
 
@@ -474,8 +467,6 @@ export class Steps {
       }),
       trace,
       stateUpdates: {
-        ...graceReset(),
-        cooldownUntil: null,
         pendingAmps: debounce.pendingAmps,
         pendingSince: debounce.pendingSince,
       },
