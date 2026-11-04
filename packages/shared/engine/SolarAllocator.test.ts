@@ -453,6 +453,47 @@ describe("SolarAllocator", () => {
   });
 
   describe("equal", () => {
+    it("leaves out a vehicle stopped at 99% of a 100% limit", () => {
+      const energy = { ...BASE_ENERGY, gridPowerW: -3220 };
+      const finished = { batteryLevel: 99, chargeLimit: 100 };
+      const vehicles = [
+        makeVehicle("v1", 1, finished),
+        makeVehicle("v2", 2),
+        makeVehicle("v3", 3),
+      ];
+      const result = SolarAllocator.equal(vehicles, BASE_CONFIG, energy);
+      expect(result.has("v1")).toBe(false);
+      expect(result.get("v2")).toBe(7);
+      expect(result.get("v3")).toBe(7);
+    });
+
+    it("keeps a vehicle still charging at 99% of a 100% limit", () => {
+      const energy = { ...BASE_ENERGY, gridPowerW: -3220 };
+      const vehicles = [
+        makeVehicle("v1", 1, {
+          batteryLevel: 99,
+          chargeLimit: 100,
+          isCharging: true,
+          chargeAmps: 0,
+        }),
+        makeVehicle("v2", 2),
+      ];
+      const result = SolarAllocator.equal(vehicles, BASE_CONFIG, energy);
+      expect(result.get("v1")).toBe(7);
+      expect(result.get("v2")).toBe(7);
+    });
+
+    it("keeps a vehicle stopped at 79% of an 80% limit", () => {
+      const energy = { ...BASE_ENERGY, gridPowerW: -3220 };
+      const vehicles = [
+        makeVehicle("v1", 1, { batteryLevel: 79, chargeLimit: 80 }),
+        makeVehicle("v2", 2),
+      ];
+      const result = SolarAllocator.equal(vehicles, BASE_CONFIG, energy);
+      expect(result.get("v1")).toBe(7);
+      expect(result.get("v2")).toBe(7);
+    });
+
     it("keeps a charging vehicle sole recipient when the split would starve an idle one", () => {
       const energy = { ...BASE_ENERGY, gridPowerW: -2530 };
       const vehicles = [

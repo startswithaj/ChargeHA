@@ -424,6 +424,37 @@ describe("ControllerEngine", () => {
   });
 
   describe("allocation", () => {
+    it("gives a finished vehicle's share to the vehicle still charging", () => {
+      const engine = new ControllerEngine();
+      const finished = makeVehicle({
+        id: "V1",
+        name: "EV 1",
+        priority: 1,
+        state: { batteryLevel: 99, chargeLimit: 100, isCharging: false },
+      });
+      const charging = makeVehicle({
+        id: "V2",
+        name: "EV 2",
+        priority: 2,
+        state: { batteryLevel: 50, isCharging: true, chargeAmps: 7 },
+      });
+      const output = engine.decide({
+        config: makeConfig(),
+        vehicles: [finished, charging],
+        activeBlockout: null,
+        energy: makeEnergy({ solarProductionW: 8000, gridPowerW: -5770 }),
+        now: new Date("2026-01-01T12:00:00Z"),
+        timestamp: Date.now(),
+      });
+      const d1 = output.decisions.get("V1");
+      const d2 = output.decisions.get("V2");
+      expect(d1?.action).toBe("none");
+      expect(d1?.reason).toBe("battery_at_limit");
+      // 5770W export + 1610W add-back = 7380W → 32A, not 16A each.
+      expect(d2?.action).toBe("adjust_amps");
+      expect(d2?.targetAmps).toBe(32);
+    });
+
     it("allocates amps equally across two vehicles", () => {
       const engine = new ControllerEngine();
       const v1 = makeVehicle({ id: "V1", name: "EV 1", priority: 1 });
