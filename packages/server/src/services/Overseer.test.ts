@@ -6,8 +6,11 @@ import { AppDatabase } from "../db/AppDatabase.ts";
 import { TypedEventEmitter } from "./TypedEventEmitter.ts";
 import type { EventMap } from "./TypedEventEmitter.ts";
 import { Overseer } from "./Overseer.ts";
+import { ConfigService } from "./ConfigService.ts";
+import type { EnergyAdapterManager } from "./EnergyAdapterManager.ts";
 import { Logger } from "../lib/Logger.ts";
 import { testable } from "../test-helpers/Testable.ts";
+import { throwingMock } from "../test-helpers/throwingMock.ts";
 
 describe("Overseer", () => {
   const testLogger = new Logger("Overseer", "error");
@@ -23,7 +26,13 @@ describe("Overseer", () => {
     eventEmitter = new TypedEventEmitter();
     safetyTrips = [];
     eventEmitter.subscribe("safety_trip", (data) => safetyTrips.push(data));
-    overseer = new Overseer(db, eventEmitter, testLogger);
+    const configService = new ConfigService(
+      db,
+      throwingMock<EnergyAdapterManager>("EnergyAdapterManager"),
+      null,
+      testLogger,
+    );
+    overseer = new Overseer(db, configService, eventEmitter, testLogger);
   });
 
   afterEach(() => {
@@ -86,6 +95,9 @@ describe("Overseer", () => {
       // Should have disabled charging
       const enabled = await db.getConfig("charging_enabled");
       expect(enabled).toBe("false");
+      expect(await db.getConfig("charging_disabled_reason")).toBe(
+        "safety_trip",
+      );
 
       // Should have set system alert
       const alertRaw = await db.getConfig("system_alert");

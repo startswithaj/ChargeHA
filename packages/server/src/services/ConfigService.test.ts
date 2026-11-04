@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { AppDatabase } from "../db/AppDatabase.ts";
+import type { SystemAlert } from "../db/types.ts";
 import { ConfigService } from "./ConfigService.ts";
 import { Logger } from "../lib/Logger.ts";
 import type { EnergyAdapterManager } from "./EnergyAdapterManager.ts";
@@ -10,6 +11,13 @@ describe("ConfigService", () => {
   const testLogger = new Logger("ConfigService", "error");
   let db: AppDatabase;
   let service: ConfigService;
+
+  const tripAlert: SystemAlert = {
+    message: "Charging disabled",
+    timestamp: "2026-01-01T00:00:00.000Z",
+    vehicleId: "VIN1",
+    vehicleName: "Car 1",
+  };
 
   beforeEach(async () => {
     db = new AppDatabase(":memory:");
@@ -121,6 +129,38 @@ describe("ConfigService", () => {
       await service.setCharging({ chargingEnabled: false });
       const result = await service.getCharging();
       expect(result.chargingEnabled).toBe(false);
+    });
+
+    it("records the user as the reason when disabled", async () => {
+      await service.setCharging({ chargingEnabled: false });
+      const internal = await service.getInternal();
+      expect(internal.chargingDisabledReason).toBe("user");
+    });
+
+    it("clears the reason and alert when re-enabled", async () => {
+      await service.disableChargingForSafetyTrip(tripAlert);
+      await service.setCharging({ chargingEnabled: true });
+      const internal = await service.getInternal();
+      expect(internal.chargingDisabledReason).toBeNull();
+      expect(internal.systemAlert).toBe("");
+    });
+
+    it("keeps the reason when chargingEnabled is not saved", async () => {
+      await service.disableChargingForSafetyTrip(tripAlert);
+      await service.setCharging({ priorityChargingEnabled: true });
+      const internal = await service.getInternal();
+      expect(internal.chargingDisabledReason).toBe("safety_trip");
+    });
+  });
+
+  describe("disableChargingForSafetyTrip", () => {
+    it("disables charging with the safety trip reason and alert", async () => {
+      await service.disableChargingForSafetyTrip(tripAlert);
+      const charging = await service.getCharging();
+      const internal = await service.getInternal();
+      expect(charging.chargingEnabled).toBe(false);
+      expect(internal.chargingDisabledReason).toBe("safety_trip");
+      expect(JSON.parse(internal.systemAlert)).toEqual(tripAlert);
     });
   });
 

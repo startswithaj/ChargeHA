@@ -89,6 +89,16 @@ export function Dashboard({ onNavigateSettings }: DashboardProps) {
                 {systemAlert.message}
               </Text>
             </div>
+            {onNavigateSettings && (
+              <Button
+                variant="soft"
+                color="gray"
+                size="2"
+                onClick={onNavigateSettings}
+              >
+                Open Settings
+              </Button>
+            )}
             <Button
               variant="soft"
               color="red"

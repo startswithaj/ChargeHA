@@ -209,7 +209,12 @@ function startBackgroundServices(
     eventEmitter,
     new Logger("ChargeController", logLevel),
   );
-  new Overseer(db, eventEmitter, new Logger("Overseer", logLevel));
+  new Overseer(
+    db,
+    configService,
+    eventEmitter,
+    new Logger("Overseer", logLevel),
+  );
 }
 
 // Construction order matters: energyManager → configService →

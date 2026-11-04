@@ -48,15 +48,16 @@ disabling the controller while a vehicle is actively drawing power.
 
 ## What happens when it trips
 
-The overseer writes three config values to the database:
+The overseer calls `ConfigService.disableChargingForSafetyTrip(alert)`, which
+writes three config values:
 
 1. **`charging_enabled` = `"false"`** — Disables the charge controller's main
    loop. The controller checks this flag at the start of every cycle and returns
    `none` for all vehicles. No more start/stop commands will be sent.
 
-2. **`oscillation_trip_at`** — Timestamp of the trip. On subsequent checks, the
-   overseer ignores transitions before this time, so re-enabling charging
-   doesn't immediately re-trip.
+2. **`charging_disabled_reason` = `"safety_trip"`** — Records why charging is
+   off. `ConfigService.setCharging()` sets it to `"user"` when charging is
+   turned off in Settings and clears it when charging is turned back on.
 
 3. **`system_alert`** — A JSON payload stored in the config table:
    ```json
@@ -68,6 +69,11 @@ The overseer writes three config values to the database:
    }
    ```
 
+The overseer then writes **`oscillation_trip_at`** (the trip timestamp) through
+`ConfigService.setInternal()`. On subsequent checks, the overseer ignores
+transitions before this time, so re-enabling charging doesn't immediately
+re-trip.
+
 The overseer emits a `safety_trip` event on the `TypedEventEmitter` and logs an
 error with the vehicle name, ID, and cycle count. `NotificationListener`
 subscribes to `safety_trip` and forwards it to `NotificationService` for user
@@ -78,20 +84,21 @@ that exceeds the threshold).
 
 ## Recovery
 
-Two independent actions are available to the user:
+Two actions are available to the user:
 
-1. **Re-enable charging** — Toggle the charging switch in the Settings UI. This
-   sets `charging_enabled` back to `"true"` and the controller loop resumes on
-   its next cycle.
+1. **Re-enable charging** — Toggle the charging switch in the Settings UI (the
+   alert banner has an "Open Settings" button). This sets `charging_enabled`
+   back to `"true"` and the controller loop resumes on its next cycle.
+   `ConfigService.setCharging()` also clears `charging_disabled_reason` and
+   `system_alert`, so the banner goes away and reminders stop.
 
 2. **Dismiss the alert banner** — Click "Dismiss" on the red alert banner shown
    at the top of the Dashboard. This calls
    `trpc.config.dismissSystemAlert.useMutation()` which clears the
    `system_alert` config value via `ConfigService`. The banner disappears.
 
-These are intentionally independent — dismissing the banner does not re-enable
-charging, and re-enabling charging does not dismiss the banner. This ensures the
-user makes a conscious decision about both.
+Dismissing the banner does not re-enable charging. Reminders keep going until
+charging is re-enabled.
 
 ## Dashboard alert banner
 
@@ -100,10 +107,22 @@ top (above the energy overview) with:
 
 - An alert triangle icon
 - The alert message and a "Safety Alert" heading
+- An "Open Settings" button that goes to the Settings page
 - A "Dismiss" button
 
 The Dashboard polls for the alert every 30 seconds via
 `trpc.config.systemAlert.useQuery`.
+
+## Reminders
+
+While `charging_disabled_reason` is `"safety_trip"`, `NotificationService` adds
+this line to every notification except the `safety_trip` one:
+
+> Charging is still disabled after a safety trip. Re-enable it in Settings.
+
+Charging is off, so the controller sends no start/stop messages. Reminders ride
+on the messages that still go out: plug/unplug, car asleep, arrived home and
+energy errors.
 
 ## Architecture
 

@@ -1,4 +1,5 @@
 import type { AppDatabase } from "../db/AppDatabase.ts";
+import type { SystemAlert } from "../db/types.ts";
 import {
   type BatteryConfig,
   batteryConfigDef,
@@ -105,9 +106,24 @@ export class ConfigService {
 
   // ── Typed section setters ──────────────────────────────────────────────
 
-  setCharging(input: Partial<ChargingConfig>): Promise<void> {
-    const kvPairs = serializeSection(chargingConfigDef, input);
-    return this.writeSectionRaw(kvPairs);
+  async setCharging(input: Partial<ChargingConfig>): Promise<void> {
+    await this.writeSectionRaw(serializeSection(chargingConfigDef, input));
+    if (input.chargingEnabled === undefined) return;
+    await this.setInternal(
+      input.chargingEnabled
+        ? { chargingDisabledReason: null, systemAlert: "" }
+        : { chargingDisabledReason: "user" },
+    );
+  }
+
+  async disableChargingForSafetyTrip(alert: SystemAlert): Promise<void> {
+    await this.writeSectionRaw(
+      serializeSection(chargingConfigDef, { chargingEnabled: false }),
+    );
+    await this.setInternal({
+      chargingDisabledReason: "safety_trip",
+      systemAlert: JSON.stringify(alert),
+    });
   }
 
   setSolar(input: Partial<SolarConfig>): Promise<void> {

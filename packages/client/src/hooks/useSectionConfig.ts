@@ -72,6 +72,7 @@ export function useChargingConfigMutation() {
     onMutate,
     onSuccess: () => {
       utils.config.charging.get.invalidate();
+      utils.config.systemAlert.invalidate();
       onSuccess();
     },
     onError,
