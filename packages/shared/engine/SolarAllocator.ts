@@ -5,6 +5,7 @@ import {
   resolvePhases,
   resolveVoltage,
 } from "../chargePower.ts";
+import { chargeFinished } from "./chargeCompletion.ts";
 import type { ControllerConfig, EngineVehicleInput } from "./types.ts";
 
 // Solar numbers shared by every solar step. Null when solar tracking is
@@ -284,13 +285,13 @@ export class SolarAllocator {
     }
 
     // Filter to eligible: auto mode, plugged in, at home (or unknown),
-    // battery below charge limit.
+    // charge not finished.
     const eligible = vehicles
       .filter((v): v is EngineVehicleInput & { state: VehicleChargeState } =>
         v.mode === "auto" &&
         v.state?.isPluggedIn === true &&
         v.state.isHome !== false &&
-        v.state.batteryLevel < v.state.chargeLimit
+        !chargeFinished(v.state)
       )
       .map((v) => {
         const state = v.state;

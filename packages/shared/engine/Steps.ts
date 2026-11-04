@@ -1,4 +1,5 @@
 import type { EnergyData, VehicleChargeState } from "../types.ts";
+import { atChargeLimit, stoppedNearFullLimit } from "./chargeCompletion.ts";
 import { scheduleLimitReached } from "./Schedules.ts";
 import { SolarAllocator } from "./SolarAllocator.ts";
 import type { SolarTargets } from "./SolarAllocator.ts";
@@ -76,7 +77,7 @@ export class Steps {
 
   static batteryAtLimit({ state }: StepContext): EvalResult {
     const { batteryLevel, chargeLimit } = state;
-    if (batteryLevel >= chargeLimit) {
+    if (atChargeLimit(state)) {
       return {
         decision: {
           action: state.isCharging ? "stop" : "none",
@@ -89,9 +90,7 @@ export class Steps {
         trace: [Trace.batteryAtLimit(batteryLevel, chargeLimit)],
       };
     }
-    const nearLimitAndDone = !state.isCharging && chargeLimit === 100 &&
-      batteryLevel >= 99;
-    if (nearLimitAndDone) {
+    if (stoppedNearFullLimit(state)) {
       return {
         decision: {
           action: "none",
