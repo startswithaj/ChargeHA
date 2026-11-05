@@ -50,6 +50,14 @@ interface ModbusTcpClient {
   ): Promise<{ response: { body: { valuesAsBuffer: Buffer } } }>;
 }
 
+// jsmodbus rejects with a UserRequestError, which has a message but isn't an Error.
+function describeError(err: unknown): string {
+  if (typeof err === "object" && err !== null && "message" in err) {
+    return String(err.message);
+  }
+  return String(err);
+}
+
 /**
  * `ModbusReader` backed by `jsmodbus` over a single `node:net` TCP socket.
  *
@@ -75,12 +83,14 @@ export class JsmodbusReader implements ModbusReader {
   ) {}
 
   connect(): Promise<void> {
+    if (this.socket) return Promise.resolve();
     const socket = this.socketFactory();
     // Attach the lifetime error handler before connecting — an unhandled 'error' would crash the process.
     socket.on("error", (err: Error) => {
       this.logger.warn(`Sigenergy socket error: ${err.message}`);
     });
     this.socket = socket;
+    socket.once("close", () => this.forget(socket));
     // jsmodbus latches "online" from the socket's connect event, so build clients before connecting.
     this.clients = new Map(
       [...new Set(this.unitIds)].map(
@@ -96,9 +106,7 @@ export class JsmodbusReader implements ModbusReader {
       // Clear the socket so clientFor() can't hand back a client bound to a dead one.
       const failed = () => {
         socket.destroy();
-        if (this.socket !== socket) return;
-        this.socket = null;
-        this.clients = new Map();
+        this.forget(socket);
       };
       const onConnect = () => {
         cleanup();
@@ -156,12 +164,19 @@ export class JsmodbusReader implements ModbusReader {
       return resp.response.body.valuesAsBuffer;
     } catch (err) {
       if (err instanceof SigenergyConnectionError) throw err;
-      const reason = err instanceof Error ? err.message : String(err);
       throw new SigenergyConnectionError(
-        `Modbus read failed at ${address} (unit ${unitId}): ${reason}`,
+        `Modbus read failed at ${address} (unit ${unitId}): ${
+          describeError(err)
+        }`,
         err instanceof Error ? err : undefined,
       );
     }
+  }
+
+  private forget(socket: Socket): void {
+    if (this.socket !== socket) return;
+    this.socket = null;
+    this.clients = new Map();
   }
 
   private clientFor(unitId: number): ModbusTcpClient {
