@@ -14,7 +14,10 @@ export class EnergyPoller {
   private readonly eventEmitter: TypedEventEmitter;
   private readonly db: AppDatabase;
   private readonly logger: Logger;
-  private timer: Promise<ReturnType<typeof setInterval>> | null = null;
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  private stopped = false;
+  private lifecycle: Promise<void> = Promise.resolve();
+  private controller: AbortController | null = null;
   // In-flight poll, tracked so stop() can await it before shutdown.
   private polling: Promise<void> | null = null;
   private latestRealtime: EnergyData | null = null;
@@ -41,40 +44,29 @@ export class EnergyPoller {
     // config_changed per key, and rebuilding per event would tear down and
     // re-login the adapter once per key.
     this.eventEmitter.subscribe("config_changed", ({ key }) => {
-      if (!this.em.isRelevantConfigKey(key)) return;
+      if (this.stopped || !this.em.isRelevantConfigKey(key)) return;
       if (this.reconfigurePending) return;
       this.reconfigurePending = true;
       queueMicrotask(() => {
         this.reconfigurePending = false;
-        void this.em.reconfigure().then(() => this.restart());
+        if (this.stopped) return;
+        void this.restart(() => this.em.reconfigure());
       });
     });
-    this.timer = this.start();
+    void this.restart();
   }
 
-  private async start(): Promise<ReturnType<typeof setInterval>> {
-    await this.em.ready();
-    this.polling = this.poll();
-    const intervalSeconds = this.em.pollIntervalSeconds();
-    this.logger.info(`Polling every ${intervalSeconds}s`);
-    return setInterval(() => {
-      this.polling = this.poll();
-    }, intervalSeconds * 1000);
+  private cancelLoop(): void {
+    if (this.timer !== null) clearTimeout(this.timer);
+    this.timer = null;
+    this.controller?.abort(new Error("Energy polling stopped"));
   }
 
-  async stop(): Promise<void> {
-    if (this.timer) {
-      clearInterval(await this.timer);
-      this.timer = null;
-    }
+  private async drainLoop(): Promise<void> {
+    this.cancelLoop();
     // Wait for any in-flight poll so it can't emit events / touch the DB
     // after stop returns.
-    if (this.polling) {
-      await this.polling.catch((err) => {
-        this.logger.error("In-flight poll failed during stop:", err);
-      });
-    }
-    this.polling = null;
+    await this.polling;
     // Reset snapshot so stop() returns us to the pre-started state — this
     // also means restart() starts with a null snapshot until the next poll
     // populates it, which is the correct semantic when reconfiguring.
@@ -82,10 +74,60 @@ export class EnergyPoller {
     this.latestCumulative = null;
   }
 
-  async restart(): Promise<void> {
-    await this.stop();
-    this.timer = this.start();
-    await this.timer;
+  restart(beforeStart?: () => Promise<void>): Promise<void> {
+    // Cancellation is immediate, even when another lifecycle operation is waiting.
+    // Explicit stop is terminal: queued or later restart requests cannot revive it.
+    if (this.stopped) return this.lifecycle;
+    this.cancelLoop();
+    this.lifecycle = this.lifecycle.then(async () => {
+      const controller = new AbortController();
+      try {
+        await this.drainLoop();
+        if (this.stopped) return;
+        // Own cancellation throughout reconfiguration/readiness and the polling loop.
+        // A queued operation gets a fresh controller only after its predecessor drains.
+        this.controller = controller;
+        await beforeStart?.();
+        if (controller.signal.aborted) return;
+        await this.em.ready();
+        if (controller.signal.aborted) return;
+        this.consecutivePollFailures = 0;
+        this.lastFailureLoggedAtMs = 0;
+        this.logger.info(
+          `Polling every ${this.em.pollIntervalSeconds()}s after completion`,
+        );
+        this.tick(controller.signal);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          this.logger.error("Energy poller restart failed:", error);
+        }
+      }
+    });
+    return this.lifecycle;
+  }
+
+  private tick(signal: AbortSignal): void {
+    if (signal.aborted) return;
+    this.polling = this.poll(signal).catch((error) => {
+      if (!signal.aborted) {
+        this.logger.error("Energy poll processing failed:", error);
+      }
+    }).finally(() => {
+      this.polling = null;
+      if (signal.aborted) return;
+      this.timer = setTimeout(
+        () => this.tick(signal),
+        this.em.pollIntervalSeconds() * 1000,
+      );
+    });
+  }
+
+  async stop(): Promise<void> {
+    this.stopped = true;
+    this.cancelLoop();
+    // Drain lifecycle outside its queue: restart must never await itself.
+    await this.lifecycle;
+    await this.drainLoop();
   }
 
   getRealtimeSnapshot(): {
@@ -132,10 +174,12 @@ export class EnergyPoller {
     });
   }
 
-  private async poll(): Promise<void> {
+  private async poll(
+    signal?: AbortSignal,
+  ): Promise<void> {
     try {
       const load = await this.chargingPoints.getChargingLoadW();
-      const realtime = await this.em.getRealtimeData(load);
+      const realtime = await this.em.getRealtimeData(load, signal);
       const adapterName = this.em.constructor.name;
       this.logger.debug(
         `${adapterName} → solar=${realtime.solarProductionW}W grid=${realtime.gridPowerW}W consumption=${realtime.homeConsumptionW}W` +
@@ -176,6 +220,11 @@ export class EnergyPoller {
         this.lastFailureLoggedAtMs = 0;
       }
     } catch (error) {
+      // ChargeHA cancelled this poll (stop/restart); timeouts don't set this.
+      if (signal?.aborted) {
+        this.logger.debug("Poll cancelled by restart/stop");
+        return;
+      }
       this.logger.error("Poll failed:", error);
       await this.recordPollFailure(error);
 

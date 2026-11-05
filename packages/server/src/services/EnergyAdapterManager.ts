@@ -81,12 +81,15 @@ export class EnergyAdapterManager {
     return this.adapter.disconnect();
   }
 
-  async getRealtimeData(load: ChargingLoad): Promise<EnergyData> {
+  async getRealtimeData(
+    load: ChargingLoad,
+    signal?: AbortSignal,
+  ): Promise<EnergyData> {
     await this.initializationPromise;
     if (!this.adapter) {
       throw new Error("EnergyAdapterManager not initialized");
     }
-    const data = await this.adapter.getRealtimeData();
+    const data = await this.adapter.getRealtimeData(signal);
 
     const addW = this.unseenLoadW(load);
     if (addW > 0) {
