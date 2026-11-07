@@ -87,6 +87,8 @@ export class SigenergyLocalAdapter implements EnergySourceAdapter {
   }
 
   async getRealtimeData(): Promise<EnergyData> {
+    // Nothing else reconnects after a dropped or failed connection.
+    await this.reader.connect();
     const solarProductionW = powerToWatts(
       readS32(await this.read(this.plantUnitId, PLANT_PV_POWER, 2)),
     );
@@ -154,12 +156,18 @@ export class SigenergyLocalAdapter implements EnergySourceAdapter {
   }
 
   /** Required read — a failure propagates and fails the poll. */
-  private read(
+  private async read(
     unitId: number,
     address: number,
     count: number,
   ): Promise<Buffer> {
-    return this.reader.readInputRegisters(unitId, address, count);
+    try {
+      return await this.reader.readInputRegisters(unitId, address, count);
+    } catch (err) {
+      // A dead peer may never close the socket, so start the next poll on a new one.
+      await this.reader.disconnect();
+      throw err;
+    }
   }
 
   /** Optional read — logs and resolves null on failure so a missing register

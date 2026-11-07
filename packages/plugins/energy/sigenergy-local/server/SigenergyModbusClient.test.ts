@@ -20,6 +20,10 @@ class FakeSocket extends EventEmitter {
   destroy(): void {
     this.destroyed = true;
   }
+
+  write(_data: unknown, _cb?: unknown): boolean {
+    return true;
+  }
 }
 
 describe("JsmodbusReader", () => {
@@ -93,5 +97,62 @@ describe("JsmodbusReader", () => {
     await reader.disconnect();
 
     expect(socket.destroyed).toBe(true);
+  });
+
+  describe("reconnecting", () => {
+    const makeTrackedReader = () => {
+      const sockets: FakeSocket[] = [];
+      const reader = new JsmodbusReader(
+        "10.0.0.5",
+        502,
+        [247, 1],
+        testLogger,
+        () => {
+          const socket = new FakeSocket();
+          sockets.push(socket);
+          return socket as unknown as Socket;
+        },
+      );
+      return { reader, sockets };
+    };
+
+    it("keeps the socket when connect is called while connected", async () => {
+      const { reader, sockets } = makeTrackedReader();
+      await reader.connect();
+      await reader.connect();
+      expect(sockets).toHaveLength(1);
+    });
+
+    it("opens a new socket after the old one closes", async () => {
+      const { reader, sockets } = makeTrackedReader();
+      await reader.connect();
+      sockets[0].emit("close");
+      await expect(reader.readInputRegisters(247, 30035, 2)).rejects.toThrow(
+        "Modbus socket is not connected",
+      );
+      await reader.connect();
+      expect(sockets).toHaveLength(2);
+    });
+
+    it("ignores a late close from a replaced socket", async () => {
+      const { reader, sockets } = makeTrackedReader();
+      await reader.connect();
+      await reader.disconnect();
+      await reader.connect();
+      sockets[0].emit("close");
+      await reader.connect();
+      expect(sockets).toHaveLength(2);
+    });
+  });
+
+  it("reports the jsmodbus message when a read fails", async () => {
+    const socket = new FakeSocket();
+    const reader = makeReader(socket);
+    await reader.connect();
+    const read = reader.readInputRegisters(247, 30035, 2);
+    socket.emit("close");
+    await expect(read).rejects.toThrow(
+      "Modbus read failed at 30035 (unit 247): connection to modbus server closed",
+    );
   });
 });

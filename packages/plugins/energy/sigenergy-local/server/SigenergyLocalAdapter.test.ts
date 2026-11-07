@@ -103,6 +103,23 @@ describe("SigenergyLocalAdapter", () => {
       reader.failAt(PLANT, PLANT_PV_POWER);
       await expect(makeAdapter().getRealtimeData()).rejects.toThrow();
     });
+
+    it("connects before reading", async () => {
+      await makeAdapter().getRealtimeData();
+      expect(reader.connectCalls).toBe(1);
+    });
+
+    it("drops the connection when a required read fails", async () => {
+      reader.failAt(PLANT, PLANT_PV_POWER);
+      await expect(makeAdapter().getRealtimeData()).rejects.toThrow();
+      expect(reader.disconnectCalls).toBe(1);
+    });
+
+    it("keeps the connection when an optional read fails", async () => {
+      reader.failAt(PLANT, PLANT_ESS_SOC);
+      await makeAdapter().getRealtimeData();
+      expect(reader.disconnectCalls).toBe(0);
+    });
   });
 
   describe("getDeviceInfo", () => {
