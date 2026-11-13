@@ -26,7 +26,8 @@ type PublicOf<T> = { [K in keyof T]: T[K] };
 // ---------------------------------------------------------------------------
 
 export interface TestableEnergyPoller {
-  poll(): Promise<void>;
+  polling: Promise<void> | null;
+  poll(signal?: AbortSignal): Promise<void>;
 }
 
 export interface TestableChargeController {

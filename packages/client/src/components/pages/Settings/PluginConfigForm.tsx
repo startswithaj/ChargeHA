@@ -71,6 +71,7 @@ function FieldControl(
   return (
     <TextField.Root
       size="2"
+      aria-label={field.label}
       type={field.secret ? "password" : undefined}
       placeholder={field.placeholder}
       color={field.required && value === "" ? "red" : undefined}
