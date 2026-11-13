@@ -543,4 +543,13 @@ the same type. Local test rigs live in `devtools/sap-ocpp-simulator/` and
     </td>
     <td>Sigenergy Local Plugin</td>
   </tr>
+  <tr>
+    <td align="center" width="120">
+      <a href="https://github.com/Clintos11">
+        <img src="https://images.weserv.nl/?url=github.com/Clintos11.png&mask=circle&w=64" width="64" alt="Clintos11"/>
+        <br /><sub><b>Clintos11</b></sub>
+      </a>
+    </td>
+    <td>Tesla Powerwall 2 via Gateway (Local) Plugin</td>
+  </tr>
 </table>
