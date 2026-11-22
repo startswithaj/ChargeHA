@@ -51,3 +51,7 @@ body {
   padding: 0;
   font-family: var(--default-font-family, system-ui, -apple-system, sans-serif);
 }
+
+body:has(.radix-themes.dark) {
+  background-color: #111113;
+}
